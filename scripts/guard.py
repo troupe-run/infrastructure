@@ -44,12 +44,19 @@ OVERRIDABLE_RULES = (
     "pr-closes-issue",
     "skip-hooks",
     "command-unparseable",
+    "delivered-file",
 )
 TAMPER_RULE = "guard-tamper"
 """Refuses an agent's attempt to grant itself an override. Never overridable."""
 RULES = (*OVERRIDABLE_RULES, TAMPER_RULE)
 
 HOOKS_PATH = ".githooks"
+SOURCE_REPOSITORY = "troupe-run/infrastructure"
+"""Where the guard's files are maintained and delivered from (spec: guard-delivery)."""
+DELIVERY_LIST = ".github/guard-delivery.json"
+"""Present only in a repository that receives the guard: the files delivered to it."""
+DELIVERY_AUTHOR_EMAIL = "340938853+troupe-run-infrastructure[bot]@users.noreply.github.com"
+"""The infrastructure App's bot account, which makes every delivery commit."""
 GUARD_DIR = "troupe-guard"
 CHECK_TIMEOUT_SECONDS = 600.0
 """How long the pre-commit check may run before the commit is refused. The default lives here
@@ -240,6 +247,44 @@ def unticked_archived_tasks(
                 "openspec/changes/archive/.",
             )
     return ALLOW
+
+
+def delivered_paths(read: Callable[[str], str | None]) -> frozenset[str]:
+    """The files delivered to this repository, from its delivered list (empty in the source)."""
+    text = read(DELIVERY_LIST)
+    if text is None:
+        return frozenset()
+    try:
+        files = json.loads(text).get("files", [])
+    except (ValueError, AttributeError):
+        # A list that can't be read still protects itself.
+        return frozenset({DELIVERY_LIST})
+    return frozenset(str(path) for path in files if isinstance(path, str)) | {DELIVERY_LIST}
+
+
+def _delivered_refusal(paths: Iterable[str], problem: str) -> Decision:
+    listed = ", ".join(sorted(paths)[:5])
+    return Decision(
+        "delivered-file",
+        f"{problem}: {listed}. Delivered files are changed only at their source.",
+        f"Change the file in {SOURCE_REPOSITORY}, and deliver it from there.",
+    )
+
+
+def delivered_file_staged(staged: Iterable[str], delivered: frozenset[str]) -> Decision:
+    """Refuse a commit that changes a delivered file (spec: guard-delivery)."""
+    touched = [path for path in staged if path in delivered]
+    if not touched:
+        return ALLOW
+    return _delivered_refusal(touched, "this commit changes delivered files")
+
+
+def read_working_tree(root: Path) -> Callable[[str], str | None]:
+    def read(path: str) -> str | None:
+        target = root / path
+        return target.read_text(encoding="utf-8") if target.is_file() else None
+
+    return read
 
 
 class ReadStaged:
@@ -682,6 +727,9 @@ def edit_decision(root: Path, file_path: str, branch: str | None) -> Decision:
             "files under .git/ aren't edited directly; it holds the override files.",
             "Use git commands for repository state. Ask the owner for an override.",
         )
+    relative = resolved.relative_to(real_root).as_posix()
+    if relative in delivered_paths(read_working_tree(root)):
+        return _delivered_refusal([relative], "this file is delivered")
     if matching_change(root, branch) is None:
         where = "main" if branch == "main" else f"branch '{branch}'"
         return Decision(
@@ -794,6 +842,23 @@ def nonconforming_commits(root: Path, commits: Iterable[str]) -> Decision:
     )
 
 
+def delivered_changes_by_others(
+    root: Path, commits: Iterable[str], delivered: frozenset[str]
+) -> Decision:
+    """The delivered-file rule over many commits: only the App's deliveries may change them."""
+    bad: list[str] = []
+    for sha in commits:
+        if git(root, "log", "-1", "--format=%ae", sha) == DELIVERY_AUTHOR_EMAIL:
+            continue
+        changed = git(root, "diff-tree", "--no-commit-id", "--name-only", "-r", sha).splitlines()
+        touched = sorted(path for path in changed if path in delivered)
+        if touched:
+            bad.append(f"{sha[:7]} ({', '.join(touched)})")
+    if not bad:
+        return ALLOW
+    return _delivered_refusal(bad, "commits not made by the delivery change delivered files")
+
+
 def run_ci(root: Path, base: str | None, head: str, branch: str | None) -> list[Decision]:
     """The git-level rules, re-checked on GitHub for a push or a pull request (design D11)."""
     commits = commits_in_range(root, base, head)
@@ -816,7 +881,27 @@ def run_ci(root: Path, base: str | None, head: str, branch: str | None) -> list[
         return result.stdout if result.returncode == 0 else None
 
     decisions.append(unticked_archived_tasks(changed, read_at_head))
+
+    def read_at_base(path: str) -> str | None:
+        return read_at_head(path) if base is None else _show(root, base, path)
+
+    # The list at the base as well as the head, so a range can't remove its own protection.
+    delivered = delivered_paths(read_at_head) | delivered_paths(read_at_base)
+    if delivered:
+        decisions.append(delivered_changes_by_others(root, commits, delivered))
     return [decision for decision in decisions if decision.refused]
+
+
+def _show(root: Path, revision: str, path: str) -> str | None:
+    result = subprocess.run(
+        ["git", "show", f"{revision}:{path}"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_git_env(),
+    )
+    return result.stdout if result.returncode == 0 else None
 
 
 # --- entry points ----------------------------------------------------------------------------
@@ -876,6 +961,11 @@ def run_pre_commit(root: Path) -> int:
         yield commit_on_main(branch)
         yield commit_branch_change(root, branch)
         yield unticked_archived_tasks(staged, ReadStaged(root))
+        # The list as committed as well as staged, so a commit can't remove its own protection.
+        delivered = delivered_paths(ReadStaged(root)) | delivered_paths(
+            lambda path: _show(root, "HEAD", path)
+        )
+        yield delivered_file_staged(staged, delivered)
         yield commit_checks(root)
 
     refusal = first_refusal(root, checks(), f"commit on {branch}")
