@@ -83,7 +83,7 @@
   an approved plan. Verify: following the README from a fresh clone reaches a clean plan.
 - [x] 7.2 Update design.md's Findings with anything found during adoption. Verify: every `ignore_changes` in `tofu/`
   appears there.
-- [ ] 7.3 Open the PR closing #2, with the clean plan, the encryption checks, the probe outputs and the Findings.
+- [x] 7.3 Open the PR closing #2, with the clean plan, the encryption checks, the probe outputs and the Findings.
   Verify: CI is green, and the PR body has each piece of evidence.
 
 ## Workflow follow-up
