@@ -14,8 +14,21 @@ locals {
     ".github/workflows/guard.yml",
   ])
 
+  # The list a receiving repository holds (spec: guard-delivery). Generated from guard_files, so it
+  # can't disagree with what is delivered; its presence is what turns on the delivered-file rule.
+  guard_list_path = ".github/guard-delivery.json"
+  guard_list = "${jsonencode({
+    source = "troupe-run/infrastructure"
+    files  = sort(concat(tolist(local.guard_files), [local.guard_list_path]))
+  })}\n"
+
+  guard_contents = merge(
+    { for source in local.guard_files : source => file("${path.module}/../${source}") },
+    { (local.guard_list_path) = local.guard_list },
+  )
+
   guard_deliveries = {
-    for pair in setproduct(local.guard_targets, local.guard_files) :
+    for pair in setproduct(local.guard_targets, keys(local.guard_contents)) :
     "${pair[0]}:${pair[1]}" => { repository = pair[0], file = pair[1] }
   }
 }
@@ -26,13 +39,10 @@ resource "github_repository_file" "guard" {
   repository          = each.value.repository
   branch              = "main"
   file                = each.value.file
-  content             = file("${path.module}/../${each.value.file}")
-  commit_message      = "chore(guard): deliver ${each.value.file} from troupe-run/infrastructure"
+  content             = local.guard_contents[each.value.file]
   overwrite_on_create = false
 
-  # Until the delivery commit messages carry the content (design D3, task 4.1), adopting the
-  # existing files must not commit just to change a message.
-  lifecycle {
-    ignore_changes = [commit_message]
-  }
+  # Changes exactly when the content does, so a delivery never reuses an earlier message
+  # (design D3).
+  commit_message = "chore(guard): deliver ${each.value.file} ${substr(sha256(local.guard_contents[each.value.file]), 0, 12)} from troupe-run/infrastructure"
 }

@@ -59,7 +59,7 @@
 
 ## 4. Generalise the guard and add the rule
 
-- [ ] 4.1 Add the source note (D2) to every delivered source that can hold a comment. Generate
+- [x] 4.1 Add the source note (D2) to every delivered source that can hold a comment. Generate
   `.github/guard-delivery.json` from the delivery list. Switch the delivery and `org_profile.tf` commit messages to
   D3's form, and remove `ignore_changes`. Verify:
   - `scripts/check.py` passes;
