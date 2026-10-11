@@ -103,4 +103,15 @@ resource "github_repository_ruleset" "main" {
       bypass_mode = "pull_request"
     }
   }
+
+  # The infrastructure App delivers the guard's files straight to main (spec: guard-delivery,
+  # design D5). It already holds org administration, so this adds no trust it didn't have.
+  dynamic "bypass_actors" {
+    for_each = var.delivery_app_id == null ? [] : [var.delivery_app_id]
+    content {
+      actor_type  = "Integration"
+      actor_id    = bypass_actors.value
+      bypass_mode = "always"
+    }
+  }
 }

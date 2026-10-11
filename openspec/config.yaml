@@ -26,7 +26,9 @@ context: |
   - troupe-run/.github holds only what GitHub expects. Its files are written here and carry a note saying so.
     Commits into it are made by the App through the API, so GitHub signs them.
   - Product concepts stay in troupe. The capability list is read from there, never copied by hand.
-  - Changes to a product repo's files arrive as pull requests through its own checks, never as direct commits.
+  - Changes to a product repo's files arrive as pull requests through its own checks, never as direct commits. The
+    one exception is the guard's files, which the App delivers straight to main after the owner approves the plan
+    (owner, 2026-10-12, #8).
   - The guard is Python 3.12+, managed with uv, standard library only, and works offline on Linux, macOS and
     Windows. Hooks refuse with the rule and the fix, and an override is granted only by the owner.
   - GitHub Free, public repos. Commit-message rules can't be enforced by GitHub; rulesets can.
