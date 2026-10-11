@@ -80,7 +80,7 @@
 - [x] 4.4 Add `delivery_bypass` to `modules/repository` (D5), set it on `repo_troupe`, and amend the "never direct
   commits" constraint in `openspec/config.yaml` to name this exception. Verify: `scripts/check.py` passes, and a
   local plan shows the bypass entry added to troupe's ruleset only.
-- [ ] 4.5 Update `README.md`:
+- [x] 4.5 Update `README.md`:
   - how the guard governs this repo;
   - how a delivery is made: only from a commit whose CI is green on all three OSes, as a plan the owner approves;
   - rollback (D9's migration plan).
