@@ -29,14 +29,14 @@
   matching import blocks, and `ignore_changes = [commit_message]` for now (group 4 removes it). Verify:
   - `scripts/check.py` passes;
   - the plan shows six imports and no other change.
-- [ ] 2.2 Show the owner the saved adoption plan, then apply it and commit the state. Verify:
+- [x] 2.2 Show the owner the saved adoption plan, then apply it and commit the state. Verify:
   - the owner approved it;
   - troupe gets no new commit (`gh api repos/troupe-run/troupe/commits?per_page=1` is unchanged);
   - the plan afterwards says "No changes".
 
 ## 3. Prove delivery on a probe (D8)
 
-- [ ] 3.1 The owner grants the App Workflows write and accepts it on the installation. Record it in
+- [x] 3.1 The owner grants the App Workflows write and accepts it on the installation. Record it in
   `oob/app-installations.json`. Verify: `scripts/oob.py` reports no differences.
 - [ ] 3.2 Create `troupe-run/infra-probe-<date>`; the owner adds it to the App's installation. Extend `tofu/probe`
   with `delivery_bypass`, and deliver a script and `.github/workflows/guard.yml` to it with D3's commit messages.
@@ -77,7 +77,7 @@
 
   Add a short `CLAUDE.md` here, and a link from `org-profile/CONTRIBUTING.md` to the rules doc. Verify:
   `test_guard_docs.py` passes, and `CONTRIBUTING.md` is the only `org-profile` change.
-- [ ] 4.4 Add `delivery_bypass` to `modules/repository` (D5), set it on `repo_troupe`, and amend the "never direct
+- [x] 4.4 Add `delivery_bypass` to `modules/repository` (D5), set it on `repo_troupe`, and amend the "never direct
   commits" constraint in `openspec/config.yaml` to name this exception. Verify: `scripts/check.py` passes, and a
   local plan shows the bypass entry added to troupe's ruleset only.
 - [ ] 4.5 Update `README.md`:
