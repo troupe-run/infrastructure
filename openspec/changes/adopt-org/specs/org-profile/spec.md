@@ -1,0 +1,28 @@
+# Spec Delta
+
+## Purpose
+
+Makes this repo the source of the files in `troupe-run/.github` (the contributing guide, security policy, org profile
+and DCO configuration), so they change through pull requests here and edits made there show up as drift.
+
+## ADDED Requirements
+
+### Requirement: The source of `.github`'s files is this repository
+Each file in `troupe-run/.github` SHALL have its source in this repository. A difference between a file on GitHub and
+its source SHALL appear in the plan. A file in `.github` with no source here SHALL be reported.
+
+#### Scenario: A file edited on GitHub shows as drift
+- **WHEN** someone edits `CONTRIBUTING.md` directly in `troupe-run/.github`
+- **THEN** the next plan shows the file returning to its source content
+
+#### Scenario: An unexpected file is reported
+- **WHEN** a file is added to `troupe-run/.github` that this repository has no source for
+- **THEN** the drift check reports it
+
+### Requirement: Adopted files match GitHub byte for byte
+When `.github`'s files are adopted, each source SHALL be identical to the file on GitHub at that moment, so adoption
+makes no commit to `.github`.
+
+#### Scenario: Adoption makes no commit
+- **WHEN** the four files are adopted and a plan runs
+- **THEN** the plan shows no change to any of them, and `troupe-run/.github` gets no new commit
