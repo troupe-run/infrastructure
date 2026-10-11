@@ -100,7 +100,7 @@
 
 ## 6. Deliver to troupe
 
-- [ ] 6.1 Save the live plan from a commit whose CI is green on all three OSes, and show it to the owner. It should
+- [x] 6.1 Save the live plan from a commit whose CI is green on all three OSes, and show it to the owner. It should
   contain:
   - troupe's ruleset gaining the App bypass;
   - updates to the six delivered files;
