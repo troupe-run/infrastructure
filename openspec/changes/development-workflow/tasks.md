@@ -2,7 +2,7 @@
 
 ## 1. Move the guard here unchanged (D1)
 
-- [ ] 1.1 Copy from `troupe-run/troupe` at `6099deb`, byte for byte:
+- [x] 1.1 Copy from `troupe-run/troupe` at `6099deb`, byte for byte:
   - `scripts/guard.py`;
   - `scripts/tests/conftest.py` and `test_guard_*.py`;
   - `docs/development-workflow.md`.
@@ -11,7 +11,7 @@
   - each file's sha256 matches troupe's at `6099deb`;
   - `uv run pytest scripts/tests` passes;
   - `scripts/check.py` passes.
-- [ ] 1.2 `scripts/check.py` turns the git hooks on (`activate_git_hooks`, as in troupe), with
+- [x] 1.2 `scripts/check.py` turns the git hooks on (`activate_git_hooks`, as in troupe), with
   `test_check_activation.py` adapted to this repo's `check.py`. Verify: the test passes, and fails when activation is
   removed.
 - [ ] 1.3 Copy `.githooks/`, `.claude/settings.json` and `.github/workflows/guard.yml` byte for byte, and turn the
