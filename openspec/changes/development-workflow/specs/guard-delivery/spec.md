@@ -1,0 +1,73 @@
+# Spec Delta
+
+## Purpose
+
+How the guard reaches the repositories it governs. This repository is the single source of the guard's files, the
+infrastructure App delivers them, a difference in a governed repository shows as drift, and a delivered file is
+changed only at its source.
+
+## ADDED Requirements
+
+### Requirement: This repository is the source of the guard's delivered files
+Each repository that receives the guard SHALL hold copies of the guard's files whose source is this repository. A
+difference between a delivered file and its source SHALL appear in the plan, and an apply SHALL restore the source
+content.
+
+#### Scenario: A delivered file edited in a governed repository shows as drift
+- **WHEN** someone changes `scripts/guard.py` in `troupe` directly
+- **THEN** the next plan shows the file returning to its source content, and applying it restores that content
+
+#### Scenario: A governed repository receives every delivered file
+- **WHEN** the managed state is read after an apply
+- **THEN** each governed repository other than this one has each delivered file, with the content of its source
+
+### Requirement: The App delivers the guard straight to main
+A delivery SHALL be committed to the governed repository's `main` by the infrastructure App, without a pull request.
+Each delivery commit SHALL be a Conventional Commit naming the file and the content it delivers. A plan in which no
+source changed SHALL deliver nothing.
+
+#### Scenario: A delivery commit names what it delivers
+- **WHEN** a changed source is applied
+- **THEN** the governed repository's `main` gains a commit by the App whose message is a Conventional Commit naming
+  the file and identifying its new content
+
+#### Scenario: Nothing to deliver
+- **WHEN** a plan runs and no delivered file's source has changed since the last delivery
+- **THEN** the plan shows no change to any delivered file, and no governed repository gets a commit
+
+### Requirement: Delivered files say where they come from
+Each delivered file that can hold a comment SHALL carry a note naming this repository as its source and saying to
+change it there. Each governed repository SHALL hold a delivered list of the files that are delivered to it.
+
+#### Scenario: A delivered script names its source
+- **WHEN** someone opens `scripts/guard.py` in `troupe`
+- **THEN** its opening lines say it is delivered from `troupe-run/infrastructure` and is changed there
+
+#### Scenario: The delivered files are listed
+- **WHEN** a governed repository's delivered list is read
+- **THEN** it names every file delivered to that repository, including itself
+
+### Requirement: Delivered files are changed only at their source
+In a governed repository that receives delivered files, a commit that changes a delivered file SHALL be refused, and
+an agent's edit to one SHALL be refused. The guard's GitHub check SHALL fail on a commit that changes a delivered file
+unless the infrastructure App made it. The fix SHALL be to change the file in this repository.
+
+#### Scenario: Committing a change to a delivered file
+- **WHEN** a contributor in `troupe` commits a change to `.githooks/pre-commit`
+- **THEN** the commit is refused, naming the rule and saying to change the file in `troupe-run/infrastructure`
+
+#### Scenario: An agent edits a delivered file
+- **WHEN** an agent in a Claude Code session in `troupe` edits `scripts/guard.py`
+- **THEN** the edit is refused, naming the rule and the source repository
+
+#### Scenario: A pushed change to a delivered file
+- **WHEN** a branch is pushed to `troupe` carrying a commit, not made by the App, that changes a delivered file
+- **THEN** the guard's GitHub check for that push fails and names the commit and the file
+
+#### Scenario: A delivery passes the check
+- **WHEN** the App's delivery commit is pushed to `troupe`'s `main`
+- **THEN** the guard's GitHub check passes
+
+#### Scenario: The source repository edits its own files
+- **WHEN** a contributor in this repository commits a change to `scripts/guard.py` on a change's branch
+- **THEN** this rule does not apply
