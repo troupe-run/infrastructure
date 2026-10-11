@@ -41,3 +41,13 @@ import {
   to       = github_repository_file.org_profile[each.key]
   id       = ".github:${each.key}:"
 }
+
+import {
+  to = module.repo_website.github_repository.this
+  id = "troupe-run.github.io"
+}
+
+import {
+  to = module.repo_website.github_issue_labels.this
+  id = "troupe-run.github.io"
+}
