@@ -77,7 +77,22 @@ removed {
 The plan then shows it as "forget", with nothing destroyed.
 
 **Adding a repository:** add it to the infrastructure App's installation first, and update the list in
-`oob/README.md`. Without the App, OpenTofu sees only the repository's public view.
+`oob/README.md`. Without the App, OpenTofu sees only the repository's public view. A new repository gets the "protect
+main" ruleset unless its `module` block sets `protect_main = false`.
+
+## How main is protected
+
+Every managed repository except `.github` has a ruleset named "protect main" on its default branch:
+- **Changes reach `main` only through a pull request,** merged with a rebase. No approval is required. A direct push,
+  a force-push, a merge commit and a squash are all refused, for the owner too. GitHub refuses to delete a default
+  branch anyway.
+- **The owner's bypass works only on pull requests.** An org admin can merge a PR past a rule that blocks it with
+  `gh pr merge --rebase --admin` (or the checkbox in the UI), and the ruleset's insights record it as a bypass. The
+  bypass doesn't allow a merge commit or a squash, and doesn't allow a direct push.
+- **Break-glass:** an org owner can always edit or disable a ruleset on GitHub. The next plan shows the edit as
+  drift, and an apply restores the declared ruleset. Follow it with a PR.
+
+The encrypted state is committed on the change's branch, so it reaches `main` with the PR.
 
 ## The state passphrase
 

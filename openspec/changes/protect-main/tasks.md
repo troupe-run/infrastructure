@@ -32,7 +32,7 @@
 
 ## 4. Docs and evidence
 
-- [ ] 4.1 Update `README.md`: changes reach `main` only by a PR merged with a rebase, the owner's bypass, and
+- [x] 4.1 Update `README.md`: changes reach `main` only by a PR merged with a rebase, the owner's bypass, and
   break-glass. Verify: the README describes what the probe showed. The archived adopt-org findings stay as they
   are, and #5's closing comment says the "no rulesets" finding is fixed.
 - [ ] 4.2 Open the PR closing #5, with the plan, the probe outputs and the apply evidence. Verify: CI and DCO are
