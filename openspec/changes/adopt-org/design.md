@@ -176,8 +176,8 @@ is done in the App's settings.
 - `tofu fmt -check -recursive tofu`;
 - `tofu -chdir=tofu init -backend=false` and `tofu validate`.
 
-`tofu validate` doesn't read state, but the early-evaluated passphrase variable still needs a value, so the check
-passes a dummy passphrase for validate only. Python is uv-managed (`pyproject.toml`, Python ≥ 3.12, dev
+`tofu validate` reads neither state nor variables' values: it passes with no passphrase set (checked in task 3.1),
+so the check needs no secret. Python is uv-managed (`pyproject.toml`, Python ≥ 3.12, dev
 dependencies `ruff`, `mypy`, `pytest`), matching troupe. A `ci` workflow runs `check.py` on `ubuntu-latest` on every
 push and pull request. It needs no secrets.
 
