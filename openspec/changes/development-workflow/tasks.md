@@ -69,7 +69,7 @@
   layer. Cover: refused in a receiving repository; allowed in the source; a commit by the App's bot accepted in CI.
   Verify: the tests pass, each one fails when its branch of the rule is removed, and the guard's tests pass on all
   three OSes in CI.
-- [ ] 4.3 Reword the troupe-only text in `guard.py` (docstring, `WORKFLOW_SUMMARY`) and in
+- [x] 4.3 Reword the troupe-only text in `guard.py` (docstring, `WORKFLOW_SUMMARY`) and in
   `docs/development-workflow.md`:
   - "this repository" becomes "a governed repository";
   - the `delivered-file` row is added;

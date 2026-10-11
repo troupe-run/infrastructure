@@ -70,3 +70,9 @@ variable "owner_bypass" {
   type        = bool
   default     = true
 }
+
+variable "delivery_app_id" {
+  description = "A GitHub App that may push straight to main, to deliver the guard (design D5). Null: none."
+  type        = number
+  default     = null
+}

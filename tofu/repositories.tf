@@ -13,6 +13,8 @@ module "repo_troupe" {
   # The cap:* labels are copied as they were on 2026-10-11; capability-labels replaces the copy
   # with troupe's capability list.
   labels = concat(local.github_default_labels, jsondecode(file("${path.module}/labels/troupe.json")))
+  # troupe receives the guard from this repository (guard_delivery.tf).
+  delivery_app_id = local.infrastructure_app_id
 }
 
 module "repo_github" {
