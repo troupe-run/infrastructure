@@ -57,3 +57,16 @@ variable "has_projects" {
   type    = bool
   default = true
 }
+
+# The ruleset on main (spec: rulesets). On for every managed repo unless its declaration says
+# otherwise; .github turns it off until its own ruleset arrives.
+variable "protect_main" {
+  type    = bool
+  default = true
+}
+
+variable "owner_bypass" {
+  description = "Org owners may bypass the ruleset on pull requests only (design D3). Off only on the probe."
+  type        = bool
+  default     = true
+}
