@@ -85,8 +85,8 @@ website, and nothing else. The owner approves that saved plan, and the saved pla
 
 ### D5. Proving the rules on a throwaway repo
 
-You are the only member, and you're the bypassing owner. Tests run as you would therefore show what *you* can do, not
-what the rules refuse. So `tofu/probe` gains a `probe_bypass` variable, and the probe runs in two phases against
+The owner is the org's only member, and the bypassing actor. Tests run as the owner would therefore show what the
+owner can do, not what the rules refuse. So `tofu/probe` gains a `probe_bypass` variable, and the probe runs in two phases against
 `troupe-run/infra-probe-<date>`, which must be added to the App's installation by the owner.
 
 **Phase 1: no bypass actor (the rules as they apply to everyone else).**
