@@ -45,6 +45,7 @@ guard: commit-on-main: commits aren't made on main; work reaches main through a 
 | `pr-closes-issue` | Claude | `gh pr create` into this repository whose `--body` or `--body-file` doesn't close an issue, or that uses `--fill` or stdin. The target is named by `--repo`/`-R`, else `GH_REPO`, else it's this repository; a PR into another repository isn't checked, and a target that can't be read, or a clone with no remote, counts as this one | add `Closes #<issue>`, or name the other repository with `--repo` |
 | `skip-hooks` | Claude | `--no-verify`, `git commit -n`, and setting, unsetting or overriding `core.hooksPath` | fix what the hook reports |
 | `command-unparseable` | Claude | a `git` or `gh` command that can't be parsed (for example, unbalanced quotes) | simplify the command |
+| `delivered-file` | git | in a repository that receives the guard, a commit that changes a file listed in `.github/guard-delivery.json` (the Claude Code hook refuses the edit too, and the `guard` check fails such a commit unless the infrastructure App made it) | change the file in `troupe-run/infrastructure`, and deliver it from there |
 | `guard-tamper` | Claude | running the override command, naming a path in the override directory, or editing under `.git/`. **No override unlocks this rule.** | ask the owner |
 
 The pre-commit check runs the full `scripts/check.py`. That takes 10–15 seconds on macOS and about a minute on
