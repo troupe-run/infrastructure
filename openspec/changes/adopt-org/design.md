@@ -235,6 +235,13 @@ So App installations leave OpenTofu for `oob/app-installations.json`. The owner'
 it is an OAuth token, and `/user/installations/{id}/repositories` takes only a token authorized to a GitHub App, a
 personal access token, or basic auth. How each installation gets read is settled in task 4.4.
 
+**Settled (task 4.4, owner, 2026-10-11): a partial check, with the gap stated.** A classic personal access token was
+refused in the same way, with no scopes and again with `repo`. So `oob/app-installations.json` declares what *can* be
+read: each App's permissions and repository selection, from `gh api orgs/troupe-run/installations`. The repositories
+each App covers are listed in `oob/README.md` and confirmed by hand, and the `teams-and-access` spec says so. The
+alternative was a user access token for the App (device flow). It was turned down, because it would probably cover the
+App's own installation and not DCO's.
+
 ### Findings, recorded and not fixed
 
 Each finding is fixed by a later change, through a PR with its plan:

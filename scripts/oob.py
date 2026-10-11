@@ -68,6 +68,17 @@ CHECKS = [
         ],
     ),
     Check(
+        name="App installations",
+        declaration="app-installations.json",
+        key="app_slug",
+        gh_args=[
+            "api",
+            f"orgs/{ORG}/installations",
+            "--jq",
+            "[.installations[] | {app_slug, repository_selection, permissions}]",
+        ],
+    ),
+    Check(
         name="issue types",
         declaration="issue-types.json",
         key="name",

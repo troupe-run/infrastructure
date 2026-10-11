@@ -14,6 +14,9 @@ TYPES = [
 ]
 PROJECTS = [{"number": 1, "title": "roadmap", "public": True, "closed": False}]
 SETTINGS = [{"name": "two_factor_requirement_enabled", "value": False}]
+APPS = [
+    {"app_slug": "dco", "repository_selection": "selected", "permissions": {"checks": "write"}},
+]
 PROFILE = [{"path": "CONTRIBUTING.md"}, {"path": "profile/README.md"}]
 
 
@@ -22,6 +25,7 @@ def oob_dir(tmp_path: Path) -> Path:
     (tmp_path / "issue-types.json").write_text(json.dumps(TYPES))
     (tmp_path / "projects.json").write_text(json.dumps(PROJECTS))
     (tmp_path / "org-settings.json").write_text(json.dumps(SETTINGS))
+    (tmp_path / "app-installations.json").write_text(json.dumps(APPS))
     for f in PROFILE:
         source = tmp_path / "org-profile" / f["path"]
         source.parent.mkdir(parents=True, exist_ok=True)
@@ -35,9 +39,12 @@ def fake_github(
     calls: list[list[str]],
     settings: list[Any] = SETTINGS,
     profile: list[Any] = PROFILE,
+    apps: list[Any] = APPS,
 ) -> oob.Fetch:
     def fetch(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
         calls.append(args)
+        if args[1].endswith("/installations"):
+            return apps
         if "git/trees" in args[1]:
             return profile
         if "issue-types" in args[1]:
@@ -90,6 +97,23 @@ def test_a_file_in_dot_github_with_no_source_is_reported(oob_dir: Path) -> None:
 def test_a_source_missing_from_dot_github_is_reported(oob_dir: Path) -> None:
     found = RUN(fake_github(TYPES, PROJECTS, [], profile=PROFILE[:1]), oob_dir)
     assert found == [".github files: 'profile/README.md' is declared but missing on GitHub"]
+
+
+def test_an_app_gaining_a_permission_is_reported(oob_dir: Path) -> None:
+    wider = [{**APPS[0], "permissions": {"checks": "write", "workflows": "write"}}]
+    found = RUN(fake_github(TYPES, PROJECTS, [], apps=wider), oob_dir)
+    assert found == [
+        "App installations: 'dco' permissions is {'checks': 'write', 'workflows': 'write'} "
+        "on GitHub, declared {'checks': 'write'}"
+    ]
+
+
+def test_an_app_installed_on_all_repos_is_reported(oob_dir: Path) -> None:
+    everywhere = [{**APPS[0], "repository_selection": "all"}]
+    found = RUN(fake_github(TYPES, PROJECTS, [], apps=everywhere), oob_dir)
+    assert found == [
+        "App installations: 'dco' repository_selection is 'all' on GitHub, declared 'selected'"
+    ]
 
 
 def test_main_exits_non_zero_on_a_difference(
