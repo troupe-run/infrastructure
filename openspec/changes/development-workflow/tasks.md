@@ -65,7 +65,7 @@
   - `scripts/check.py` passes;
   - a local plan, not applied, shows only content and message changes to delivered and synced files, plus the
     new list.
-- [ ] 4.2 Add the `delivered-file` rule (D4) to pre-commit, the edit hook and `guard.py ci`, with tests for each
+- [x] 4.2 Add the `delivered-file` rule (D4) to pre-commit, the edit hook and `guard.py ci`, with tests for each
   layer. Cover: refused in a receiving repository; allowed in the source; a commit by the App's bot accepted in CI.
   Verify: the tests pass, each one fails when its branch of the rule is removed, and the guard's tests pass on all
   three OSes in CI.

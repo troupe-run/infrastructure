@@ -1,4 +1,4 @@
-"""Workflow guardrails for this repository (spec: development-workflow).
+"""Workflow guardrails for every repository the org builds in (spec: development-workflow).
 
 Every rule is a pure function from facts to a Decision. Thin entry points gather the facts, apply
 the rules, honour a person-granted override, and refuse or allow:
@@ -13,6 +13,10 @@ the rules, honour a person-granted override, and refuse or allow:
 
 Standard library only, so it runs under `uv run --no-project` without installing anything.
 These guardrails stop honest shortcuts; they are not a security boundary (design D1).
+
+Source: troupe-run/infrastructure, where the rules are documented (docs/development-workflow.md).
+Copies in other repositories are delivered from there (spec: guard-delivery). "Design D<n>" refers
+to troupe's archived workflow-guardrails change, which holds the reasoning behind each rule.
 """
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
 
-# Rule ids, as named in refusals, overrides and docs/development-workflow.md (design D7).
+# Rule ids, as named in refusals, overrides and the rules doc (design D7).
 OVERRIDABLE_RULES = (
     "commit-on-main",
     "commit-branch-change",
@@ -1022,7 +1026,8 @@ def run_claude_pre_tool_use(payload: dict[str, object], stdout: TextIO | None = 
 
 
 WORKFLOW_SUMMARY = (
-    "This repository's workflow is enforced by guardrails (docs/development-workflow.md): "
+    "This repository's workflow is enforced by guardrails ("
+    f"https://github.com/{SOURCE_REPOSITORY}/blob/main/docs/development-workflow.md): "
     "issue -> OpenSpec change (/opsx:propose) on a branch named after the change -> "
     "/opsx:apply -> PR that closes the issue -> archive on the branch -> merge -> comment on and "
     "close the issue. Conventional Commits; scripts/check.py passes before every commit. "

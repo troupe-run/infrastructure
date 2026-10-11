@@ -29,14 +29,21 @@ status; OpenSpec holds what the system does and how each change will do it.
 
 1. **An issue says what and why.** Use the Feature, Bug or Decision form. A Decision issue is an open question,
    with the research done: options, evidence and a recommendation.
-2. **An OpenSpec change says how.** It lives under `openspec/changes/<name>/`, with a proposal, spec deltas, a
-   design and tasks. Its proposal cites the issue.
+2. **An OpenSpec change says how.** It lives under `openspec/changes/<name>/`, on a branch named `<name>`, with a
+   proposal, spec deltas, a design and tasks. Its proposal cites the issue.
 3. **A pull request delivers it.** It names the change and closes the issue (`Closes #12`). Specs, code and tests
    change together.
-4. **After the merge,** the change is archived, which updates `openspec/specs/`. Then the issue gets a comment
-   linking the PR and the change, and is closed.
+4. **Before the merge,** the change is archived on its branch, which updates `openspec/specs/`, so the pull
+   request lands code, tests and specs together. It's merged by rebase.
+5. **After the merge,** the issue gets a comment linking the PR and the change, and is closed.
 
 Small fixes follow the same path. A bug fix adds the scenario that reproduces the bug to the spec.
+
+## Guardrails
+
+Each repository that builds with this workflow enforces it with git hooks, Claude Code hooks and a GitHub check.
+They refuse a shortcut with the rule's name and the fix. The rules, and how an override works, are in
+[development-workflow.md](https://github.com/troupe-run/infrastructure/blob/main/docs/development-workflow.md).
 
 ## Before you open a pull request
 
