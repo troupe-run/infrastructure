@@ -34,6 +34,17 @@ class Check:
 
 CHECKS = [
     Check(
+        name="org settings",
+        declaration="org-settings.json",
+        key="name",
+        gh_args=[
+            "api",
+            f"orgs/{ORG}",
+            "--jq",
+            '[{name: "two_factor_requirement_enabled", value: .two_factor_requirement_enabled}]',
+        ],
+    ),
+    Check(
         name="issue types",
         declaration="issue-types.json",
         key="name",

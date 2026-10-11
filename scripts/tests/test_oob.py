@@ -13,19 +13,25 @@ TYPES = [
     {"name": "Bug", "description": "Broken", "color": "red", "is_enabled": True},
 ]
 PROJECTS = [{"number": 1, "title": "roadmap", "public": True, "closed": False}]
+SETTINGS = [{"name": "two_factor_requirement_enabled", "value": False}]
 
 
 @pytest.fixture
 def oob_dir(tmp_path: Path) -> Path:
     (tmp_path / "issue-types.json").write_text(json.dumps(TYPES))
     (tmp_path / "projects.json").write_text(json.dumps(PROJECTS))
+    (tmp_path / "org-settings.json").write_text(json.dumps(SETTINGS))
     return tmp_path
 
 
-def fake_github(types: list[Any], projects: list[Any], calls: list[list[str]]) -> oob.Fetch:
+def fake_github(
+    types: list[Any], projects: list[Any], calls: list[list[str]], settings: list[Any] = SETTINGS
+) -> oob.Fetch:
     def fetch(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
         calls.append(args)
-        return types if "issue-types" in args[1] else projects
+        if "issue-types" in args[1]:
+            return types
+        return projects if args[1] == "graphql" else settings
 
     return fetch
 
@@ -49,6 +55,14 @@ def test_a_changed_field_is_reported_with_both_values(oob_dir: Path) -> None:
     private = [{**PROJECTS[0], "public": False}]
     found = oob.run(fake_github(TYPES, private, []), oob_dir)
     assert found == ["projects: 1 public is False on GitHub, declared True"]
+
+
+def test_two_factor_turned_on_by_hand_is_reported(oob_dir: Path) -> None:
+    on = [{"name": "two_factor_requirement_enabled", "value": True}]
+    found = oob.run(fake_github(TYPES, PROJECTS, [], settings=on), oob_dir)
+    assert found == [
+        "org settings: 'two_factor_requirement_enabled' value is True on GitHub, declared False"
+    ]
 
 
 def test_main_exits_non_zero_on_a_difference(

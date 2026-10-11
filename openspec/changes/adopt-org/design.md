@@ -87,19 +87,24 @@ variable has no default, so a missing passphrase stops the run before any state 
 - **Rotation:** OpenTofu supports a `fallback` key for reading, so the passphrase can be changed later without a
   migration. This is noted, not built.
 
-### D3. Auth: an empty `app_auth {}`, with IDs in the wrapper's environment
+### D3. Auth: `app_auth` with the IDs committed and the key from a variable
 
-The provider reads `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID` and `GITHUB_APP_PEM_FILE` (the key's contents, not a
-path) when `app_auth {}` is empty. The two IDs aren't secret. The wrapper sets them from committed constants, so
-nobody has to export them. Leaving the block empty, rather than putting `var.` references in it, keeps the provider
-block the same locally and in CI.
+`providers.tf` holds the App ID and installation ID, which aren't secret. The private key comes from
+`var.github_app_pem` (the PEM contents, not a path), which is supplied at run time. The block is the same locally and in
+CI.
+
+*Revised during task 4:* the first version used an empty `app_auth {}`, which reads `GITHUB_APP_ID`,
+`GITHUB_APP_INSTALLATION_ID` and `GITHUB_APP_PEM_FILE` from the environment. Once resources existed, `tofu validate`
+checked the provider block and failed without those variables, so the repo's check would have needed fake values.
+Committing the IDs in the provider block keeps them in one named place, and lets `validate` pass with no environment
+at all.
 
 ### D4. Secrets: the wrapper, with `op run`
 
 `scripts/tofu.py` (standard library only, run with `uv run`) is the only way the docs tell anyone to run `tofu`:
 
-1. It sets `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID` and `GITHUB_OWNER`.
-2. **If `GITHUB_APP_PEM_FILE` and `TF_VAR_state_passphrase` are both set,** it runs `tofu -chdir=tofu <args>` as is.
+1. It sets `OP_ACCOUNT` to the owner's 1Password account unless one is already set.
+2. **If `TF_VAR_github_app_pem`, `TF_VAR_state_passphrase` and `TF_VAR_billing_email` are all set,** it runs `tofu -chdir=tofu <args>` as is.
    This is how CI will run it.
 3. **Otherwise, if `op` is on the PATH,** it runs `op run --env-file=tofu/secrets.env -- tofu -chdir=tofu <args>`.
    `tofu/secrets.env` is committed and holds only `op://` references (vault, item and field names), never values.
@@ -110,7 +115,7 @@ block the same locally and in CI.
 - **Why `op run` and not `op read` into the wrapper's own environment:** the secret never passes through Python
   or a shell variable, and the masking comes free.
 - **Why a wrapper at all,** rather than documenting the `op run` line: it gives the "missing secret" refusal the spec
-  requires, a single place for the IDs, and the same entry point CI will use.
+  requires, and the same entry point CI will use.
 - **The organisation's billing email** is required by `github_organization_settings`. It isn't secret, but it is
   personal data in a public repo, so it is supplied the same way: an `op://` reference, read into
   `TF_VAR_billing_email`.

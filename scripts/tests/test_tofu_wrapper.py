@@ -17,7 +17,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 WRAPPER = ROOT / "scripts" / "tofu.py"
 SECRETS = {
-    "GITHUB_APP_PEM_FILE": "pem",
+    "TF_VAR_github_app_pem": "pem",
     "TF_VAR_state_passphrase": "pass",
     "TF_VAR_billing_email": "a@b.c",
 }
@@ -27,8 +27,7 @@ SECRETS = {
 FAKE = """#!{python}
 import json, os, subprocess, sys
 name = os.path.basename(sys.argv[0])
-keys = ["GITHUB_APP_ID", "GITHUB_APP_INSTALLATION_ID", "GITHUB_OWNER", "OP_ACCOUNT",
-        "GITHUB_APP_PEM_FILE", "TF_VAR_state_passphrase", "TF_VAR_billing_email"]
+keys = ["OP_ACCOUNT", "TF_VAR_github_app_pem", "TF_VAR_state_passphrase", "TF_VAR_billing_email"]
 with open(os.environ["CALLS"], "a") as f:
     f.write(json.dumps({{"tool": name, "args": sys.argv[1:],
                         "env": {{k: os.environ.get(k) for k in keys}}}}) + "\\n")
@@ -72,7 +71,7 @@ def test_secrets_in_the_environment_run_tofu_without_op(tmp_path: Path) -> None:
     assert code == 0
     assert [c["tool"] for c in calls] == ["tofu"]
     assert calls[0]["args"] == [f"-chdir={ROOT / 'tofu'}", "plan"]
-    assert calls[0]["env"]["GITHUB_APP_PEM_FILE"] == "pem"
+    assert calls[0]["env"]["TF_VAR_github_app_pem"] == "pem"
 
 
 def test_missing_secrets_run_tofu_under_op_run_with_the_references_file(tmp_path: Path) -> None:
@@ -90,21 +89,17 @@ def test_one_missing_secret_is_enough_to_use_op(tmp_path: Path) -> None:
 
 
 def test_missing_secret_without_op_stops_before_tofu_and_names_it(tmp_path: Path) -> None:
-    partial = {k: v for k, v in SECRETS.items() if k != "GITHUB_APP_PEM_FILE"}
+    partial = {k: v for k, v in SECRETS.items() if k != "TF_VAR_github_app_pem"}
     code, stderr, calls = run(tmp_path, ["tofu"], partial)
     assert code != 0
     assert calls == []
-    assert "GITHUB_APP_PEM_FILE" in stderr
+    assert "TF_VAR_github_app_pem" in stderr
     assert "TF_VAR_state_passphrase" not in stderr
 
 
-def test_the_app_ids_and_op_account_are_set_for_tofu(tmp_path: Path) -> None:
+def test_op_runs_in_the_configured_account(tmp_path: Path) -> None:
     _, _, calls = run(tmp_path, ["tofu", "op"], {})
-    tofu_env = calls[1]["env"]
-    assert tofu_env["GITHUB_APP_ID"] == "5272634"
-    assert tofu_env["GITHUB_APP_INSTALLATION_ID"] == "170224209"
-    assert tofu_env["GITHUB_OWNER"] == "troupe-run"
-    assert calls[0]["env"]["OP_ACCOUNT"]
+    assert calls[0]["env"]["OP_ACCOUNT"] == "l-a-u.1password.com"
 
 
 def test_no_tofu_on_the_path_is_refused(tmp_path: Path) -> None:

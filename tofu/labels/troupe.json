@@ -1,0 +1,182 @@
+[
+  {
+    "name": "cap:actor-runners",
+    "color": "1D76DB",
+    "description": "Capability: actor-runners"
+  },
+  {
+    "name": "cap:actors",
+    "color": "1D76DB",
+    "description": "Capability: actors"
+  },
+  {
+    "name": "cap:cli",
+    "color": "1D76DB",
+    "description": "Capability: cli"
+  },
+  {
+    "name": "cap:collaboration",
+    "color": "1D76DB",
+    "description": "Capability: collaboration"
+  },
+  {
+    "name": "cap:config",
+    "color": "1D76DB",
+    "description": "Capability: config"
+  },
+  {
+    "name": "cap:core-api",
+    "color": "1D76DB",
+    "description": "Capability: core-api"
+  },
+  {
+    "name": "cap:cues",
+    "color": "1D76DB",
+    "description": "Capability: cues"
+  },
+  {
+    "name": "cap:effects",
+    "color": "1D76DB",
+    "description": "Capability: effects"
+  },
+  {
+    "name": "cap:escalation",
+    "color": "1D76DB",
+    "description": "Capability: escalation"
+  },
+  {
+    "name": "cap:event-store",
+    "color": "1D76DB",
+    "description": "Capability: event-store"
+  },
+  {
+    "name": "cap:flows",
+    "color": "1D76DB",
+    "description": "Capability: flows"
+  },
+  {
+    "name": "cap:gates",
+    "color": "1D76DB",
+    "description": "Capability: gates"
+  },
+  {
+    "name": "cap:guests",
+    "color": "1D76DB",
+    "description": "Capability: guests"
+  },
+  {
+    "name": "cap:house",
+    "color": "1D76DB",
+    "description": "Capability: house"
+  },
+  {
+    "name": "cap:identity",
+    "color": "1D76DB",
+    "description": "Capability: identity"
+  },
+  {
+    "name": "cap:infrastructure",
+    "color": "5319E7",
+    "description": "The troupe-run org's own setup, not a troupe capability"
+  },
+  {
+    "name": "cap:lifecycle",
+    "color": "1D76DB",
+    "description": "Capability: lifecycle"
+  },
+  {
+    "name": "cap:lineage",
+    "color": "1D76DB",
+    "description": "Capability: lineage"
+  },
+  {
+    "name": "cap:notes",
+    "color": "1D76DB",
+    "description": "Capability: notes"
+  },
+  {
+    "name": "cap:notifications",
+    "color": "1D76DB",
+    "description": "Capability: notifications"
+  },
+  {
+    "name": "cap:performance",
+    "color": "1D76DB",
+    "description": "Capability: performance"
+  },
+  {
+    "name": "cap:platform",
+    "color": "1D76DB",
+    "description": "Capability: platform"
+  },
+  {
+    "name": "cap:plugins",
+    "color": "1D76DB",
+    "description": "Capability: plugins"
+  },
+  {
+    "name": "cap:policy",
+    "color": "1D76DB",
+    "description": "Capability: policy"
+  },
+  {
+    "name": "cap:projections",
+    "color": "1D76DB",
+    "description": "Capability: projections"
+  },
+  {
+    "name": "cap:protocol",
+    "color": "1D76DB",
+    "description": "Capability: protocol"
+  },
+  {
+    "name": "cap:roles",
+    "color": "1D76DB",
+    "description": "Capability: roles"
+  },
+  {
+    "name": "cap:settings",
+    "color": "1D76DB",
+    "description": "Capability: settings"
+  },
+  {
+    "name": "cap:stages",
+    "color": "1D76DB",
+    "description": "Capability: stages"
+  },
+  {
+    "name": "cap:storage",
+    "color": "1D76DB",
+    "description": "Capability: storage"
+  },
+  {
+    "name": "cap:telemetry",
+    "color": "1D76DB",
+    "description": "Capability: telemetry"
+  },
+  {
+    "name": "cap:theatre",
+    "color": "1D76DB",
+    "description": "Capability: theatre"
+  },
+  {
+    "name": "cap:vcs",
+    "color": "1D76DB",
+    "description": "Capability: vcs"
+  },
+  {
+    "name": "cap:work-tracking",
+    "color": "1D76DB",
+    "description": "Capability: work-tracking"
+  },
+  {
+    "name": "needs:owner",
+    "color": "D93F0B",
+    "description": "Waiting on a decision from the owner"
+  },
+  {
+    "name": "parked",
+    "color": "C5DEF5",
+    "description": "Agreed or deferred until a named later change"
+  }
+]
