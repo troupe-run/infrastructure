@@ -8,6 +8,10 @@
 #   2. save its README as README.probe.md here, and set probe_repo = "<name>" in terraform.tfvars;
 #   3. from tofu/probe, with OP_ACCOUNT set: op run --env-file=../secrets.env -- tofu <init|plan|apply>;
 #   4. delete the repo, then this directory's state, README.probe.md and terraform.tfvars.
+#
+# The guard-delivery probe (development-workflow, design D8) needs no README.probe.md: set
+# probe_delivery = true to deliver the guard's script, workflow and list, plus probe-note.txt,
+# whose content is var.probe_note, with the live delivery's commit messages.
 
 terraform {
   required_version = ">= 1.8"
@@ -58,6 +62,24 @@ variable "probe_bypass" {
   default     = true
 }
 
+variable "probe_delivery" {
+  description = "Deliver the guard's script, workflow and list to the probe (development-workflow D8)."
+  type        = bool
+  default     = false
+}
+
+variable "probe_delivery_bypass" {
+  description = "Give the infrastructure App the delivery bypass on the probe's ruleset (design D5)."
+  type        = bool
+  default     = false
+}
+
+variable "probe_note" {
+  description = "The content of probe-note.txt, changed between applies to test the commit message."
+  type        = string
+  default     = "first\n"
+}
+
 variable "declared" {
   description = "Set to false to remove the repo's declaration (the prevent_destroy step)."
   type        = bool
@@ -82,15 +104,17 @@ module "probe" {
   description  = "Throwaway: drift probe for troupe-run/infrastructure#2. Deleted after use."
   labels       = jsondecode(file("${path.module}/../labels/github-defaults.json"))
   owner_bypass = var.probe_bypass
+
+  delivery_app_id = var.probe_delivery_bypass ? 5272634 : null
 }
 
 resource "github_repository_file" "probe" {
-  count = var.declared ? 1 : 0
+  count = var.declared && fileexists("${path.module}/README.probe.md") ? 1 : 0
 
   repository          = var.probe_repo
   branch              = "main"
   file                = "README.md"
-  content             = file("${path.module}/README.probe.md")
+  content             = try(file("${path.module}/README.probe.md"), "")
   commit_message      = "chore: probe file"
   overwrite_on_create = false
 
@@ -100,7 +124,34 @@ resource "github_repository_file" "probe" {
 }
 
 locals {
-  adopt = var.declared ? toset(["probe"]) : toset([])
+  adopt        = var.declared ? toset(["probe"]) : toset([])
+  adopt_readme = var.declared && fileexists("${path.module}/README.probe.md") ? toset(["probe"]) : toset([])
+
+  # The same shape as the live delivery (../guard_delivery.tf): sources from this repository, the
+  # list generated, and a message that changes exactly when the content does (design D3).
+  probe_sources = var.probe_delivery ? {
+    "scripts/guard.py"            = file("${path.module}/../../scripts/guard.py")
+    ".github/workflows/guard.yml" = file("${path.module}/../../.github/workflows/guard.yml")
+    "probe-note.txt"              = var.probe_note
+  } : {}
+  probe_list = var.probe_delivery ? {
+    ".github/guard-delivery.json" = jsonencode({
+      source = "troupe-run/infrastructure"
+      files  = sort(concat(keys(local.probe_sources), [".github/guard-delivery.json"]))
+    })
+  } : {}
+  probe_deliveries = merge(local.probe_sources, local.probe_list)
+}
+
+resource "github_repository_file" "delivery" {
+  for_each = local.probe_deliveries
+
+  repository          = var.probe_repo
+  branch              = "main"
+  file                = each.key
+  content             = each.value
+  commit_message      = "chore(guard): deliver ${each.key} ${substr(sha256(each.value), 0, 12)} from troupe-run/infrastructure"
+  overwrite_on_create = false
 }
 
 import {
@@ -116,7 +167,7 @@ import {
 }
 
 import {
-  for_each = local.adopt
+  for_each = local.adopt_readme
   to       = github_repository_file.probe[0]
   id       = "${var.probe_repo}:README.md:"
 }
