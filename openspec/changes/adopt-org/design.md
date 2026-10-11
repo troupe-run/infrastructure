@@ -252,11 +252,11 @@ Each finding is fixed by a later change, through a PR with its plan:
 | Branches not deleted on merge | `required-checks` |
 | Wiki and classic projects on, unused | `required-checks` |
 | No rulesets; `main` unprotected everywhere | `protect-main` |
-| 2FA not required; members can create repos | a later org-settings change. Turning on 2FA can remove members who don't have it; today the only member is the owner, who must have it. |
+| 2FA not required; members can create repos | a later org-settings change. Requiring 2FA removes members who don't have it enabled, so first confirm the only member, the owner, has it. 2FA is outside the provider, so it's checked in `oob/org-settings.json`, and the change has to set it by hand or by script. |
 | A sync commit into `.github` would reuse the previous commit's message (`ignore_changes = [commit_message]`; see the D7 results) | the change that first syncs `.github`. It must give each commit a message naming the source commit without the plan showing a permanent diff. |
 | GitHub Pages on `troupe-run.github.io` isn't declared. `pages` is computed, so it shows no drift either. | a later change, if Pages settings are to be managed |
-| `homepage` is `null` on `.github` and the website. Adoption's no-op PATCH sets it to `""`, which means the same. | accepted with the adoption apply |
-| `.github`'s files carry no "edit this in infrastructure" line | the change that adds the `.github` ruleset. It is also the first App commit, which tests signing. |
+| `homepage` was `null` on `.github` and the website. Adoption's no-op PATCH set it to `""`, which means the same. | done: applied with the owner's approval, 2026-10-11 (the only live difference in the before/after diff) |
+| `.github`'s files carry no "edit this in infrastructure" line | the change that adds the `.github` ruleset. The probe has already shown that the App's commits are verified. |
 
 ## Risks / Trade-offs
 
