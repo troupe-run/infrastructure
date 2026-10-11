@@ -24,15 +24,38 @@ Fetch = Callable[[list[str]], Any]
 
 @dataclass(frozen=True)
 class Check:
-    """One thing outside OpenTofu: its declaration file, how to read it, and its key field."""
+    """One thing outside OpenTofu: its declaration file, how to read it, and its key field.
+
+    A declaration is either a JSON file in oob/ or, where this repo already holds the source,
+    derived from it (so there is no second list to keep in step).
+    """
 
     name: str
     declaration: str
     key: str
     gh_args: list[str]
+    derived: Callable[[Path], list[Record]] | None = None
+
+
+def org_profile_files(root: Path) -> list[Record]:
+    """Every file under org-profile/, the source of troupe-run/.github (spec: org-profile)."""
+    source = root / "org-profile"
+    return [{"path": p.relative_to(source).as_posix()} for p in source.rglob("*") if p.is_file()]
 
 
 CHECKS = [
+    Check(
+        name=".github files",
+        declaration="org-profile/ (derived)",
+        key="path",
+        gh_args=[
+            "api",
+            f"repos/{ORG}/.github/git/trees/main?recursive=1",
+            "--jq",
+            '[.tree[] | select(.type == "blob") | {path}]',
+        ],
+        derived=org_profile_files,
+    ),
     Check(
         name="org settings",
         declaration="org-settings.json",
@@ -96,16 +119,19 @@ def gh(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
     return json.loads(result.stdout)
 
 
-def run(fetch: Fetch, oob_dir: Path) -> list[str]:
+def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT) -> list[str]:
     found: list[str] = []
     for check in CHECKS:
-        declared = json.loads((oob_dir / check.declaration).read_text())
+        if check.derived is not None:
+            declared = check.derived(root)
+        else:
+            declared = json.loads((oob_dir / check.declaration).read_text())
         found += differences(check.name, check.key, declared, fetch(check.gh_args))
     return found
 
 
 def main() -> int:
-    found = run(gh, OOB)
+    found = run(gh, OOB, ROOT)
     for line in found:
         print(line)
     if found:

@@ -171,6 +171,26 @@ declaration doesn't delete) that can only be shown by changing something on GitH
 Each step's output goes in the PR as the evidence. Step 1 needs the owner, because adding a repo to the installation
 is done in the App's settings.
 
+**Results (2026-10-11, `troupe-run/infra-probe-20261011`, since deleted):**
+- **Import then apply:** `3 imported, 0 added, 1 changed`. The "change" is the provider-local `archive_on_destroy` and
+  `ignore_vulnerability_alerts_during_read`. The provider applies it with a `PATCH` of the whole repo. Diffing the repo's
+  full API JSON, its labels and its head commit before and after showed **one difference: `homepage` went from `null`
+  to `""`**. The provider always sends the field. The live `.github` and `troupe-run.github.io` have `homepage: null`,
+  so their adoption apply makes the same cosmetic write. After the apply, the plan was clean.
+- **Hand edits:** merge commits turned off, a label added and the managed file edited. The plan showed all three
+  reverting, and applying them reverted all three.
+- **The App's file commit:** author `troupe-run-infrastructure[bot]`, committer `GitHub`, **verified (`valid`)**. This
+  settles the brief's inference: commits the App makes through the API are signed by GitHub.
+- **But its message was the previous commit's ("Initial commit"),** not the configured one. With `commit_message` in
+  `ignore_changes`, the provider updates using the message held in state, which was read back from the last commit.
+  This is harmless here, because adoption commits nothing. It's a finding for the first change that syncs `.github`.
+- **Declaration removed:** the plan failed with `Resource instance module.probe[0].github_repository.this has
+  prevent_destroy`, and the repo was untouched. A `removed` block with `destroy = false` planned
+  `0 to destroy, 3 to forget`.
+- **A file added to `.github` by hand:** OpenTofu can't see files that aren't declared, so the `oob` check covers it.
+  It derives `.github`'s expected files from `org-profile/` (D6).
+
+
 ### D8. The repo's check
 
 `scripts/check.py` runs, in order, failing on the first failure:
@@ -226,6 +246,9 @@ Each finding is fixed by a later change, through a PR with its plan:
 | Wiki and classic projects on, unused | `required-checks` |
 | No rulesets; `main` unprotected everywhere | `protect-main` |
 | 2FA not required; members can create repos | a later org-settings change. Turning on 2FA can remove members who don't have it; today the only member is the owner, who must have it. |
+| A sync commit into `.github` would reuse the previous commit's message (`ignore_changes = [commit_message]`; see the D7 results) | the change that first syncs `.github`. It must give each commit a message naming the source commit without the plan showing a permanent diff. |
+| GitHub Pages on `troupe-run.github.io` isn't declared. `pages` is computed, so it shows no drift either. | a later change, if Pages settings are to be managed |
+| `homepage` is `null` on `.github` and the website. Adoption's no-op PATCH sets it to `""`, which means the same. | accepted with the adoption apply |
 | `.github`'s files carry no "edit this in infrastructure" line | the change that adds the `.github` ruleset. It is also the first App commit, which tests signing. |
 
 ## Risks / Trade-offs
