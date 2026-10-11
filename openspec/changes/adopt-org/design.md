@@ -19,7 +19,18 @@ See proposal.md for why. The org as observed on 2026-10-11, read through the API
 Provider `integrations/github` v6.13.0 has resources for org settings, repositories, rulesets, labels
 (`github_issue_labels`), App installation repositories, repository files and environments. Its documentation has
 **no resource for org issue types**, and only **classic** Projects (`github_organization_project`), not Projects v2.
-Task 1 confirms this with `tofu providers schema`.
+
+**Confirmed by task 1.1** (`tofu providers schema -json`, OpenTofu 1.13.1, provider 6.13.0, 88 resources):
+
+| Thing | Resource | Data source |
+|---|---|---|
+| Org issue types | none | none |
+| Projects | `github_organization_project`, `github_repository_project`, `github_project_card`, `github_project_column`, all classic; `github_organization_project` is marked `deprecated` | none |
+| App installation repos | `github_app_installation_repositories` (`installation_id`, `selected_repositories`), `github_app_installation_repository` | `github_organization_app_installations` |
+| Rulesets | `github_repository_ruleset`, `github_organization_ruleset` | none |
+| Org settings, labels, files | `github_organization_settings`, `github_issue_labels`, `github_repository_file` | labels and files |
+
+So issue types and the Projects v2 project go to `oob/` (D6).
 
 ## Goals / Non-Goals
 

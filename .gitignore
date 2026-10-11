@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.DS_Store
+
+# OpenTofu: provider downloads, drafts and saved plans never get committed. The encrypted state does
+# (tofu/terraform.tfstate); the probe's state doesn't (design D7).
+.terraform/
+generated.tf
+*.tfplan
+tofu/probe/terraform.tfstate*
+*.tfstate.backup

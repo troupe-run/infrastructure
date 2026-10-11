@@ -2,7 +2,7 @@
 
 ## 1. Coverage probe (read-only, decides D9)
 
-- [ ] 1.1 Pin the provider (`integrations/github ~> 6.13`) in a scratch root, run `tofu providers schema -json`, and
+- [x] 1.1 Pin the provider (`integrations/github ~> 6.13`) in a scratch root, run `tofu providers schema -json`, and
   record in design.md which of issue types, Projects v2 and App installation repositories have a resource. Verify:
   the recorded list matches the schema output, which is quoted in the PR.
 - [ ] 1.2 With App auth (key via `op run`, nothing committed), run a read-only import plan of
@@ -11,7 +11,7 @@
 
 ## 2. Tooling skeleton
 
-- [ ] 2.1 Add `pyproject.toml` (uv, Python ≥ 3.12, dev dependencies ruff, mypy, pytest), `.gitignore` (probe state,
+- [x] 2.1 Add `pyproject.toml` (uv, Python ≥ 3.12, dev dependencies ruff, mypy, pytest), `.gitignore` (probe state,
   `.terraform/`, `generated.tf`, plan files) and `uv.lock`. Verify: `uv sync` succeeds and `uv run pytest` runs
   (with no tests yet).
 - [ ] 2.2 Create or name the 1Password items for the App key, the state passphrase and the billing email with the
