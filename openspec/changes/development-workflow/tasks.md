@@ -14,7 +14,7 @@
 - [x] 1.2 `scripts/check.py` turns the git hooks on (`activate_git_hooks`, as in troupe), with
   `test_check_activation.py` adapted to this repo's `check.py`. Verify: the test passes, and fails when activation is
   removed.
-- [ ] 1.3 Copy `.githooks/`, `.claude/settings.json` and `.github/workflows/guard.yml` byte for byte, and turn the
+- [x] 1.3 Copy `.githooks/`, `.claude/settings.json` and `.github/workflows/guard.yml` byte for byte, and turn the
   hooks on here. Verify:
   - their sha256 values match troupe's;
   - the next commit on this branch runs the pre-commit check, shown in its output;
