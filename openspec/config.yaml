@@ -1,0 +1,70 @@
+schema: spec-driven
+
+# Project context (optional)
+# Add only constraints that should guide OpenSpec artifacts and workflows.
+# Include constraints an agent cannot infer by reading the code.
+# Keep general project documentation and discoverable codebase facts out.
+# Example:
+#   context: |
+#     Designs and tasks must cover Windows, macOS, and Linux
+#     Write all artifacts in Spanish
+context: |
+  This repo says how the troupe-run GitHub organisation builds software. It is not the product: troupe itself lives
+  in troupe-run/troupe. This repo owns two things: the org as code (OpenTofu: settings, rulesets, labels, teams,
+  App installations, and the files of troupe-run/.github, which is a target only), and the development process (the
+  development-workflow spec and its guard: git hooks, Claude Code hooks and a GitHub check) for every repo the org
+  builds in, this one included. Decision #25 in troupe records why.
+
+  Fixed constraints:
+  - OpenTofu with the integrations/github provider. Adopt what exists (import it, then prove it with a clean plan)
+    before changing anything.
+  - No secrets in the repo. State is encrypted with OpenTofu state encryption. The provider authenticates as the
+    troupe-run-infrastructure GitHub App; its private key and the state passphrase live outside the repo. Secret
+    values are never managed by OpenTofu.
+  - Every apply is shown as a plan first and approved by the owner. CI applies only from main, through an
+    environment that needs the owner's approval.
+  - troupe-run/.github holds only what GitHub expects. Its files are written here and carry a note saying so.
+    Commits into it are made by the App through the API, so GitHub signs them.
+  - Product concepts stay in troupe. The capability list is read from there, never copied by hand.
+  - Changes to a product repo's files arrive as pull requests through its own checks, never as direct commits.
+  - The guard is Python 3.12+, managed with uv, standard library only, and works offline on Linux, macOS and
+    Windows. Hooks refuse with the rule and the fix, and an override is granted only by the owner.
+  - GitHub Free, public repos. Commit-message rules can't be enforced by GitHub; rulesets can.
+
+  Quality bar:
+  - Python: mypy --strict and ruff clean; every behaviour has a test that fails when it breaks, named for what its
+    body checks.
+  - OpenTofu: tofu fmt and tofu validate clean; the plan is part of every pull request's evidence.
+  - Done means verified: show the test output or the plan.
+  - Keep each decision in one named place. When unsure, take the choice that can't lock the owner out or lose data,
+    and say so.
+
+  Working:
+  - Don't invent requirements. Research what you can reach first, then ask with findings, options and a
+    recommendation.
+  - Surface design decisions in the proposal or design before code depends on them.
+  - Test GitHub behaviour in throwaway repos, never live ones, and delete them afterwards.
+  - When a change fixes a tracked issue, comment on the issue with the change and close it.
+  - Commit in small steps with messages that say why.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
