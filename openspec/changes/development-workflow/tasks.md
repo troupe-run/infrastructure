@@ -20,12 +20,12 @@
   - the next commit on this branch runs the pre-commit check, shown in its output;
   - a commit attempted with a non-conventional message is refused by the `commit-msg` hook, and isn't made;
   - the `guard` check is green on the pushed branch.
-- [ ] 1.4 Add the `guard-tests` CI job (D10): macOS and Windows, plus 3.13 on Linux, running
+- [x] 1.4 Add the `guard-tests` CI job (D10): macOS and Windows, plus 3.13 on Linux, running
   `scripts/tests/test_guard_*.py`. Verify: every job is green on the pushed branch.
 
 ## 2. Adopt troupe's copies (D9 step 2)
 
-- [ ] 2.1 Add `tofu/guard_delivery.tf`: a `github_repository_file` for each of troupe's six existing guard files, the
+- [x] 2.1 Add `tofu/guard_delivery.tf`: a `github_repository_file` for each of troupe's six existing guard files, the
   matching import blocks, and `ignore_changes = [commit_message]` for now (group 4 removes it). Verify:
   - `scripts/check.py` passes;
   - the plan shows six imports and no other change.

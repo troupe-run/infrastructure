@@ -51,3 +51,9 @@ import {
   to = module.repo_website.github_issue_labels.this
   id = "troupe-run.github.io"
 }
+
+import {
+  for_each = local.guard_deliveries
+  to       = github_repository_file.guard[each.key]
+  id       = "${each.value.repository}:${each.value.file}:"
+}
