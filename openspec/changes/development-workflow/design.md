@@ -100,19 +100,31 @@ chore(guard): deliver <path> <first 12 of sha256(content)> from troupe-run/infra
 chore: sync <path> <first 12 of sha256(content)> from troupe-run/infrastructure       (.github's files)
 ```
 
-The message changes exactly when the content does, so `ignore_changes = [commit_message]` goes:
-- **No change:** the provider reads back the message of the file's last commit, which is ours, and the plan is
-  clean.
-- **A content change:** content and message differ together, and the provider makes one commit with the new message.
-- **A hand edit in the target:** both content and message differ, and the apply restores both.
+The message changes exactly when the content does, so `ignore_changes = [commit_message]` goes.
 
-**Until group 4,** the adopted files keep `ignore_changes`, so that adopting them makes no commit. Their last
-commits carry troupe's own messages. Whether a message-only difference makes the provider commit is the probe's
-fourth case.
+**What the provider does with the message** (probe, 2026-10-12, D8). The adopt-org finding was half right:
+- **On import,** it reads the message of the file's last commit into state.
+- **After that,** state holds the configured message. GitHub's history is never compared again.
+
+The cases, as the probe showed them:
+- **No change:** the plan is clean.
+- **A content change:** one commit, with the new message.
+- **A hand edit:** the plan shows the content returning, though not the message. The apply restores the content with
+  a fresh delivery commit.
+- **A message-only difference after an apply** (a hand edit, then a revert): the plan is clean, and nothing is
+  committed.
+- **A message-only difference after an import:** the plan shows the message changing, and the apply makes an
+  **empty** commit (no files changed).
+
+So the stale message came from `ignore_changes` keeping the imported message as the "current" one. Removing it in
+group 4 gives each adopted file whose content doesn't otherwise change one empty commit, which resets its message
+once. In the live plan that's four files: troupe's `.claude/settings.json` (it can't carry the source note), and
+`.github`'s `SECURITY.md`, `profile/README.md` and `.github/dco.yml`. Every commit after that is a real change.
+
+**Until group 4,** the adopted files keep `ignore_changes`, so that adopting them makes no commit.
 
 Both messages pass troupe's `commit-message` rule (scope `guard` matches `[a-z0-9][a-z0-9-]*`). They have to,
-because the `guard` check runs on the push to `main`. The probe (D8) proves all three cases before any live
-apply.
+because the `guard` check runs on the push to `main`.
 
 **Rejected: naming the source commit's SHA.** It changes on every commit, even when the content doesn't. Worse, it
 changes again when the PR is merged by rebase, so a plan from `main` would want to redeliver unchanged files.
