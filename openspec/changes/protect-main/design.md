@@ -109,6 +109,21 @@ owner can do, not what the rules refuse. So `tofu/probe` gains a `probe_bypass` 
 
 Each step's output goes into the PR. Then the probe repo is deleted.
 
+**Results (2026-10-12, `infra-probe-20261011-rules`):**
+- Steps 1, 2, 4 and 5 behaved as listed. The force-push refusal names both rules ("Changes must be made through a
+  pull request", "Cannot force-push to this branch"). The repo's own settings still allowed merge commits and
+  squashes, so their refusal came from the ruleset.
+- **Step 3 doesn't isolate the `deletion` rule.** GitHub refuses to delete any repo's default branch ("Cannot delete
+  the default branch", 422) before a ruleset is consulted, and `~DEFAULT_BRANCH` always names that branch. `main`
+  can't be deleted either way. The rule stays, so the declaration says what is meant.
+- **Step 7: the bypass doesn't override the merge method.** `gh pr merge --merge --admin` is refused like `--merge`,
+  so `main` stays linear even for the owner. What the bypass does permit was shown by requiring one approval on the
+  probe's ruleset by hand: `--rebase` was refused ("the base branch policy prohibits the merge"), and
+  `--rebase --admin` merged, recorded in the ruleset's insights as `bypass`. The ruleset's API reports
+  `current_user_can_bypass: pull_requests_only`.
+- Step 8 also restored the hand-set review count: the plan showed `enforcement` `disabled -> active` and
+  `required_approving_review_count` `1 -> 0`.
+
 ## Risks / Trade-offs
 
 - [An agent, or the owner, can no longer push a quick fix to `main`] → That is the intent. Everything already goes
