@@ -31,26 +31,26 @@
 - [x] 3.1 Write `tofu/versions.tf` (provider pin, `encryption` block per D2 with `enforced = true` for state and plan)
   and `tofu/providers.tf` (`app_auth {}`, owner `troupe-run`). Verify: `tofu fmt -check` and `tofu validate` pass
   through `check.py`.
-- [ ] 3.2 Show the encryption holds. Run `scripts/tofu.py plan` with an empty configuration and commit nothing yet.
+- [x] 3.2 Show the encryption holds. Run `scripts/tofu.py plan` with an empty configuration and commit nothing yet.
   Check that the state file has no plain-text resource data, and that a plan with `TF_VAR_state_passphrase` unset
   fails before writing a file. Verify: both outputs are quoted in the PR.
 
 ## 4. Adopt the org
 
-- [ ] 4.1 Org settings: import `github_organization_settings`, generate, and tidy into `tofu/org.tf`, with the billing
+- [x] 4.1 Org settings: import `github_organization_settings`, generate, and tidy into `tofu/org.tf`, with the billing
   email from `var.billing_email`. Verify: `scripts/tofu.py plan` shows no change to it. Any `ignore_changes` field is
   listed under Findings with its reason.
-- [ ] 4.2 Write `tofu/modules/repository` (settings, `prevent_destroy`, `archive_on_destroy`, and
+- [x] 4.2 Write `tofu/modules/repository` (settings, `prevent_destroy`, `archive_on_destroy`, and
   `github_issue_labels` from an input map). Then import `troupe`, `.github`, `infrastructure` and
   `troupe-run.github.io` into one instance each, with their labels as data. Verify: the plan shows no change to any
   repo or label, and troupe declares 46 labels.
-- [ ] 4.3 `.github`'s files: fetch them into `org-profile/`, compare each with its blob SHA (`git hash-object`), and
+- [x] 4.3 `.github`'s files: fetch them into `org-profile/`, compare each with its blob SHA (`git hash-object`), and
   import the four `github_repository_file` resources. Verify: the hashes match, the plan shows no change, and
   `troupe-run/.github` has no new commit (its head SHA before and after is quoted in the PR).
 - [x] 4.4 App installations, by the route task 1.2 chose (`oob/`, D9). Write `oob/app-installations.json`
   (permissions and repository selection) and the hand-confirmed repository lists in `oob/README.md`. Verify:
   `scripts/oob.py` reports no difference, and tests cover a new permission and a switch to all repositories.
-- [ ] 4.5 Delete `generated.tf`, keep `imports.tf`, and commit the encrypted state. Verify: `scripts/tofu.py plan`
+- [x] 4.5 Delete `generated.tf`, keep `imports.tf`, and commit the encrypted state. Verify: `scripts/tofu.py plan`
   prints "No changes. Your infrastructure matches the configuration.", which is quoted in the PR, and
   `scripts/check.py` passes.
 
