@@ -55,7 +55,7 @@
 
 ## 5. Drift checks for what OpenTofu can't manage
 
-- [x] 5.1 Write `oob/issue-types.json` and `oob/project.json` from GitHub's current state, plus `scripts/oob.py` with
+- [x] 5.1 Write `oob/issue-types.json` and `oob/projects.json` from GitHub's current state, plus `scripts/oob.py` with
   tests. The tests cover: no differences exit 0; an extra, missing or changed item is reported and exits non-zero; no
   call writes. Verify: `uv run pytest` passes, and `uv run scripts/oob.py` against the live org reports no
   differences.
