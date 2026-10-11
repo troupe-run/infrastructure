@@ -38,24 +38,24 @@
 
 - [x] 3.1 The owner grants the App Workflows write and accepts it on the installation. Record it in
   `oob/app-installations.json`. Verify: `scripts/oob.py` reports no differences.
-- [ ] 3.2 Create `troupe-run/infra-probe-<date>`; the owner adds it to the App's installation. Extend `tofu/probe`
+- [x] 3.2 Create `troupe-run/infra-probe-<date>`; the owner adds it to the App's installation. Extend `tofu/probe`
   with `delivery_bypass`, and deliver a script and `.github/workflows/guard.yml` to it with D3's commit messages.
   Verify:
   - with `delivery_bypass = false`, the delivery is refused, with the output recorded;
   - with it true, the delivery lands and is made by the App;
   - the owner's direct push is still refused;
   - the workflow file delivered without error.
-- [ ] 3.3 D3's cases on the probe:
+- [x] 3.3 D3's cases on the probe:
   - an unchanged plan is clean;
   - a content change makes exactly one commit with the new message;
   - a hand edit shows content and message drifting, and the apply restores both;
   - a message-only difference: record whether the provider makes a commit, and write the answer into D3.
 
   Verify: each output recorded.
-- [ ] 3.4 With `guard.py` and `guard.yml` delivered to the probe, check two things. A delivery push to `main` passes
+- [x] 3.4 With `guard.py` and `guard.yml` delivered to the probe, check two things. A delivery push to `main` passes
   the `guard` check. A branch carrying a hand-made commit to a delivered file fails it, once group 4's rule exists
   (re-run this task after 4.2). Verify: both check runs' URLs and results recorded.
-- [ ] 3.5 Delete the probe repo and its local state and files. Verify: `gh repo view` reports not found.
+- [x] 3.5 Delete the probe repo and its local state and files. Verify: `gh repo view` reports not found.
 
 ## 4. Generalise the guard and add the rule
 
