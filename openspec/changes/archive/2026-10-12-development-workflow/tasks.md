@@ -121,7 +121,7 @@
 
 ## 7. Pull request
 
-- [ ] 7.1 Open the PR closing #8, with the probe, plan and apply evidence. Verify:
+- [x] 7.1 Open the PR closing #8, with the probe, plan and apply evidence. Verify:
   - CI, `guard` and DCO are green;
   - the PR merges by rebase.
 
