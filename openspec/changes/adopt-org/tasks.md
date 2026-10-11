@@ -47,8 +47,9 @@
 - [ ] 4.3 `.github`'s files: fetch them into `org-profile/`, compare each with its blob SHA (`git hash-object`), and
   import the four `github_repository_file` resources. Verify: the hashes match, the plan shows no change, and
   `troupe-run/.github` has no new commit (its head SHA before and after is quoted in the PR).
-- [ ] 4.4 App installations, by the route task 1.2 chose. Either import them into `tofu/apps.tf`, or write
-  `oob/app-installations.json`. Verify: the plan, or `scripts/oob.py`, reports no difference.
+- [x] 4.4 App installations, by the route task 1.2 chose (`oob/`, D9). Write `oob/app-installations.json`
+  (permissions and repository selection) and the hand-confirmed repository lists in `oob/README.md`. Verify:
+  `scripts/oob.py` reports no difference, and tests cover a new permission and a switch to all repositories.
 - [ ] 4.5 Delete `generated.tf`, keep `imports.tf`, and commit the encrypted state. Verify: `scripts/tofu.py plan`
   prints "No changes. Your infrastructure matches the configuration.", which is quoted in the PR, and
   `scripts/check.py` passes.
@@ -59,7 +60,7 @@
   tests. The tests cover: no differences exit 0; an extra, missing or changed item is reported and exits non-zero; no
   call writes. Verify: `uv run pytest` passes, and `uv run scripts/oob.py` against the live org reports no
   differences.
-- [ ] 5.2 Write `oob/README.md` naming each gap (issue types, Projects v2, and App installations if 4.4 went that
+- [x] 5.2 Write `oob/README.md` naming each gap (issue types, Projects v2, and App installations if 4.4 went that
   way), the provider version it was checked against, and the check that replaces it. Verify: every file in `oob/`
   is named in the README.
 

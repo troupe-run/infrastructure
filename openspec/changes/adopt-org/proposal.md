@@ -23,7 +23,8 @@ with no changes, means the first apply that does change something shows only tha
   - org settings;
   - the repos that aren't archived: `troupe`, `.github`, `infrastructure` and `troupe-run.github.io` (their settings
     and their labels, including troupe's 34 `cap:*` labels as they exist today);
-  - which repos the DCO App and the infrastructure App are installed on;
+  - the DCO App's and the infrastructure App's installations: permissions and repository selection, checked by a
+    read-only `gh` check, since OpenTofu can't read them as the App;
   - the four files of `troupe-run/.github`.
 - **Org issue types and the "troupe roadmap" project**, which the provider can't manage (to be confirmed with
   `tofu providers schema`), get a read-only `gh` check that reports drift from what this repo declares.
@@ -46,7 +47,8 @@ which changes them; applying from CI.
 - `org-settings`: the org's own settings, plus its issue types and its project.
 - `repositories`: which repos are managed and their settings, and that an apply can't delete one.
 - `labels`: each managed repo's labels, declared in full.
-- `teams-and-access`: which repos each GitHub App is installed on (teams join later; the org has none).
+- `teams-and-access`: each GitHub App's permissions and repository selection, checked for drift, and the repos each
+  is installed on, confirmed by hand because no token we hold can read them (teams join later; the org has none).
 - `org-profile`: the files of `troupe-run/.github`, whose source is this repo.
 
 ### Modified Capabilities
