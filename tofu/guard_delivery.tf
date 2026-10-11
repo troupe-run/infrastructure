@@ -42,6 +42,10 @@ resource "github_repository_file" "guard" {
   content             = local.guard_contents[each.value.file]
   overwrite_on_create = false
 
+  # After the repository's ruleset, which lets the App push (design D5). Without this the
+  # deliveries race the bypass, and one that lands first is refused with a 409.
+  depends_on = [module.repo_troupe]
+
   # Changes exactly when the content does, so a delivery never reuses an earlier message
   # (design D3).
   commit_message = "chore(guard): deliver ${each.value.file} ${substr(sha256(local.guard_contents[each.value.file]), 0, 12)} from troupe-run/infrastructure"
