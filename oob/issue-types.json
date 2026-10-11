@@ -1,0 +1,32 @@
+[
+  {
+    "color": "yellow",
+    "description": "A specific piece of work",
+    "is_enabled": true,
+    "name": "Task"
+  },
+  {
+    "color": "red",
+    "description": "An unexpected problem or behavior",
+    "is_enabled": true,
+    "name": "Bug"
+  },
+  {
+    "color": "blue",
+    "description": "A request, idea, or new functionality",
+    "is_enabled": true,
+    "name": "Feature"
+  },
+  {
+    "color": "purple",
+    "description": "A theme spanning several features or OpenSpec changes",
+    "is_enabled": true,
+    "name": "Epic"
+  },
+  {
+    "color": "orange",
+    "description": "An open question with a brief: options, evidence, recommendation",
+    "is_enabled": true,
+    "name": "Decision"
+  }
+]
