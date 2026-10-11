@@ -27,7 +27,7 @@ variable "labels" {
 }
 
 # Merge and feature settings. The defaults are what every repo had when adopted (2026-10-11);
-# several are findings to fix in later changes (openspec/changes/adopt-org/design.md, Findings).
+# several are findings to fix in later changes (openspec/changes/archive/2026-10-11-adopt-org/design.md, Findings).
 variable "allow_merge_commit" {
   type    = bool
   default = true
