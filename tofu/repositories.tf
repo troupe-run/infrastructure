@@ -30,3 +30,12 @@ module "repo_infrastructure" {
   topics       = ["infrastructure-as-code", "openspec", "opentofu"]
   labels       = local.github_default_labels
 }
+
+# GitHub Pages (deployed from Actions) isn't declared yet: the provider treats `pages` as
+# computed, so leaving it out shows no drift. See the Findings in design.md.
+module "repo_website" {
+  source      = "./modules/repository"
+  name        = "troupe-run.github.io"
+  description = "troupe.run \u2014 website and landing page"
+  labels      = local.github_default_labels
+}
