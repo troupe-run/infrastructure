@@ -198,6 +198,18 @@ Task 1 tests this: import the resource for the infrastructure App's own installa
 
 The spec allows either route. This is the one place where the design depends on a probe result.
 
+**Result (task 1.2, 2026-10-11):** neither can be read as the App. An import plan of both, authenticated as the App,
+failed:
+
+```
+Error: GET https://api.github.com/user/installations/170224209/repositories?per_page=100: 403 Resource not accessible by integration []
+Error: GET https://api.github.com/user/installations/170159387/repositories?per_page=100: 403 Resource not accessible by integration []
+```
+
+So App installations leave OpenTofu for `oob/app-installations.json`. The owner's `gh` login can't read them either:
+it is an OAuth token, and `/user/installations/{id}/repositories` takes only a token authorized to a GitHub App, a
+personal access token, or basic auth. How each installation gets read is settled in task 4.4.
+
 ### Findings, recorded and not fixed
 
 Each finding is fixed by a later change, through a PR with its plan:

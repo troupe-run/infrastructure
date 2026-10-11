@@ -5,7 +5,7 @@
 - [x] 1.1 Pin the provider (`integrations/github ~> 6.13`) in a scratch root, run `tofu providers schema -json`, and
   record in design.md which of issue types, Projects v2 and App installation repositories have a resource. Verify:
   the recorded list matches the schema output, which is quoted in the PR.
-- [ ] 1.2 With App auth (key via `op run`, nothing committed), run a read-only import plan of
+- [x] 1.2 With App auth (key via `op run`, nothing committed), run a read-only import plan of
   `github_app_installation_repositories` for installation 170224209, and of DCO's 170159387. Record which can be read,
   and update D9 to the route taken (OpenTofu or `oob/`). Verify: the plan output, or its error, is quoted in design.md.
 
@@ -14,7 +14,7 @@
 - [x] 2.1 Add `pyproject.toml` (uv, Python ≥ 3.12, dev dependencies ruff, mypy, pytest), `.gitignore` (probe state,
   `.terraform/`, `generated.tf`, plan files) and `uv.lock`. Verify: `uv sync` succeeds and `uv run pytest` runs
   (with no tests yet).
-- [ ] 2.2 Create or name the 1Password items for the App key, the state passphrase and the billing email with the
+- [x] 2.2 Create or name the 1Password items for the App key, the state passphrase and the billing email with the
   owner, and write `tofu/secrets.env` with their `op://` references only. Verify: `op run --env-file=tofu/secrets.env
   -- sh -c 'test -n "$GITHUB_APP_PEM_FILE"'` exits 0, and `git grep -n "BEGIN RSA\|BEGIN PRIVATE"` finds nothing.
 - [x] 2.3 Write `scripts/tofu.py` (D3, D4) and its tests: the env-already-set path runs `tofu` without `op`; the
