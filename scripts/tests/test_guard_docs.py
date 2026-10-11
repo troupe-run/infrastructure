@@ -1,4 +1,4 @@
-"""Task 6.4: docs/development-workflow.md lists exactly the guard's rules."""
+"""The rules doc (docs/development-workflow.md) lists exactly the guard's rules."""
 
 import re
 
