@@ -6,7 +6,8 @@ How the troupe-run GitHub organisation builds software. This repo is not the pro
 - **The org as code.** OpenTofu declares the org's settings, its repositories and their labels, and the files of
   [troupe-run/.github](https://github.com/troupe-run/.github), which is a target only. What OpenTofu can't manage is
   checked for drift from [`oob/`](oob/README.md).
-- **The development process.** The `development-workflow` spec and its guard. Coming in a later change.
+- **The development process.** The `development-workflow` spec and its guard, which governs this repo and is
+  delivered to troupe. The rules are in [docs/development-workflow.md](docs/development-workflow.md).
 
 Work follows OpenSpec: an issue, then a change under `openspec/changes/`, on a branch named after it, then a pull request
 that closes the issue. Specs live in `openspec/specs/`.
@@ -19,9 +20,12 @@ that closes the issue. Specs live in `openspec/specs/`.
 | `tofu/modules/repository/` | One managed repository: settings, labels, and protection against deletion |
 | `tofu/labels/` | Label sets as data |
 | `tofu/probe/` | Points the same module at a throwaway repo, to show drift behaviour without touching a live one |
+| `tofu/guard_delivery.tf` | The guard's files in each repository that receives it, and the generated list of them |
 | `org-profile/` | The source of `troupe-run/.github`'s files, byte for byte |
+| `scripts/guard.py`, `.githooks/`, `.claude/settings.json`, `.github/workflows/guard.yml` | The guard: this repo's own, and the source of every delivered copy |
+| `docs/development-workflow.md` | Every rule the guard enforces, and how an override works |
 | `oob/` | What OpenTofu can't manage, and `scripts/oob.py`'s declarations |
-| `scripts/` | `tofu.py` (the only way to run `tofu`), `oob.py` (drift checks), `check.py` (the repo's check) |
+| `scripts/` | `tofu.py` (the only way to run `tofu`), `oob.py` (drift checks), `check.py` (the repo's check), `guard.py` |
 
 ## Setup
 
@@ -35,6 +39,10 @@ You need:
 uv sync
 uv run scripts/check.py          # ruff, mypy --strict, pytest, tofu fmt and validate; needs no secret
 ```
+
+The first run of the check turns the git hooks on (`core.hooksPath = .githooks`), and says so. From then on, each
+commit runs the check first and needs a Conventional Commit message on a branch named after an OpenSpec change. A
+Claude Code session turns the hooks on too, and its hooks refuse the same shortcuts.
 
 ## Running a plan
 
@@ -102,3 +110,31 @@ The passphrase is in 1Password, as the item named in `tofu/secrets.env`. If it i
 - run a plan and an apply. The import blocks in `tofu/imports.tf` re-adopt everything.
 
 You lose time, not data.
+
+## Delivering the guard
+
+troupe holds copies of the guard's files, delivered from this repo by the App straight to its `main` (spec:
+`guard-delivery`). A change to the guard reaches troupe like any other change to the org, with one extra condition:
+
+1. Change the guard's source here, on the change's branch, with its tests.
+2. **Wait until CI is green on all three OSes for that commit.** troupe's own CI doesn't see the files before they
+   land, so this is their only check.
+3. Plan, show the saved plan to the owner, and apply it after approval. Each changed file becomes one commit on
+   troupe's `main`, by the App, named `chore(guard): deliver <path> <content hash> from troupe-run/infrastructure`.
+4. Check troupe's `guard` and CI runs on those commits.
+
+The probe showed how this behaves (design D3 and D8 of the `development-workflow` change):
+- troupe's ruleset lets only the App push to `main`; the owner's own push is still refused;
+- a hand edit to a delivered file in troupe fails troupe's `guard` check (`delivered-file`), and shows in the next
+  plan, whose apply restores the file;
+- an unchanged file is never recommitted.
+
+**If a delivery breaks troupe,** fix the source here and deliver again: no troupe hook can block a delivery. A person
+can also grant themselves a local override in a troupe clone.
+
+**To stop delivering,** in this order:
+1. Drop `.github/guard-delivery.json` from the delivery, and apply. The App deletes it from troupe, which turns
+   `delivered-file` off there. It has to go first, while the App can still push.
+2. Replace the remaining delivery resources with `removed` blocks (see "Changing the org"). That leaves the files in
+   troupe, which then change through troupe's own workflow.
+3. Remove `delivery_app_id` from `repo_troupe`.

@@ -270,6 +270,8 @@ The `guard` workflow arrives with D1 and runs on every push and PR here, as in t
 D9 is the plan. Existing troupe clones need nothing: the hooks path and override directory are unchanged.
 
 **Rollback, in order:**
-- set `delivery_bypass = false` on `repo_troupe`;
-- replace the delivery resources with `removed` blocks, which forget them and leave the files in place;
-- troupe's copies then become editable through troupe's own workflow again.
+1. **Drop the delivered list from the delivery,** so the App deletes it from troupe. It goes first, while the App
+   can still push. Its presence is what turns `delivered-file` on, and a `removed` block would leave it in place.
+2. **Replace the other delivery resources with `removed` blocks.** That forgets them and leaves the files in place,
+   and troupe's copies become editable through troupe's own workflow again.
+3. **Remove `delivery_app_id` from `repo_troupe`.**
