@@ -35,7 +35,7 @@
 - [x] 4.1 Update `README.md`: changes reach `main` only by a PR merged with a rebase, the owner's bypass, and
   break-glass. Verify: the README describes what the probe showed. The archived adopt-org findings stay as they
   are, and #5's closing comment says the "no rulesets" finding is fixed.
-- [ ] 4.2 Open the PR closing #5, with the plan, the probe outputs and the apply evidence. Verify: CI and DCO are
+- [x] 4.2 Open the PR closing #5, with the plan, the probe outputs and the apply evidence. Verify: CI and DCO are
   green, and the PR merges by rebase under the new ruleset, which also checks the ruleset from the inside.
 
 ## Workflow follow-up
