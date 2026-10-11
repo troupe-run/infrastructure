@@ -137,7 +137,7 @@ labels into data. Then `generated.tf` is deleted. Adoption is done when `tofu pl
 
 ### D6. What OpenTofu can't manage: read-only drift checks
 
-`oob/` holds a declaration per thing (`issue-types.json`, `project.json`, and `app-installations.json` if D9 needs
+`oob/` holds a declaration per thing (`issue-types.json`, `projects.json`, and `app-installations.json` if D9 needs
 it) and `scripts/oob.py`, which reads GitHub with `gh api` and compares. It prints the differences and exits non-zero
 if there are any. It never writes to GitHub in this change. A later change can add `--apply`, behind the same
 plan-then-approve rule. Each check names, in its output and in `oob/README.md`, the OpenTofu gap that it fills.

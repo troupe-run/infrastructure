@@ -23,7 +23,7 @@
   test fails when its branch is broken (checked by temporarily breaking it).
 - [x] 2.4 Write `scripts/check.py` (D8) and a test that it fails when one step fails. Verify: `uv run
   scripts/check.py` passes on the branch.
-- [ ] 2.5 Add `.github/workflows/ci.yml`, running `scripts/check.py` on `ubuntu-latest` for every push and pull
+- [x] 2.5 Add `.github/workflows/ci.yml`, running `scripts/check.py` on `ubuntu-latest` for every push and pull
   request, with no secrets and actions pinned to a SHA. Verify: the workflow is green on the pushed branch.
 
 ## 3. OpenTofu skeleton and encryption
@@ -55,7 +55,7 @@
 
 ## 5. Drift checks for what OpenTofu can't manage
 
-- [ ] 5.1 Write `oob/issue-types.json` and `oob/project.json` from GitHub's current state, plus `scripts/oob.py` with
+- [x] 5.1 Write `oob/issue-types.json` and `oob/project.json` from GitHub's current state, plus `scripts/oob.py` with
   tests. The tests cover: no differences exit 0; an extra, missing or changed item is reported and exits non-zero; no
   call writes. Verify: `uv run pytest` passes, and `uv run scripts/oob.py` against the live org reports no
   differences.
