@@ -1,5 +1,5 @@
 # Repository tooling only: the OpenTofu wrapper, the out-of-band drift checks and scripts/check.py.
-# Not a distributable package. See openspec/changes/adopt-org/design.md (D4, D6, D8).
+# Not a distributable package. See openspec/changes/archive/2026-10-11-adopt-org/design.md (D4, D6, D8).
 [project]
 name = "troupe-infrastructure"
 version = "0"

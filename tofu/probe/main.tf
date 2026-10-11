@@ -3,7 +3,7 @@
 # touching a live one. Its state is git-ignored and deleted with the repo; it is encrypted the
 # same way regardless.
 #
-# To run it again (task 6 in openspec/changes/adopt-org/tasks.md, archived with the change):
+# To run it again (task 6 in openspec/changes/archive/2026-10-11-adopt-org/tasks.md):
 #   1. gh repo create troupe-run/<name> --public --add-readme, then add it to the App's installation;
 #   2. save its README as README.probe.md here, and set probe_repo = "<name>" in terraform.tfvars;
 #   3. from tofu/probe, with OP_ACCOUNT set: op run --env-file=../secrets.env -- tofu <init|plan|apply>;

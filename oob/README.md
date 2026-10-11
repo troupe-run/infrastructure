@@ -3,7 +3,7 @@
 These parts of the org can't be managed by OpenTofu, so this directory declares them and
 `scripts/oob.py` checks GitHub against the declarations. It only reads: it prints every
 difference and exits 1 if there are any. Fix the difference on GitHub, or change the
-declaration here in a pull request (design D6 in `openspec/changes/adopt-org/`).
+declaration here in a pull request (design D6 in `openspec/changes/archive/2026-10-11-adopt-org/`).
 
 Checked against provider `integrations/github` 6.13.0 with `tofu providers schema` (2026-10-11).
 
