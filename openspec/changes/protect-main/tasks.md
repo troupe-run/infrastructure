@@ -25,9 +25,9 @@
 
 ## 3. Protect the live repos
 
-- [ ] 3.1 Save the plan and show it to the owner. Verify: it contains exactly the three ruleset creations, and the
+- [x] 3.1 Save the plan and show it to the owner. Verify: it contains exactly the three ruleset creations, and the
   owner approves it.
-- [ ] 3.2 Apply the saved plan, and commit the encrypted state. Verify: the plan afterwards says "No changes", each
+- [x] 3.2 Apply the saved plan, and commit the encrypted state. Verify: the plan afterwards says "No changes", each
   repo's ruleset read with `gh api` matches the probe's, and `scripts/oob.py` reports no differences.
 
 ## 4. Docs and evidence
