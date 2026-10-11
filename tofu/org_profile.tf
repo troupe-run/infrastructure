@@ -16,13 +16,9 @@ resource "github_repository_file" "org_profile" {
   branch              = "main"
   file                = each.key
   content             = file("${path.module}/../org-profile/${each.key}")
-  commit_message      = "chore: sync ${each.key} from troupe-run/infrastructure"
   overwrite_on_create = false
 
-  # The provider reads back the message of the file's last commit, which isn't a property of
-  # the file. Ignoring it keeps the plan about content; a content change still commits with
-  # the message above.
-  lifecycle {
-    ignore_changes = [commit_message]
-  }
+  # Changes exactly when the content does, so a sync never reuses an earlier message (spec:
+  # org-profile; development-workflow design D3).
+  commit_message = "chore: sync ${each.key} ${substr(sha256(file("${path.module}/../org-profile/${each.key}")), 0, 12)} from troupe-run/infrastructure"
 }

@@ -52,8 +52,9 @@ import {
   id = "troupe-run.github.io"
 }
 
+# The files troupe already had when it was adopted; the generated list is created, not imported.
 import {
-  for_each = local.guard_deliveries
+  for_each = { for key, delivery in local.guard_deliveries : key => delivery if delivery.file != local.guard_list_path }
   to       = github_repository_file.guard[each.key]
   id       = "${each.value.repository}:${each.value.file}:"
 }

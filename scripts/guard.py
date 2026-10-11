@@ -1,3 +1,4 @@
+# Source: troupe-run/infrastructure. Change it there; copies in other repositories are delivered.
 """Workflow guardrails for every repository the org builds in (spec: development-workflow).
 
 Every rule is a pure function from facts to a Decision. Thin entry points gather the facts, apply
@@ -14,9 +15,8 @@ the rules, honour a person-granted override, and refuse or allow:
 Standard library only, so it runs under `uv run --no-project` without installing anything.
 These guardrails stop honest shortcuts; they are not a security boundary (design D1).
 
-Source: troupe-run/infrastructure, where the rules are documented (docs/development-workflow.md).
-Copies in other repositories are delivered from there (spec: guard-delivery). "Design D<n>" refers
-to troupe's archived workflow-guardrails change, which holds the reasoning behind each rule.
+The rules are documented in troupe-run/infrastructure (docs/development-workflow.md). "Design D<n>"
+refers to troupe's archived workflow-guardrails change, which holds the reasoning behind each rule.
 """
 
 from __future__ import annotations
