@@ -38,5 +38,6 @@ mypy_path = ["scripts", "scripts/tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["scripts/tests"]
+pythonpath = ["scripts"]
 addopts = ["-ra", "--strict-markers", "--strict-config"]
 xfail_strict = true

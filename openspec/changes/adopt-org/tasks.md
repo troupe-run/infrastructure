@@ -17,18 +17,18 @@
 - [ ] 2.2 Create or name the 1Password items for the App key, the state passphrase and the billing email with the
   owner, and write `tofu/secrets.env` with their `op://` references only. Verify: `op run --env-file=tofu/secrets.env
   -- sh -c 'test -n "$GITHUB_APP_PEM_FILE"'` exits 0, and `git grep -n "BEGIN RSA\|BEGIN PRIVATE"` finds nothing.
-- [ ] 2.3 Write `scripts/tofu.py` (D3, D4) and its tests: the env-already-set path runs `tofu` without `op`; the
+- [x] 2.3 Write `scripts/tofu.py` (D3, D4) and its tests: the env-already-set path runs `tofu` without `op`; the
   `op` path wraps the command in `op run --env-file`; a missing secret with no `op` exits non-zero before running
   `tofu`, naming the variable. Tests use a fake `tofu` and `op` on the PATH. Verify: `uv run pytest` passes, and each
   test fails when its branch is broken (checked by temporarily breaking it).
-- [ ] 2.4 Write `scripts/check.py` (D8) and a test that it fails when one step fails. Verify: `uv run
+- [x] 2.4 Write `scripts/check.py` (D8) and a test that it fails when one step fails. Verify: `uv run
   scripts/check.py` passes on the branch.
 - [ ] 2.5 Add `.github/workflows/ci.yml`, running `scripts/check.py` on `ubuntu-latest` for every push and pull
   request, with no secrets and actions pinned to a SHA. Verify: the workflow is green on the pushed branch.
 
 ## 3. OpenTofu skeleton and encryption
 
-- [ ] 3.1 Write `tofu/versions.tf` (provider pin, `encryption` block per D2 with `enforced = true` for state and plan)
+- [x] 3.1 Write `tofu/versions.tf` (provider pin, `encryption` block per D2 with `enforced = true` for state and plan)
   and `tofu/providers.tf` (`app_auth {}`, owner `troupe-run`). Verify: `tofu fmt -check` and `tofu validate` pass
   through `check.py`.
 - [ ] 3.2 Show the encryption holds. Run `scripts/tofu.py plan` with an empty configuration and commit nothing yet.
