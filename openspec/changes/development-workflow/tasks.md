@@ -108,12 +108,12 @@
   - `.github`'s `CONTRIBUTING.md` and the synced files' messages.
 
   Verify: the owner approves it.
-- [ ] 6.2 Apply the saved plan, and commit the state. Verify:
+- [x] 6.2 Apply the saved plan, and commit the state. Verify:
   - the plan afterwards says "No changes";
   - each delivered file in troupe matches its source's sha256;
   - troupe's `guard` and CI runs on the delivery pushes are green;
   - `scripts/oob.py` reports no differences.
-- [ ] 6.3 In a scratch clone of troupe, check the delivered rule locally:
+- [x] 6.3 In a scratch clone of troupe, check the delivered rule locally:
   - a commit changing `scripts/guard.py` is refused with `delivered-file`;
   - a commit on a change's branch that touches only other files is accepted.
 
