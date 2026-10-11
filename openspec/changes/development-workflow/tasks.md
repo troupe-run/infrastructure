@@ -89,7 +89,7 @@
 
 ## 5. The matching troupe change (D9 step 5)
 
-- [ ] 5.1 Open the troupe issue. It removes troupe's `development-workflow` spec, the guard's tests (keeping
+- [x] 5.1 Open the troupe issue. It removes troupe's `development-workflow` spec, the guard's tests (keeping
   `test_check_activation.py`) and `docs/development-workflow.md`, and points `CLAUDE.md` at this repo's doc. Verify:
   the issue exists and links to #8.
 - [ ] 5.2 The troupe change is made through troupe's own workflow (issue, OpenSpec change, PR) and merged by the
