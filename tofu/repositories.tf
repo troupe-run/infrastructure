@@ -16,10 +16,12 @@ module "repo_troupe" {
 }
 
 module "repo_github" {
-  source      = "./modules/repository"
-  name        = ".github"
-  description = "Org-wide defaults for troupe-run repositories: DCO config, contributing, security policy, org profile"
-  labels      = local.github_default_labels
+  source = "./modules/repository"
+  name   = ".github"
+  # .github gets its own ruleset, letting only the App push, in required-checks.
+  protect_main = false
+  description  = "Org-wide defaults for troupe-run repositories: DCO config, contributing, security policy, org profile"
+  labels       = local.github_default_labels
 }
 
 module "repo_infrastructure" {

@@ -52,6 +52,12 @@ variable "probe_repo" {
   type        = string
 }
 
+variable "probe_bypass" {
+  description = "Passed to the module's owner_bypass: false shows the rules as they apply to everyone (D5 phase 1)."
+  type        = bool
+  default     = true
+}
+
 variable "declared" {
   description = "Set to false to remove the repo's declaration (the prevent_destroy step)."
   type        = bool
@@ -72,9 +78,10 @@ module "probe" {
   source = "../modules/repository"
   count  = var.declared ? 1 : 0
 
-  name        = var.probe_repo
-  description = "Throwaway: drift probe for troupe-run/infrastructure#2. Deleted after use."
-  labels      = jsondecode(file("${path.module}/../labels/github-defaults.json"))
+  name         = var.probe_repo
+  description  = "Throwaway: drift probe for troupe-run/infrastructure#2. Deleted after use."
+  labels       = jsondecode(file("${path.module}/../labels/github-defaults.json"))
+  owner_bypass = var.probe_bypass
 }
 
 resource "github_repository_file" "probe" {

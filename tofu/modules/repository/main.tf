@@ -65,3 +65,42 @@ resource "github_issue_labels" "this" {
     }
   }
 }
+
+# main is changed only through pull requests merged by rebase; its history can't be rewritten or
+# deleted (spec: rulesets; openspec/changes/protect-main/design.md, D2 and D3).
+resource "github_repository_ruleset" "main" {
+  count = var.protect_main ? 1 : 0
+
+  name        = "protect main"
+  repository  = github_repository.this.name
+  target      = "branch"
+  enforcement = "active"
+
+  conditions {
+    ref_name {
+      include = ["~DEFAULT_BRANCH"]
+      exclude = []
+    }
+  }
+
+  rules {
+    deletion                = true
+    non_fast_forward        = true
+    required_linear_history = true
+
+    pull_request {
+      required_approving_review_count = 0
+      allowed_merge_methods           = ["rebase"]
+    }
+  }
+
+  # Org owners bypass on pull requests only: never a direct push, so an agent using the owner's
+  # credentials can't push to main either. Break-glass is editing the ruleset on GitHub.
+  dynamic "bypass_actors" {
+    for_each = var.owner_bypass ? [1] : []
+    content {
+      actor_type  = "OrganizationAdmin"
+      bypass_mode = "pull_request"
+    }
+  }
+}
