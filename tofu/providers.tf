@@ -1,8 +1,18 @@
-# The provider acts as the troupe-run-infrastructure App (design D3). With `app_auth {}` empty it
-# reads GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID and GITHUB_APP_PEM_FILE (the key's contents),
-# which scripts/tofu.py supplies, so this block is the same locally and in CI.
+# The provider acts as the troupe-run-infrastructure App (design D3). The App and installation
+# IDs aren't secret; the private key arrives at run time through var.github_app_pem, supplied by
+# scripts/tofu.py from 1Password (or by CI from a secret), so this block is the same everywhere.
 provider "github" {
   owner = "troupe-run"
 
-  app_auth {}
+  app_auth {
+    id              = "5272634"
+    installation_id = "170224209"
+    pem_file        = var.github_app_pem
+  }
+}
+
+variable "github_app_pem" {
+  description = "The App's private key (PEM contents, not a path). Never committed."
+  type        = string
+  sensitive   = true
 }

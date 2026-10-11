@@ -16,7 +16,7 @@
   (with no tests yet).
 - [x] 2.2 Create or name the 1Password items for the App key, the state passphrase and the billing email with the
   owner, and write `tofu/secrets.env` with their `op://` references only. Verify: `op run --env-file=tofu/secrets.env
-  -- sh -c 'test -n "$GITHUB_APP_PEM_FILE"'` exits 0, and `git grep -n "BEGIN RSA\|BEGIN PRIVATE"` finds nothing.
+  -- sh -c 'test -n "$TF_VAR_github_app_pem"'` exits 0, and `git grep -n "BEGIN RSA\|BEGIN PRIVATE"` finds nothing.
 - [x] 2.3 Write `scripts/tofu.py` (D3, D4) and its tests: the env-already-set path runs `tofu` without `op`; the
   `op` path wraps the command in `op run --env-file`; a missing secret with no `op` exits non-zero before running
   `tofu`, naming the variable. Tests use a fake `tofu` and `op` on the PATH. Verify: `uv run pytest` passes, and each

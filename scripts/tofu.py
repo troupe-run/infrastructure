@@ -3,7 +3,6 @@
 Usage: uv run scripts/tofu.py <tofu arguments>     e.g. uv run scripts/tofu.py plan
 
 This is the only documented way to run `tofu` here (design D3, D4):
-- it sets the App's IDs, which aren't secret, so nobody has to export them;
 - when the secrets are already in the environment (CI), it runs `tofu` as is;
 - otherwise it runs `tofu` under `op run`, which resolves the `op://` references in
   tofu/secrets.env for that one process and masks them in its output;
@@ -22,16 +21,9 @@ ROOT = Path(__file__).resolve().parent.parent
 TOFU_DIR = ROOT / "tofu"
 SECRETS_ENV = TOFU_DIR / "secrets.env"
 
-# Not secret (spec: state-and-apply). The provider reads these when `app_auth {}` is empty.
-APP_ENV = {
-    "GITHUB_OWNER": "troupe-run",
-    "GITHUB_APP_ID": "5272634",
-    "GITHUB_APP_INSTALLATION_ID": "170224209",
-}
-
 # Supplied at run time, never committed. The billing email isn't secret, but it is personal
 # data in a public repo, so it travels the same way (design D4).
-SECRETS = ("GITHUB_APP_PEM_FILE", "TF_VAR_state_passphrase", "TF_VAR_billing_email")
+SECRETS = ("TF_VAR_github_app_pem", "TF_VAR_state_passphrase", "TF_VAR_billing_email")
 
 # The 1Password account holding the items in tofu/secrets.env. An OP_ACCOUNT already in the
 # environment wins.
@@ -68,7 +60,7 @@ def plan_command(
 
 
 def main(argv: list[str]) -> int:
-    env = {**os.environ, **APP_ENV}
+    env = dict(os.environ)
     env.setdefault("OP_ACCOUNT", OP_ACCOUNT)
     decision = plan_command(argv, env, shutil.which)
     if isinstance(decision, Refusal):
