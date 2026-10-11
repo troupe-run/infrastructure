@@ -12,4 +12,7 @@ __pycache__/
 generated.tf
 *.tfplan
 tofu/probe/terraform.tfstate*
+tofu/probe/terraform.tfvars
+tofu/probe/README.probe.md
+tofu/probe/.terraform.lock.hcl
 *.tfstate.backup

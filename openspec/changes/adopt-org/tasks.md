@@ -65,13 +65,14 @@
 
 ## 6. Prove the drift behaviours on a throwaway repo (D7)
 
-- [ ] 6.1 Create `troupe-run/infra-probe-<date>` with the owner's `gh`. The owner adds it to the infrastructure App's
+- [x] 6.1 Create `troupe-run/infra-probe-<date>` with the owner's `gh`. The owner adds it to the infrastructure App's
   installation. Write `tofu/probe/` using `modules/repository` and a `github_repository_file`, with its own encrypted
   state, git-ignored. Verify: import, then a clean plan.
-- [ ] 6.2 Change a merge setting, add a label and add a file on the probe repo by hand. Verify: the plan shows each
-  reverting or reported, and the output is quoted in the PR.
-- [ ] 6.3 Remove the repo's declaration. Verify: the plan fails on `prevent_destroy`, and the repo still exists.
-- [ ] 6.4 Delete the probe repo, and remove it from the installation if GitHub hasn't already. Verify: `gh repo view
+- [x] 6.2 Change a merge setting, add a label and edit the managed file on the probe repo by hand. Verify: the plan
+  shows each reverting, and the output is quoted in the PR. (A file added by hand is invisible to OpenTofu, so it's
+  covered by the `.github files` check in `scripts/oob.py`, with tests and a clean live run.)
+- [x] 6.3 Remove the repo's declaration. Verify: the plan fails on `prevent_destroy`, and the repo still exists.
+- [x] 6.4 Delete the probe repo, and remove it from the installation if GitHub hasn't already. Verify: `gh repo view
   troupe-run/infra-probe-<date>` reports not found.
 
 ## 7. Docs and evidence

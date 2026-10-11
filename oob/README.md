@@ -10,6 +10,7 @@ Checked against provider `integrations/github` 6.13.0 with `tofu providers schem
 | File | What it declares | Why OpenTofu can't manage it | Read with |
 |---|---|---|---|
 | `issue-types.json` | the org's issue types: name, description, colour, enabled | the provider has no resource or data source for issue types | `gh api orgs/troupe-run/issue-types` |
+| org-profile/ (derived) | the files `troupe-run/.github` should hold: exactly the files under `org-profile/` | `github_repository_file` manages declared files only, so a file added by hand would never show in a plan | `gh api repos/troupe-run/.github/git/trees/main` |
 | `org-settings.json` | org settings the provider has no attribute for: today, whether 2FA is required | `github_organization_settings` has no two-factor attribute | `gh api orgs/troupe-run` |
 | `projects.json` | the org's projects: number, title, public, closed, short description | the provider supports only classic Projects; ours are Projects v2 | `gh api graphql` (`projectsV2`) |
 
