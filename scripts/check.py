@@ -4,7 +4,7 @@ Usage: uv run scripts/check.py
 
 The same script runs locally and in CI, so the two can't diverge (design D8). It needs no
 secret: `tofu validate` reads neither state nor variable values. Every repo the org builds in
-has a scripts/check.py; the development-workflow guard will rely on that name.
+has a scripts/check.py; the development-workflow guard runs it before every commit.
 """
 
 import shutil
@@ -40,6 +40,20 @@ def gates() -> list[tuple[str, list[str]]]:
     ]
 
 
+def activate_git_hooks(root: Path) -> str | None:
+    """Turn the repository's git hooks on by default (spec: development-workflow).
+
+    Git never runs hooks from a fresh clone, so the project's own tooling turns them on. The
+    logic lives in guard.py, next to the hooks it activates.
+    """
+    if not (root / ".git").exists():
+        return None  # not a git checkout (for example, an unpacked source archive)
+    sys.path.insert(0, str(root / "scripts"))
+    import guard
+
+    return guard.activate_hooks(root)
+
+
 def run_gates(steps: list[tuple[str, list[str]]], cwd: Path) -> int:
     for label, command in steps:
         print(f"==> {label}", flush=True)
@@ -55,5 +69,12 @@ def run_gates(steps: list[tuple[str, list[str]]], cwd: Path) -> int:
     return 0
 
 
+def main() -> int:
+    activated = activate_git_hooks(ROOT)
+    if activated is not None:
+        print(f"check: {activated}", flush=True)
+    return run_gates(gates(), ROOT)
+
+
 if __name__ == "__main__":
-    sys.exit(run_gates(gates(), ROOT))
+    sys.exit(main())
