@@ -1,11 +1,10 @@
 # The files of troupe-run/.github, whose source is ../org-profile (spec: org-profile).
 
 locals {
+  # Every file under org-profile/, so a new source can't be left unpublished (pr-templates D1).
+  # fileset reads the disk, not git, so macOS's .DS_Store is left out of a local plan.
   org_profile_files = toset([
-    "CONTRIBUTING.md",
-    "SECURITY.md",
-    "profile/README.md",
-    ".github/dco.yml",
+    for f in fileset("${path.module}/../org-profile", "**") : f if basename(f) != ".DS_Store"
   ])
 }
 

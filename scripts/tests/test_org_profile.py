@@ -90,7 +90,8 @@ def test_the_decision_form_applies_needs_owner() -> None:
 
 @pytest.mark.parametrize(
     "path",
-    sorted(p for p in ORG_PROFILE.rglob("*") if p.is_file()),
+    # Every file tofu/org_profile.tf publishes, which leaves out macOS's .DS_Store (design D1).
+    sorted(p for p in ORG_PROFILE.rglob("*") if p.is_file() and p.name != ".DS_Store"),
     ids=lambda p: p.relative_to(ORG_PROFILE).as_posix(),
 )
 def test_every_org_profile_file_starts_with_its_source_note(path: Path) -> None:

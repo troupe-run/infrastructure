@@ -35,7 +35,7 @@
 
 ## 3. Publishing (design D1)
 
-- [ ] 3.1 In `tofu/org_profile.tf`, derive `org_profile_files` from `fileset("${path.module}/../org-profile", "**")`,
+- [x] 3.1 In `tofu/org_profile.tf`, derive `org_profile_files` from `fileset("${path.module}/../org-profile", "**")`,
   excluding `.DS_Store`, and update the file's opening comment. Verify:
   - `scripts/check.py` passes;
   - `tofu console` lists the nine paths (the four existing, the five new);
