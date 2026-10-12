@@ -27,6 +27,9 @@
   `editLink`, the footer's "Site source"), with a note to merge it only after the rename is applied. Verify: its
   checks are green, and its diff touches only those three references.
 
+  There were four, not three: `tests/e2e/docs.spec.ts` asserts the edit link, so it changes with `editLink`
+  (troupe-run/troupe-run.github.io#3). Its CI ran 49 unit and 182 e2e tests on Node 22.
+
 ## Workflow follow-up
 
 - Archive on the branch before the merge, syncing the `repositories` and `rulesets` deltas.
