@@ -91,6 +91,8 @@ workflow_dispatch on main ----------+-> [plan] env: plan (read-only App)
   - metadata: read.
 
   The probe (D8) settles the exact set: any 403 in a read-only plan names a missing read permission.
+- **Its IDs:** App 5280157, installation 170434831 (created by the owner, 2026-10-12). Its key is the 1Password item
+  `troupe-run-infrastructure-plan` in `troupe.run`, field `private key`, the same shape as the write App's.
 - **Its installation** covers the same repositories as the write App's. The README's "Adding a repository" gains
   "install both Apps".
 - **The `plan` environment** holds the read-only App's key, the state passphrase and the billing email. It has no
