@@ -9,6 +9,9 @@
   - `scripts/check.py` passes (`tofu fmt`, `tofu validate`, tests);
   - `grep -c '"needs:owner"' tofu/labels/*.json` finds it in `workflow.json` only.
 
+  Extended during apply (owner, 2026-10-12): `parked` moved the same way (colour `C5DEF5`); `troupe.json` then holds
+  only `cap:*` labels.
+
 ## 2. The templates (design D2, D4)
 
 - [x] 2.1 Write `org-profile/.github/PULL_REQUEST_TEMPLATE.md`: troupe's template (design Context), with the D2
@@ -50,8 +53,8 @@
 
 - [ ] 4.1 Open the pull request (`Closes #19`, "Part of #15"; design D7). Its evidence:
   - the CI plan comment, after the owner approves the run. It must show five files created in `troupe-run/.github`,
-    `needs:owner` created in `infrastructure`, `.github` and `website`, and no change to the four existing files or
-    to troupe's labels;
+    `needs:owner` and `parked` created in `infrastructure`, `.github` and `website`, and no change to the four
+    existing files or to troupe's labels;
   - the test output.
 
   Verify: every required check is green on all three OSes, and the plan comment matches.

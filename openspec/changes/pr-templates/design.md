@@ -69,18 +69,22 @@ derived drift check was written to avoid.
 **Alternative for the PR template: no note.** That breaks `org-profile`'s requirement for one file. The cost of the
 note is a line of hidden text in each PR description, which is acceptable.
 
-### D3. `needs:owner` moves to a shared list every repository gets
+### D3. The workflow's labels move to a shared list every repository gets
 
 A new `tofu/labels/workflow.json` holds `needs:owner` (colour `D93F0B`, "Waiting on a decision from the owner", as
 troupe has it). `tofu/repositories.tf` gains `local.workflow_labels`, and each repository's `labels` becomes
 `concat(local.github_default_labels, local.workflow_labels, …)`. The entry leaves `troupe.json`, so troupe declares
 it once.
 
+**`parked` joins it** (owner, 2026-10-12, during apply): "Agreed or deferred until a named later change" (colour
+`C5DEF5`) is the workflow's too, not troupe's. With both moved, `troupe.json` holds only troupe's `cap:*` labels,
+which `capability-labels` will replace whole.
+
 **Why one list:** the label is the workflow's, not troupe's. A future workflow label is added in one place.
 
 **troupe's plan stays empty for this label:** same name, colour and description. The module writes all of a
 repository's labels as one `github_issue_labels` resource, keyed by name (`tofu/modules/repository/main.tf`), so
-moving the entry between lists changes nothing GitHub sees. The plan is the proof.
+moving entries between lists changes nothing GitHub sees. The plan is the proof.
 
 **Alternative: drop `labels:` from the Decision form.** GitHub skips a label that doesn't exist, so the form would
 still work, but a Decision issue would lose the marker the owner filters on.
@@ -94,7 +98,9 @@ As the issue gives it:
 - `decision.yml` and `config.yml` as the issue says; `config.yml`'s contact link is named "Report a vulnerability",
   points to `https://github.com/troupe-run/.github/blob/main/SECURITY.md`, and says to report privately.
 - **PR template:** troupe's, with the last comment replaced by: "Archive the change on this branch before merging.
-  After the merge, comment on the issue with this PR and the archived change."
+  After the merge, comment on the issue with this PR and the archived change." The Verified prompt's tool list gains
+  "e.g." ("The commands you ran (e.g. tests, ruff, mypy --strict)…"), so it reads as an example in repositories that
+  don't use Python (owner, 2026-10-12, during apply).
 
 **One addition to the issue's wording:** the "Add a `cap:<capability>` label…" line in `feature.yml` and
 `decision.yml` becomes "If the repository has `cap:<capability>` labels, add one for each capability this touches."
@@ -148,7 +154,7 @@ opened from a session. Options:
 
 ## Migration Plan
 
-1. Merge; CI's plan shows five file creations in `.github`, `needs:owner` created in three repositories, and no
+1. Merge; CI's plan shows five file creations in `.github`, `needs:owner` and `parked` created in three repositories, and no
    change to the existing four files or troupe's labels.
 2. The owner approves the apply. D6 verifies on a throwaway repository.
 3. Part 2 in troupe deletes its templates, and the org defaults apply there.
