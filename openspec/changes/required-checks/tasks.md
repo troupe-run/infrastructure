@@ -59,7 +59,7 @@
   body checks. Verify the test fails when it should:
   - temporarily renaming a matrix leg in a scratch copy fails it, and so does dropping an entry from the JSON;
   - the real files pass.
-- [ ] 2.4 Update the docs:
+- [x] 2.4 Update the docs:
   - the README's "How main is protected": the required checks, where their names live, and that the owner's bypass
     merges past a red check;
   - `docs/development-workflow.md`: the `guard` check *is* required now (lines 17, 27–28 and 90), and the

@@ -144,9 +144,16 @@ Every managed repository except `.github` has a ruleset named "protect main" on 
 - **Changes reach `main` only through a pull request,** merged with a rebase. No approval is required. A direct push,
   a force-push, a merge commit and a squash are all refused, for the owner too. GitHub refuses to delete a default
   branch anyway.
+- **A pull request merges only when its required checks pass.** Each repository's checks are listed in
+  `tofu/required-checks.json`, as GitHub names them (`guard tests (macos-latest, Python 3.13)`, not the workflow's job
+  id), each pinned to the App that posts it, so a status of the same name posted by anything else doesn't count. A
+  skipped job counts as passed. A test checks this repository's list against its workflows; when you rename a job or
+  change a matrix in troupe or the website, change the list here too, or their pull requests wait for a check that
+  never reports.
 - **The owner's bypass works only on pull requests.** An org admin can merge a PR past a rule that blocks it with
-  `gh pr merge --rebase --admin` (or the checkbox in the UI), and the ruleset's insights record it as a bypass. The
-  bypass doesn't allow a merge commit or a squash, and doesn't allow a direct push.
+  `gh pr merge --rebase --admin` (or the checkbox in the UI), past failing or missing required checks too, and the
+  ruleset's insights record it as a bypass. The bypass doesn't allow a merge commit or a squash, and doesn't allow a
+  direct push.
 - **Break-glass:** an org owner can always edit or disable a ruleset on GitHub. The next plan shows the edit as
   drift, and an apply restores the declared ruleset. Follow it with a PR.
 
