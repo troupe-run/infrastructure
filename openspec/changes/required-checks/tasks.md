@@ -100,7 +100,7 @@
   - `scripts/check.py` passes;
   - a local plan shows one ruleset created on `.github` with only the App as a bypass actor, and no other ruleset
     replaced.
-- [ ] 4.2 Add the D6 note as the first line of each file in `org-profile/`. Verify:
+- [x] 4.2 Add the D6 note as the first line of each file in `org-profile/`. Verify:
   - a local plan shows four `github_repository_file.org_profile` updates, each with a new `chore: sync ...` message;
   - after the apply, the org profile page renders without the note (checked in follow-up).
 
