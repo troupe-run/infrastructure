@@ -95,7 +95,7 @@
 
 ## 4. `.github`'s ruleset and notes (design D4, D6)
 
-- [ ] 4.1 Set `repo_github` to `main_ruleset = "app-only"` (task 1.1), with the App's bypass. Update the README
+- [x] 4.1 Set `repo_github` to `main_ruleset = "app-only"` (task 1.1), with the App's bypass. Update the README
   ("Adding a repository", which still names `protect_main`, and "How main is protected"). Verify:
   - `scripts/check.py` passes;
   - a local plan shows one ruleset created on `.github` with only the App as a bypass actor, and no other ruleset

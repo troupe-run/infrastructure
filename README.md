@@ -145,7 +145,11 @@ main" ruleset unless its `module` block sets `main_ruleset` to `app-only` or `no
 
 ## How main is protected
 
-Every managed repository except `.github` has a ruleset named "protect main" on its default branch:
+`.github` has a ruleset named "app only": nobody but the infrastructure App can change its `main`, not by a push and
+not by merging a pull request, and the owner has no bypass. Its files are written from `org-profile/` here, so change
+them there. The break-glass is the same as below: edit or disable the ruleset on GitHub, and the next plan restores it.
+
+Every other managed repository has a ruleset named "protect main" on its default branch:
 - **Changes reach `main` only through a pull request,** merged with a rebase. No approval is required. A direct push,
   a force-push, a merge commit and a squash are all refused, for the owner too. GitHub refuses to delete a default
   branch anyway.
