@@ -53,7 +53,7 @@
   - `scripts/check.py` passes;
   - a local plan shows `required_status_checks` added to exactly the three `protect main` rulesets, with the
     expected names and IDs.
-- [ ] 2.3 Write `scripts/tests/test_required_checks.py` (D1). It expands every `pull_request` job's name across its
+- [x] 2.3 Write `scripts/tests/test_required_checks.py` (D1). It expands every `pull_request` job's name across its
   matrix (`include`/`exclude`) in `ci.yml`, `guard.yml` and `tofu.yml`, leaving out `changes`. It asserts that the
   result equals `infrastructure`'s `github-actions` entries, and that `DCO` is listed. Name each test for what its
   body checks. Verify the test fails when it should:
