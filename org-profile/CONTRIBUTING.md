@@ -1,3 +1,4 @@
+<!-- Source: troupe-run/infrastructure (org-profile/CONTRIBUTING.md). Change it there; this copy is written by the App. -->
 # Contributing to troupe
 
 Thanks for helping. This guide applies to every troupe-run repository that doesn't have a `CONTRIBUTING.md` of
