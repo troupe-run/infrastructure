@@ -10,7 +10,7 @@
   - each fails when its behaviour is broken: blob ID, skip, the planned `sha`, the message, and the 409 exit;
   - the end-to-end test fails when the script is replaced by the old `jq --arg` command on Linux, or, where it can't
     be run on macOS, the CI `check` job's output is shown.
-- [ ] 1.3 Replace the "Commit the state to main as the App" step in `tofu.yml` with a call to the script; nothing else
+- [x] 1.3 Replace the "Commit the state to main as the App" step in `tofu.yml` with a call to the script; nothing else
   in the workflow changes. Verify: `actionlint` is clean, and the diff of `tofu.yml` touches only that step.
 
 ## 2. Prove it against GitHub (D3)

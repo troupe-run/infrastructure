@@ -271,18 +271,10 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          # The blob the plan was made from: if main's file has changed since, GitHub answers 409
-          # instead of overwriting it (design D4), and the state stays in the artifact above.
-          blob=$(git rev-parse "$SHA:tofu/terraform.tfstate")
-          if [ "$(git hash-object tofu/terraform.tfstate)" = "$blob" ]; then
-            echo "The state is unchanged (the apply wrote nothing); no commit."
-            exit 0
-          fi
-          jq -n \
-            --arg message "$(printf 'chore(tofu): commit the state after applying %s\n\nApplied by %s' "${SHA:0:7}" "$RUN_URL")" \
-            --arg content "$(base64 -w0 tofu/terraform.tfstate)" \
-            --arg sha "$blob" \
-            '{message: $message, content: $content, sha: $sha, branch: "main"}' > "$RUNNER_TEMP/state.json"
-          gh api -X PUT "repos/$GITHUB_REPOSITORY/contents/tofu/terraform.tfstate" \
-            --input "$RUNNER_TEMP/state.json" --jq '"committed " + .commit.sha'
+        # Skips an unchanged state; otherwise commits it on the blob the plan was made from, so a
+        # main changed since gets a 409 instead of an overwrite, and the state stays in the artifact
+        # above (ci-apply design D4). The request is built in memory: the state is too big for one
+        # command-line argument (fix-state-commit).
+        run: >-
+          uv run --no-project scripts/commit_state.py --repo "$GITHUB_REPOSITORY" --branch main
+          --path tofu/terraform.tfstate --planned "$SHA" --run-url "$RUN_URL"
