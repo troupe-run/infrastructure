@@ -124,13 +124,13 @@ the issue chooser and a draft PR, and check the three forms, the blank issue, th
 template. File one Decision issue and check its type and label. Then delete the repository. The live repositories
 are only read: `infrastructure`'s issue chooser shows the forms.
 
-### D7. How this PR references #15 (open: needs the owner)
+### D7. How this PR references #15 (owner: option A, 2026-10-12)
 
 The issue's plan says this PR says "Part of #15", so #15 stays open until troupe's part lands. The guard's
 `pr-closes-issue` rule refuses a PR into this repository without a closing keyword, so "Part of #15" alone can't be
 opened from a session. Options:
 - **A. A sub-issue of #15 for this part** ("Publish the PR template and issue forms as org defaults"); this PR
-  `Closes` it and says "Part of #15". troupe's PR closes #15. Fits the rule and the issue's intent. *Recommended.*
+  `Closes` it and says "Part of #15". troupe's PR closes #15. Fits the rule and the issue's intent. *Chosen: #19.*
 - **B. This PR closes #15,** and part 2 gets its own issue in troupe. Simpler, but #15 closes while troupe's copies
   are still stale, which is the problem #15 reports.
 - **C. The owner grants a one-use override** of `pr-closes-issue` for this PR. Uses the break-glass for a routine
