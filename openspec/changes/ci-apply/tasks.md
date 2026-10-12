@@ -41,14 +41,14 @@
 
 ## 3. The ephemeral identity and the environments (D3, D2, D11 step 3)
 
-- [ ] 3.1 In `tofu/providers.tf`, make `github_app_pem` ephemeral (D3). Verify:
+- [x] 3.1 In `tofu/providers.tf`, make `github_app_pem` ephemeral (D3). Verify:
   - `scripts/check.py` passes;
   - a local plan reports no changes;
   - that plan, saved, holds no private key (`tofu show -json` grep) and applies only with the key supplied.
-- [ ] 3.2 Add `tofu/environments.tf`: `plan-pr`, `plan-main` and `apply` on `infrastructure` with the D2 settings, and
+- [x] 3.2 Add `tofu/environments.tf`: `plan-pr`, `plan-main` and `apply` on `infrastructure` with the D2 settings, and
   the `main`-only deployment policies for `plan-main` and `apply`. Verify: `scripts/check.py` passes, and the saved
   plan shows exactly the three environments and the two policies to add.
-- [ ] 3.3 Show the owner the saved plan. After their approval, apply it, then commit the state. Verify:
+- [x] 3.3 Show the owner the saved plan. After their approval, apply it, then commit the state. Verify:
   - the next plan reports no changes;
   - `gh api repos/troupe-run/infrastructure/environments` shows all three environments, with the reviewers and
     branch policies as declared.
