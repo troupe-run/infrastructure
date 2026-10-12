@@ -26,16 +26,16 @@ variable "labels" {
   }))
 }
 
-# Merge and feature settings. The defaults are what every repo had when adopted (2026-10-11);
-# several are findings to fix in later changes (openspec/changes/archive/2026-10-11-adopt-org/design.md, Findings).
+# Merge and feature settings (spec: repositories; required-checks design D5): rebase merges only,
+# matching the ruleset, branches deleted on merge, and the unused wiki and classic projects off.
 variable "allow_merge_commit" {
   type    = bool
-  default = true
+  default = false
 }
 
 variable "allow_squash_merge" {
   type    = bool
-  default = true
+  default = false
 }
 
 variable "allow_rebase_merge" {
@@ -45,17 +45,17 @@ variable "allow_rebase_merge" {
 
 variable "delete_branch_on_merge" {
   type    = bool
-  default = false
+  default = true
 }
 
 variable "has_wiki" {
   type    = bool
-  default = true
+  default = false
 }
 
 variable "has_projects" {
   type    = bool
-  default = true
+  default = false
 }
 
 # Which ruleset covers main (spec: rulesets; required-checks design D4):
