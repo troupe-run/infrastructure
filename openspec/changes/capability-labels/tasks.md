@@ -23,16 +23,16 @@
 
 ## 3. The spec check
 
-- [ ] 3.1 Write failing tests in `scripts/tests/test_oob.py`, each named for what it checks: a troupe spec folder
+- [x] 3.1 Write failing tests in `scripts/tests/test_oob.py`, each named for what it checks: a troupe spec folder
       with no label is reported, naming the folder and `tofu/labels/troupe.json`; a label with no spec is not
       reported; every spec labelled reports nothing; the `gh` call that lists the specs is a read (extend
       `test_every_github_call_is_a_read`). Verify they fail with `uv run pytest scripts/tests/test_oob.py`
-- [ ] 3.2 Add the one-way spec check to `scripts/oob.py` (design D4) and include it in `run` and in `main`'s
+- [x] 3.2 Add the one-way spec check to `scripts/oob.py` (design D4) and include it in `run` and in `main`'s
       "no differences" line; verify the tests from 3.1 pass and `uv run scripts/check.py` passes (mypy --strict,
       ruff)
-- [ ] 3.3 Run `uv run scripts/oob.py` against GitHub before 2.4's plan is applied and verify it reports exactly the
+- [x] 3.3 Run `uv run scripts/oob.py` against GitHub before 2.4's plan is applied and verify it reports exactly the
       three specs as unlabelled when run on `main`'s `troupe.json`, and nothing for troupe's specs on this branch
-- [ ] 3.4 Add a row for troupe's specs to `oob/README.md`'s check table (what's declared, why OpenTofu can't check
+- [x] 3.4 Add a row for troupe's specs to `oob/README.md`'s check table (what's declared, why OpenTofu can't check
       it, how it's read), and verify the table renders with `uv run scripts/check.py` still passing
 
 ## 4. Document the path

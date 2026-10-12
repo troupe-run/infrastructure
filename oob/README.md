@@ -14,6 +14,7 @@ Checked against provider `integrations/github` 6.13.0 with `tofu providers schem
 | `app-installations.json` | each App installed in the org: its permissions and repository selection | the provider can't read installations as the App (403, design D9) | `gh api orgs/troupe-run/installations` |
 | `org-settings.json` | org settings the provider has no attribute for: today, whether 2FA is required | `github_organization_settings` has no two-factor attribute | `gh api orgs/troupe-run` |
 | `projects.json` | the org's projects: number, title, public, closed, short description | the provider supports only classic Projects; ours are Projects v2 | `gh api graphql` (`projectsV2`) |
+| `tofu/labels/troupe.json` (derived) | a `cap:<name>` label for each folder in troupe's `openspec/specs/`. One way: a label with no spec isn't reported, since a label can come before its spec. The fix is a pull request adding the label (spec: labels) | OpenTofu manages the labels but can't read troupe's files | `gh api repos/troupe-run/troupe/contents/openspec/specs` |
 
 Run it with your own `gh` login, which needs read access to the org:
 

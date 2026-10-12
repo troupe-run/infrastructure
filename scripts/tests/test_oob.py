@@ -18,6 +18,11 @@ APPS = [
     {"app_slug": "dco", "repository_selection": "selected", "permissions": {"checks": "write"}},
 ]
 PROFILE = [{"path": "CONTRIBUTING.md"}, {"path": "profile/README.md"}]
+CAP_LABELS = [
+    {"name": "cap:cli", "color": "1D76DB", "description": "Capability: cli"},
+    {"name": "cap:cues", "color": "1D76DB", "description": "Capability: cues"},
+]
+SPECS = ["cli"]
 
 
 @pytest.fixture
@@ -30,6 +35,9 @@ def oob_dir(tmp_path: Path) -> Path:
         source = tmp_path / "org-profile" / f["path"]
         source.parent.mkdir(parents=True, exist_ok=True)
         source.write_text("x")
+    labels = tmp_path / "tofu" / "labels" / "troupe.json"
+    labels.parent.mkdir(parents=True)
+    labels.write_text(json.dumps(CAP_LABELS))
     return tmp_path
 
 
@@ -40,9 +48,12 @@ def fake_github(
     settings: list[Any] = SETTINGS,
     profile: list[Any] = PROFILE,
     apps: list[Any] = APPS,
+    specs: list[str] = SPECS,
 ) -> oob.Fetch:
     def fetch(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
         calls.append(args)
+        if args[1].endswith("/contents/openspec/specs"):
+            return specs
         if args[1].endswith("/installations"):
             return apps
         if "git/trees" in args[1]:
@@ -116,6 +127,23 @@ def test_an_app_installed_on_all_repos_is_reported(oob_dir: Path) -> None:
     ]
 
 
+def test_a_troupe_spec_with_no_cap_label_is_reported(oob_dir: Path) -> None:
+    found = RUN(fake_github(TYPES, PROJECTS, [], specs=["cli", "artifact-store"]), oob_dir)
+    assert found == [
+        "troupe specs: 'artifact-store' has no cap:artifact-store label; "
+        "add it to tofu/labels/troupe.json by pull request"
+    ]
+
+
+def test_a_cap_label_ahead_of_its_spec_is_not_reported(oob_dir: Path) -> None:
+    """cap:cues is declared and troupe has no cues spec: a label can come before its spec."""
+    assert RUN(fake_github(TYPES, PROJECTS, [], specs=["cli"]), oob_dir) == []
+
+
+def test_troupe_specs_all_labelled_report_nothing(oob_dir: Path) -> None:
+    assert RUN(fake_github(TYPES, PROJECTS, [], specs=["cli", "cues"]), oob_dir) == []
+
+
 def test_main_exits_non_zero_on_a_difference(
     oob_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -138,12 +166,11 @@ def test_main_exits_zero_when_nothing_differs(
 def test_every_github_call_is_a_read() -> None:
     """REST calls carry no method or body flags; the GraphQL call is a query, not a mutation."""
     write_flags = {"-X", "--method", "-F", "--field", "--input", "-H"}
-    for check in oob.CHECKS:
-        args = check.gh_args
+    for name, args in [*((c.name, c.gh_args) for c in oob.CHECKS), ("specs", oob.SPECS_GH_ARGS)]:
         assert args[0] == "api"
-        assert not write_flags & set(args), check.name
+        assert not write_flags & set(args), name
         fields = [args[i + 1] for i, a in enumerate(args) if a in {"-f", "--raw-field"}]
         if args[1] == "graphql":
-            assert all(f.startswith("query={") for f in fields), check.name
+            assert all(f.startswith("query={") for f in fields), name
         else:
-            assert fields == [], check.name
+            assert fields == [], name
