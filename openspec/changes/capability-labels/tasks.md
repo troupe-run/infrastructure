@@ -2,20 +2,20 @@
 
 ## 1. The decision
 
-- [ ] 1.1 Rewrite the constraint in `openspec/config.yaml` to design D1's wording, and verify with
+- [x] 1.1 Rewrite the constraint in `openspec/config.yaml` to design D1's wording, and verify with
       `openspec context --json` that the config still parses and carries the new text
-- [ ] 1.2 `parked` was removed from #22 at proposal time (2026-10-12, the owner's direction; it no longer waits on
+- [x] 1.2 `parked` was removed from #22 at proposal time (2026-10-12, the owner's direction; it no longer waits on
       troupe). Verify with `gh issue view 22 --json labels` that it is still off
 
 ## 2. Reconcile troupe's labels
 
-- [ ] 2.1 Re-read usage: list every `cap:*` label on troupe-run/troupe issues and pull requests, open and closed,
+- [x] 2.1 Re-read usage: list every `cap:*` label on troupe-run/troupe issues and pull requests, open and closed,
       and verify every one of the 34 declared labels is still in `tofu/labels/troupe.json` (none removed or renamed;
       design D3)
-- [ ] 2.2 Add `cap:artifact-store`, `cap:runner-protocol` and `cap:scripted-runner` to `tofu/labels/troupe.json`
+- [x] 2.2 Add `cap:artifact-store`, `cap:runner-protocol` and `cap:scripted-runner` to `tofu/labels/troupe.json`
       (colour `1D76DB`, description `Capability: <name>`, sorted by name; design D2), and verify the file holds 37
       labels and `uv run scripts/check.py` passes (`tofu fmt`, `tofu validate`)
-- [ ] 2.3 Replace the "copied as they were on 2026-10-11" comment in `tofu/repositories.tf` with one saying
+- [x] 2.3 Replace the "copied as they were on 2026-10-11" comment in `tofu/repositories.tf` with one saying
       `troupe.json` is troupe's capability labels, changed by pull request (spec: labels), and verify `tofu fmt`
       passes
 - [ ] 2.4 Run `uv run scripts/tofu.py plan` and verify it shows exactly three labels created on troupe-run/troupe and

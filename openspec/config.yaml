@@ -25,7 +25,9 @@ context: |
     environment that needs the owner's approval.
   - troupe-run/.github holds only what GitHub expects. Its files are written here and carry a note saying so.
     Commits into it are made by the App through the API, so GitHub signs them.
-  - Product concepts stay in troupe. The capability list is read from there, never copied by hand.
+  - Product concepts stay in troupe. troupe's `cap:*` labels are the exception: they're declared here in
+    tofu/labels/troupe.json and changed by pull request when a capability is needed. troupe keeps no separate
+    capability list to read them from (owner, 2026-10-12, #22).
   - Changes to a product repo's files arrive as pull requests through its own checks, never as direct commits. The
     one exception is the guard's files, which the App delivers straight to main after the owner approves the plan
     (owner, 2026-10-12, #8).

@@ -10,6 +10,11 @@
     "description": "Capability: actors"
   },
   {
+    "name": "cap:artifact-store",
+    "color": "1D76DB",
+    "description": "Capability: artifact-store"
+  },
+  {
     "name": "cap:cli",
     "color": "1D76DB",
     "description": "Capability: cli"
@@ -133,6 +138,16 @@
     "name": "cap:roles",
     "color": "1D76DB",
     "description": "Capability: roles"
+  },
+  {
+    "name": "cap:runner-protocol",
+    "color": "1D76DB",
+    "description": "Capability: runner-protocol"
+  },
+  {
+    "name": "cap:scripted-runner",
+    "color": "1D76DB",
+    "description": "Capability: scripted-runner"
   },
   {
     "name": "cap:settings",
