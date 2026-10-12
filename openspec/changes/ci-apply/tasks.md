@@ -2,7 +2,7 @@
 
 ## 1. The read-only App (D2, D11 step 1)
 
-- [ ] 1.1 The owner creates the GitHub App `troupe-run-infrastructure-plan` with read-only permissions:
+- [x] 1.1 The owner creates the GitHub App `troupe-run-infrastructure-plan` with read-only permissions:
   - administration, contents, issues, members and organization administration: read;
   - metadata: read;
   - no webhook.
@@ -10,7 +10,7 @@
   The owner installs it on the same repositories as `troupe-run-infrastructure`, and stores its private key in
   1Password next to the write App's. Verify: `gh api orgs/troupe-run/installations` lists both Apps, with the plan
   App's permissions all `read`.
-- [ ] 1.2 Record the plan App in `oob/app-installations.json`, and its App and installation IDs in this change's
+- [x] 1.2 Record the plan App in `oob/app-installations.json`, and its App and installation IDs in this change's
   design. Add "install both Apps" to the README's "Adding a repository". Verify: `uv run scripts/oob.py` reports no
   differences.
 
