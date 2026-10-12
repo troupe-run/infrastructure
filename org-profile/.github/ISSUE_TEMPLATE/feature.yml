@@ -1,0 +1,26 @@
+# Source: troupe-run/infrastructure (org-profile/.github/ISSUE_TEMPLATE/feature.yml). Change it there; this copy is written by the App.
+name: Feature
+description: Something a project should do. Becomes one OpenSpec change.
+type: Feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the outcome, not the implementation. The OpenSpec change holds the design and tasks.
+        If the repository has `cap:<capability>` labels, add one for each capability this touches.
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: Who needs what, and why.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: In and out of scope
+  - type: input
+    id: change
+    attributes:
+      label: OpenSpec change
+      description: The change name under openspec/changes/, once it exists.

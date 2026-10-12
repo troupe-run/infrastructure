@@ -11,11 +11,11 @@
 
 ## 2. The templates (design D2, D4)
 
-- [ ] 2.1 Write `org-profile/.github/PULL_REQUEST_TEMPLATE.md`: troupe's template (design Context), with the D2
+- [x] 2.1 Write `org-profile/.github/PULL_REQUEST_TEMPLATE.md`: troupe's template (design Context), with the D2
   source note as its first line and the last comment replaced by D4's wording. Verify: `git diff --no-index` against
   troupe's copy (fetched to the scratchpad with `gh api … -H "Accept: application/vnd.github.raw"`) shows only the
   note and that comment.
-- [ ] 2.2 Write `org-profile/.github/ISSUE_TEMPLATE/bug.yml`, `feature.yml`, `decision.yml` and `config.yml`: troupe's
+- [x] 2.2 Write `org-profile/.github/ISSUE_TEMPLATE/bug.yml`, `feature.yml`, `decision.yml` and `config.yml`: troupe's
   forms with D4's wording, the `cap:` line as D4 rewords it, and D2's YAML source note as each first line.
   `config.yml`: `blank_issues_enabled: true` and D4's contact link. Verify:
   - `git diff --no-index` against troupe's copies shows only D4's wording and the note;
