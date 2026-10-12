@@ -74,6 +74,11 @@ is two approvals:
    `.github/workflows/`, then approve: on the run, **Review deployments**, tick `plan-pr`, **Approve and deploy**.
    GitHub notifies you of each waiting run. The plan appears as one comment on the pull request, updated on each
    push. Put `scripts/oob.py`'s output in the pull request yourself.
+
+   The plan is a required check: the pull request can't merge until you've approved the run and the plan has
+   succeeded. A pull request that changes only files OpenTofu never reads (`openspec/`, `docs/`, `oob/`,
+   `scripts/tests/`, `README.md`, `CLAUDE.md`; the list is in `scripts/plan_needed.py`) skips the plan, which counts
+   as passed and asks you for nothing. Anything else is planned, including a file the list doesn't know about.
 2. **Merge.** Once CI and `guard` pass on `main`, the `plan (main)` job plans unattended and shows the plan in the
    run's summary. A plan with no changes ends there.
 3. **Read that plan, then approve the `apply` job** (`apply` environment). It applies exactly the saved plan you
