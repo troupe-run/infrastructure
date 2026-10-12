@@ -29,6 +29,10 @@
       "app": "github-actions"
     },
     {
+      "context": "plan (pull request)",
+      "app": "github-actions"
+    },
+    {
       "context": "DCO",
       "app": "dco"
     }
