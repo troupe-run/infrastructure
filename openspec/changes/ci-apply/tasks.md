@@ -57,7 +57,7 @@
 
 ## 4. The workflow and the bypass (D1, D4–D7)
 
-- [ ] 4.1 Add `.github/workflows/tofu.yml` with:
+- [x] 4.1 Add `.github/workflows/tofu.yml` with:
   - the PR path: plan in `plan-pr` (with `deployment: false`) on the merge ref, posted as one edited comment,
     stopping with a message when no secrets are available;
   - the `workflow_run` and `workflow_dispatch` path, made of the jobs `plan`, `apply` and `state`:

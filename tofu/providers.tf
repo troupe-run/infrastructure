@@ -2,8 +2,8 @@
 # IDs aren't secret; the private key arrives at run time through var.github_app_pem, supplied by
 # scripts/tofu.py from 1Password (or by CI from a secret), so this block is the same everywhere.
 locals {
-  # The troupe-run-infrastructure App: the provider acts as it, and troupe's ruleset lets it
-  # deliver the guard (guard_delivery.tf).
+  # The troupe-run-infrastructure App: the provider acts as it, troupe's ruleset lets it deliver
+  # the guard (guard_delivery.tf), and this repository's lets CI commit the state (tofu.yml).
   infrastructure_app_id = 5272634
 }
 

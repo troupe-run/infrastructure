@@ -104,10 +104,11 @@ resource "github_repository_ruleset" "main" {
     }
   }
 
-  # The infrastructure App delivers the guard's files straight to main (spec: guard-delivery,
-  # design D5). It already holds org administration, so this adds no trust it didn't have.
+  # The infrastructure App pushes straight to main: guard deliveries to the repositories that
+  # receive the guard (spec: guard-delivery), and the state after a CI apply here (spec: ci-apply).
+  # It already holds org administration, so this adds no trust it didn't have.
   dynamic "bypass_actors" {
-    for_each = var.delivery_app_id == null ? [] : [var.delivery_app_id]
+    for_each = var.app_bypass_id == null ? [] : [var.app_bypass_id]
     content {
       actor_type  = "Integration"
       actor_id    = bypass_actors.value
