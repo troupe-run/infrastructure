@@ -15,15 +15,15 @@
 
 ## 2. Prove it against GitHub (D3)
 
-- [ ] 2.1 On a throwaway repository, run the three cases of D3 with the owner's `gh` token. Verify:
+- [x] 2.1 On a throwaway repository, run the three cases of D3 with the owner's `gh` token. Verify:
   - the 300 KB file on GitHub is byte-identical (its blob SHA equals `git hash-object` of the local file);
   - the stale run exits 1 with a 409;
   - the unchanged run makes no commit (the commit count is the same before and after).
-- [ ] 2.2 Delete the throwaway repository and its clone. Verify: `gh repo list troupe-run` doesn't list it.
+- [x] 2.2 Delete the throwaway repository and its clone. Verify: `gh repo list troupe-run` doesn't list it.
 
 ## 3. Recover the state and land it (D4)
 
-- [ ] 3.1 Copy the `state-after-apply` artifact of run 38200444558 over `tofu/terraform.tfstate`, and commit it.
+- [x] 3.1 Copy the `state-after-apply` artifact of run 38200444558 over `tofu/terraform.tfstate`, and commit it.
   Verify: it's serial 7, of the same lineage, and still encrypted; and a local plan reports no changes.
 - [ ] 3.2 Open the pull request (`Closes #11`). Verify:
   - every check is green;
