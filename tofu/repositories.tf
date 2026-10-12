@@ -3,6 +3,24 @@
 
 locals {
   github_default_labels = jsondecode(file("${path.module}/labels/github-defaults.json"))
+
+  # The checks each repository's pull requests need before they merge (spec: rulesets), named
+  # as GitHub reports them. infrastructure's are tested against its workflows
+  # (scripts/tests/test_required_checks.py); troupe's and website's were read from their latest
+  # merged pull requests on 2026-10-12 (required-checks design D1).
+  required_checks = jsondecode(file("${path.module}/required-checks.json"))
+
+  # The App that posts each check, so a status of the same name from anything else doesn't count.
+  check_apps = {
+    "github-actions" = 15368
+    "dco"            = 1861
+  }
+
+  checks_for = {
+    for repo, checks in local.required_checks : repo => [
+      for check in checks : { context = check.context, integration_id = local.check_apps[check.app] }
+    ]
+  }
 }
 
 module "repo_troupe" {
@@ -14,7 +32,8 @@ module "repo_troupe" {
   # with troupe's capability list.
   labels = concat(local.github_default_labels, jsondecode(file("${path.module}/labels/troupe.json")))
   # troupe receives the guard from this repository (guard_delivery.tf).
-  app_bypass_id = local.infrastructure_app_id
+  app_bypass_id   = local.infrastructure_app_id
+  required_checks = local.checks_for["troupe"]
 }
 
 module "repo_github" {
@@ -34,7 +53,8 @@ module "repo_infrastructure" {
   topics       = ["infrastructure-as-code", "openspec", "opentofu"]
   labels       = local.github_default_labels
   # CI commits the state here after an apply (spec: ci-apply, design D4).
-  app_bypass_id = local.infrastructure_app_id
+  app_bypass_id   = local.infrastructure_app_id
+  required_checks = local.checks_for["infrastructure"]
 }
 
 # GitHub Pages (deployed from Actions) isn't declared yet: the provider treats `pages` as
@@ -44,6 +64,7 @@ module "repo_website" {
   name        = "website"
   description = "troupe.run \u2014 website and landing page"
   # Set by the owner on GitHub after rename-website, and declared here (required-checks).
-  homepage_url = "https://troupe.run/"
-  labels       = local.github_default_labels
+  homepage_url    = "https://troupe.run/"
+  labels          = local.github_default_labels
+  required_checks = local.checks_for["website"]
 }
