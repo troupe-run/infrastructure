@@ -54,11 +54,17 @@ contacting GitHub, saying which secret is missing and how to supply it.
 
 ### Requirement: Every change is shown as a plan and approved before it is applied
 No apply SHALL run unless the plan it applies was shown first and the owner approved it. Every pull request that
-changes what is declared SHALL include its plan as evidence.
+changes what is declared SHALL show its plan as evidence: posted by CI (spec: ci-apply), or run on the owner's
+machine when CI can't plan. An apply from the owner's machine is a break-glass: it SHALL be approved the same way,
+and its state SHALL reach `main` through a pull request.
 
 #### Scenario: An apply follows an approved plan
 - **WHEN** a change to the org is to be applied
 - **THEN** its plan has been shown, and the owner has approved that plan, before the apply runs
+
+#### Scenario: A break-glass apply's state reaches main by pull request
+- **WHEN** the owner applies from their machine
+- **THEN** the resulting state is committed on a branch and reaches `main` through a pull request, not pushed directly
 
 ### Requirement: Adoption is proven by a plan with no changes
 Bringing an existing GitHub object under management SHALL leave it unchanged. Its adoption is complete only when a
@@ -67,3 +73,11 @@ plan reports no changes for it.
 #### Scenario: A clean plan after adoption
 - **WHEN** the existing org, repositories, labels, App installations and `.github` files have been imported
 - **THEN** `tofu plan` reports no changes to add, change or destroy
+
+### Requirement: A saved plan holds no key
+A saved plan SHALL NOT contain the App's private key. The key SHALL be supplied again when the plan is applied, so a
+plan file passed between CI jobs or kept on disk can't be used to act as the App.
+
+#### Scenario: A saved plan holds no key
+- **WHEN** a saved plan is inspected with the passphrase
+- **THEN** it contains no private key, and applying it without the key supplied fails
