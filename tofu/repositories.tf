@@ -39,10 +39,12 @@ module "repo_troupe" {
 module "repo_github" {
   source = "./modules/repository"
   name   = ".github"
-  # .github gets its own ruleset, letting only the App push, in required-checks.
-  main_ruleset = "none"
-  description  = "Org-wide defaults for troupe-run repositories: DCO config, contributing, security policy, org profile"
-  labels       = local.github_default_labels
+  # Only the App changes main: its files are written from org-profile/ here (spec: rulesets,
+  # org-profile; required-checks design D4).
+  main_ruleset  = "app-only"
+  app_bypass_id = local.infrastructure_app_id
+  description   = "Org-wide defaults for troupe-run repositories: DCO config, contributing, security policy, org profile"
+  labels        = local.github_default_labels
 }
 
 module "repo_infrastructure" {
