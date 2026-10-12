@@ -46,3 +46,11 @@ change it there. The note SHALL NOT appear in what GitHub renders from the file,
 #### Scenario: The note isn't rendered
 - **WHEN** the org's profile page is viewed on GitHub
 - **THEN** the note doesn't appear on it
+
+#### Scenario: A new pull request's description doesn't show the note
+- **WHEN** someone opens a pull request whose description starts from the org's template
+- **THEN** the rendered description doesn't show the note
+
+#### Scenario: An issue form doesn't show the note
+- **WHEN** someone opens one of the org's issue forms
+- **THEN** the form doesn't show the note
