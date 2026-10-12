@@ -1,0 +1,76 @@
+{
+  "infrastructure": [
+    {
+      "context": "check",
+      "app": "github-actions"
+    },
+    {
+      "context": "guard tests (ubuntu-latest, Python 3.13)",
+      "app": "github-actions"
+    },
+    {
+      "context": "guard tests (macos-latest, Python 3.12)",
+      "app": "github-actions"
+    },
+    {
+      "context": "guard tests (macos-latest, Python 3.13)",
+      "app": "github-actions"
+    },
+    {
+      "context": "guard tests (windows-latest, Python 3.12)",
+      "app": "github-actions"
+    },
+    {
+      "context": "guard tests (windows-latest, Python 3.13)",
+      "app": "github-actions"
+    },
+    {
+      "context": "guard (workflow rules)",
+      "app": "github-actions"
+    },
+    {
+      "context": "DCO",
+      "app": "dco"
+    }
+  ],
+  "troupe": [
+    {
+      "context": "check (ubuntu-latest, Python 3.12)",
+      "app": "github-actions"
+    },
+    {
+      "context": "check (ubuntu-latest, Python 3.13)",
+      "app": "github-actions"
+    },
+    {
+      "context": "check (macos-latest, Python 3.12)",
+      "app": "github-actions"
+    },
+    {
+      "context": "check (macos-latest, Python 3.13)",
+      "app": "github-actions"
+    },
+    {
+      "context": "check (windows-latest, Python 3.12)",
+      "app": "github-actions"
+    },
+    {
+      "context": "check (windows-latest, Python 3.13)",
+      "app": "github-actions"
+    },
+    {
+      "context": "guard (workflow rules)",
+      "app": "github-actions"
+    },
+    {
+      "context": "DCO",
+      "app": "dco"
+    }
+  ],
+  "website": [
+    {
+      "context": "test",
+      "app": "github-actions"
+    }
+  ]
+}
