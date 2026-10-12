@@ -41,7 +41,7 @@ module "repo_infrastructure" {
 # computed, so leaving it out shows no drift. See the Findings in design.md.
 module "repo_website" {
   source      = "./modules/repository"
-  name        = "troupe-run.github.io"
+  name        = "website"
   description = "troupe.run \u2014 website and landing page"
   labels      = local.github_default_labels
 }
