@@ -43,5 +43,7 @@ module "repo_website" {
   source      = "./modules/repository"
   name        = "website"
   description = "troupe.run \u2014 website and landing page"
-  labels      = local.github_default_labels
+  # Set by the owner on GitHub after rename-website, and declared here (required-checks).
+  homepage_url = "https://troupe.run/"
+  labels       = local.github_default_labels
 }
