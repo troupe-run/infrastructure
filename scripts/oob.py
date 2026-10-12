@@ -106,6 +106,27 @@ CHECKS = [
 ]
 
 
+# troupe's spec folders, each of which needs a cap:<folder> label (spec: labels). The check is one
+# way, unlike CHECKS: a label with no spec isn't reported, since a label can come before its spec.
+SPECS_GH_ARGS = [
+    "api",
+    f"repos/{ORG}/troupe/contents/openspec/specs",
+    "--jq",
+    '[.[] | select(.type == "dir") | .name]',
+]
+TROUPE_LABELS = "tofu/labels/troupe.json"
+
+
+def unlabelled_specs(specs: list[str], root: Path) -> list[str]:
+    """Each troupe spec folder with no declared cap:<folder> label."""
+    labels = {label["name"] for label in json.loads((root / TROUPE_LABELS).read_text())}
+    return [
+        f"troupe specs: {spec!r} has no cap:{spec} label; add it to {TROUPE_LABELS} by pull request"
+        for spec in sorted(specs)
+        if f"cap:{spec}" not in labels
+    ]
+
+
 def differences(name: str, key: str, declared: list[Record], actual: list[Record]) -> list[str]:
     """Every item missing, extra or changed, in a stable order."""
     want = {item[key]: item for item in declared}
@@ -138,6 +159,7 @@ def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT) -> list[str]:
         else:
             declared = json.loads((oob_dir / check.declaration).read_text())
         found += differences(check.name, check.key, declared, fetch(check.gh_args))
+    found += unlabelled_specs(fetch(SPECS_GH_ARGS), root)
     return found
 
 
@@ -148,7 +170,7 @@ def main() -> int:
     if found:
         print(f"oob: {len(found)} difference(s). Fix GitHub, or update the declaration in oob/.")
         return 1
-    print(f"oob: no differences ({', '.join(c.name for c in CHECKS)})")
+    print(f"oob: no differences ({', '.join(c.name for c in CHECKS)}, troupe specs)")
     return 0
 
 
