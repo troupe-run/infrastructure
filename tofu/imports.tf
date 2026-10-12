@@ -36,8 +36,10 @@ import {
   id = "infrastructure"
 }
 
+# The four files .github had when it was adopted. Files added to org-profile/ since are created,
+# not imported (pr-templates D1).
 import {
-  for_each = local.org_profile_files
+  for_each = toset(["CONTRIBUTING.md", "SECURITY.md", "profile/README.md", ".github/dco.yml"])
   to       = github_repository_file.org_profile[each.key]
   id       = ".github:${each.key}:"
 }
