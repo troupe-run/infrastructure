@@ -48,6 +48,8 @@ guard: commit-on-main: commits aren't made on main; work reaches main through a 
 | `skip-hooks` | Claude | `--no-verify`, `git commit -n`, and setting, unsetting or overriding `core.hooksPath` | fix what the hook reports |
 | `command-unparseable` | Claude | a `git` or `gh` command that can't be parsed (for example, unbalanced quotes) | simplify the command |
 | `delivered-file` | git | in a repository that receives the guard, a commit that changes a file listed in `.github/guard-delivery.json` (the Claude Code hook refuses the edit too, and the `guard` check fails such a commit unless the infrastructure App made it) | change the file in `troupe-run/infrastructure`, and deliver it from there |
+| `owner-only` | Claude | a `gh` command doing what only the owner does, in any repository: merging past a pull request's rules (`gh pr merge --admin`, or any merge through the API), approving or rejecting a deployment, changing a ruleset, branch protection or environment, org and repository administration (secrets, variables, labels, repository settings, Pages, issue types, project definitions, transfers), and the login's credentials (`gh auth token`, `auth status --show-token`, login and logout). The throwaway repositories `troupe-run/infra-probe-*`, `spike-*` and `bakeoff-*` are exempt, except deleting, archiving, unarchiving or renaming a `spike-*` or `bakeoff-*` record. The list is `GH_OWNER_ONLY`, `GH_API_OWNER_ONLY` and `GH_MUTATIONS_OWNER_ONLY` in `scripts/guard.py` | ask the owner, or change it in `troupe-run/infrastructure` through a pull request |
+| `gh-allow-list` | Claude | any other `gh` command not on the allow-list (reads, and the everyday pull request, issue, comment, sub-issue, project-item and workflow-run writes): an unknown subcommand, an extension, an alias, an unlisted `gh api` write or GraphQL mutation, and a GraphQL query that can't be read before it runs (stdin, or a file not yet written). The list is the `GH_*` tables in `scripts/guard.py`, built from the commands agents ran in earlier sessions (refuse-admin-merge, design D4) | ask the owner, or add it to the list in `troupe-run/infrastructure`; a read with fields needs `-X GET` |
 | `guard-tamper` | Claude | running the override command, naming a path in the override directory, or editing under `.git/`. **No override unlocks this rule.** | ask the owner |
 
 The pre-commit check runs the full `scripts/check.py`. That takes 10–15 seconds on macOS and about a minute on
@@ -88,7 +90,16 @@ own checks (`scripts/check.py`), and any other files, stay each repository's own
 - **These hooks aren't a security boundary.** They stop honest shortcuts. A Bash command that writes a file isn't
   seen by the edit hook, though the git hooks catch it at commit time. A determined bypass is still possible.
   GitHub's rulesets and required checks are the hard backstop.
-- **Pull requests opened through `gh api`** aren't checked for a closing reference by the Claude Code hook.
+- **The `gh` rules see only `gh`.** An agent holds the owner's login, so any other HTTP client with its token
+  (`curl`, a script, a `gh` extension the guard refuses to run but a script could) bypasses them, and so does an MCP
+  tool, which the hook doesn't see. Refusing `gh auth token` makes the token harder to reach, not unreachable: it's
+  also in the keychain and gh's config.
+- **A command assembled at run time** (`eval`, `sh -c "$X"`) isn't known before it runs, so its `gh` words can't
+  be checked.
+- **A throwaway repository is a naming convention.** An agent can create `troupe-run/spike-x` and do anything there;
+  that's confined to a repository nothing depends on.
+- **Pull requests opened through `gh api`** aren't checked for a closing reference. They're refused anyway, as
+  an unlisted write (`gh-allow-list`), unless the owner grants an override.
 - **A bad commit message can reach a branch** if the local hooks were skipped, because GitHub doesn't reject it at
   push time on our plan. The `guard` check flags it at once, and blocks the merge.
 - **The local hooks run the working tree's `guard.py`.** A commit that edits it can disable its own check. The

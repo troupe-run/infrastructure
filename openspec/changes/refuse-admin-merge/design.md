@@ -65,7 +65,8 @@ anywhere.
 - agents may run any `gh` command against one, `gh api` writes included (rulesets, contents, refs);
 - only `infra-probe-*` may be deleted by an agent;
 - deleting, archiving or unarchiving `spike-*` or `bakeoff-*` is `owner-only` (owner, 2026-10-12). It works offline,
-  and the archived records can't be lost.
+  and the archived records can't be lost. Renaming one is `owner-only` too (found in implementation): a renamed
+  record would leave the prefix, and with it this protection.
 
 **How the repository is found:**
 - `-R`/`--repo`, or `GH_REPO` set for the command, as `pr_closes_issue` reads them;

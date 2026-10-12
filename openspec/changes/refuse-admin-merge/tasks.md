@@ -2,7 +2,7 @@
 
 ## 1. The rules and the table (design D1–D3, D5)
 
-- [ ] 1.1 Add `owner-only` and `gh-allow-list` to `OVERRIDABLE_RULES`. Write the table as one constant in
+- [x] 1.1 Add `owner-only` and `gh-allow-list` to `OVERRIDABLE_RULES`. Write the table as one constant in
   `scripts/guard.py`, grouped as in D3. Write `gh_decision(words, cwd)`, which:
   - reads gh's subcommand, flags, method, endpoint and GraphQL query (D3, "How gh is read");
   - finds the target repository (D2);
@@ -43,7 +43,7 @@
     refused command through, and a `gh-allow-list` override doesn't unlock an `owner-only` refusal.
 
   Verify: the tests pass locally, and on all three OSes in CI.
-- [ ] 1.3 Update `docs/development-workflow.md`:
+- [x] 1.3 Update `docs/development-workflow.md`:
   - a row for each rule in the rules table, saying what it refuses and its fix, and pointing to the table in
     `scripts/guard.py` rather than copying it;
   - D6's gaps under Known gaps.
