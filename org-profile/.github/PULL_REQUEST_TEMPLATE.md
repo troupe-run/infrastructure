@@ -15,4 +15,4 @@ Closes #
 
 ## Verified
 
-<!-- The commands you ran (tests, ruff, mypy --strict) and their result. -->
+<!-- The commands you ran (e.g. tests, ruff, mypy --strict) and their result. -->
