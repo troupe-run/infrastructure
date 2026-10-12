@@ -87,7 +87,7 @@
   `plan (pull request)` to `infrastructure`'s entries in `required-checks.json`. Verify:
   - `scripts/check.py` passes, including `test_required_checks.py`;
   - `actionlint` passes, if it can be run with `uvx` or `brew`; otherwise say so.
-- [ ] 3.3 Update the README's "Changing the org": a pull request that changes nothing OpenTofu reads skips the plan
+- [x] 3.3 Update the README's "Changing the org": a pull request that changes nothing OpenTofu reads skips the plan
   and asks for no approval, and every other pull request can't merge until its plan has run. Verify:
   - `scripts/check.py` passes;
   - this change's own pull request (which changes `tofu/`) asks for the plan approval, and a scratch commit touching
@@ -121,7 +121,7 @@
 
 ## 6. Land it
 
-- [ ] 6.1 Open the pull request (`Closes #14`). Its evidence:
+- [x] 6.1 Open the pull request (`Closes #14`). Its evidence:
   - the CI plan comment, after the owner approves the run. It must show only the changes listed in design.md's
     Migration step 3;
   - `scripts/oob.py`'s output;
