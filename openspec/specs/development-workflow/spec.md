@@ -334,4 +334,9 @@ spec gives it, and SHALL NOT name a particular repository's product, so they sui
 
 #### Scenario: Vulnerability reports go to the security policy
 - **WHEN** someone opens the issue chooser in a repository using the org's forms
-- **THEN** it offers a blank issue and a link to the security policy for reporting a vulnerability
+- **THEN** it offers a blank issue and exactly one entry for reporting a vulnerability: GitHub's own, shown because
+  the org publishes a security policy
+
+#### Scenario: The chooser config doesn't duplicate GitHub's security entry
+- **WHEN** the org's chooser config adds a contact link to the security policy
+- **THEN** the repository's checks fail and say GitHub already shows that entry

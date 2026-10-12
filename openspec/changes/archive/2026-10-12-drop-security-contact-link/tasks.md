@@ -12,7 +12,7 @@
 
 ## 2. Land it
 
-- [ ] 2.1 Open the pull request (`Closes #21`). Its evidence:
+- [x] 2.1 Open the pull request (`Closes #21`). Its evidence:
   - the CI plan comment, after the owner approves the run. It must show only
     `github_repository_file.org_profile[".github/ISSUE_TEMPLATE/config.yml"]` updated, with a new sync commit message,
     and nothing else;
