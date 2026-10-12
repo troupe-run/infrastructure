@@ -103,12 +103,13 @@ and checks:
 - every label in its top-level `labels:` is in `tofu/labels/workflow.json`;
 - its first line is the source note naming its own path.
 
-Standard library only, so the top-level keys are read line by line (`^type: `, `^labels: [...]`), and a form whose
-keys can't be read that way fails with its name rather than passing. `oob.py` already proves
-`oob/issue-types.json` matches GitHub, so the chain reaches the org.
+The forms are parsed with PyYAML, already a dev dependency that `test_required_checks.py` uses; the
+standard-library rule binds the guard, not its tests. A form with no `type:`, or one that doesn't parse, fails with
+its name rather than passing. `oob.py` already proves `oob/issue-types.json` matches GitHub, so the chain reaches
+the org.
 
-**Alternative: a YAML parser.** The guard's scripts are standard library only, and three top-level keys don't need
-one.
+**Alternative: read the top-level keys line by line.** First planned on the belief that tests were standard library
+only too (corrected during apply). It would miss a flow-style or multi-line `labels:` that GitHub accepts.
 
 ### D6. Verifying GitHub's behaviour
 

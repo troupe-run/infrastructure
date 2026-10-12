@@ -22,12 +22,12 @@
   - no file names troupe except the `troupe --version` example (`grep -n -i troupe` over the four);
   - each file parses as YAML (`uv run --with pyyaml python -c …`, run once from the scratchpad, not added to the
     project).
-- [ ] 2.3 Write `scripts/tests/test_org_profile.py` (design D5), each test named for what its body checks:
+- [x] 2.3 Write `scripts/tests/test_org_profile.py` (design D5), each test named for what its body checks:
   - each form's `type:` is an enabled type in `oob/issue-types.json`;
   - each label a form applies is in `tofu/labels/workflow.json`;
-  - each file in `org-profile/.github/ISSUE_TEMPLATE/` and the PR template starts with the source note naming its
-    own path;
-  - a form with no readable `type:` line fails, naming the form (a fixture in `tmp_path`);
+  - every file under `org-profile/` starts with the source note naming its own path (widened during apply from the
+    new files only: the existing four already comply, and it is the same check);
+  - a form with no `type:`, or that doesn't parse, fails, naming the form (a fixture in `tmp_path`);
   - a form naming an undeclared type, or an undeclared label, fails, naming both (fixtures in `tmp_path`).
 
   Verify: the tests pass; each failure test fails when the check it covers is removed (break it once, run, restore);
