@@ -1,7 +1,8 @@
 # Proposal
 
 Issue: #14 (part of #1, step 5). The owner's decisions of 2026-10-12, made when this change was proposed, are
-recorded in design.md (D1–D5).
+recorded in design.md (D1, D2, D4, D7) and
+[on #14](https://github.com/troupe-run/infrastructure/issues/14#issuecomment-6119985296).
 
 ## Why
 

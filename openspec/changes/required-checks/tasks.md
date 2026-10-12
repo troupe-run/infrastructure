@@ -128,7 +128,7 @@
   - the probe's findings.
 
   Verify: every check is green, and the plan comment is present and matches.
-- [ ] 6.2 Comment the owner's four decisions of 2026-10-12 on #14, and link the comment from the proposal. The four
+- [x] 6.2 Comment the owner's four decisions of 2026-10-12 on #14, and link the comment from the proposal. The four
   decisions are:
   - delete the plan App;
   - require the PR plan, skipped by a job condition;
@@ -136,7 +136,7 @@
   - no owner bypass on `.github`.
 
   Verify: the comment URL.
-- [ ] 6.3 Open a follow-up issue for refusing `gh pr merge --admin` in Claude Code sessions (design, Risks), and the
+- [x] 6.3 Open a follow-up issue for refusing `gh pr merge --admin` in Claude Code sessions (design, Risks), and the
   open question of DCO on `website`. Verify: the issue URLs.
 
 ## Workflow follow-up

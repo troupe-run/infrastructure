@@ -276,7 +276,7 @@ The probe's results go into this design, as they did for ci-apply. Then the repo
   can't tell the owner from an agent using the owner's token. This is the same gap `protect-main` accepted, so the
   bypass stays pull-request-only and every bypass is visible in the pull request's timeline. Closing the gap needs a
   guard rule refusing `--admin` in Claude Code sessions. That belongs to the development workflow, not this change.
-  It's raised as a follow-up issue (task 6.3) rather than built here.
+  It's raised as a follow-up, #16, rather than built here.
 - **[Every infrastructure pull request now waits for the owner's approval of its plan]** → That was already true for
   the plan to appear. D2 removes the wait for pull requests that change nothing OpenTofu reads, which covers most
   OpenSpec-only and docs-only pull requests.
@@ -318,4 +318,4 @@ hold nothing, and turning branch deletion on removes only branches that were alr
 ## Open Questions
 
 - **Whether `website` should get DCO** (installing the DCO App there and requiring it). That is the owner's call,
-  and can be a later change. It adds one entry to `required-checks.json`.
+  asked on #16, and can be a later change. It adds one entry to `required-checks.json`.
