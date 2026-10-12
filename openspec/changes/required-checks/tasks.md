@@ -45,7 +45,7 @@
 
 ## 2. Required checks (design D1, D3)
 
-- [ ] 2.1 Add PyYAML and `types-PyYAML` to the `dev` dependency group, and run `uv lock`. Verify: `uv sync --locked`
+- [x] 2.1 Add PyYAML and `types-PyYAML` to the `dev` dependency group, and run `uv lock`. Verify: `uv sync --locked`
   succeeds, and `scripts/guard.py` still imports nothing outside the standard library (`test_guard_*` still pass).
 - [ ] 2.2 Write `tofu/required-checks.json` with the names in design.md's Context table, for `infrastructure`,
   `troupe` and `website`. In `repositories.tf`, map App slugs to IDs, and pass each repository's list to the
