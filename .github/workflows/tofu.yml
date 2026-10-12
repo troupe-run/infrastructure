@@ -1,0 +1,288 @@
+name: tofu
+
+# Plans and applies the org from CI (spec: ci-apply; openspec/changes/ci-apply/design.md).
+#
+#   pull request          pr-plan   env plan-pr (owner approves)   plan posted on the PR
+#   CI green on main  --> plan      env plan-main (main only)      plan in the run summary
+#   or a manual run       apply     env apply (owner approves)     apply that saved plan, then commit
+#                                                                  the state to main as the App
+#
+# Every job authenticates as the troupe-run-infrastructure App, through scripts/tofu.py, with the
+# secrets of its environment. The owner sets them from 1Password (README); none is in this file.
+on:
+  pull_request:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One plan-and-apply on main at a time, never cancelled: a later merge waits, and then plans
+# against the state the earlier run left (design D6). A pull request's plan is replaced by its next.
+concurrency:
+  group: tofu-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  OPENTOFU_VERSION: 1.13.1
+  # The App's bot, which commits the state (design D4).
+  STATE_AUTHOR: 340938853+troupe-run-infrastructure[bot]@users.noreply.github.com
+
+jobs:
+  pr-plan:
+    name: plan (pull request)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The owner approves each run before it gets the App's key: a pull request runs its own copy of
+    # this file. Look at whether it changes .github/workflows/ before approving (design D2).
+    environment:
+      name: plan-pr
+      deployment: false
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      TF_VAR_github_app_pem: ${{ secrets.TF_VAR_github_app_pem }}
+      TF_VAR_state_passphrase: ${{ secrets.TF_VAR_state_passphrase }}
+      TF_VAR_billing_email: ${{ secrets.TF_VAR_billing_email }}
+    steps:
+      - name: Secrets available?
+        id: secrets
+        run: |
+          if [ -z "$TF_VAR_state_passphrase" ]; then
+            echo "::notice::No secrets for this run (a fork or Dependabot pull request), so no plan. The owner can plan it locally."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+      # GitHub's merge ref: the pull request on top of main, so the plan reads main's latest state.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.secrets.outputs.available == 'true'
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        if: steps.secrets.outputs.available == 'true'
+        with:
+          python-version: "3.12"
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        if: steps.secrets.outputs.available == 'true'
+        with:
+          tofu_version: ${{ env.OPENTOFU_VERSION }}
+          tofu_wrapper: false
+      - name: Plan
+        if: steps.secrets.outputs.available == 'true'
+        run: |
+          uv run --no-project scripts/tofu.py init -input=false -no-color
+          uv run --no-project scripts/tofu.py plan -input=false -no-color -lock=false -out=pr.tfplan
+          uv run --no-project scripts/tofu.py show -no-color pr.tfplan > "$RUNNER_TEMP/plan.txt"
+      - name: Post the plan on the pull request
+        if: steps.secrets.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="$RUNNER_TEMP/comment.md"
+          {
+            echo "### OpenTofu plan for ${HEAD_SHA:0:7}"
+            echo
+            echo "$(grep -E '^(Plan:|No changes)' "$RUNNER_TEMP/plan.txt" | head -1)"
+            echo
+            echo "Made in CI on this pull request merged onto \`main\` ([run]($RUN_URL)). The apply happens after the merge, once the owner approves the plan made then."
+            echo
+            echo '<details><summary>Full plan</summary>'
+            echo
+            echo '```'
+            # A comment holds at most 65536 characters; the run keeps the whole plan.
+            head -c 60000 "$RUNNER_TEMP/plan.txt"
+            echo '```'
+            echo '</details>'
+          } > "$body"
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body-file "$body"
+
+  plan:
+    name: plan (main)
+    if: >-
+      github.ref == 'refs/heads/main' && (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: plan-main
+      deployment: false
+    outputs:
+      changes: ${{ steps.plan.outputs.changes }}
+      sha: ${{ steps.sha.outputs.sha }}
+    env:
+      TF_VAR_github_app_pem: ${{ secrets.TF_VAR_github_app_pem }}
+      TF_VAR_state_passphrase: ${{ secrets.TF_VAR_state_passphrase }}
+      TF_VAR_billing_email: ${{ secrets.TF_VAR_billing_email }}
+    steps:
+      - name: The commit to plan
+        id: sha
+        env:
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: echo "sha=${RUN_SHA:-$GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.sha.outputs.sha }}
+          fetch-depth: 2
+      - name: Skip the App's own state commit
+        id: skip
+        run: |
+          author=$(git log -1 --format=%ae)
+          files=$(git diff-tree --no-commit-id --name-only -r HEAD)
+          if [ "$author" = "$STATE_AUTHOR" ] && [ "$files" = "tofu/terraform.tfstate" ]; then
+            echo "::notice::This commit is the App's state commit after an apply; nothing to plan."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Wait for the guard check on this commit
+        if: steps.skip.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          # CI has passed (this run follows it); the guard is a separate workflow, delivered to troupe
+          # as it is, so it is checked here. An apply follows green CI and guard (design D1).
+          for _ in $(seq 1 60); do
+            result=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow guard.yml --commit "$SHA" \
+              --event push --json status,conclusion --jq '.[0] | "\(.status) \(.conclusion)"')
+            case "$result" in
+              "completed success") echo "guard passed on $SHA"; exit 0 ;;
+              completed*) echo "::error::guard concluded '$result' on $SHA; not planning."; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "::error::guard didn't finish on $SHA within 10 minutes."
+          exit 1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        if: steps.skip.outputs.skip == 'false'
+        with:
+          python-version: "3.12"
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        if: steps.skip.outputs.skip == 'false'
+        with:
+          tofu_version: ${{ env.OPENTOFU_VERSION }}
+          tofu_wrapper: false
+      - name: Plan
+        id: plan
+        if: steps.skip.outputs.skip == 'false'
+        run: |
+          uv run --no-project scripts/tofu.py init -input=false -no-color
+          set +e
+          uv run --no-project scripts/tofu.py plan -input=false -no-color -detailed-exitcode -out=main.tfplan
+          code=$?
+          set -e
+          case $code in
+            0) echo "changes=false" >> "$GITHUB_OUTPUT" ;;
+            2) echo "changes=true" >> "$GITHUB_OUTPUT" ;;
+            *) exit "$code" ;;
+          esac
+          uv run --no-project scripts/tofu.py show -no-color main.tfplan > "$RUNNER_TEMP/plan.txt"
+      - name: Show the plan for approval
+        if: steps.skip.outputs.skip == 'false'
+        env:
+          CHANGES: ${{ steps.plan.outputs.changes }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          {
+            echo "### OpenTofu plan for ${SHA:0:7}"
+            echo
+            if [ "$CHANGES" = "true" ]; then
+              echo "**$(grep -E '^Plan:' "$RUNNER_TEMP/plan.txt" | head -1)** The apply job waits for the owner's approval (Review deployments)."
+            else
+              echo "No changes. Nothing to approve."
+            fi
+            echo
+            echo '```'
+            head -c 900000 "$RUNNER_TEMP/plan.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the saved plan for the apply job
+        if: steps.plan.outputs.changes == 'true'
+        # Encrypted with the state passphrase, and it holds no key (design D3).
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: main-tfplan
+          path: tofu/main.tfplan
+          retention-days: 1
+          if-no-files-found: error
+
+  apply:
+    name: apply (main)
+    needs: plan
+    if: needs.plan.outputs.changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The owner's approval of the plan above (spec: ci-apply).
+    environment: apply
+    env:
+      TF_VAR_github_app_pem: ${{ secrets.TF_VAR_github_app_pem }}
+      TF_VAR_state_passphrase: ${{ secrets.TF_VAR_state_passphrase }}
+      TF_VAR_billing_email: ${{ secrets.TF_VAR_billing_email }}
+      SHA: ${{ needs.plan.outputs.sha }}
+    steps:
+      # The same commit as the plan: applying a saved plan refuses inputs that differ (design D3).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ env.OPENTOFU_VERSION }}
+          tofu_wrapper: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: main-tfplan
+          path: tofu
+      - name: Apply the approved plan
+        id: apply
+        run: |
+          uv run --no-project scripts/tofu.py init -input=false -no-color
+          uv run --no-project scripts/tofu.py apply -input=false -no-color main.tfplan
+      # From here on, run even when the apply failed part way: its state is still the truth.
+      - name: Keep the state
+        if: always() && steps.apply.outcome != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: state-after-apply
+          path: tofu/terraform.tfstate
+          retention-days: 90
+          if-no-files-found: error
+      - name: Token for the state commit
+        id: token
+        if: always() && steps.apply.outcome != 'skipped'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: 5272634
+          private-key: ${{ secrets.TF_VAR_github_app_pem }}
+          repositories: infrastructure
+      - name: Commit the state to main as the App
+        if: always() && steps.apply.outcome != 'skipped'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # The blob the plan was made from: if main's file has changed since, GitHub answers 409
+          # instead of overwriting it (design D4), and the state stays in the artifact above.
+          blob=$(git rev-parse "$SHA:tofu/terraform.tfstate")
+          if [ "$(git hash-object tofu/terraform.tfstate)" = "$blob" ]; then
+            echo "The state is unchanged (the apply wrote nothing); no commit."
+            exit 0
+          fi
+          jq -n \
+            --arg message "$(printf 'chore(tofu): commit the state after applying %s\n\nApplied by %s' "${SHA:0:7}" "$RUN_URL")" \
+            --arg content "$(base64 -w0 tofu/terraform.tfstate)" \
+            --arg sha "$blob" \
+            '{message: $message, content: $content, sha: $sha, branch: "main"}' > "$RUNNER_TEMP/state.json"
+          gh api -X PUT "repos/$GITHUB_REPOSITORY/contents/tofu/terraform.tfstate" \
+            --input "$RUNNER_TEMP/state.json" --jq '"committed " + .commit.sha'
