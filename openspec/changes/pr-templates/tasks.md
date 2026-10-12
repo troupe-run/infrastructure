@@ -2,7 +2,7 @@
 
 ## 1. The shared workflow labels (design D3)
 
-- [ ] 1.1 Create `tofu/labels/workflow.json` holding `needs:owner` exactly as `tofu/labels/troupe.json` has it
+- [x] 1.1 Create `tofu/labels/workflow.json` holding `needs:owner` exactly as `tofu/labels/troupe.json` has it
   (colour `D93F0B`, "Waiting on a decision from the owner"), and remove the entry from `troupe.json`. In
   `tofu/repositories.tf`, add `local.workflow_labels` and put it in every repository's `labels`, with a comment
   naming the `labels` spec. Verify:
