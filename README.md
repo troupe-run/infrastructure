@@ -54,21 +54,71 @@ uv run scripts/oob.py            # drift in what OpenTofu can't manage
 
 `scripts/tofu.py` runs `tofu` in `tofu/` as the `troupe-run-infrastructure` GitHub App:
 - **When the secrets are already in the environment** (`TF_VAR_github_app_pem`, `TF_VAR_state_passphrase` and
-  `TF_VAR_billing_email`), as they will be in CI, it uses them.
+  `TF_VAR_billing_email`), as they are in CI, it uses them.
 - **Otherwise** it runs `tofu` under `op run`, which takes the secrets from the 1Password references in
   `tofu/secrets.env` for that one run. Expect a 1Password prompt.
 - **Without either,** it stops before contacting GitHub and names what's missing.
 
-No secret is ever written to the repo. The state is encrypted, and is unreadable without the passphrase.
+No secret is ever written to the repo. The state is encrypted, and is unreadable without the passphrase. The App's
+key is ephemeral input, so a saved plan doesn't hold it either: applying a saved plan asks for the key again.
+
+A local plan is read-only and always safe to run. Changes reach the org through CI (below).
 
 ## Changing the org
 
-1. Change the configuration on a branch, and run a plan.
-2. Put the plan output (and `scripts/oob.py`'s) in the pull request.
-3. **Nothing is applied until the owner has approved that plan.** Apply the saved plan you showed:
-   `uv run scripts/tofu.py plan -out=change.tfplan`, then after approval
-   `uv run scripts/tofu.py apply change.tfplan`.
-4. Commit the updated `tofu/terraform.tfstate`.
+Changes are planned and applied by the `tofu` workflow (`.github/workflows/tofu.yml`, spec `ci-apply`). Your part
+is two approvals:
+
+1. **Open a pull request.** Its `plan (pull request)` job waits for your approval, because a pull request runs its
+   own copy of the workflow, and an approved run holds the App's key. Look at whether the pull request changes
+   `.github/workflows/`, then approve: on the run, **Review deployments**, tick `plan-pr`, **Approve and deploy**.
+   GitHub notifies you of each waiting run. The plan appears as one comment on the pull request, updated on each
+   push. Put `scripts/oob.py`'s output in the pull request yourself.
+2. **Merge.** Once CI and `guard` pass on `main`, the `plan (main)` job plans unattended and shows the plan in the
+   run's summary. A plan with no changes ends there.
+3. **Read that plan, then approve the `apply` job** (`apply` environment). It applies exactly the saved plan you
+   read, then commits the new encrypted state to `main` as the App:
+   `chore(tofu): commit the state after applying <sha>`. That commit starts no further plan.
+
+Rejecting the approval applies nothing. To plan `main` again later, for example after drift or a rejection, run
+`gh workflow run tofu.yml --ref main`.
+
+| Environment | Who may use it | Approval | Used by |
+|---|---|---|---|
+| `plan-pr` | any branch | the owner, each run | a pull request's plan |
+| `plan-main` | `main` only | none | the plan after a merge, and manual runs |
+| `apply` | `main` only | the owner | the apply |
+
+Each holds the same three secrets. OpenTofu declares the environments (`tofu/environments.tf`) but never their
+values: the owner sets them from 1Password, so no value is printed or passes through a session:
+
+```sh
+export OP_ACCOUNT=l-a-u.1password.com
+for env in plan-pr plan-main apply; do
+  op read -n "op://troupe.run/troupe-run-infrastructure/private key" \
+    | gh secret set TF_VAR_github_app_pem --env "$env" -R troupe-run/infrastructure
+  op read -n "op://troupe.run/troupe-run-infrastructure tofu state/password" \
+    | gh secret set TF_VAR_state_passphrase --env "$env" -R troupe-run/infrastructure
+  op read -n "op://troupe.run/troupe-run-infrastructure tofu state/billing email" \
+    | gh secret set TF_VAR_billing_email --env "$env" -R troupe-run/infrastructure
+done
+```
+
+Run it again after rotating any of them.
+
+### Break-glass: applying from your machine
+
+When CI can't apply (GitHub Actions down, or the workflow itself broken), apply locally. Do it only while no `tofu`
+run is in progress: nothing locks the state between CI and your machine.
+
+1. On a branch named after the change, `uv run scripts/tofu.py plan -out=change.tfplan`, and show the plan to the
+   owner.
+2. **After the owner approves it,** `uv run scripts/tofu.py apply change.tfplan`.
+3. Commit the updated `tofu/terraform.tfstate` on that branch, and merge it through a pull request.
+
+**If CI applied but couldn't commit the state,** the run fails and keeps the state as its `state-after-apply`
+artifact. Download it (`gh run download <run> -n state-after-apply`), copy it over `tofu/terraform.tfstate` on a
+branch, and merge that through a pull request.
 
 **An apply can't delete a repository.** Removing a repository's declaration makes the plan fail on `prevent_destroy`.
 To stop managing a repository but keep it, replace its `module` block with:
@@ -84,8 +134,8 @@ removed {
 
 The plan then shows it as "forget", with nothing destroyed.
 
-**Adding a repository:** add it to both Apps' installations first (`troupe-run-infrastructure`, which applies,
-and `troupe-run-infrastructure-plan`, which plans), and update the lists in `oob/README.md`. Without the App, OpenTofu sees only the repository's public view. A new repository gets the "protect
+**Adding a repository:** add it to the `troupe-run-infrastructure` App's installation first, and update the list in
+`oob/README.md`. Without the App, OpenTofu sees only the repository's public view. A new repository gets the "protect
 main" ruleset unless its `module` block sets `protect_main = false`.
 
 ## How main is protected
@@ -100,7 +150,8 @@ Every managed repository except `.github` has a ruleset named "protect main" on 
 - **Break-glass:** an org owner can always edit or disable a ruleset on GitHub. The next plan shows the edit as
   drift, and an apply restores the declared ruleset. Follow it with a PR.
 
-The encrypted state is committed on the change's branch, so it reaches `main` with the PR.
+After a CI apply, the App commits the encrypted state straight to this repository's `main`. Its ruleset lets the App
+through for that, and only the App.
 
 ## The state passphrase
 
@@ -117,10 +168,10 @@ troupe holds copies of the guard's files, delivered from this repo by the App st
 `guard-delivery`). A change to the guard reaches troupe like any other change to the org, with one extra condition:
 
 1. Change the guard's source here, on the change's branch, with its tests.
-2. **Wait until CI is green on all three OSes for that commit.** troupe's own CI doesn't see the files before they
-   land, so this is their only check.
-3. Plan, show the saved plan to the owner, and apply it after approval. Each changed file becomes one commit on
-   troupe's `main`, by the App, named `chore(guard): deliver <path> <content hash> from troupe-run/infrastructure`.
+2. **Merge it.** The `tofu` workflow plans the delivery only after CI is green on all three OSes, and `guard` has
+   passed, for that commit. troupe's own CI doesn't see the files before they land, so this is their only check.
+3. Read the plan, and approve the apply. Each changed file becomes one commit on troupe's `main`, by the App, named
+   `chore(guard): deliver <path> <content hash> from troupe-run/infrastructure`.
 4. Check troupe's `guard` and CI runs on those commits.
 
 The probe showed how this behaves (design D3 and D8 of the `development-workflow` change):

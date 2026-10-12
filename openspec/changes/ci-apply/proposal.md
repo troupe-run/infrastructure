@@ -1,6 +1,8 @@
 # Proposal
 
-Issue: #6 (part of #1). The owner's decisions of 2026-10-12 are recorded in #6's comments and in design.md.
+Issue: #6 (part of #1). The owner's decisions of 2026-10-12 are recorded in design.md and on #6:
+[state and the first PR-plan choice](https://github.com/troupe-run/infrastructure/issues/6#issuecomment-6115909893),
+[approval-gated PR plans instead](https://github.com/troupe-run/infrastructure/issues/6#issuecomment-6117082829).
 
 ## Why
 
