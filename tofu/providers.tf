@@ -17,8 +17,11 @@ provider "github" {
   }
 }
 
+# Ephemeral: a saved plan keeps only the name, and the key is supplied again at apply, so no plan
+# file (including CI's plan artifact) ever holds it (ci-apply design D3).
 variable "github_app_pem" {
-  description = "The App's private key (PEM contents, not a path). Never committed."
+  description = "The App's private key (PEM contents, not a path). Never committed, never saved in a plan."
   type        = string
   sensitive   = true
+  ephemeral   = true
 }
