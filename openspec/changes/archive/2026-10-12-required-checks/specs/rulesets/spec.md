@@ -13,13 +13,11 @@ ruleset instead, under which only the infrastructure App changes `main`.
   active ruleset on `main`, and the plan shows no difference from the declaration
 
 ### Requirement: Changes reach main only through a pull request
-A push directly to `main` SHALL be refused for everyone, the owner included. A pull request SHALL be mergeable
-without an approving review, because the org has one maintainer. There are two exceptions, both for the
-infrastructure App:
-- in a repository that receives the guard from this repository, it MAY push its deliveries straight to `main`;
+A push directly to `main` SHALL be refused for everyone, the owner included (`.github` excepted: see below). A
+pull request SHALL be mergeable without an approving review, because the org has one maintainer. The infrastructure
+App is excepted:
+- in a repository that receives the guard, it MAY push its deliveries straight to `main`;
 - in this repository, it MAY push the encrypted state straight to `main` after an apply.
-
-`.github` is not covered by this requirement: its `main` changes only as the App writes it.
 
 #### Scenario: A direct push is refused
 - **WHEN** anyone, the owner included, pushes a commit directly to `main`
