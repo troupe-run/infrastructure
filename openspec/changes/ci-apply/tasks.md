@@ -70,7 +70,7 @@
   - `scripts/check.py` passes;
   - `actionlint` passes, if it can be run with `uvx` or `brew`; otherwise say so;
   - after the owner approves the pull request's plan run, a plan comment appears that reports no changes.
-- [ ] 4.2 Rename the module variable `delivery_app_id` to `app_bypass_id` and set it on `repo_infrastructure`. Update
+- [x] 4.2 Rename the module variable `delivery_app_id` to `app_bypass_id` and set it on `repo_infrastructure`. Update
   the README's "To stop delivering" and the comment in `main.tf`. Verify:
   - `scripts/check.py` passes;
   - a local plan shows exactly one change, the bypass actor added to infrastructure's ruleset;
@@ -85,7 +85,7 @@
 
 ## 5. Land it and verify the first CI apply (D11 steps 5–6)
 
-- [ ] 5.1 Open the pull request (`Closes #6`). Its evidence:
+- [x] 5.1 Open the pull request (`Closes #6`). Its evidence:
   - the CI plan comment (after the owner approves its run), showing only the bypass;
   - the local plan and apply from 3.3;
   - the probe's findings.
