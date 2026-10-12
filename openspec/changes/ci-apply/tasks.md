@@ -75,12 +75,12 @@
   - `scripts/check.py` passes;
   - a local plan shows exactly one change, the bypass actor added to infrastructure's ruleset;
   - the pull request's CI plan comment, updated by the push, shows the same.
-- [ ] 4.3 Update the README ("Changing the org", a new "Break-glass: applying from your machine", the secrets
+- [x] 4.3 Update the README ("Changing the org", a new "Break-glass: applying from your machine", the secrets
   commands, the "Adding a repository" note), `CLAUDE.md` and `org-profile/CONTRIBUTING.md`: the plan comes from CI,
   and approval happens on the run. Remove the "the state is committed on the change's branch" line. Verify:
   - `scripts/check.py` passes;
   - `grep` finds no remaining instruction to commit state on a branch, except in the break-glass section.
-- [ ] 4.4 Comment the owner's decisions on #6, if not done already, and link them from the proposal. Verify: the
+- [x] 4.4 Comment the owner's decisions on #6, if not done already, and link them from the proposal. Verify: the
   comment URL.
 
 ## 5. Land it and verify the first CI apply (D11 steps 5–6)

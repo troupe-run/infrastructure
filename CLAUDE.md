@@ -13,13 +13,14 @@ Every change, however small, follows one path. The full guide is the org's
 1. **An issue** says what and why.
 2. **An OpenSpec change** says how: `/opsx:propose <name>`, on a branch named exactly `<name>`.
 3. **`/opsx:apply`** builds it. A task is ticked only when its verification has run and passed.
-4. **A pull request** closes the issue (`Closes #n`), with the plan as evidence when it changes the org.
+4. **A pull request** closes the issue (`Closes #n`). CI posts its plan as evidence, once the owner approves that run.
 5. **`/opsx:archive`** runs on the branch before merging. The owner merges by rebase.
 6. **After the merge**, comment on the issue with the PR and the archived change.
 
 Commits are Conventional Commits, signed off, and `uv run scripts/check.py` passes before each one.
 
-**Nothing is applied to the org without the owner's approval of the saved plan.** Test GitHub behaviour on a
+**Nothing is applied to the org without the owner's approval of the saved plan.** CI applies `main` after the owner
+approves the run's `apply` job; a local apply is the break-glass (README). Test GitHub behaviour on a
 throwaway repository, never a live one. Secrets come from 1Password at run time and are never printed or pasted.
 
 ## Guardrails
