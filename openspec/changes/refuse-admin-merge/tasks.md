@@ -11,7 +11,7 @@
   Call it for each simple command in `shell_decisions`. Standard library only. Verify:
   - `mypy --strict` and `ruff` are clean;
   - `scripts/check.py` passes.
-- [ ] 1.2 Write `scripts/tests/test_guard_gh.py`, each test named for what its body checks.
+- [x] 1.2 Write `scripts/tests/test_guard_gh.py`, each test named for what its body checks.
   - **Reads are allowed:** one test per read row of D3, plus `GET` with `-X GET` and fields, and a GraphQL query with
     no mutation.
   - **Workflow writes are allowed:** one test per row, including `pr merge` without `--admin`, and each listed REST
