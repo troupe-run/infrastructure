@@ -2,10 +2,10 @@
 
 ## 1. The script and its tests (D1, D2)
 
-- [ ] 1.1 Add `scripts/commit_state.py` as in D1: standard library only, with I/O injectable for tests. Verify:
+- [x] 1.1 Add `scripts/commit_state.py` as in D1: standard library only, with I/O injectable for tests. Verify:
   - `scripts/check.py` passes, including ruff and `mypy --strict`;
   - `--help` names every argument.
-- [ ] 1.2 Add `scripts/tests/test_commit_state.py` with the D2 unit tests and the 300 KB end-to-end test. Verify:
+- [x] 1.2 Add `scripts/tests/test_commit_state.py` with the D2 unit tests and the 300 KB end-to-end test. Verify:
   - the tests pass;
   - each fails when its behaviour is broken: blob ID, skip, the planned `sha`, the message, and the 409 exit;
   - the end-to-end test fails when the script is replaced by the old `jq --arg` command on Linux, or, where it can't
