@@ -239,6 +239,34 @@ The probe runs before anything live changes, using `tofu/probe` (with a new `pro
 
 The probe's results go into this design, as they did for ci-apply. Then the repository and the project are deleted.
 
+**Findings (2026-10-12, `troupe-run/infra-probe-20261012`, since deleted):**
+1. **A failing required check blocks the merge:** `gh pr merge --rebase` was refused with "the base branch policy
+   prohibits the merge" (probe#1).
+2. **The owner's bypass merges past it:** `gh pr merge --rebase --admin` merged probe#1 with `probe-check` failing.
+3. **A status from the wrong source doesn't count.** probe#2's commit carried `[skip ci]`, so no check ran, and the
+   merge was refused: a missing check blocks. Then `probe-check` and `probe-skipped` were posted as `success`
+   statuses with the owner's token, and the merge was still refused, because each check is pinned to GitHub
+   Actions (15368).
+4. **A skipped job counts as passed.** On probe#2's next commit, `probe-check` passed and `probe-skipped` was
+   `SKIPPED`. The pull request showed `CLEAN` and merged with no bypass.
+5. **The App pushes past required checks.** A `github_repository_file` update made by the App went straight to `main`
+   under the `pull-request` ruleset with both checks required. The commit was by `troupe-run-infrastructure[bot]`,
+   and verified.
+6. **`app-only` holds:**
+   - the owner's direct push was refused (`GH013 ... Cannot update this protected ref`);
+   - probe#3 couldn't merge, normally or with `--admin` ("Repository rule violations found / Cannot update this
+     protected ref");
+   - the App's file commit was accepted.
+7. **The setting changes are clean.** The full repository JSON before and after applying D5 differed in exactly
+   `allow_merge_commit`, `allow_squash_merge`, `delete_branch_on_merge`, `has_wiki`, `has_projects` and
+   `updated_at`.
+8. **Turning classic projects off hides a linked org project from the repository.** With `has_projects = false`:
+   - the project still listed the repository and kept its item;
+   - but the repository's `projectsV2` came back empty, so its Projects tab no longer shows the project.
+
+   Turning it back on restored the link. So **`troupe` keeps `has_projects = true`**, because the roadmap is linked
+   to it (D5). The other three repositories are linked to no project.
+
 ## Risks / Trade-offs
 
 - **[A required check name drifts from the workflow, and every pull request blocks]** → For this repository, the test
