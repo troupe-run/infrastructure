@@ -25,7 +25,7 @@
 
 - [x] 3.1 Copy the `state-after-apply` artifact of run 38200444558 over `tofu/terraform.tfstate`, and commit it.
   Verify: it's serial 7, of the same lineage, and still encrypted; and a local plan reports no changes.
-- [ ] 3.2 Open the pull request (`Closes #11`). Verify:
+- [x] 3.2 Open the pull request (`Closes #11`). Verify:
   - every check is green;
   - after the owner approves the PR plan, its comment reports no changes.
 
