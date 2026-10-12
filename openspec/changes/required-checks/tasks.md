@@ -12,12 +12,12 @@
   Verify:
   - `scripts/check.py` passes;
   - a local plan of the live root shows no changes.
-- [ ] 1.2 Create `troupe-run/infra-probe-<yyyymmdd>` (public, with a README), and have the owner add it to the
+- [x] 1.2 Create `troupe-run/infra-probe-<yyyymmdd>` (public, with a README), and have the owner add it to the
   `troupe-run-infrastructure` App's installation. Give it a `probe-check` workflow: one job on `pull_request`, which
   passes unless the commit holds `fail.txt`. Also add a second job, skipped by `if: false`. Point `tofu/probe` at it
   with `probe_main_ruleset` and `probe_required_checks` (both checks). Verify: `tofu plan` in `tofu/probe` shows the
   probe repository with the `pull-request` ruleset and both checks required.
-- [ ] 1.3 Run D8 steps 1–5. For each, record the command and GitHub's response:
+- [x] 1.3 Run D8 steps 1–5. For each, record the command and GitHub's response:
   - a red pull request is refused;
   - `--admin` merges it;
   - a status posted with the owner's token doesn't satisfy the check;
@@ -25,18 +25,18 @@
   - the App's file commit to `main` is accepted despite the required check.
 
   Verify: all five behave as the rulesets spec delta says. Any surprise stops the change and is raised with the owner.
-- [ ] 1.4 Run D8 step 6 with `probe_main_ruleset = "app-only"`. Verify:
+- [x] 1.4 Run D8 step 6 with `probe_main_ruleset = "app-only"`. Verify:
   - the owner's push is refused;
   - the owner's pull request merge is refused, with `--admin` too;
   - the App's file commit is accepted.
-- [ ] 1.5 Run D8 step 7. Save `gh api repos/troupe-run/<probe>` before and after applying the D5 settings, and diff
+- [x] 1.5 Run D8 step 7. Save `gh api repos/troupe-run/<probe>` before and after applying the D5 settings, and diff
   the two. Verify: only `allow_merge_commit`, `allow_squash_merge`, `delete_branch_on_merge`, `has_wiki`,
   `has_projects` and `updated_at`/`pushed_at` differ.
-- [ ] 1.6 Run D8 step 8 with a throwaway org project linked to the probe repository and holding one of its issues.
+- [x] 1.6 Run D8 step 8 with a throwaway org project linked to the probe repository and holding one of its issues.
   Set `has_projects = false`. Verify, and record which way D5 goes for `troupe`:
   - the link and the item survive (`gh api graphql` on the project's `repositories` and `items`);
   - the repository's linked-projects list still shows it.
-- [ ] 1.7 Record the findings in design.md (under D8, as ci-apply did) and in the adopt-org findings memory. Then
+- [x] 1.7 Record the findings in design.md (under D8, as ci-apply did) and in the adopt-org findings memory. Then
   delete the probe repository and the throwaway project, and remove the probe's local state, `terraform.tfvars` and
   workflow file. Verify:
   - `gh repo view troupe-run/<probe>` reports not found;
