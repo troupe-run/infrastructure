@@ -27,7 +27,7 @@
 - [x] 2.2 With the read-only App's installation token, attempt a write on the probe repository, for example creating
   a label. Verify: GitHub answers 403. Note any 403 that the read-only plan in 2.1 hit, and add that read permission
   in 1.1.
-- [ ] 2.3 On a throwaway repository, create the probe environments with the same settings as D2: `apply` (owner
+- [x] 2.3 On a throwaway repository, create the probe environments with the same settings as D2: `apply` (owner
   reviewer, `main` only, no admin bypass) and `plan` (open). Add a small workflow, then show that:
   - a run on a branch requesting `apply` is refused;
   - a run on `main` waits for approval;
@@ -35,7 +35,7 @@
   - whether `environment: { name: plan, deployment: false }` avoids a deployment entry on the pull request.
 
   Verify by each run's outcome, linked in the findings.
-- [ ] 2.4 Delete the probe repositories and the probe's local state. Record the findings in this design (which D3
+- [x] 2.4 Delete the probe repositories and the probe's local state. Record the findings in this design (which D3
   path holds, and whether `deployment: false` works) and in the adopt-org findings memory. Verify:
   `gh repo list troupe-run` shows no probe repository, and `git status` shows no probe state.
 
@@ -52,7 +52,7 @@
   - the next plan reports no changes;
   - `gh api repos/troupe-run/infrastructure/environments` shows all three environments, with the reviewers and
     branch policies as declared.
-- [ ] 3.4 The owner sets the nine secrets from 1Password (D9). I give the exact commands; the owner runs them.
+- [x] 3.4 The owner sets the nine secrets from 1Password (D9). I give the exact commands; the owner runs them.
   Verify: `gh secret list --env` for each of `plan-pr`, `plan-main` and `apply` lists the three names (names only).
 
 ## 4. The workflow and the bypass (D1, D4–D7)
