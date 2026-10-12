@@ -16,7 +16,7 @@
 
 ## 2. Probe the assumptions (D8)
 
-- [ ] 2.1 Extend `tofu/probe` with the ephemeral `github_app_*` variables, wired as in D3. On a throwaway repository:
+- [x] 2.1 Extend `tofu/probe` with the ephemeral `github_app_*` variables, wired as in D3. On a throwaway repository:
   - plan a change as the read-only App with `-out`;
   - apply that saved plan as the write App.
 
@@ -24,7 +24,7 @@
   - the apply succeeds and the change is on GitHub;
   - the plan's `tofu show -json` contains neither key nor either App's ID as a variable value;
   - applying the saved plan without the key supplied fails, rather than using a stored one.
-- [ ] 2.2 With the read-only App's installation token, attempt a write on the probe repository, for example creating
+- [x] 2.2 With the read-only App's installation token, attempt a write on the probe repository, for example creating
   a label. Verify: GitHub answers 403. Note any 403 that the read-only plan in 2.1 hit, and add that read permission
   in 1.1.
 - [ ] 2.3 On a throwaway repository, create the probe environments with the same settings as D2: `apply` (owner
@@ -41,42 +41,35 @@
 
 ## 3. The ephemeral identity and the environments (D3, D2, D11 step 3)
 
-- [ ] 3.1 In `tofu/providers.tf`:
-  - make `github_app_pem` ephemeral;
-  - add the ephemeral `github_app_id` and `github_app_installation_id`, defaulting to null;
-  - add `local.infrastructure_installation_id`;
-  - wire `app_auth` as in D3.
-
-  Verify:
+- [ ] 3.1 In `tofu/providers.tf`, make `github_app_pem` ephemeral (D3). Verify:
   - `scripts/check.py` passes;
-  - a local plan as the write App reports no changes;
-  - a local plan with `TF_VAR_github_app_id` and `TF_VAR_github_app_installation_id` set to the plan App's IDs, and
-    its key, also reports no changes.
-- [ ] 3.2 Add `tofu/environments.tf`: `plan` and `apply` on `infrastructure` with the D2 settings, and the
-  `main`-only deployment policy for `apply`. Verify: `scripts/check.py` passes, and the saved plan shows exactly the
-  two environments and the policy to add.
+  - a local plan reports no changes;
+  - that plan, saved, holds no private key (`tofu show -json` grep) and applies only with the key supplied.
+- [ ] 3.2 Add `tofu/environments.tf`: `plan-pr`, `plan-main` and `apply` on `infrastructure` with the D2 settings, and
+  the `main`-only deployment policies for `plan-main` and `apply`. Verify: `scripts/check.py` passes, and the saved
+  plan shows exactly the three environments and the two policies to add.
 - [ ] 3.3 Show the owner the saved plan. After their approval, apply it, then commit the state. Verify:
   - the next plan reports no changes;
-  - `gh api repos/troupe-run/infrastructure/environments` shows both environments, with `apply`'s reviewer and
-    branch policy as declared.
-- [ ] 3.4 The owner sets the six secrets from 1Password (D9). I give the exact commands; the owner runs them.
-  Verify: `gh secret list --env plan` and `gh secret list --env apply` each list the three names (names only).
+  - `gh api repos/troupe-run/infrastructure/environments` shows all three environments, with the reviewers and
+    branch policies as declared.
+- [ ] 3.4 The owner sets the nine secrets from 1Password (D9). I give the exact commands; the owner runs them.
+  Verify: `gh secret list --env` for each of `plan-pr`, `plan-main` and `apply` lists the three names (names only).
 
 ## 4. The workflow and the bypass (D1, D4–D7)
 
 - [ ] 4.1 Add `.github/workflows/tofu.yml` with:
-  - the PR path: plan as the read-only App on the merge ref, posted as one edited comment, stopping with a message
-    when no secrets are available;
+  - the PR path: plan in `plan-pr` (with `deployment: false`) on the merge ref, posted as one edited comment,
+    stopping with a message when no secrets are available;
   - the `workflow_run` and `workflow_dispatch` path, made of the jobs `plan`, `apply` and `state`:
-    - `plan` waits for `guard`, shows the plan in the summary, and skips on no changes or on the App's own state
-      commit;
+    - `plan` runs in `plan-main` (with `deployment: false`), waits for `guard`, shows the plan in the summary, and
+      skips on no changes or on the App's own state commit;
     - `apply` runs in the `apply` environment;
     - `state` uploads the state artifact and makes the `PUT` commit.
 
   Actions are pinned by SHA, as in `ci.yml`. Verify:
   - `scripts/check.py` passes;
   - `actionlint` passes, if it can be run with `uvx` or `brew`; otherwise say so;
-  - pushing the branch posts a plan comment on the pull request that reports no changes.
+  - after the owner approves the pull request's plan run, a plan comment appears that reports no changes.
 - [ ] 4.2 Rename the module variable `delivery_app_id` to `app_bypass_id` and set it on `repo_infrastructure`. Update
   the README's "To stop delivering" and the comment in `main.tf`. Verify:
   - `scripts/check.py` passes;
@@ -93,7 +86,7 @@
 ## 5. Land it and verify the first CI apply (D11 steps 5–6)
 
 - [ ] 5.1 Open the pull request (`Closes #6`). Its evidence:
-  - the CI plan comment, showing only the bypass;
+  - the CI plan comment (after the owner approves its run), showing only the bypass;
   - the local plan and apply from 3.3;
   - the probe's findings.
 

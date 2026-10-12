@@ -3,31 +3,36 @@
 ## Purpose
 
 How a declared change reaches the org from CI: the plan on every pull request, and the plan, approval and apply on
-`main`. Covers the environments that gate them, the read-only identity that plans run as, and the commit of the new
-state after an apply.
+`main`. Covers the environments that gate them, and the commit of the new state after an apply.
 
 ## ADDED Requirements
 
 ### Requirement: Every pull request is planned in CI
-A pull request into `main` SHALL get a plan made in CI, against the state on `main`, posted on the pull request.
-The plan is the pull request's evidence. When the pull request is updated, the posted plan SHALL be replaced rather
+A pull request into `main` SHALL get a plan made in CI, against the state on `main`, posted on the pull request,
+once the owner has approved that run. The plan is the pull request's evidence. When the pull request is updated, the posted plan SHALL be replaced rather
 than added to. A pull request from a fork SHALL NOT be planned, because it gets no secrets.
 
 #### Scenario: A pull request that changes the org shows its plan
 - **WHEN** a pull request changes what is declared
-- **THEN** a plan showing that change is posted on the pull request, without the owner running anything
+- **THEN** a plan showing that change is posted on the pull request once the owner approves the run, without the
+  owner running anything locally
 
 #### Scenario: A new push replaces the plan
 - **WHEN** a pull request that already has a posted plan is pushed to again
 - **THEN** the pull request shows one plan: the latest
 
-### Requirement: Plans run with a read-only identity
-A plan made for a pull request SHALL authenticate as a GitHub App that can only read the org. No credential that can
-change the org SHALL be available to a pull request's workflow run.
+### Requirement: A pull request's run holds no credential without the owner's approval
+A workflow run for a pull request SHALL NOT get any credential (the App's key or the state passphrase) until the
+owner has approved that run. A run that isn't approved SHALL NOT plan. A pull request's run SHALL NOT be able to
+reach the credential for planning `main`, which needs no approval.
 
-#### Scenario: A pull request's run can't change the org
-- **WHEN** a pull request's workflow run tries to change anything in the org through the credentials it was given
-- **THEN** GitHub refuses the change
+#### Scenario: An unapproved pull request run gets nothing
+- **WHEN** a pull request is pushed and the owner hasn't approved its plan run
+- **THEN** the run waits, and no step in it has received a secret
+
+#### Scenario: A pull request can't borrow main's plan credential
+- **WHEN** a pull request's run asks for the environment that plans `main`
+- **THEN** GitHub refuses the deployment
 
 ### Requirement: Main is applied only after the owner approves its plan
 After every push to `main`, CI SHALL plan and show the plan before asking for approval. It SHALL then wait for the
@@ -48,8 +53,9 @@ unchanged.
 - **THEN** the run ends after the plan, with no approval requested
 
 ### Requirement: Only main can apply
-The credential that can change the org SHALL be available only to a run on `main` that the owner has approved. A run
-on any other branch SHALL NOT be able to reach it.
+An apply SHALL run only on `main`, after the owner's approval. The credential that can change the org SHALL reach a
+workflow run only when the run is on `main` or the owner has approved it. A run on any other branch SHALL NOT reach
+the environments that `main` uses.
 
 #### Scenario: A branch can't apply
 - **WHEN** a workflow run on a branch other than `main` asks for the apply environment

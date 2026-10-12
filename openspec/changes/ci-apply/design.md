@@ -25,7 +25,8 @@
     - self-hosted HTTP servers that write to git.
 
     Neither was acceptable, so the state stays on `main`, committed by the App.
-  - **PR plans:** a second, read-only App.
+  - **PR plans:** first a second, read-only App. The probe (D8) found that it can't read repositories' merge
+    settings, so the owner chose instead to gate each PR plan on their approval, with the write App (D2).
 - **Constraints** (`openspec/config.yaml`):
   - CI applies only from `main`, through an environment that needs the owner's approval;
   - secret values are never managed by OpenTofu;
@@ -36,8 +37,8 @@
 
 **Goals:**
 - A merge to `main` is applied without the owner at the Mac, after a plan they approve in GitHub.
-- Every pull request shows its plan, made in CI, unattended.
-- No pull request's run can reach a credential that can change the org.
+- Every pull request shows its plan, made in CI, after one click from the owner instead of a local run.
+- No pull request's run can reach a credential that can change the org without the owner approving that run.
 - The state stays committed, encrypted, on `main`, and the history says which commit each state came from.
 - Local runs keep working, as the fallback and the break-glass.
 
@@ -53,17 +54,17 @@
 ### D1. One workflow, `tofu.yml`, with two paths
 
 ```
-pull_request ---------------------> [pr-plan]  env: plan  (read-only App)
+pull_request ---------------------> [pr-plan]  env: plan-pr  (owner approves; any branch)
                                         |
                                         +--> plan posted as a PR comment (replaced on each push)
 
 workflow_run: CI completed on main -+
-workflow_dispatch on main ----------+-> [plan] env: plan (read-only App)
+workflow_dispatch on main ----------+-> [plan] env: plan-main (main only; no approval)
                                         |   waits for guard on the same commit
                                         |   plan -out, summary in the run
                                         |   no changes --> run ends
                                         v
-                                    [apply] env: apply (owner approves; write App)
+                                    [apply] env: apply (owner approves; main only)
                                         |   apply the saved plan
                                         v
                                     [state] commit tofu/terraform.tfstate to main as the App
@@ -83,61 +84,61 @@ workflow_dispatch on main ----------+-> [plan] env: plan (read-only App)
 - **Why one file, not `ci.yml`:** CI cancels superseded runs (`cancel-in-progress: true`). A cancelled apply is
   unsafe, so tofu needs its own concurrency (D6).
 
-### D2. The plan is made as a read-only App; only the apply holds the write key
+### D2. Three environments, one App; every PR plan waits for the owner
 
-- **The read-only App:** a second App, `troupe-run-infrastructure-plan`, has the write App's permission set at read
-  level:
-  - administration, contents, issues, members and organization administration: read;
-  - metadata: read.
+Every CI job authenticates as the write App, `troupe-run-infrastructure`. What a run can reach is decided by its
+environment:
 
-  The probe (D8) settles the exact set: any 403 in a read-only plan names a missing read permission.
-- **Its IDs:** App 5280157, installation 170434831 (created by the owner, 2026-10-12). Its key is the 1Password item
-  `troupe-run-infrastructure-plan` in `troupe.run`, field `private key`, the same shape as the write App's.
-- **Its installation** covers the same repositories as the write App's. The README's "Adding a repository" gains
-  "install both Apps".
-- **The `plan` environment** holds the read-only App's key, the state passphrase and the billing email. It has no
-  reviewer and no branch restriction, because a pull request's run has to reach it.
-  - The worst a hostile workflow change in a pull request can do with them is read the org and decrypt the state.
-  - The state holds settings and the billing email, nothing that grants access.
-  - Fork pull requests get no secrets, and their job says so and stops.
-- **The `apply` environment** holds the write App's key, the passphrase and the billing email:
-  - its required reviewer is the owner (user 160232611);
-  - its deployment branch policy is custom, `main` only;
+| Environment | Who may deploy | Approval | Used by |
+|---|---|---|---|
+| `plan-pr` | any branch | the owner, on every run | the pull request plan |
+| `plan-main` | `main` only | none | the plan after a merge, and the manual run |
+| `apply` | `main` only | the owner | the apply |
+
+- **Each environment holds the same three secrets:** the write App's key, the state passphrase and the billing
+  email (D9).
+- **`plan-pr`** needs approval because a pull request runs its own version of the workflow. Before approving, the
+  owner checks whether the pull request changes `.github/workflows/`, since an approved run holds the write key.
+  Fork pull requests get no secrets at all; their job says so and stops.
+- **`plan-main`** needs no approval, because only code the owner merged reaches `main`. Its branch policy keeps every
+  other ref out. The probe showed GitHub refusing a branch: *"Branch … is not allowed to deploy to apply due to
+  environment protection rules."* So the plan after a merge runs unattended, and the owner approves once, at the
+  apply.
+- **`plan-pr` and `apply`** both have:
+  - the owner (user 160232611) as required reviewer;
   - `can_admins_bypass = false`, so the approval can't be skipped;
-  - `prevent_self_review = false`, because the owner both merges and approves.
-- **The main plan also runs in `plan`,** as the read-only App. So the write key is reachable only after the
-  approval.
+  - `prevent_self_review = false`, because the owner both pushes and approves.
+- **The plan jobs use `environment: { name: …, deployment: false }`.** The probe showed that this gives the job the
+  environment's secrets without recording a deployment, so pull requests don't fill up with "deployed to plan-pr".
 
-### D3. The App's identity is ephemeral input
+**Why not the read-only App** (the owner's first choice, superseded 2026-10-12): the probe showed that a token with
+only read rights gets a repository's merge settings back as missing. Those are `allow_merge_commit`,
+`allow_rebase_merge`, `allow_squash_merge` and the four merge and squash message fields. As a result:
+- a read-only plan shows them as changes on every repository;
+- applying such a plan would PATCH every repository, which adopt-org showed has side effects.
 
-For D2 to work, a plan saved as the read-only App has to apply as the write App. OpenTofu doesn't store ephemeral
-variables' values in a plan, only their names, and they're allowed in provider configuration. So:
+Filtering those lines out of the comment would hide a real merge-setting change. Giving the App push rights would
+make it no longer read-only. So the owner chose to approve each PR plan instead.
 
-```hcl
-variable "github_app_pem"             { type = string, sensitive = true, ephemeral = true }
-variable "github_app_id"              { type = string, default = null,   ephemeral = true }
-variable "github_app_installation_id" { type = string, default = null,   ephemeral = true }
+The read-only App, `troupe-run-infrastructure-plan` (App 5280157, installation 170434831), stays installed and
+declared in `oob/` for now, unused. `required-checks` decides whether to delete it.
 
-provider "github" {
-  app_auth {
-    id              = coalesce(var.github_app_id, tostring(local.infrastructure_app_id))
-    installation_id = coalesce(var.github_app_installation_id, local.infrastructure_installation_id)
-    pem_file        = var.github_app_pem
-  }
-}
-```
+### D3. The App's key is ephemeral input
 
-- **Defaults** are the write App's, from the locals that stay the single place for its ID. So local runs and the
-  apply job set nothing new.
-- **The plan jobs** set `TF_VAR_github_app_id` and `TF_VAR_github_app_installation_id` to the read-only App's IDs.
-  These aren't secrets, so they're literals in the workflow.
-- **A bonus:** the key stops being written into saved plans at all.
-- **This is the one assumption to prove before anything depends on it** (D8). The fallback, if a saved plan can't
-  switch identity:
-  - the main plan uses the write App instead;
-  - its key also lives in a third environment, `plan-main`, limited to `main` and with no reviewer.
+`var.github_app_pem` becomes `ephemeral = true`. OpenTofu then keeps only the variable's name in a saved plan, and
+asks for its value again at apply. The probe confirmed this:
+- the saved plan's `tofu show -json` had no key;
+- applying it without a key failed with *"Variable "github_app_pem" is configured as ephemeral … need to be given a
+  value during `tofu plan` and also during `tofu apply`"*.
 
-  That's still sound, because only owner-merged code reaches `main`. It's just one more place the key lives.
+So the plan artifact passed from the plan job to the apply job holds no key, on top of being encrypted.
+
+The probe also showed that a saved plan can be applied as a different App, when the App's ID and installation ID are
+ephemeral input too. With one App in CI that isn't needed, so the live root keeps its IDs as they are.
+
+One more finding constrains the workflow: applying a saved plan re-reads `terraform.tfvars` and `-var`. If a
+non-ephemeral value differs from the plan's, OpenTofu refuses: *"Mismatch between input and plan variable value"*.
+The apply job therefore gets exactly the plan job's inputs: the same commit, and the same environment secrets.
 
 ### D4. State is committed to `main` by the App
 
@@ -212,17 +213,27 @@ Before the live root changes, two throwaway repositories show the behaviour. Bot
 
 The probe's findings go in the memory of adopt-org findings and, where they change the design, back here.
 
+**Findings (2026-10-12, `troupe-run/infra-probe-20261012`):**
+- **A plan saved as the read-only App applied as the write App:** the description changed. The plan held no key and
+  neither App ID. Without a key the apply failed. This proves the identity switch, but D2 no longer needs it.
+- **The read-only App was refused a write:** `403 Resource not accessible by integration`.
+- **The read-only App can't read merge settings,** which led to the change of plan in D2.
+- **A push to a branch asking for `apply`** (`main` only) was refused.
+- **A pull request's run reached `plan`** and its secret, on `refs/pull/1/merge`. With `deployment: false`, no
+  deployment was recorded.
+- **A push to `main` asking for `apply`** waited for the owner's approval.
+
 ### D9. Secrets are set by the owner, from 1Password
 
-There are six environment secrets: `TF_VAR_github_app_pem`, `TF_VAR_state_passphrase` and `TF_VAR_billing_email` in
-each of `plan` and `apply`. The plan App's key goes in `plan`. The owner runs, for example:
+There are nine environment secrets: `TF_VAR_github_app_pem`, `TF_VAR_state_passphrase` and `TF_VAR_billing_email` in
+each of `plan-pr`, `plan-main` and `apply`. The owner runs, for example:
 
 ```
 op read "op://troupe.run/troupe-run-infrastructure/private key" \
   | gh secret set TF_VAR_github_app_pem --env apply -R troupe-run/infrastructure
 ```
 
-so no value is printed or passes through a session. The README lists all six commands.
+so no value is printed or passes through a session. The README gives a loop that sets all nine.
 
 ### D10. Local runs stay
 
@@ -241,35 +252,39 @@ so no value is printed or passes through a session. The README lists all six com
 The environments and their secrets must exist before the workflow can run. The App's push bypass should be applied
 by CI itself, so that the first live CI apply is a real one and exercises the state commit.
 
-1. **The owner** creates and installs the plan App, and stores its key in 1Password.
+1. **The owner** creates and installs the plan App, and stores its key in 1Password. This step is done; D2 explains
+   why the App is now unused.
 2. **Probe** (D8).
 3. **On the branch, locally:**
-   - commit the ephemeral identity and the environments;
+   - commit the ephemeral key and the three environments;
    - plan, and the owner approves;
    - apply, and commit the state.
 
    This is the last state committed on a branch.
-4. **The owner** sets the six secrets (D9).
-5. **Commit the workflow and the bypass.** The pull request's own CI plan is the first PR plan: it should show only
-   the bypass.
+4. **The owner** sets the nine secrets (D9).
+5. **Commit the workflow and the bypass.** The pull request's own CI plan is the first PR plan, run after the owner
+   approves it. It should show only the bypass.
 6. **Archive, then the owner merges.** The `main` run plans the bypass; the owner approves; it applies, then commits
    the state through the bypass it just applied.
 
 ## Risks / Trade-offs
 
-- **[Ephemeral identity doesn't behave as documented]** → probed first (D8). The fallback (D3) keeps the design
-  without it.
 - **[No lock between CI and a local break-glass apply]** → the README says to apply locally only when no `tofu` run is
   in progress. The state `PUT` with `sha` refuses to overwrite a file that changed underneath it.
 - **[The state commit fails after a successful apply]** → the state is kept as an artifact and the run fails loudly.
   Even if the state were lost, the import blocks re-adopt everything (README, "The state passphrase").
-- **[A pull request can read the plan secrets]** → by a workflow change in a pull request from this repository, which
-  only the owner and their sessions can open. The exposure is read access and the state's contents.
+- **[An approved PR plan holds the write key]** → a pull request that changes the workflow could misuse it, once the
+  owner approves its run. Only the owner and their sessions can open such a pull request. Before approving, the
+  owner checks whether it touches `.github/workflows/`. `required-checks` can add a CODEOWNERS or guard rule for
+  workflow changes.
+- **[One click per PR push]** → the price of an accurate plan without a second identity. A pull request that changes
+  nothing under `tofu/` still asks. The PR job could be limited to `paths: [tofu/**]`, but the plan is evidence for
+  `oob/` and specs as well, so every pull request gets one.
 - **[An approval is asked for a plan the owner hasn't read]** → the plan is in the same run's summary. Approving is
   the owner's act, as approving a pasted plan was.
 - **[CI on `main` is noisier]** → each state commit runs CI and `guard` once more. That's cheap, and keeps every
   commit on `main` checked.
 - **[The DCO App]** → the state commit has no sign-off. DCO checks pull requests, not pushes. `required-checks` will
   revisit this if it matters.
-- **[Two Apps to keep in step]** → `oob/app-installations.json` declares both installations' permissions, and
-  `scripts/oob.py` reports drift.
+- **[An unused App]** → the read-only App stays declared in `oob/`, so its drift is still reported, until
+  `required-checks` decides whether to delete it.
