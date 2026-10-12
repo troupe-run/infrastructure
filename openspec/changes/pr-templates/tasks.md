@@ -41,7 +41,7 @@
   - `tofu console` lists the nine paths (the four existing, the five new);
   - `uv run scripts/oob.py` reports the five new files as declared here but missing on GitHub, and nothing else for
     `.github`.
-- [ ] 3.2 Add a short "Where the templates come from" section to `docs/development-workflow.md`: the PR template and
+- [x] 3.2 Add a short "Where the templates come from" section to `docs/development-workflow.md`: the PR template and
   issue forms are org defaults published from `org-profile/`; a repository with its own `.github/ISSUE_TEMPLATE/`
   uses none of the org's forms; a form's type and labels must be declared (D5). Verify: `scripts/check.py` passes,
   including `test_guard_docs.py`.
