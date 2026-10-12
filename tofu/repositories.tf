@@ -21,7 +21,7 @@ module "repo_github" {
   source = "./modules/repository"
   name   = ".github"
   # .github gets its own ruleset, letting only the App push, in required-checks.
-  protect_main = false
+  main_ruleset = "none"
   description  = "Org-wide defaults for troupe-run repositories: DCO config, contributing, security policy, org profile"
   labels       = local.github_default_labels
 }

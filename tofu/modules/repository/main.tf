@@ -66,10 +66,11 @@ resource "github_issue_labels" "this" {
   }
 }
 
-# main is changed only through pull requests merged by rebase; its history can't be rewritten or
-# deleted (spec: rulesets; openspec/changes/protect-main/design.md, D2 and D3).
+# main is changed only through pull requests merged by rebase, once their required checks pass; its
+# history can't be rewritten or deleted (spec: rulesets; protect-main design D2 and D3,
+# required-checks design D1 and D4).
 resource "github_repository_ruleset" "main" {
-  count = var.protect_main ? 1 : 0
+  count = var.main_ruleset == "pull-request" ? 1 : 0
 
   name        = "protect main"
   repository  = github_repository.this.name
@@ -92,6 +93,24 @@ resource "github_repository_ruleset" "main" {
       required_approving_review_count = 0
       allowed_merge_methods           = ["rebase"]
     }
+
+    # Each check is pinned to the App that posts it, so a status of the same name from anywhere
+    # else doesn't count. Not strict: the App's state commit after every apply would otherwise put
+    # every open pull request out of date (required-checks design D3).
+    dynamic "required_status_checks" {
+      for_each = length(var.required_checks) > 0 ? [1] : []
+      content {
+        strict_required_status_checks_policy = false
+
+        dynamic "required_check" {
+          for_each = var.required_checks
+          content {
+            context        = required_check.value.context
+            integration_id = required_check.value.integration_id
+          }
+        }
+      }
+    }
   }
 
   # Org owners bypass on pull requests only: never a direct push, so an agent using the owner's
@@ -113,6 +132,45 @@ resource "github_repository_ruleset" "main" {
       actor_type  = "Integration"
       actor_id    = bypass_actors.value
       bypass_mode = "always"
+    }
+  }
+}
+
+# Only the App changes main: no push, no pull request merge, no force-push or deletion, by anyone
+# else, org owners included. The owner's break-glass is editing the ruleset on GitHub
+# (required-checks design D4).
+resource "github_repository_ruleset" "app_only" {
+  count = var.main_ruleset == "app-only" ? 1 : 0
+
+  name        = "app only"
+  repository  = github_repository.this.name
+  target      = "branch"
+  enforcement = "active"
+
+  conditions {
+    ref_name {
+      include = ["~DEFAULT_BRANCH"]
+      exclude = []
+    }
+  }
+
+  rules {
+    update                        = true
+    update_allows_fetch_and_merge = false
+    deletion                      = true
+    non_fast_forward              = true
+  }
+
+  bypass_actors {
+    actor_type  = "Integration"
+    actor_id    = var.app_bypass_id
+    bypass_mode = "always"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.app_bypass_id != null
+      error_message = "An app-only ruleset needs app_bypass_id: without it, nothing could change main."
     }
   }
 }
