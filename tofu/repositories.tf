@@ -32,8 +32,8 @@ module "repo_troupe" {
   name         = "troupe"
   description  = "troupe: run your development process with agents and people in named roles"
   homepage_url = "https://troupe.run"
-  # The cap:* labels are copied as they were on 2026-10-11; capability-labels replaces the copy
-  # with troupe's capability list.
+  # troupe.json is troupe's capability labels, declared here and changed by pull request: troupe
+  # keeps no separate list (spec: labels; owner, 2026-10-12, #22).
   labels = concat(local.github_default_labels, local.workflow_labels, jsondecode(file("${path.module}/labels/troupe.json")))
   # The org's roadmap (project 1) is linked here, and turning projects off would hide it from the
   # repository (required-checks design D8, finding 8).
