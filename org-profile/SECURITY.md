@@ -1,3 +1,4 @@
+<!-- Source: troupe-run/infrastructure (org-profile/SECURITY.md). Change it there; this copy is written by the App. -->
 # Security policy
 
 ## Reporting a vulnerability

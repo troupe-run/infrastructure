@@ -1,3 +1,4 @@
+<!-- Source: troupe-run/infrastructure (org-profile/profile/README.md). Change it there; this copy is written by the App. -->
 # troupe
 
 **Your agents need a director.**
