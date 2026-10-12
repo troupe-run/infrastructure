@@ -18,7 +18,7 @@
 - [x] 2.3 Replace the "copied as they were on 2026-10-11" comment in `tofu/repositories.tf` with one saying
       `troupe.json` is troupe's capability labels, changed by pull request (spec: labels), and verify `tofu fmt`
       passes
-- [ ] 2.4 Run `uv run scripts/tofu.py plan` and verify it shows exactly three labels created on troupe-run/troupe and
+- [x] 2.4 Run `uv run scripts/tofu.py plan` and verify it shows exactly three labels created on troupe-run/troupe and
       nothing deleted; quote the plan in the pull request
 
 ## 3. The spec check
@@ -37,12 +37,12 @@
 
 ## 4. Document the path
 
-- [ ] 4.1 Change the `cap:` line in `org-profile/.github/ISSUE_TEMPLATE/feature.yml` and `decision.yml` to design
+- [x] 4.1 Change the `cap:` line in `org-profile/.github/ISSUE_TEMPLATE/feature.yml` and `decision.yml` to design
       D5's wording, and verify `uv run pytest scripts/tests/test_org_profile.py` passes and the plan shows both files
       updated in troupe-run/.github
 - [x] 4.2 Update `README.md`'s `tofu/labels/` layout row to name `troupe.json` as troupe's capability labels, changed
       by pull request, and verify the row reads correctly in the rendered README
-- [ ] 4.3 Run `openspec validate capability-labels --strict` and verify it passes
+- [x] 4.3 Run `openspec validate capability-labels --strict` and verify it passes
 
 ## Workflow follow-up
 
