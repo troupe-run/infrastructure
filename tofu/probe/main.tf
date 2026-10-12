@@ -13,9 +13,12 @@
 # probe_delivery = true to deliver the guard's script, workflow and list, plus probe-note.txt,
 # whose content is var.probe_note, with the live delivery's commit messages.
 #
-# The ci-apply probe (design D8) switches identity between plan and apply: plan with
-# TF_VAR_github_app_id and TF_VAR_github_app_installation_id set to the read-only plan App's,
-# and its key, saving the plan; then apply that plan with the write App's key and neither ID set.
+# The ci-apply probe (design D8) switched identity between plan and apply: it planned with
+# TF_VAR_github_app_id and TF_VAR_github_app_installation_id set to the read-only plan App's, and
+# applied that plan with the write App's key and neither ID set. The plan App was deleted in
+# required-checks (design D7); the variables stay for any App the same test needs.
+#
+# The required-checks probe (design D8) sets probe_main_ruleset and probe_required_checks.
 # probe_description makes the change; probe_environments adds the D2 environments.
 
 terraform {

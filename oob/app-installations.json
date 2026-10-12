@@ -23,17 +23,5 @@
       "workflows": "write"
     },
     "repository_selection": "selected"
-  },
-  {
-    "app_slug": "troupe-run-infrastructure-plan",
-    "permissions": {
-      "administration": "read",
-      "contents": "read",
-      "issues": "read",
-      "members": "read",
-      "metadata": "read",
-      "organization_administration": "read"
-    },
-    "repository_selection": "selected"
   }
 ]
