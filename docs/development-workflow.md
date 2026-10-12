@@ -14,7 +14,7 @@ drift apart:
 | Git hooks: `pre-commit`, `commit-msg` | on every commit, for everyone | the git rules below | yes, `--no-verify` (it's your machine) |
 | Git hook: `pre-push` | on every push, any branch | every commit being pushed is a Conventional Commit | yes, `--no-verify` |
 | Claude Code hooks (`.claude/settings.json`) | before an agent's tool call | the Claude rules below, including refusing `--no-verify` | no, for an agent following `CLAUDE.md` |
-| The `guard` GitHub check (`.github/workflows/guard.yml`) | on every push to every branch, and every pull request | commit messages, the branch-change match, archived tasks | no, once `required-checks` (troupe-run/infrastructure#1) makes it required |
+| The `guard` GitHub check (`.github/workflows/guard.yml`) | on every push to every branch, and every pull request | commit messages, the branch-change match, archived tasks | no: it's a required check, so a pull request can't merge while it's red (`tofu/required-checks.json`) |
 
 **The git hooks are on by default.** Git never runs hooks from a fresh clone, so the repository's own tooling turns
 them on: running `uv run scripts/check.py` does it, and so does starting a Claude Code session. Each says so when it
@@ -24,8 +24,8 @@ does. You can also run `git config core.hooksPath .githooks` yourself.
 commit-message ruleset is accepted, but not enforced, on Free (`troupe-run`) and on Team (`hpsgd`, public and
 private repositories), although Team did enforce a branch-deletion rule in the same repository. Metadata rules need
 GitHub Enterprise, so moving the project or upgrading to Team wouldn't help. So a bad message can still
-reach a branch. The `guard` check goes red within a minute of the push, and can't be merged once
-`required-checks` makes it required. Fix it before anyone builds on the branch.
+reach a branch. The `guard` check goes red within a minute of the push, and a pull request can't merge while it's
+red. Fix it before anyone builds on the branch.
 
 Every refusal names its rule and its fix:
 
@@ -87,10 +87,10 @@ own checks (`scripts/check.py`), and any other files, stay each repository's own
 
 - **These hooks aren't a security boundary.** They stop honest shortcuts. A Bash command that writes a file isn't
   seen by the edit hook, though the git hooks catch it at commit time. A determined bypass is still possible.
-  GitHub's rulesets and required checks (`required-checks`) are the hard backstop.
+  GitHub's rulesets and required checks are the hard backstop.
 - **Pull requests opened through `gh api`** aren't checked for a closing reference by the Claude Code hook.
 - **A bad commit message can reach a branch** if the local hooks were skipped, because GitHub doesn't reject it at
-  push time on our plan. The `guard` check flags it at once, and blocks the merge once required.
+  push time on our plan. The `guard` check flags it at once, and blocks the merge.
 - **The local hooks run the working tree's `guard.py`.** A commit that edits it can disable its own check. The
   `guard` check on GitHub runs the committed rules, and in a repository that receives the guard, the plan shows the
   edit as drift.
