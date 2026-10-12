@@ -34,7 +34,6 @@ lists below are checked by hand in each App's settings, by any change that adds,
 | App | Repositories | Confirmed |
 |---|---|---|
 | `troupe-run-infrastructure` | `troupe`, `.github`, `infrastructure`, `website` | 2026-10-11, owner |
-| `troupe-run-infrastructure-plan` (unused, see ci-apply design D2) | `troupe`, `.github`, `infrastructure`, `website` | 2026-10-12, owner |
 | `dco` | `troupe`, `.github`, `infrastructure` | 2026-10-11, owner |
 
 A repository the infrastructure App isn't installed on shows only its public view to OpenTofu (merge settings read as

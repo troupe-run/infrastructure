@@ -111,7 +111,7 @@
   defaults findings. Verify:
   - `scripts/check.py` passes;
   - a local plan shows, per repository, only the D5 fields changing.
-- [ ] 5.2 The owner deletes `troupe-run-infrastructure-plan` (D7) and its 1Password item. Then remove it from:
+- [x] 5.2 The owner deletes `troupe-run-infrastructure-plan` (D7) and its 1Password item. Then remove it from:
   - `oob/app-installations.json`;
   - `oob/README.md`'s table;
   - `tofu/probe/main.tf`'s comment.
