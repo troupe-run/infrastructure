@@ -1,7 +1,7 @@
 # Contributing to troupe
 
 Thanks for helping. This guide applies to every troupe-run repository that doesn't have a `CONTRIBUTING.md` of
-its own. The website ([troupe-run.github.io](https://github.com/troupe-run/troupe-run.github.io)) has its own.
+its own. The [website](https://github.com/troupe-run/website) has its own.
 
 ## Licence and sign-off
 

@@ -44,12 +44,12 @@ import {
 
 import {
   to = module.repo_website.github_repository.this
-  id = "troupe-run.github.io"
+  id = "website"
 }
 
 import {
   to = module.repo_website.github_issue_labels.this
-  id = "troupe-run.github.io"
+  id = "website"
 }
 
 # The files troupe already had when it was adopted; the generated list is created, not imported.

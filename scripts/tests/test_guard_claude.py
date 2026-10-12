@@ -165,7 +165,7 @@ def pr_rules(command: str, cwd: Path) -> set[str | None]:
     "command",
     [
         f"gh pr create --repo troupe-run/.github {NO_CLOSE}",
-        f"gh pr create -R troupe-run/troupe-run.github.io {NO_CLOSE}",
+        f"gh pr create -R troupe-run/website {NO_CLOSE}",
         f"gh pr create --repo=troupe-run/.github {NO_CLOSE}",
         f"GH_REPO=troupe-run/.github gh pr create {NO_CLOSE}",
     ],
