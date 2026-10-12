@@ -58,11 +58,27 @@ variable "has_projects" {
   default = true
 }
 
-# The ruleset on main (spec: rulesets). On for every managed repo unless its declaration says
-# otherwise; .github turns it off until its own ruleset arrives.
-variable "protect_main" {
-  type    = bool
-  default = true
+# Which ruleset covers main (spec: rulesets; required-checks design D4):
+#   pull-request  changes arrive by pull request, merged by rebase once the required checks pass
+#   app-only      only the App in app_bypass_id changes main (.github)
+#   none          no ruleset (the probe, or a repository not protected yet)
+variable "main_ruleset" {
+  type    = string
+  default = "pull-request"
+
+  validation {
+    condition     = contains(["pull-request", "app-only", "none"], var.main_ruleset)
+    error_message = "main_ruleset must be pull-request, app-only or none."
+  }
+}
+
+variable "required_checks" {
+  description = "Checks a pull request needs before it merges, each pinned to the App that posts it (pull-request only)."
+  type = list(object({
+    context        = string
+    integration_id = number
+  }))
+  default = []
 }
 
 variable "owner_bypass" {

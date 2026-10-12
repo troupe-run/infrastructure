@@ -2,7 +2,7 @@
 
 ## 1. Probe on a throwaway repository (design D8)
 
-- [ ] 1.1 Give the module what the probe needs, and leave the live repositories unchanged:
+- [x] 1.1 Give the module what the probe needs, and leave the live repositories unchanged:
   - `required_checks`: a list of `{ context, integration_id }`, defaulting to `[]`, which adds a
     `required_status_checks` rule (`strict_required_status_checks_policy = false`, D3) only when it isn't empty;
   - `main_ruleset` (`pull-request` | `app-only` | `none`, default `pull-request`) in place of `protect_main`, with the

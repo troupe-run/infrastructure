@@ -77,10 +77,19 @@ variable "probe_description" {
   default     = "Throwaway: drift probe for troupe-run/infrastructure#2. Deleted after use."
 }
 
-variable "probe_protect_main" {
-  description = "Passed to the module's protect_main: false lets a probe workflow be pushed to main."
-  type        = bool
-  default     = true
+variable "probe_main_ruleset" {
+  description = "Passed to the module's main_ruleset: none lets a probe workflow be pushed to main."
+  type        = string
+  default     = "pull-request"
+}
+
+variable "probe_required_checks" {
+  description = "Passed to the module's required_checks (required-checks design D8)."
+  type = list(object({
+    context        = string
+    integration_id = number
+  }))
+  default = []
 }
 
 variable "probe_environments" {
@@ -138,11 +147,12 @@ module "probe" {
   source = "../modules/repository"
   count  = var.declared ? 1 : 0
 
-  name         = var.probe_repo
-  description  = var.probe_description
-  labels       = jsondecode(file("${path.module}/../labels/github-defaults.json"))
-  owner_bypass = var.probe_bypass
-  protect_main = var.probe_protect_main
+  name            = var.probe_repo
+  description     = var.probe_description
+  labels          = jsondecode(file("${path.module}/../labels/github-defaults.json"))
+  owner_bypass    = var.probe_bypass
+  main_ruleset    = var.probe_main_ruleset
+  required_checks = var.probe_required_checks
 
   app_bypass_id = var.probe_delivery_bypass ? 5272634 : null
 }

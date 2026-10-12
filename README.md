@@ -136,7 +136,7 @@ The plan then shows it as "forget", with nothing destroyed.
 
 **Adding a repository:** add it to the `troupe-run-infrastructure` App's installation first, and update the list in
 `oob/README.md`. Without the App, OpenTofu sees only the repository's public view. A new repository gets the "protect
-main" ruleset unless its `module` block sets `protect_main = false`.
+main" ruleset unless its `module` block sets `main_ruleset` to `app-only` or `none`.
 
 ## How main is protected
 
