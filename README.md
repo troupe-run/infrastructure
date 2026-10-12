@@ -137,4 +137,4 @@ can also grant themselves a local override in a troupe clone.
    `delivered-file` off there. It has to go first, while the App can still push.
 2. Replace the remaining delivery resources with `removed` blocks (see "Changing the org"). That leaves the files in
    troupe, which then change through troupe's own workflow.
-3. Remove `delivery_app_id` from `repo_troupe`.
+3. Remove `app_bypass_id` from `repo_troupe`.

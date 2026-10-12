@@ -71,8 +71,8 @@ variable "owner_bypass" {
   default     = true
 }
 
-variable "delivery_app_id" {
-  description = "A GitHub App that may push straight to main, to deliver the guard (design D5). Null: none."
+variable "app_bypass_id" {
+  description = "A GitHub App that may push straight to main: to deliver the guard, or to commit state after a CI apply. Null: none."
   type        = number
   default     = null
 }

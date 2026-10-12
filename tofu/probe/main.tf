@@ -144,7 +144,7 @@ module "probe" {
   owner_bypass = var.probe_bypass
   protect_main = var.probe_protect_main
 
-  delivery_app_id = var.probe_delivery_bypass ? 5272634 : null
+  app_bypass_id = var.probe_delivery_bypass ? 5272634 : null
 }
 
 resource "github_repository_file" "probe" {

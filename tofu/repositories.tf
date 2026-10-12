@@ -14,7 +14,7 @@ module "repo_troupe" {
   # with troupe's capability list.
   labels = concat(local.github_default_labels, jsondecode(file("${path.module}/labels/troupe.json")))
   # troupe receives the guard from this repository (guard_delivery.tf).
-  delivery_app_id = local.infrastructure_app_id
+  app_bypass_id = local.infrastructure_app_id
 }
 
 module "repo_github" {
@@ -33,6 +33,8 @@ module "repo_infrastructure" {
   description  = "How the troupe-run org builds software: the org as code (OpenTofu), the development workflow and its guardrails"
   topics       = ["infrastructure-as-code", "openspec", "opentofu"]
   labels       = local.github_default_labels
+  # CI commits the state here after an apply (spec: ci-apply, design D4).
+  app_bypass_id = local.infrastructure_app_id
 }
 
 # GitHub Pages (deployed from Actions) isn't declared yet: the provider treats `pages` as
