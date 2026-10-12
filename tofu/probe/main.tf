@@ -12,6 +12,11 @@
 # The guard-delivery probe (development-workflow, design D8) needs no README.probe.md: set
 # probe_delivery = true to deliver the guard's script, workflow and list, plus probe-note.txt,
 # whose content is var.probe_note, with the live delivery's commit messages.
+#
+# The ci-apply probe (design D8) switches identity between plan and apply: plan with
+# TF_VAR_github_app_id and TF_VAR_github_app_installation_id set to the read-only plan App's,
+# and its key, saving the plan; then apply that plan with the write App's key and neither ID set.
+# probe_description makes the change; probe_environments adds the D2 environments.
 
 terraform {
   required_version = ">= 1.8"
@@ -46,9 +51,42 @@ variable "state_passphrase" {
   sensitive = true
 }
 
+# Ephemeral, so a saved plan stores neither the key nor the identity it was made with, and the
+# apply runs as whichever App it is given (ci-apply design D3). Null IDs mean the write App.
 variable "github_app_pem" {
   type      = string
   sensitive = true
+  ephemeral = true
+}
+
+variable "github_app_id" {
+  type      = string
+  default   = null
+  ephemeral = true
+}
+
+variable "github_app_installation_id" {
+  type      = string
+  default   = null
+  ephemeral = true
+}
+
+variable "probe_description" {
+  description = "The probe repo's description, changed to make a plan with one change (ci-apply D8)."
+  type        = string
+  default     = "Throwaway: drift probe for troupe-run/infrastructure#2. Deleted after use."
+}
+
+variable "probe_protect_main" {
+  description = "Passed to the module's protect_main: false lets a probe workflow be pushed to main."
+  type        = bool
+  default     = true
+}
+
+variable "probe_environments" {
+  description = "Add the plan and apply environments of ci-apply design D2 to the probe."
+  type        = bool
+  default     = false
 }
 
 variable "probe_repo" {
@@ -90,8 +128,8 @@ provider "github" {
   owner = "troupe-run"
 
   app_auth {
-    id              = "5272634"
-    installation_id = "170224209"
+    id              = coalesce(var.github_app_id, "5272634")
+    installation_id = coalesce(var.github_app_installation_id, "170224209")
     pem_file        = var.github_app_pem
   }
 }
@@ -101,9 +139,10 @@ module "probe" {
   count  = var.declared ? 1 : 0
 
   name         = var.probe_repo
-  description  = "Throwaway: drift probe for troupe-run/infrastructure#2. Deleted after use."
+  description  = var.probe_description
   labels       = jsondecode(file("${path.module}/../labels/github-defaults.json"))
   owner_bypass = var.probe_bypass
+  protect_main = var.probe_protect_main
 
   delivery_app_id = var.probe_delivery_bypass ? 5272634 : null
 }
@@ -170,4 +209,38 @@ import {
   for_each = local.adopt_readme
   to       = github_repository_file.probe[0]
   id       = "${var.probe_repo}:README.md:"
+}
+
+# The environments of ci-apply design D2, on the probe.
+resource "github_repository_environment" "plan" {
+  count = var.probe_environments ? 1 : 0
+
+  repository  = var.probe_repo
+  environment = "plan"
+}
+
+resource "github_repository_environment" "apply" {
+  count = var.probe_environments ? 1 : 0
+
+  repository          = var.probe_repo
+  environment         = "apply"
+  can_admins_bypass   = false
+  prevent_self_review = false
+
+  reviewers {
+    users = [160232611]
+  }
+
+  deployment_branch_policy {
+    protected_branches     = false
+    custom_branch_policies = true
+  }
+}
+
+resource "github_repository_environment_deployment_policy" "apply_main" {
+  count = var.probe_environments ? 1 : 0
+
+  repository     = var.probe_repo
+  environment    = github_repository_environment.apply[0].environment
+  branch_pattern = "main"
 }
