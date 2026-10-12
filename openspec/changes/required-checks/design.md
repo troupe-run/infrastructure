@@ -94,7 +94,9 @@ aggregator to troupe would also need a pull request in troupe.
 The script prints `plan=true` unless **every** changed file sits under a short list of prefixes that OpenTofu is
 known never to read:
 - `openspec/`, `docs/`, `oob/`, `scripts/tests/`;
-- `README.md`, `CLAUDE.md`, and the `.claude/rules/` and `.claude/learnings/` trees.
+- `README.md` and `CLAUDE.md`.
+
+Nothing under `.claude/` is on the list: `.claude/settings.json` is delivered.
 
 `pr-plan` then gets `needs: changes`, and runs when
 `!cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.plan == 'true')`.

@@ -73,7 +73,7 @@
 
 ## 3. The PR plan as a required check (design D2)
 
-- [ ] 3.1 Write `scripts/plan_needed.py` (standard library only, `mypy --strict`). It takes the changed paths on
+- [x] 3.1 Write `scripts/plan_needed.py` (standard library only, `mypy --strict`). It takes the changed paths on
   stdin, prints `plan=true|false`, and the ignore-list lives in it. Write `scripts/tests/test_plan_needed.py`:
   - every path OpenTofu reads (the `file(`/`fileset(` paths in `tofu/*.tf`, `guard_files` from `guard_delivery.tf`,
     `org-profile/**`) plans;
