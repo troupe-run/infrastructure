@@ -20,6 +20,11 @@
     "description": "Capability: cli"
   },
   {
+    "name": "cap:client-protocol",
+    "color": "1D76DB",
+    "description": "Capability: client-protocol"
+  },
+  {
     "name": "cap:collaboration",
     "color": "1D76DB",
     "description": "Capability: collaboration"
@@ -143,6 +148,11 @@
     "name": "cap:runner-protocol",
     "color": "1D76DB",
     "description": "Capability: runner-protocol"
+  },
+  {
+    "name": "cap:runs",
+    "color": "1D76DB",
+    "description": "Capability: runs"
   },
   {
     "name": "cap:scripted-runner",
