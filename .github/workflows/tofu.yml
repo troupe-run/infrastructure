@@ -2,7 +2,8 @@ name: tofu
 
 # Plans and applies the org from CI (spec: ci-apply; openspec/changes/ci-apply/design.md).
 #
-#   pull request          pr-plan   env plan-pr (owner approves)   plan posted on the PR
+#   pull request          changes   no environment                 does it touch what OpenTofu reads?
+#                         pr-plan   env plan-pr (owner approves)   plan posted on the PR, unless not
 #   CI green on main  --> plan      env plan-main (main only)      plan in the run summary
 #   or a manual run       apply     env apply (owner approves)     apply that saved plan, then commit
 #                                                                  the state to main as the App
@@ -32,9 +33,36 @@ env:
   STATE_AUTHOR: 340938853+troupe-run-infrastructure[bot]@users.noreply.github.com
 
 jobs:
+  # Whether a pull request changes anything OpenTofu reads (scripts/plan_needed.py, required-checks
+  # design D2). No environment and no secrets. Not a required check itself: if it fails, the plan
+  # runs.
+  changes:
+    name: does it need a plan?
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      plan: ${{ steps.paths.outputs.plan }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: The pull request's changed paths
+        id: paths
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: git diff --name-only "$BASE...$HEAD" | python3 scripts/plan_needed.py >> "$GITHUB_OUTPUT"
+
   pr-plan:
     name: plan (pull request)
-    if: github.event_name == 'pull_request'
+    # A required check (tofu/required-checks.json). Skipped, which counts as passed and asks for no
+    # approval, only when `changes` succeeded and found nothing OpenTofu reads.
+    needs: changes
+    if: >-
+      github.event_name == 'pull_request' && !cancelled() &&
+      (needs.changes.result != 'success' || needs.changes.outputs.plan == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # The owner approves each run before it gets the App's key: a pull request runs its own copy of

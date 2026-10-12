@@ -83,7 +83,7 @@
   - `docs-old/x` plans (prefix, not substring).
 
   Verify: the tests pass, and the first one fails when `.claude/` is added to the ignore-list.
-- [ ] 3.2 Add the `changes` job to `tofu.yml`, and make `pr-plan` depend on it with D2's condition. Add
+- [x] 3.2 Add the `changes` job to `tofu.yml`, and make `pr-plan` depend on it with D2's condition. Add
   `plan (pull request)` to `infrastructure`'s entries in `required-checks.json`. Verify:
   - `scripts/check.py` passes, including `test_required_checks.py`;
   - `actionlint` passes, if it can be run with `uvx` or `brew`; otherwise say so.
