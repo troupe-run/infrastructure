@@ -3,5 +3,10 @@
     "name": "needs:owner",
     "color": "D93F0B",
     "description": "Waiting on a decision from the owner"
+  },
+  {
+    "name": "parked",
+    "color": "C5DEF5",
+    "description": "Agreed or deferred until a named later change"
   }
 ]

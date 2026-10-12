@@ -168,10 +168,5 @@
     "name": "cap:work-tracking",
     "color": "1D76DB",
     "description": "Capability: work-tracking"
-  },
-  {
-    "name": "parked",
-    "color": "C5DEF5",
-    "description": "Agreed or deferred until a named later change"
   }
 ]

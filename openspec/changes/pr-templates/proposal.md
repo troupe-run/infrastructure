@@ -26,8 +26,9 @@ ties them to the `development-workflow` spec, so they drifted. Every other repos
   in the forms, an HTML comment in the PR template (design D2).
 - **`tofu/org_profile.tf` derives its file list from `org-profile/`**, so a new source file can't be left unpublished
   (design D1).
-- **`needs:owner` becomes a label in every managed repository.** The Decision form applies it, and today only troupe
-  has it. It moves from troupe's label list to a list every repository shares (design D3).
+- **The workflow's labels, `needs:owner` and `parked`, become labels in every managed repository.** The Decision
+  form applies `needs:owner`, and today only troupe has either. They move from troupe's label list to a list every
+  repository shares (design D3).
 - **A test ties the forms to what they need:** each form's `type:` is an issue type declared in `oob/issue-types.json`,
   and each label a form applies is in the shared list (design D5).
 
@@ -54,10 +55,10 @@ None.
 ## Impact
 
 - **Changed:** `org-profile/.github/` (five new files), `tofu/org_profile.tf`, `tofu/repositories.tf`,
-  `tofu/labels/` (a new shared list; `needs:owner` leaves `troupe.json`), `scripts/tests/` (a new test),
+  `tofu/labels/` (a new shared list; `needs:owner` and `parked` leave `troupe.json`), `scripts/tests/` (a new test),
   `docs/development-workflow.md` (where the templates live).
 - **Applied, after the owner approves the plan:** five commits by the App to `troupe-run/.github`; `needs:owner`
-  created in `infrastructure`, `.github` and `website`. troupe's `needs:owner` is unchanged (the same label, declared
+  and `parked` created in `infrastructure`, `.github` and `website`. troupe's are unchanged (the same labels, declared
   from a different list).
 - **Every repository in the org without its own templates** (`infrastructure`, `.github`, `website`, and any new
   repository) gets the PR template and the Bug, Feature and Decision forms. `website` has its own `CONTRIBUTING.md`
