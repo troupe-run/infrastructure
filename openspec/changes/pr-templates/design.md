@@ -47,6 +47,12 @@ unexpected on GitHub only after someone noticed it missing. Deriving the list ma
 **`.DS_Store` is excluded** because `fileset` reads the disk, not git. CI's checkout has none, but a local plan on
 macOS could otherwise propose publishing one.
 
+**The adoption import is pinned to the four adopted files** (found during apply). `tofu/imports.tf` imported
+`github_repository_file.org_profile` for each key of `local.org_profile_files`, so any new file, whether listed by
+hand or derived, became an import of something not yet on GitHub, and the plan failed with a 404 for each. The
+import now names the four files `.github` had at adoption, as the guard's import already does for troupe's files.
+New files are created. The local plan then showed 5 to add, 3 to change (the labels) and 0 to destroy.
+
 **Alternative: extend the explicit list to nine paths.** Simple, but it's the second list to keep in step that the
 derived drift check was written to avoid.
 
