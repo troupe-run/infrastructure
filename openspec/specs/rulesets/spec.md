@@ -7,14 +7,14 @@ refuse, who may bypass them, and how the owner keeps the ability to change them.
 ## Requirements
 
 ### Requirement: Main is protected on every managed repository except .github
-`main` SHALL be covered by a ruleset on `troupe`, `infrastructure` and `troupe-run.github.io`, and on every repository
-brought under management later unless its declaration says otherwise. `troupe-run/.github` is excluded until its own
-ruleset is declared.
+`main` SHALL be covered by a ruleset on `troupe`, `infrastructure` and `website`, and on every repository brought
+under management later unless its declaration says otherwise. `troupe-run/.github` is excluded until its own ruleset
+is declared.
 
 #### Scenario: Every protected repository has the ruleset
 - **WHEN** the managed repositories' rulesets are read from GitHub
-- **THEN** `troupe`, `infrastructure` and `troupe-run.github.io` each have an active ruleset on `main`, and the plan
-  shows no difference from the declaration
+- **THEN** `troupe`, `infrastructure` and `website` each have an active ruleset on `main`, and the plan shows no
+  difference from the declaration
 
 ### Requirement: Changes reach main only through a pull request
 A push directly to `main` SHALL be refused for everyone, the owner included. A pull request SHALL be mergeable
