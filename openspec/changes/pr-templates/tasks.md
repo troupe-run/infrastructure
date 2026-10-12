@@ -51,7 +51,7 @@
 
 ## 4. Land it
 
-- [ ] 4.1 Open the pull request (`Closes #19`, "Part of #15"; design D7). Its evidence:
+- [x] 4.1 Open the pull request (`Closes #19`, "Part of #15"; design D7). Its evidence:
   - the CI plan comment, after the owner approves the run. It must show five files created in `troupe-run/.github`,
     `needs:owner` and `parked` created in `infrastructure`, `.github` and `website`, and no change to the four
     existing files or to troupe's labels;
