@@ -106,7 +106,7 @@
 
 ## 5. Repository settings and the plan App (design D5, D7)
 
-- [ ] 5.1 Change the module's defaults per D5. Set `has_projects = true` on `troupe` with a comment, if and only if
+- [x] 5.1 Change the module's defaults per D5. Set `has_projects = true` on `troupe` with a comment, if and only if
   task 1.6 found that turning it off affects the linked project. Remove the `variables.tf` comment that calls the
   defaults findings. Verify:
   - `scripts/check.py` passes;

@@ -31,6 +31,9 @@ module "repo_troupe" {
   # The cap:* labels are copied as they were on 2026-10-11; capability-labels replaces the copy
   # with troupe's capability list.
   labels = concat(local.github_default_labels, jsondecode(file("${path.module}/labels/troupe.json")))
+  # The org's roadmap (project 1) is linked here, and turning projects off would hide it from the
+  # repository (required-checks design D8, finding 8).
+  has_projects = true
   # troupe receives the guard from this repository (guard_delivery.tf).
   app_bypass_id   = local.infrastructure_app_id
   required_checks = local.checks_for["troupe"]
