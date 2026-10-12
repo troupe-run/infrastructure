@@ -85,6 +85,19 @@ A hand edit to a delivered file shows as drift in the next plan, and an apply re
 refuses such an edit before it gets that far: change the file in `troupe-run/infrastructure` instead. The scripts'
 own checks (`scripts/check.py`), and any other files, stay each repository's own.
 
+## Where the templates come from
+
+The pull request template and the Bug, Feature and Decision issue forms are the org's defaults. Their source is
+`org-profile/.github/` in `troupe-run/infrastructure`, and the App publishes them to `troupe-run/.github` with the
+other org-wide files (specs: `development-workflow`, `org-profile`).
+
+- **GitHub applies them only where a repository has none of its own.** A repository with any
+  `.github/ISSUE_TEMPLATE/` folder, even one holding only a `config.yml`, uses none of the org's forms. A repository
+  with its own `PULL_REQUEST_TEMPLATE.md` uses that one.
+- **A form's issue type and labels must exist.** GitHub silently drops a type or label it doesn't know, so
+  `scripts/tests/test_org_profile.py` checks each form's `type:` against `oob/issue-types.json`, and its labels
+  against `tofu/labels/workflow.json`, which every managed repository gets.
+
 ## Known gaps
 
 - **These hooks aren't a security boundary.** They stop honest shortcuts. A Bash command that writes a file isn't
