@@ -2,8 +2,8 @@
 
 Issue: #15 (raised as troupe-run/troupe#32 and transferred here). This change is part 1 of the issue's delivery
 plan: specify the templates here and publish them to `troupe-run/.github`. Part 2, deleting troupe's own copies so
-the org defaults apply, is a change in troupe-run/troupe. How this PR references #15 is open (design, Open
-Questions).
+the org defaults apply, is a change in troupe-run/troupe. This part is tracked as sub-issue #19, which this PR
+closes (design D7).
 
 ## Why
 

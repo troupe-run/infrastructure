@@ -48,7 +48,7 @@
 
 ## 4. Land it
 
-- [ ] 4.1 Open the pull request, referencing #15 as the owner decides in design D7. Its evidence:
+- [ ] 4.1 Open the pull request (`Closes #19`, "Part of #15"; design D7). Its evidence:
   - the CI plan comment, after the owner approves the run. It must show five files created in `troupe-run/.github`,
     `needs:owner` created in `infrastructure`, `.github` and `website`, and no change to the four existing files or
     to troupe's labels;
@@ -67,6 +67,7 @@
   - D6: on a throwaway `infra-probe-templates`, check the issue chooser (three forms, blank issue, security link) and
     a draft PR's description; file a Decision issue and check its type and `needs:owner`; delete the repository.
     Check `infrastructure`'s issue chooser, read only.
-- Comment on #15 with the PR and the archived change. #15 stays open for part 2 unless D7 settles otherwise.
+- Comment on #19 with the PR and the archived change (the merge closes it), and on #15 that part 1 is done. #15
+  stays open for part 2.
 - **Part 2, in troupe-run/troupe:** propose a change that deletes `.github/ISSUE_TEMPLATE/` and
   `.github/PULL_REQUEST_TEMPLATE.md`, with a PR that says `Closes troupe-run/infrastructure#15`.
