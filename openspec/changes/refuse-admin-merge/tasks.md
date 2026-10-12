@@ -54,7 +54,7 @@
 
 ## 2. Land it
 
-- [ ] 2.1 Open the pull request (`Closes #16`). Its evidence:
+- [x] 2.1 Open the pull request (`Closes #16`). Its evidence:
   - the CI plan comment, after the owner approves the run. It must show only `scripts/guard.py` delivered to troupe;
   - the test output, including the survey test.
 
