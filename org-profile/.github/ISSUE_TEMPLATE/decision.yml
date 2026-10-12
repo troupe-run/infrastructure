@@ -9,6 +9,7 @@ body:
       value: |
         Do the research before asking. State what is already decided, then ask only the open part.
         If the repository has `cap:<capability>` labels, add one for each capability this touches.
+        If none fits, say so here; a new label is added by a pull request to troupe-run/infrastructure.
   - type: textarea
     id: context
     attributes:
