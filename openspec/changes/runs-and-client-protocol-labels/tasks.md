@@ -2,17 +2,17 @@
 
 ## 1. Declare the labels
 
-- [ ] 1.1 Re-read troupe's spec folders on `main` (`gh api repos/troupe-run/troupe/contents/openspec/specs`) and
+- [x] 1.1 Re-read troupe's spec folders on `main` (`gh api repos/troupe-run/troupe/contents/openspec/specs`) and
       verify `client-protocol` and `runs` are still the only ones without a declared `cap:` label
-- [ ] 1.2 Add `cap:client-protocol` (after `cap:cli`) and `cap:runs` (after `cap:runner-protocol`) to
+- [x] 1.2 Add `cap:client-protocol` (after `cap:cli`) and `cap:runs` (after `cap:runner-protocol`) to
       `tofu/labels/troupe.json`, colour `1D76DB`, description `Capability: <name>` (design D1), and verify the file
       holds 39 labels, is still sorted by name (`jq -r '.[].name'` against `sort`), and `uv run scripts/check.py`
       passes
-- [ ] 1.3 Run `uv run scripts/tofu.py plan` and verify it shows exactly two labels created on troupe-run/troupe and
+- [x] 1.3 Run `uv run scripts/tofu.py plan` and verify it shows exactly two labels created on troupe-run/troupe and
       nothing else changed or deleted; keep its output for the pull request
-- [ ] 1.4 Run `uv run scripts/oob.py` on this branch and verify it reports nothing for troupe's specs; keep its output
+- [x] 1.4 Run `uv run scripts/oob.py` on this branch and verify it reports nothing for troupe's specs; keep its output
       for the pull request
-- [ ] 1.5 Run `openspec validate runs-and-client-protocol-labels --strict` and verify it passes
+- [x] 1.5 Run `openspec validate runs-and-client-protocol-labels --strict` and verify it passes
 
 ## Workflow follow-up
 
