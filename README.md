@@ -18,7 +18,7 @@ that closes the issue. Specs live in `openspec/specs/`.
 |---|---|
 | `tofu/` | The OpenTofu root module and its encrypted, committed state |
 | `tofu/modules/repository/` | One managed repository: settings, labels, and protection against deletion |
-| `tofu/labels/` | Label sets as data |
+| `tofu/labels/` | Label sets as data. `troupe.json` is troupe's `cap:*` capability labels: a new capability gets its label by a pull request here |
 | `tofu/probe/` | Points the same module at a throwaway repo, to show drift behaviour without touching a live one |
 | `tofu/guard_delivery.tf` | The guard's files in each repository that receives it, and the generated list of them |
 | `org-profile/` | The source of `troupe-run/.github`'s files, byte for byte |

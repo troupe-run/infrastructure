@@ -40,7 +40,7 @@
 - [ ] 4.1 Change the `cap:` line in `org-profile/.github/ISSUE_TEMPLATE/feature.yml` and `decision.yml` to design
       D5's wording, and verify `uv run pytest scripts/tests/test_org_profile.py` passes and the plan shows both files
       updated in troupe-run/.github
-- [ ] 4.2 Update `README.md`'s `tofu/labels/` layout row to name `troupe.json` as troupe's capability labels, changed
+- [x] 4.2 Update `README.md`'s `tofu/labels/` layout row to name `troupe.json` as troupe's capability labels, changed
       by pull request, and verify the row reads correctly in the rendered README
 - [ ] 4.3 Run `openspec validate capability-labels --strict` and verify it passes
 
