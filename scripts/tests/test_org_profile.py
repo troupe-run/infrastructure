@@ -147,3 +147,60 @@ def test_a_file_without_its_source_note_fails_naming_it(tmp_path: Path) -> None:
 def test_a_source_note_naming_another_path_fails(tmp_path: Path) -> None:
     write(tmp_path / "a.md", f"<!-- {note('b.md')} -->\n")
     assert note_problem(tmp_path, tmp_path / "a.md") is not None
+
+
+CHOOSER_CONFIG = FORMS / "config.yml"
+
+
+def security_link_problems(config: Path) -> list[str]:
+    """The chooser config mustn't link to the security policy (drop-security-contact-link).
+
+    GitHub already shows its own "Report a security vulnerability" entry wherever the org has a
+    security policy, so a contact link to it is a second, duplicate entry.
+    """
+    loaded: Any = yaml.safe_load(config.read_text(encoding="utf-8"))
+    links = loaded.get("contact_links") or [] if isinstance(loaded, dict) else []
+    return [
+        f"{config.name}: contact link {link.get('name')!r} points to the security policy, which "
+        "GitHub already shows as its own 'Report a security vulnerability' entry"
+        for link in links
+        if isinstance(link, dict)
+        and (
+            str(link.get("url", "")).lower().endswith("security.md")
+            or "/security" in str(link.get("url", "")).lower()
+        )
+    ]
+
+
+def test_the_chooser_config_doesnt_duplicate_githubs_security_entry() -> None:
+    assert security_link_problems(CHOOSER_CONFIG) == []
+
+
+def test_a_contact_link_to_the_security_policy_fails_saying_github_shows_it(
+    tmp_path: Path,
+) -> None:
+    config = write(
+        tmp_path / "config.yml",
+        "blank_issues_enabled: true\n"
+        "contact_links:\n"
+        "  - name: Report a vulnerability\n"
+        "    url: https://github.com/troupe-run/.github/blob/main/SECURITY.md\n"
+        "    about: Privately.\n"
+        "  - name: Discussions\n"
+        "    url: https://github.com/orgs/troupe-run/discussions\n"
+        "    about: Questions.\n",
+    )
+    assert security_link_problems(config) == [
+        "config.yml: contact link 'Report a vulnerability' points to the security policy, which "
+        "GitHub already shows as its own 'Report a security vulnerability' entry"
+    ]
+
+
+def test_a_security_advisories_link_counts_as_the_security_policy(tmp_path: Path) -> None:
+    config = write(
+        tmp_path / "config.yml",
+        "contact_links:\n"
+        "  - name: Report\n"
+        "    url: https://github.com/troupe-run/troupe/security/advisories/new\n",
+    )
+    assert len(security_link_problems(config)) == 1

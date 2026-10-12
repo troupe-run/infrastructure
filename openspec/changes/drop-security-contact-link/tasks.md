@@ -2,7 +2,7 @@
 
 ## 1. The config and its test
 
-- [ ] 1.1 Remove `contact_links` from `org-profile/.github/ISSUE_TEMPLATE/config.yml`, keeping the source note and
+- [x] 1.1 Remove `contact_links` from `org-profile/.github/ISSUE_TEMPLATE/config.yml`, keeping the source note and
   `blank_issues_enabled: true`. Add a test to `scripts/tests/test_org_profile.py`, named for what it checks: the
   chooser config has no contact link whose URL is the security policy, and a fixture `config.yml` with one fails with
   a message saying GitHub already shows that entry. Verify:
