@@ -34,9 +34,9 @@ None.
 
 ### Modified Capabilities
 
-- `development-workflow`: the requirement "Agents' gh commands are allow-listed" says an everyday write is allowed
-  through its `gh` command only, never as a GraphQL mutation; a refused mutation is named, and the fix names the
-  allowed `gh` command when there is one.
+- `development-workflow`: a new requirement, "Each everyday gh write has one way to do it": an everyday write is
+  allowed through its `gh` command only, never as a GraphQL mutation; a refused mutation is named, and the fix names
+  the allowed `gh` command when there is one. "Agents' gh commands are allow-listed" is unchanged.
 
 ## Impact
 
