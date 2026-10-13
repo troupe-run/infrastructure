@@ -92,3 +92,9 @@ variable "app_bypass_id" {
   type        = number
   default     = null
 }
+
+variable "delivered_paths" {
+  description = "Files only the App in app_bypass_id may change, on any branch: the guard's delivered files. Empty: no such ruleset."
+  type        = list(string)
+  default     = []
+}

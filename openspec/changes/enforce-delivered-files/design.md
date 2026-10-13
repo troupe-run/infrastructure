@@ -66,6 +66,15 @@ by `tofu/probe` with a new `probe_delivered_paths` variable passed to the module
 The probe uses the owner's `gh` login only against `troupe-run/infra-probe-*`, which the guard exempts. Pushing a
 forged author there is a test of GitHub, not a workaround of the guard.
 
+**Findings.**
+- *Provider schema (task 1.1, 2026-10-13).* `tofu providers schema -json` for `integrations/github` 6.13.0, in a
+  scratch directory, shows that `github_repository_ruleset`:
+  - takes a `target` of `branch`, `push` or `tag`;
+  - has an optional `conditions` block (a list, at most one item);
+  - has an optional `rules.file_path_restriction` block (at most one), whose `restricted_file_paths` is a required
+    list of strings ("Prevent commits that include changes in specified file paths from being pushed to the commit
+    graph").
+
 ### D2. One push ruleset per governed repository, over the delivered paths
 
 The module gains `delivered_paths` (a list of strings, default `[]`). When it isn't empty, the module adds a ruleset
