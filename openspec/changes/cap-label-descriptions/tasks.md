@@ -2,11 +2,11 @@
 
 ## 1. The descriptions
 
-- [ ] 1.1 Write the offline description test (design D3) in `scripts/tests/`, named for what it checks: a `cap:`
+- [x] 1.1 Write the offline description test (design D3) in `scripts/tests/`, named for what it checks: a `cap:`
       description over 100 characters fails naming the label and length; one equal to `Capability: <name>` fails
       naming the label; `TBD` passes. Verify it fails on today's `troupe.json` (38 labels named) with
       `uv run pytest` on that file
-- [ ] 1.2 Replace the 38 descriptions in `tofu/labels/troupe.json` with #26's comment table, re-read from the issue
+- [x] 1.2 Replace the 38 descriptions in `tofu/labels/troupe.json` with #26's comment table, re-read from the issue
       at the time, leaving names, colours, order and `cap:infrastructure` unchanged. Verify with a `jq` diff that
       only `description` fields changed (38 of them), that 1.1's test passes, and that `uv run scripts/check.py`
       passes
