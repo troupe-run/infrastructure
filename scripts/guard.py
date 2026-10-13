@@ -1577,6 +1577,26 @@ class UnreadableTitleError(Exception):
     """A pull_request event whose payload has no string title: malformed input, not "no title"."""
 
 
+class UnreadableHeadRepositoryError(Exception):
+    """A pull_request event whose head repository is present but isn't an object with a string
+    full_name: malformed input, not "no repository" (open-release-exemption design D2)."""
+
+
+def _head_repository(pull_request: dict[str, object]) -> str | None:
+    """The repository a pull request's branch lives in: a fork's name for a fork. None when the
+    payload names none, as for a deleted fork, whose head.repo is null."""
+    head = pull_request.get("head")
+    repo = head.get("repo") if isinstance(head, dict) else None
+    if repo is None:
+        return None
+    full_name = repo.get("full_name") if isinstance(repo, dict) else None
+    if not isinstance(full_name, str):
+        raise UnreadableHeadRepositoryError(
+            os.environ.get("GITHUB_EVENT_PATH", "no GITHUB_EVENT_PATH")
+        )
+    return full_name
+
+
 def _event_payload() -> dict[str, object]:
     event_path = os.environ.get("GITHUB_EVENT_PATH")
     if event_path and Path(event_path).is_file():
@@ -1586,9 +1606,12 @@ def _event_payload() -> dict[str, object]:
     return {}
 
 
-def github_ci_inputs(root: Path) -> tuple[str | None, str, str | None, str | None]:
-    """The range, branch and pull request title for this GitHub Actions run (design D11;
-    release-please-prs design D3). A push has no title."""
+def github_ci_inputs(
+    root: Path,
+) -> tuple[str | None, str, str | None, str | None, str | None]:
+    """The range, branch, pull request title and the branch's repository for this GitHub Actions
+    run (design D11; release-please-prs design D3; open-release-exemption design D2). A push has
+    no title, and its repository is the run's; a pull request's is its head repository."""
     event = os.environ.get("GITHUB_EVENT_NAME", "")
     payload = _event_payload()
     head = git(root, "rev-parse", "HEAD")
@@ -1599,12 +1622,13 @@ def github_ci_inputs(root: Path) -> tuple[str | None, str, str | None, str | Non
             raise UnreadableTitleError(os.environ.get("GITHUB_EVENT_PATH", "no GITHUB_EVENT_PATH"))
         base_branch = os.environ.get("GITHUB_BASE_REF", "main")
         base = git(root, "merge-base", f"origin/{base_branch}", head, check=False) or None
-        return base, head, os.environ.get("GITHUB_HEAD_REF"), title
+        repository = _head_repository(pull_request) if isinstance(pull_request, dict) else None
+        return base, head, os.environ.get("GITHUB_HEAD_REF"), title, repository
     before = payload.get("before")
     branch = os.environ.get("GITHUB_REF_NAME")
     if not isinstance(before, str) or not before or _is_null(before):
         before = git(root, "merge-base", "origin/main", head, check=False) or None
-    return before, head, branch, None
+    return before, head, branch, None, os.environ.get("GITHUB_REPOSITORY") or None
 
 
 def run_ci_entry(
@@ -1613,10 +1637,11 @@ def run_ci_entry(
     head: str | None,
     branch: str | None,
     title: str | None = None,
+    repository: str | None = None,
 ) -> int:
     if head is None:
         try:
-            base, head, branch, title = github_ci_inputs(root)
+            base, head, branch, title, repository = github_ci_inputs(root)
         except UnreadableTitleError as error:
             refusal = Decision(
                 "commit-message",
@@ -1626,7 +1651,17 @@ def run_ci_entry(
             )
             print(refusal.text(), file=sys.stderr)
             return 1
-    refusals = run_ci(root, base, head, branch, title)
+        except UnreadableHeadRepositoryError as error:
+            refusal = Decision(
+                "commit-branch-change",
+                "couldn't read the pull request's head repository from the event payload "
+                f"({error}).",
+                "Re-run the check. If it fails again, the event payload is malformed: tell the "
+                "owner, with the run's URL.",
+            )
+            print(refusal.text(), file=sys.stderr)
+            return 1
+    refusals = run_ci(root, base, head, branch, title, repository)
     for refusal in refusals:
         print(refusal.text(), file=sys.stderr)
     if not refusals:
@@ -1788,6 +1823,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     ci.add_argument("--head", help="end of the range (default: from GitHub)")
     ci.add_argument("--branch", help="branch the range belongs to (default: from GitHub)")
     ci.add_argument("--title", help="a pull request's title to check (default: from GitHub)")
+    ci.add_argument(
+        "--repository",
+        help="owner/name of the repository the branch lives in (default: from GitHub)",
+    )
     grant = sub.add_parser("override", help="grant one override (a person, in a terminal)")
     grant.add_argument("rule", choices=OVERRIDABLE_RULES)
     grant.add_argument("--reason", required=True)
@@ -1810,7 +1849,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.entry == "pre-push":
         return run_pre_push(root, sys.stdin.read().splitlines())
     if args.entry == "ci":
-        return run_ci_entry(root, args.base, args.head, args.branch, args.title)
+        return run_ci_entry(root, args.base, args.head, args.branch, args.title, args.repository)
     path = grant_override(root, args.rule, args.reason)
     print(f"guard: override granted for '{args.rule}' (one action). Recorded in {path.parent}.")
     return 0
