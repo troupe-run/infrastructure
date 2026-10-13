@@ -2,87 +2,87 @@
   {
     "name": "cap:actor-runners",
     "color": "1D76DB",
-    "description": "Capability: actor-runners"
+    "description": "Running an actor through a runner process: launch, limits, cancel, and one trusted outcome"
   },
   {
     "name": "cap:actors",
     "color": "1D76DB",
-    "description": "Capability: actors"
+    "description": "Who holds a role: an agent or a person, and how each is defined in config"
   },
   {
     "name": "cap:artifact-store",
     "color": "1D76DB",
-    "description": "Capability: artifact-store"
+    "description": "Content-addressed store for large or sensitive run artifacts, such as transcripts, kept by hash"
   },
   {
     "name": "cap:cli",
     "color": "1D76DB",
-    "description": "Capability: cli"
+    "description": "The troupe command line: a thin client over the core, with its flags, output and exit codes"
   },
   {
     "name": "cap:client-protocol",
     "color": "1D76DB",
-    "description": "Capability: client-protocol"
+    "description": "Commands and queries every surface uses to reach the core, as JSON Schema messages"
   },
   {
     "name": "cap:collaboration",
     "color": "1D76DB",
-    "description": "Capability: collaboration"
+    "description": "Working across installs and machines: approvals and answers that travel between people"
   },
   {
     "name": "cap:config",
     "color": "1D76DB",
-    "description": "Capability: config"
+    "description": "Config files under .troupe/: layout, per-file schemas, the hand-edit sweep and write-back"
   },
   {
     "name": "cap:core-api",
     "color": "1D76DB",
-    "description": "Capability: core-api"
+    "description": "The core's commands and queries, which the CLI, run server and UIs all call"
   },
   {
     "name": "cap:cues",
     "color": "1D76DB",
-    "description": "Capability: cues"
+    "description": "Open requests addressed to a role, with a brief, raised by gates and escalations"
   },
   {
     "name": "cap:effects",
     "color": "1D76DB",
-    "description": "Capability: effects"
+    "description": "What an actor may touch (files, network), declared in config and enforced by its stage"
   },
   {
     "name": "cap:escalation",
     "color": "1D76DB",
-    "description": "Capability: escalation"
+    "description": "How an agent gets a decision: research first, then a brief to the role that owns it"
   },
   {
     "name": "cap:event-store",
     "color": "1D76DB",
-    "description": "Capability: event-store"
+    "description": "Append-only text events git can merge, read back in a stable order across branches and forks"
   },
   {
     "name": "cap:flows",
     "color": "1D76DB",
-    "description": "Capability: flows"
+    "description": "TBD"
   },
   {
     "name": "cap:gates",
     "color": "1D76DB",
-    "description": "Capability: gates"
+    "description": "Points where work waits for a decision from the role that owns it"
   },
   {
     "name": "cap:guests",
     "color": "1D76DB",
-    "description": "Capability: guests"
+    "description": "Installable packs that add to troupe, with their own config files and schemas"
   },
   {
     "name": "cap:house",
     "color": "1D76DB",
-    "description": "Capability: house"
+    "description": "The long-lived local process that serves theatres and keeps projections live"
   },
   {
     "name": "cap:identity",
     "color": "1D76DB",
-    "description": "Capability: identity"
+    "description": "Working out who is acting through a chain of sources, and refusing when nobody can be named"
   },
   {
     "name": "cap:infrastructure",
@@ -92,106 +92,106 @@
   {
     "name": "cap:lifecycle",
     "color": "1D76DB",
-    "description": "Capability: lifecycle"
+    "description": "TBD"
   },
   {
     "name": "cap:lineage",
     "color": "1D76DB",
-    "description": "Capability: lineage"
+    "description": "What every event records about itself: who, through what, when, why, change, cause, approvals"
   },
   {
     "name": "cap:notes",
     "color": "1D76DB",
-    "description": "Capability: notes"
+    "description": "What a performance teaches, recorded and fed into the next one"
   },
   {
     "name": "cap:notifications",
     "color": "1D76DB",
-    "description": "Capability: notifications"
+    "description": "Telling a role's holder that something needs them, through pluggable channels"
   },
   {
     "name": "cap:performance",
     "color": "1D76DB",
-    "description": "Capability: performance"
+    "description": "One run of a process: starting, following and ending a performance"
   },
   {
     "name": "cap:platform",
     "color": "1D76DB",
-    "description": "Capability: platform"
+    "description": "The one seam for OS-specific behaviour: files, locks, processes, signals, IPC, file watching"
   },
   {
     "name": "cap:plugins",
     "color": "1D76DB",
-    "description": "Capability: plugins"
+    "description": "Ports, transports (direct or JSON-RPC), and how plugins are declared, acquired and trusted"
   },
   {
     "name": "cap:policy",
     "color": "1D76DB",
-    "description": "Capability: policy"
+    "description": "Authoritative settings read through one seam; a lower level can tighten, never loosen"
   },
   {
     "name": "cap:projections",
     "color": "1D76DB",
-    "description": "Capability: projections"
+    "description": "Read models folded from events, such as config files, run status and logs"
   },
   {
     "name": "cap:protocol",
     "color": "1D76DB",
-    "description": "Capability: protocol"
+    "description": "Language-neutral JSON Schema contracts in protocol/, shared by every language and surface"
   },
   {
     "name": "cap:roles",
     "color": "1D76DB",
-    "description": "Capability: roles"
+    "description": "Jobs in a process, such as reviewer; who holds each, and routing work to roles"
   },
   {
     "name": "cap:runner-protocol",
     "color": "1D76DB",
-    "description": "Capability: runner-protocol"
+    "description": "The JSON-RPC contract between troupe and a runner, so runners can be written in any language"
   },
   {
     "name": "cap:runs",
     "color": "1D76DB",
-    "description": "Capability: runs"
+    "description": "Recording each run of an actor with lineage, and reading runs back: status, logs, follow"
   },
   {
     "name": "cap:scripted-runner",
     "color": "1D76DB",
-    "description": "Capability: scripted-runner"
+    "description": "The deterministic test runner that plays scripts or replays recorded streams"
   },
   {
     "name": "cap:settings",
     "color": "1D76DB",
-    "description": "Capability: settings"
+    "description": "Named settings with one default each, and how project, user and house levels layer"
   },
   {
     "name": "cap:stages",
     "color": "1D76DB",
-    "description": "Capability: stages"
+    "description": "Where an actor runs, and whether its effects can be enforced there: local, Docker, others"
   },
   {
     "name": "cap:storage",
     "color": "1D76DB",
-    "description": "Capability: storage"
+    "description": "Where troupe keeps state and caches on disk, per theatre and per user"
   },
   {
     "name": "cap:telemetry",
     "color": "1D76DB",
-    "description": "Capability: telemetry"
+    "description": "Anonymous usage data: asked for, recorded as an event, inspectable, off when nobody can be asked"
   },
   {
     "name": "cap:theatre",
     "color": "1D76DB",
-    "description": "Capability: theatre"
+    "description": "A project troupe serves: a directory with troupe config, addressed by id"
   },
   {
     "name": "cap:vcs",
     "color": "1D76DB",
-    "description": "Capability: vcs"
+    "description": "The version-control port: git or a plain filesystem, read for lineage and the event store"
   },
   {
     "name": "cap:work-tracking",
     "color": "1D76DB",
-    "description": "Capability: work-tracking"
+    "description": "Reading and updating tracked work (issues, epics, labels) through a tracker port"
   }
 ]
