@@ -55,15 +55,22 @@
 
 ## 5. Evidence
 
-- [ ] 5.1 Dry run in a throwaway local repository (no GitHub). Use a bare remote holding `main` and a
+- [x] 5.1 Dry run in a throwaway local repository (no GitHub). Use a bare remote holding `main` and a
       `release-please--branches--main` branch whose only commit is authored by
       `troupe-run-release[bot] <341990208+troupe-run-release[bot]@users.noreply.github.com>`. Run this branch's
       `scripts/guard.py ci --head … --branch … --repository troupe-run/troupe` (exit 0), then the same with
       `troupe-run/infrastructure` and with `someone/troupe` (exit 1, `commit-branch-change`). Add a commit by another
       author and run with `troupe-run/troupe` (exit 1). Record the commands and output here
+      Done 2026-10-14 with `env -u CLAUDE_PROJECT_DIR -u GITHUB_EVENT_NAME -u GITHUB_REPOSITORY uv run --no-project
+      python scripts/guard.py ci --base <main> --head <sha> --branch release-please--branches--main --repository …`.
+      Bot's only commit (1750562): `troupe-run/troupe` exit 0, "every rule passes for
+      release-please--branches--main"; `troupe-run/infrastructure`, `someone/troupe` and no `--repository` each
+      exit 1, "guard: commit-branch-change: branch 'release-please--branches--main' has no matching OpenSpec
+      change". With `fix: slip something in` by another author added (bcb39db), `troupe-run/troupe` exit 1, the same
+      `commit-branch-change` refusal
 - [ ] 5.2 Run `uv run scripts/tofu.py plan` (after fast-forwarding onto `origin/main`) and verify it shows only the
       delivered `scripts/guard.py` changing in troupe; keep it for the pull request
-- [ ] 5.3 Run `openspec validate open-release-exemption --strict` and verify it passes
+- [x] 5.3 Run `openspec validate open-release-exemption --strict` and verify it passes
 
 ## Workflow follow-up
 
