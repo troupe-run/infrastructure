@@ -20,14 +20,14 @@
 
 ## 2. Pull request titles are Conventional Commits
 
-- [ ] 2.1 Write failing tests in `scripts/tests/test_guard_push_and_ci.py` (design D3): `run_ci` with the title
+- [x] 2.1 Write failing tests in `scripts/tests/test_guard_push_and_ci.py` (design D3): `run_ci` with the title
       `chore: release main` and conforming commits passes; with `Release main` it returns one `commit-message`
       refusal whose problem names the title and whose fix says to edit the title, not to amend a commit; with no
       title (a push) no title is checked; `github_ci_inputs`, given a `pull_request` event payload file through
       `GITHUB_EVENT_PATH`, returns its `pull_request.title`, and given a payload with no string title, the run fails
       saying it couldn't read the title; `guard.py ci --title 'Release main'` exits 1 and prints the refusal. Verify
       they fail
-- [ ] 2.2 Add `pr_title`, the title to `github_ci_inputs` and `run_ci`, and `--title` to `guard.py ci` (design D3).
+- [x] 2.2 Add `pr_title`, the title to `github_ci_inputs` and `run_ci`, and `--title` to `guard.py ci` (design D3).
       Verify 2.1's tests pass, all of `scripts/tests/` passes, and `uv run scripts/check.py` passes
 
 ## 3. The check re-runs when a title changes
