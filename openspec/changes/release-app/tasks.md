@@ -58,13 +58,13 @@
 
 ## 4. Evidence
 
-- [ ] 4.1 Run `uv run scripts/tofu.py plan`. Verify `Plan: 4 to add, 1 to change, 0 to destroy`: the
+- [x] 4.1 Run `uv run scripts/tofu.py plan`. Verify `Plan: 4 to add, 1 to change, 0 to destroy`: the
       `release branches` ruleset exactly as D7 declares it, the `release` environment, its deployment policy, the
       variable, and troupe's two labels. Verify it changes and destroys nothing else, and leaves `protect main`'s
       bypass actors unchanged (spec: release-credentials). Grep every `+`, `~` and `-` line, and keep the plan for
       the pull request
-- [ ] 4.2 Run `uv run scripts/oob.py` and verify it reports no difference. Keep its output for the pull request
-- [ ] 4.3 Run `openspec validate release-app --strict` and verify it passes
+- [x] 4.2 Run `uv run scripts/oob.py` and verify it reports no difference. Keep its output for the pull request
+- [x] 4.3 Run `openspec validate release-app --strict` and verify it passes
 
 ## Workflow follow-up
 
