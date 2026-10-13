@@ -68,14 +68,14 @@ task left is one that runs.
 - [ ] 4.1 Open the pull request (`Closes #35`). Verify that every required check passes and that its CI plan, once
   the owner approves the run, shows:
   - **fallback path:** no changes.
-- [ ] 4.2 After the merge, and the owner's approval of the `main` plan if it has changes, verify:
-  - **fallback path:** after the next 06:00 UTC, `gh run list --workflow tofu.yml --event schedule` shows a run, and
-    its `plan (main)` job planned (not skipped) and reported no changes.
-- [ ] 4.3 Open the follow-up issue for the pre-merge check (design D5, option 2; the owner agreed 2026-10-13):
-  outcome, the signature probe it needs, and a link back to #35. Verify: `gh issue view <n>` shows it, and #35's
-  closing comment links it.
+- [x] 4.3 Open the follow-up issue (#39) for the pre-merge check (design D5, option 2; the owner agreed 2026-10-13):
+  outcome, the signature probe it needs, and a link back to #35. Verify: `gh issue view <n>` shows it open.
 
 ## Workflow follow-up
 
 - Run `/opsx:archive` on the branch before merging, as the workflow requires.
-- After the merge, comment on #35 with the pull request, the archived change, the path taken and the follow-up issue.
+- After the merge, comment on #35 with the pull request, the archived change, the path taken and the follow-up issue
+  (#39).
+- After the next 06:00 UTC (it can't be checked before the merge, and the change is archived before it; formerly
+  task 4.2): `gh run list --workflow tofu.yml --event schedule` shows a run whose `plan (main)` job planned (not
+  skipped) and reported no changes, or waits for the owner's approval with the drift it found.
