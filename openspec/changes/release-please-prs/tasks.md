@@ -60,9 +60,9 @@
       to `Release main again`, the new run failed and the PR went `BLOCKED`. The required check follows the latest
       run. Runs 38398862872 (fail), 38399366970 (pass), 38399470199 (fail); the URLs died with the repository, which
       `gh repo view` confirms is gone
-- [ ] 5.2 Run `uv run scripts/tofu.py plan` and verify it shows only the delivered `scripts/guard.py` and
+- [x] 5.2 Run `uv run scripts/tofu.py plan` and verify it shows only the delivered `scripts/guard.py` and
       `.github/workflows/guard.yml` changing in troupe; keep it for the pull request
-- [ ] 5.3 Run `openspec validate release-please-prs --strict` and verify it passes
+- [x] 5.3 Run `openspec validate release-please-prs --strict` and verify it passes
 
 ## Workflow follow-up
 
