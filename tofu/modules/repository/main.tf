@@ -174,35 +174,3 @@ resource "github_repository_ruleset" "app_only" {
     }
   }
 }
-
-# Only the App changes a delivered file: a push or an edit through GitHub that touches one is
-# refused on every branch, for everyone else, org owners included (spec: rulesets; the
-# enforce-delivered-files change, design D2 and D3). A push ruleset covers every ref, so it has no
-# conditions. The owner's break-glass is editing the ruleset on GitHub, which the next plan shows.
-resource "github_repository_ruleset" "delivered" {
-  count = length(var.delivered_paths) > 0 ? 1 : 0
-
-  name        = "delivered files"
-  repository  = github_repository.this.name
-  target      = "push"
-  enforcement = "active"
-
-  rules {
-    file_path_restriction {
-      restricted_file_paths = var.delivered_paths
-    }
-  }
-
-  bypass_actors {
-    actor_type  = "Integration"
-    actor_id    = var.app_bypass_id
-    bypass_mode = "always"
-  }
-
-  lifecycle {
-    precondition {
-      condition     = var.app_bypass_id != null
-      error_message = "delivered_paths needs app_bypass_id: without it, nothing could deliver those files."
-    }
-  }
-}
