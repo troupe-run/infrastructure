@@ -8,9 +8,9 @@ each may do and how its repositories are chosen); teams join it when the org has
 ## Requirements
 
 ### Requirement: Each App's installation is declared and checked
-For each GitHub App installed in the org (today DCO and `troupe-run-infrastructure`), its permissions and its
-repository selection (all repositories, or selected ones) SHALL be declared here. A difference from GitHub SHALL be
-reported by a drift check that only reads.
+For each GitHub App installed in the org (today DCO, `troupe-run-infrastructure` and `troupe-run-release`), its
+permissions and its repository selection (all repositories, or selected ones) SHALL be declared here. A difference
+from GitHub SHALL be reported by a drift check that only reads.
 
 #### Scenario: An App given a new permission is reported
 - **WHEN** an App's installation gains a permission on GitHub without the declaration changing
@@ -40,4 +40,9 @@ uses SHALL be deleted, and its declaration and its keys removed with it.
 
 #### Scenario: The declared installations are only the ones in use
 - **WHEN** the drift check reads the org's App installations
-- **THEN** it finds exactly DCO and `troupe-run-infrastructure`, and reports no difference
+- **THEN** it finds exactly DCO, `troupe-run-infrastructure` and `troupe-run-release`, and reports no difference
+
+#### Scenario: The release App is used
+- **WHEN** someone asks what uses `troupe-run-release`
+- **THEN** this repository names troupe's release workflow (troupe-run/troupe#23) and the `release` environment and
+  variable it declares for it (spec: release-credentials)
