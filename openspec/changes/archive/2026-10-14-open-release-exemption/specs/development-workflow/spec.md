@@ -1,11 +1,10 @@
 ## MODIFIED Requirements
 
 ### Requirement: The release branch passes the branch rule, narrowly
-The GitHub check SHALL exempt a branch from the branch-change rule only when its name starts with `release-please--`,
-it adds at least one commit to `main`, every one authored by the release App's bot account, and the branch lives in a
-repository where a ruleset lets only the release App create, update or delete `release-please--*` branches (for a pull
-request, its head repository). Every other rule, the commit-message rule included, SHALL still apply. A check that
-can't name the branch's repository, or a guard without the bot's address, SHALL exempt no branch.
+The GitHub check SHALL exempt a branch from the branch-change rule only when it's named `release-please--*`, adds at
+least one commit to `main`, all by the release App's bot, and lives in a repository (a pull request's head repository)
+whose ruleset lets only the release App write those branches. Other rules SHALL still apply. With no repository named,
+or no bot address in the guard, no branch SHALL be exempt.
 
 #### Scenario: A release pull request
 - **WHEN** a push or pull request in `troupe-run/troupe` is checked for `release-please--branches--main`, whose only
