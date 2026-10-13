@@ -51,7 +51,7 @@
 - [x] 3.4 Delete the probe repository, then `tofu/probe`'s local state, `terraform.tfvars` and any other files the
       probe made. Verify `gh repo view troupe-run/infra-probe-20261013` fails, and that `git status` shows only the
       intended changes to `tofu/probe/main.tf`
-- [ ] 3.5 Add `github_repository_ruleset.release_branches` to `tofu/release.tf` (design D7), with the release App's
+- [x] 3.5 Add `github_repository_ruleset.release_branches` to `tofu/release.tf` (design D7), with the release App's
       ID as a local and a comment naming the spec. Add a paragraph to README.md's "How main is protected" saying who
       may write troupe's `release-please--*` branches, and that the break-glass is editing the ruleset. Verify
       `uv run scripts/check.py` passes

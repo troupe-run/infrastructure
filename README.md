@@ -21,7 +21,7 @@ that closes the issue. Specs live in `openspec/specs/`.
 | `tofu/labels/` | Label sets as data. `troupe.json` is troupe's `cap:*` capability labels: a new capability gets its label by a pull request here. `release.json` is release-please's two labels on troupe |
 | `tofu/probe/` | Points the same module at a throwaway repo, to show drift behaviour without touching a live one |
 | `tofu/guard_delivery.tf` | The guard's files in each repository that receives it, and the generated list of them |
-| `tofu/release.tf` | What troupe's release workflow needs: the `release` environment, limited to `main`, and the release App's client ID. The App and its key are set up by hand ([oob/README.md](oob/README.md#troupes-release-app-set-up-by-hand)) |
+| `tofu/release.tf` | What troupe's release workflow needs: the `release` environment, limited to `main`, the release App's client ID, and the ruleset that reserves `release-please--*` branches for the App. The App and its key are set up by hand ([oob/README.md](oob/README.md#troupes-release-app-set-up-by-hand)) |
 | `org-profile/` | The source of `troupe-run/.github`'s files, byte for byte |
 | `scripts/guard.py`, `.githooks/`, `.claude/settings.json`, `.github/workflows/guard.yml` | The guard: this repo's own, and the source of every delivered copy |
 | `docs/development-workflow.md` | Every rule the guard enforces, and how an override works |
@@ -171,6 +171,13 @@ Every other managed repository has a ruleset named "protect main" on its default
   direct push.
 - **Break-glass:** an org owner can always edit or disable a ruleset on GitHub. The next plan shows the edit as
   drift, and an apply restores the declared ruleset. Follow it with a PR.
+
+troupe also has a ruleset named "release branches" (`tofu/release.tf`): only the `troupe-run-release` App can create,
+update or delete a `release-please--*` branch, and the owner has no bypass. The guard exempts those branches from its
+branch rule only when the App authored every commit, and an author can be set by anyone, so GitHub enforces who writes
+them. GitHub's delete-on-merge is refused there too, so the release branch stays after its pull request merges, and
+release-please reuses it. The break-glass is the same: edit or disable the ruleset on GitHub, and the next plan
+restores it.
 
 After a CI apply, the App commits the encrypted state straight to this repository's `main`. Its ruleset lets the App
 through for that, and only the App.
