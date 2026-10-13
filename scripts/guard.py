@@ -71,6 +71,10 @@ GET /users/troupe-run-release%5Bbot%5D, and only once the ruleset that lets only
 release-please--* branches is applied (troupe-run/infrastructure#34). While None, no branch is
 exempt from the branch-change rule (release-please-prs design D2, D5)."""
 RELEASE_BRANCH_PREFIX = "release-please--"
+RELEASE_REPOSITORIES = frozenset({"troupe-run/troupe"})
+"""Where a ruleset lets only the release App write release-please--* branches (tofu/release.tf).
+The exemption trusts a commit's author only in these; anywhere else the author would be the only
+check (open-release-exemption design D1)."""
 GUARD_DIR = "troupe-guard"
 CHECK_TIMEOUT_SECONDS = 600.0
 """How long the pre-commit check may run before the commit is refused. The default lives here
@@ -1461,13 +1465,21 @@ def delivered_changes_by_others(
     return _delivered_refusal(bad, "commits not made by the delivery change delivered files")
 
 
-def release_branch_by_the_bot(root: Path, head: str, branch: str | None) -> bool:
-    """A release-please branch whose commits not on main are all the release bot's, and there's at
-    least one. Judged by what the branch adds to main, not the event's range: release-please
-    force-pushes when main moves, and a push's range then holds main's new commits too
-    (release-please-prs design D1). The name and the author are both self-declared; a ruleset
-    that lets only the App write these branches is the hard check (design D5)."""
-    if RELEASE_AUTHOR_EMAIL is None or not (branch or "").startswith(RELEASE_BRANCH_PREFIX):
+def release_branch_by_the_bot(
+    root: Path, head: str, branch: str | None, repository: str | None
+) -> bool:
+    """A release-please branch, living in one of RELEASE_REPOSITORIES, whose commits not on main
+    are all the release bot's, and there's at least one. Judged by what the branch adds to main,
+    not the event's range: release-please force-pushes when main moves, and a push's range then
+    holds main's new commits too (release-please-prs design D1). The name and the author are both
+    self-declared; the ruleset that lets only the App write these branches is the hard check
+    (design D5), so a repository without it, or none named, exempts nothing
+    (open-release-exemption design D1, D2)."""
+    if (
+        RELEASE_AUTHOR_EMAIL is None
+        or repository not in RELEASE_REPOSITORIES
+        or not (branch or "").startswith(RELEASE_BRANCH_PREFIX)
+    ):
         return False
     result = subprocess.run(
         ["git", "log", "--format=%ae", head, "--not", "origin/main"],
@@ -1482,15 +1494,25 @@ def release_branch_by_the_bot(root: Path, head: str, branch: str | None) -> bool
 
 
 def run_ci(
-    root: Path, base: str | None, head: str, branch: str | None, title: str | None = None
+    root: Path,
+    base: str | None,
+    head: str,
+    branch: str | None,
+    title: str | None = None,
+    repository: str | None = None,
 ) -> list[Decision]:
     """The git-level rules, re-checked on GitHub for a push or a pull request (design D11), and a
-    pull request's title when there is one."""
+    pull request's title when there is one. The repository is the one the branch lives in, which
+    decides whether a release branch can be exempt (open-release-exemption design D2)."""
     commits = commits_in_range(root, base, head)
     decisions = [nonconforming_commits(root, commits)]
     if title is not None:
         decisions.append(pr_title(title))
-    if branch and branch != "main" and not release_branch_by_the_bot(root, head, branch):
+    if (
+        branch
+        and branch != "main"
+        and not release_branch_by_the_bot(root, head, branch, repository)
+    ):
         decisions.append(commit_branch_change(root, branch))
     changed: list[str] = []
     for sha in commits:
