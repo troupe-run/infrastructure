@@ -51,7 +51,7 @@
 
 ## 6. Evidence
 
-- [ ] 6.1 In the scratch repository, with this branch's `guard.py` committed as its `origin/main` and installed as the
+- [x] 6.1 In the scratch repository, with this branch's `guard.py` committed as its `origin/main` and installed as the
       hook in headless `claude -p --permission-mode auto`, verify each of these and record the results for the pull
       request:
       - a granted read (`gh pr view 32 -R troupe-run/infrastructure --json state`) runs, with an `autoMode.hard_deny`
