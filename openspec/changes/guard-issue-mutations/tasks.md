@@ -34,12 +34,12 @@
 
 ## 4. Evidence
 
-- [ ] 4.1 In this session, with the new guard as the hook, run a refused `gh api graphql` mutation that changes
+- [x] 4.1 In this session, with the new guard as the hook, run a refused `gh api graphql` mutation that changes
       nothing on GitHub (`updateIssueIssueType` with a dummy id is refused before it is sent), and quote the refusal.
       Verify it names the mutation and `gh issue edit <n> --type <name>`
-- [ ] 4.2 Run `uv run scripts/tofu.py plan` and verify it shows only the delivered `scripts/guard.py` changing in the
+- [x] 4.2 Run `uv run scripts/tofu.py plan` and verify it shows only the delivered `scripts/guard.py` changing in the
       governed repositories; keep it for the pull request
-- [ ] 4.3 Run `openspec validate guard-issue-mutations --strict` and verify it passes
+- [x] 4.3 Run `openspec validate guard-issue-mutations --strict` and verify it passes
 
 ## Workflow follow-up
 
