@@ -68,8 +68,10 @@
       exit 1, "guard: commit-branch-change: branch 'release-please--branches--main' has no matching OpenSpec
       change". With `fix: slip something in` by another author added (bcb39db), `troupe-run/troupe` exit 1, the same
       `commit-branch-change` refusal
-- [ ] 5.2 Run `uv run scripts/tofu.py plan` (after fast-forwarding onto `origin/main`) and verify it shows only the
+- [x] 5.2 Run `uv run scripts/tofu.py plan` (after fast-forwarding onto `origin/main`) and verify it shows only the
       delivered `scripts/guard.py` changing in troupe; keep it for the pull request
+      Done 2026-10-14 on a branch level with `origin/main`: `Plan: 0 to add, 1 to change, 0 to destroy.`, the one
+      change being `github_repository_file.guard["troupe:scripts/guard.py"]` updated in place
 - [x] 5.3 Run `openspec validate open-release-exemption --strict` and verify it passes
 
 ## Workflow follow-up
