@@ -721,6 +721,14 @@ GH_WORKFLOW_WRITES = frozenset(
         ("workflow", "run"), ("run", "rerun"), ("run", "cancel"),
     }
 )  # fmt: skip
+# What the hook grants, so it runs without a prompt or auto mode's check (guard-grants-gh
+# design D1). A grant skips auto mode's classifier entirely, so this is narrower than the
+# allow-list: merging, checking out and starting or stopping runs keep Claude Code's own check,
+# and so does gh api.
+GH_NOT_GRANTED = frozenset(
+    {("pr", "merge"), ("pr", "checkout"), ("workflow", "run"), ("run", "rerun"), ("run", "cancel")}
+)
+GH_GRANTED = GH_READS | (GH_WORKFLOW_WRITES - GH_NOT_GRANTED)
 GH_OWNER_ONLY = {
     ("secret", "set"): "admin", ("secret", "delete"): "admin",
     ("variable", "set"): "admin", ("variable", "delete"): "admin",
