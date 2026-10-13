@@ -2,6 +2,7 @@
 GitHub for a push or a pull request."""
 
 import json
+import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -314,6 +315,61 @@ def test_the_bot_s_release_branch_with_no_repository_named_fails_the_branch_rule
     commit_as(repo, TEST_BOT, "chore: release main", "CHANGELOG.md")
     [refusal] = guard.run_ci(repo.path, base, repo.head(), RELEASE_BRANCH, repository=None)
     assert refusal.rule == "commit-branch-change"
+
+
+TOFU = SCRIPTS.parent / "tofu"
+
+
+def _blocks(text: str, opening: str) -> list[str]:
+    """Each top-level block in a .tf file whose first line matches the pattern, by brace depth."""
+    blocks = []
+    for match in re.finditer(opening, text, re.MULTILINE):
+        depth, end = 0, match.end()
+        for end in range(match.start(), len(text)):
+            depth += {"{": 1, "}": -1}.get(text[end], 0)
+            if depth == 0 and text[end] == "}":
+                break
+        blocks.append(text[match.start() : end + 1])
+    return blocks
+
+
+def release_ruleset_repositories(release_tf: str, repositories_tf: str) -> set[str]:
+    """The repositories a ruleset covering release-please--* branches is declared for, by full
+    name. A text reading of the two files, not an HCL parser (open-release-exemption design D4)."""
+    owner = guard.SOURCE_REPOSITORY.split("/")[0]
+    names = {}
+    for block in _blocks(repositories_tf, r'^module "(\w+)" \{'):
+        module = re.match(r'module "(\w+)"', block)
+        name = re.search(r'^  name\s*=\s*"([^"]+)"', block, re.MULTILINE)
+        if module and name:
+            names[module.group(1)] = f"{owner}/{name.group(1)}"
+    covered = set()
+    for block in _blocks(release_tf, r'^resource "github_repository_ruleset" "\w+" \{'):
+        target = re.search(r"repository\s*=\s*module\.(\w+)\.name", block)
+        if '"refs/heads/release-please--*"' in block and target and target.group(1) in names:
+            covered.add(names[target.group(1)])
+    return covered
+
+
+def test_every_repository_the_guard_exempts_has_the_release_ruleset_declared() -> None:
+    covered = release_ruleset_repositories(
+        (TOFU / "release.tf").read_text(encoding="utf-8"),
+        (TOFU / "repositories.tf").read_text(encoding="utf-8"),
+    )
+    assert guard.RELEASE_REPOSITORIES.issubset(covered)
+
+
+def test_removing_the_release_ruleset_leaves_its_repository_uncovered() -> None:
+    release_tf = (TOFU / "release.tf").read_text(encoding="utf-8")
+    [ruleset] = [
+        block
+        for block in _blocks(release_tf, r'^resource "github_repository_ruleset" "\w+" \{')
+        if "release-please--" in block
+    ]
+    covered = release_ruleset_repositories(
+        release_tf.replace(ruleset, ""), (TOFU / "repositories.tf").read_text(encoding="utf-8")
+    )
+    assert not guard.RELEASE_REPOSITORIES.issubset(covered)
 
 
 # release-please-prs: pull request titles are Conventional Commits (design D3)
