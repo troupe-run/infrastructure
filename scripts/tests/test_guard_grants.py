@@ -1,6 +1,12 @@
 """What the guard's hook grants: plain gh reads and everyday writes, only from the reviewed guard
 (spec: development-workflow; guard-grants-gh design D1-D4)."""
 
+import os
+import tempfile
+from pathlib import Path
+
+import pytest
+
 import guard
 
 # What is granted (D1)
@@ -23,3 +29,123 @@ def test_merging_checking_out_and_running_workflows_are_not_granted() -> None:
 
 def test_the_everyday_housekeeping_writes_are_granted() -> None:
     assert {("pr", "ready"), ("issue", "edit"), ("issue", "comment")} <= guard.GH_GRANTED
+
+
+def test_reads_that_write_local_files_anywhere_are_not_granted() -> None:
+    assert guard.GH_GRANTED & {("run", "download"), ("repo", "clone")} == set()
+
+
+# Only plain commands are granted (D2)
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh pr ready 74",
+        "gh issue edit 29 --type Feature",
+        "gh issue edit 29 --add-blocked-by 63",
+        'gh issue comment 1 --body "Fix #3, see https://example.com/?q=a"',
+        "gh pr view 17 --json comments --jq '.comments[] | .body'",
+        "gh issue list -R troupe-run/troupe --search 'is:open label:cap:runs'",
+        "gh pr ready 74 -R troupe-run/infrastructure",
+    ],
+)
+def test_a_plain_granted_gh_command_is_granted(command: str, tmp_path: Path) -> None:
+    assert guard.grantable(command, tmp_path, tmp_path)
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh pr merge 32 --rebase",
+        "gh pr checkout 32",
+        "gh workflow run tofu.yml",
+        "gh run rerun 123",
+        "gh run download 123 -D out",
+        "gh repo clone troupe-run/troupe",
+        "gh api repos/troupe-run/troupe",
+        "gh repo delete troupe-run/infra-probe-x --yes",
+        "gh label create x -R troupe-run/infra-probe-x",
+        "gh auth status --show-token",
+        "gh pr create --title t --body 'no closing reference'",
+        "gh my-extension run",
+        "gh",
+        "gh pr",
+    ],
+)
+def test_a_command_outside_the_grant_or_refused_is_not_granted(
+    command: str, tmp_path: Path
+) -> None:
+    assert not guard.grantable(command, tmp_path, tmp_path)
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh pr ready 74 && rm -rf build",
+        "gh pr ready 74; ls",
+        "gh pr ready 74 | cat",
+        "gh pr ready 74 &",
+        "gh pr ready 74\nrm -rf build",
+        'gh issue comment 1 --body "$(cat notes)"',
+        'gh issue comment 1 --body "`id`"',
+        'gh issue comment 1 --body "$HOME"',
+        "gh issue comment 1 --body $HOME",
+        "GH_TOKEN=x gh pr ready 74",
+        "/usr/local/bin/gh pr ready 74",
+        "command gh pr ready 74",
+        "gh pr ready 74 > out",
+        "gh pr ready 74 2>/dev/null",
+        "gh issue comment 1 --body-file - <<'EOF'\nbody\nEOF",
+        "gh issue comment 1 --body-file notes*",
+        "gh issue comment 1 --body-file ~/notes.md",
+        "gh pr ready 74 # comment",
+        "(gh pr ready 74)",
+        "gh pr ready \\74",
+        "gh issue comment 1 --body 'unbalanced",
+    ],
+)
+def test_a_gh_command_with_shell_syntax_is_not_granted(command: str, tmp_path: Path) -> None:
+    assert not guard.grantable(command, tmp_path, tmp_path)
+
+
+def test_a_body_file_inside_the_repository_is_granted(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / "notes").mkdir(parents=True)
+    (repo / "notes" / "body.md").write_text("Closes #1\n", encoding="utf-8")
+    assert guard.grantable("gh issue comment 1 --body-file notes/body.md", repo, repo)
+    assert guard.grantable("gh issue comment 1 -F notes/body.md", repo, repo)
+
+
+def test_a_body_file_under_the_temp_directory_is_granted(tmp_path: Path) -> None:
+    body = Path(tempfile.gettempdir()) / f"grant-test-{os.getpid()}.md"
+    body.write_text("text\n", encoding="utf-8")
+    try:
+        command = f"gh issue comment 1 --body-file={body}"
+        assert guard.grantable(command, tmp_path / "elsewhere", tmp_path / "elsewhere")
+    finally:
+        body.unlink()
+
+
+@pytest.mark.parametrize(
+    "flag",
+    ["--body-file /etc/hosts", "-F /etc/hosts", "--body-file=/etc/hosts", "--body-file -"],
+)
+def test_a_body_file_outside_the_repository_and_temp_directory_is_not_granted(
+    flag: str, tmp_path: Path
+) -> None:
+    assert not guard.grantable(f"gh issue comment 1 {flag}", tmp_path, tmp_path)
+
+
+def test_a_body_file_under_the_home_directory_is_not_granted(tmp_path: Path) -> None:
+    secret = Path.home() / ".ssh" / "id_ed25519"
+    assert not guard.grantable(f"gh issue comment 1 --body-file {secret}", tmp_path, tmp_path)
+
+
+def test_a_symlink_inside_the_repository_to_a_file_outside_is_not_granted(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "body.md").symlink_to("/etc/hosts")
+    assert not guard.grantable("gh issue comment 1 --body-file body.md", repo, repo)
