@@ -2,7 +2,7 @@
 
 ## 1. The exemption holds only where the branch's repository has the release ruleset
 
-- [ ] 1.1 Write failing tests in `scripts/tests/test_guard_push_and_ci.py`, each named for what its body checks
+- [x] 1.1 Write failing tests in `scripts/tests/test_guard_push_and_ci.py`, each named for what its body checks
       (design D1, D5). Give `run_ci` the repository the branch lives in. The section keeps its monkeypatched test
       address until 3.1 fills the real one, which then replaces it. Then: the bot's `release-please--branches--main`
       in `troupe-run/troupe` passes; the same branch in `troupe-run/infrastructure` fails on `commit-branch-change`;
@@ -10,7 +10,7 @@
       `commit-branch-change`. Keep the existing cases (someone else's commit alone or after the bot's, another branch
       name, a non-conventional bot commit, a branch adding nothing, the force-push range), each in
       `troupe-run/troupe`. Verify the new ones fail with `uv run pytest scripts/tests/test_guard_push_and_ci.py`
-- [ ] 1.2 Add `RELEASE_REPOSITORIES = frozenset({"troupe-run/troupe"})` beside `RELEASE_AUTHOR_EMAIL`, with a
+- [x] 1.2 Add `RELEASE_REPOSITORIES = frozenset({"troupe-run/troupe"})` beside `RELEASE_AUTHOR_EMAIL`, with a
       docstring naming `tofu/release.tf`. Make `release_branch_by_the_bot` and `run_ci` take the repository, and exempt
       nothing unless it's in the set (design D1). Verify 1.1's tests pass, all of `scripts/tests/` passes, and
       `uv run scripts/check.py` passes (mypy --strict, ruff)
