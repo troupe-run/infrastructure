@@ -29,7 +29,7 @@
 
 ## 3. Docs
 
-- [ ] 3.1 Update the `gh-allow-list` row in `docs/development-workflow.md` (design D4). Verify `test_guard_docs.py`
+- [x] 3.1 Update the `gh-allow-list` row in `docs/development-workflow.md` (design D4). Verify `test_guard_docs.py`
       passes and `uv run scripts/check.py` passes
 
 ## 4. Evidence
