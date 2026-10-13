@@ -2,22 +2,22 @@
 
 ## 1. No GraphQL mutation is allowed
 
-- [ ] 1.1 Change the tests in `scripts/tests/test_guard_gh.py` (design D1): replace
+- [x] 1.1 Change the tests in `scripts/tests/test_guard_gh.py` (design D1): replace
       `test_each_listed_graphql_mutation_is_allowed` with a test that each of the six formerly listed mutations and
       #30's three is refused as `gh-allow-list`; change the survey case for `updateIssue` to expect `gh-allow-list`;
       move the mixed-query and unparseable-query tests off `updateIssue` as the "listed" example where it matters;
       add a test that `gh issue edit 29 --type Feature`, `--remove-type`, `--add-blocked-by 63`,
       `--remove-blocked-by 63` and `--add-sub-issue 64` are allowed. Verify the refusal cases fail with
       `uv run pytest scripts/tests/test_guard_gh.py`
-- [ ] 1.2 Empty `GH_MUTATIONS_ALLOWED` in `scripts/guard.py`, keeping the table (design D1). Verify 1.1's tests pass,
+- [x] 1.2 Empty `GH_MUTATIONS_ALLOWED` in `scripts/guard.py`, keeping the table (design D1). Verify 1.1's tests pass,
       a GraphQL query with no mutation is still allowed, and owner-only mutations are still `owner-only`
 
 ## 2. Name the mutation and its gh command when refusing
 
 - [ ] 2.1 Write failing tests in `scripts/tests/test_guard_gh.py`, each named for what it checks:
       each mutation in design D1's table is named in its refusal, and its fix names the `gh` command in that
-      table; `addLabelsToLabelable`'s fix names `gh issue edit <n> --add-label <name>`; a mutation with no allowed equivalent (`deleteIssue`,
-      `addPullRequestReview`) is named, and its fix names no `gh` command; a query with two mutations, one repeated,
+      table; `addLabelsToLabelable`'s fix names `gh issue edit <n> --add-label <name>`; a mutation with no allowed
+      equivalent (`deleteIssue`, `addPullRequestReview`) is named, and its fix names no `gh` command; a query with two mutations, one repeated,
       names each once, in query order; the GraphQL fix leaves out the `-X GET` note; a REST refusal's message is
       unchanged. Verify they fail
 - [ ] 2.2 Write the table's two consistency tests (design D2): every command in `GH_MUTATION_EQUIVALENTS`, with its

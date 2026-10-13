@@ -752,12 +752,9 @@ GH_API_OWNER_ONLY = tuple(
         (r".*/(secrets|variables)(/.*)?", "admin"),
     )
 )
-GH_MUTATIONS_ALLOWED = frozenset(
-    {
-        "updateIssue", "addSubIssue", "removeSubIssue", "addComment", "addProjectV2ItemById",
-        "updateProjectV2ItemFieldValue",
-    }
-)  # fmt: skip
+# Every everyday write has one way to do it, its gh command, so no GraphQL mutation is allowed
+# (guard-issue-mutations design D1). Add one here only for a write gh can't do.
+GH_MUTATIONS_ALLOWED: frozenset[str] = frozenset()
 GH_MUTATIONS_OWNER_ONLY = {
     "mergePullRequest": "merge",
     "approveDeployments": "deployment", "rejectDeployments": "deployment",
