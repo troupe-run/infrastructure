@@ -39,7 +39,7 @@ guard: commit-on-main: commits aren't made on main; work reaches main through a 
 | Rule | Layer | Refuses | Fix |
 |---|---|---|---|
 | `commit-on-main` | git | a commit with `main` checked out | create a branch named after the change |
-| `commit-branch-change` | git | a commit on a branch with no matching OpenSpec change (active, or archived on that branch), or on a detached HEAD. On GitHub, a `release-please--` branch is exempt when it adds at least one commit to `main` and every one is authored by the release App's bot (`RELEASE_AUTHOR_EMAIL` in `scripts/guard.py`, empty until the App exists, so nothing is exempt yet) | propose the change, or switch to its branch |
+| `commit-branch-change` | git | a commit on a branch with no matching OpenSpec change (active, or archived on that branch), or on a detached HEAD. On GitHub, a `release-please--` branch is exempt when it adds at least one commit to `main`, every one is authored by the release App's bot (`RELEASE_AUTHOR_EMAIL` in `scripts/guard.py`), and the branch lives in a repository whose ruleset reserves those branches for the App (`RELEASE_REPOSITORIES`: troupe only). For a pull request that's its head repository, so a fork's branch is never exempt; a run that names no repository exempts nothing | propose the change, or switch to its branch |
 | `commit-message` | git | a first line that isn't a Conventional Commit (`type(scope)!: subject`); `fixup!`, `squash!` and `amend!` are accepted when they name a Conventional Commit subject. The `guard` check applies the same rule to a pull request's title, which becomes the commit message if squash merging is ever turned on | use one of `feat fix docs build ci test refactor perf style chore revert` |
 | `commit-checks` | git | a commit while tracked files have unstaged changes, or while `scripts/check.py` fails | stage or stash the changes; fix what the check reports |
 | `archive-incomplete` | git | a commit that adds an archived change with an unticked task | finish and tick every task first |
@@ -152,8 +152,10 @@ other org-wide files (specs: `development-workflow`, `org-profile`).
   restores it.
 - **The release-branch exemption trusts the commit's author.** A `release-please--` branch skips the
   branch-change rule when the release App's bot authored its commits, and anyone can write that author into a
-  commit. The hard check is a ruleset that lets only the release App create, update or delete those branches
-  (troupe-run/infrastructure#34). Until it's applied, the bot isn't recorded in the guard, so no branch is exempt.
+  commit. The hard check is troupe's "release branches" ruleset (`tofu/release.tf`), which lets only the release App
+  create, update or delete those branches, so on troupe the branch name is the proof. The exemption applies nowhere
+  else: not in this repository, which has no such ruleset, and not to a fork's branch, which troupe's ruleset doesn't
+  cover. A test fails if an exempt repository loses its declared ruleset.
 - **Overrides are local.** The `guard` check on GitHub ignores them, so nothing granted on one machine excuses a
   commit on `main`.
 - **Bash parsing is heuristic.** When a `git` or `gh` command can't be parsed, it's refused rather than guessed at.
