@@ -117,7 +117,7 @@
   {
     "name": "cap:platform",
     "color": "1D76DB",
-    "description": "The one seam for OS-specific behaviour: files, locks, processes, signals, IPC, file watching"
+    "description": "The one seam for OS-specific behaviour: files, locks, processes, interrupts, file watching, paths"
   },
   {
     "name": "cap:plugins",
@@ -137,7 +137,7 @@
   {
     "name": "cap:protocol",
     "color": "1D76DB",
-    "description": "Language-neutral JSON Schema contracts in protocol/, shared by every language and surface"
+    "description": "Strict, language-neutral JSON Schema contracts in protocol/ and each plugin, for every surface"
   },
   {
     "name": "cap:roles",
