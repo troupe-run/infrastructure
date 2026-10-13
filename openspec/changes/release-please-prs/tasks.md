@@ -2,7 +2,7 @@
 
 ## 1. The release branch passes the branch rule, narrowly
 
-- [ ] 1.1 Write failing tests in `scripts/tests/test_guard_push_and_ci.py`, each named for what its body checks
+- [x] 1.1 Write failing tests in `scripts/tests/test_guard_push_and_ci.py`, each named for what its body checks
       (design D1, D2), with `RELEASE_AUTHOR_EMAIL` patched to a test address and commits authored with
       `git commit --author`: a `release-please--branches--main` branch whose only commit, `chore: release main`, is
       the bot's passes `run_ci`; the same branch with one commit by someone else, alone or after the bot's, fails on
@@ -12,7 +12,7 @@
       `RELEASE_AUTHOR_EMAIL` left `None`, the bot's release branch fails on `commit-branch-change`; and after `main`
       gains someone else's commit and the release commit is rebuilt on it, a push range from the old head to the
       new one passes. Verify they fail with `uv run pytest scripts/tests/test_guard_push_and_ci.py`
-- [ ] 1.2 Add `RELEASE_AUTHOR_EMAIL: str | None = None` next to `DELIVERY_AUTHOR_EMAIL`, with a docstring saying how
+- [x] 1.2 Add `RELEASE_AUTHOR_EMAIL: str | None = None` next to `DELIVERY_AUTHOR_EMAIL`, with a docstring saying how
       to fill it, and make `run_ci` skip the branch-change rule only for a `release-please--` branch whose commits
       not on `origin/main` are non-empty and all authored by it (design D1, D2). Verify 1.1's tests pass, every
       existing test in `test_guard_push_and_ci.py` and `test_guard_delivery.py` still passes, and
