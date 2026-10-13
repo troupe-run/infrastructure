@@ -1305,6 +1305,17 @@ def grantable(command: str, cwd: Path, root: Path) -> bool:
     return all(_within(Path(f) if Path(f).is_absolute() else cwd / f, root, temp) for f in files)
 
 
+def guard_is_reviewed(root: Path, running: Path = Path(__file__)) -> bool:
+    """True if the running guard is byte-identical to scripts/guard.py on origin/main, so a guard
+    edited on a branch can refuse but never grant (design D3). Any doubt is False."""
+    try:
+        here = git(root, "hash-object", "--", str(running))
+        reviewed = git(root, "rev-parse", "--verify", "--quiet", "origin/main:scripts/guard.py")
+    except (RuntimeError, OSError):
+        return False
+    return bool(here) and here == reviewed
+
+
 def edit_decision(root: Path, file_path: str, branch: str | None) -> Decision:
     target = Path(file_path)
     target = target if target.is_absolute() else root / target

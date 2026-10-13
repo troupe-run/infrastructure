@@ -3,9 +3,11 @@
 
 import os
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from conftest import Repo, git
 
 import guard
 
@@ -149,3 +151,44 @@ def test_a_symlink_inside_the_repository_to_a_file_outside_is_not_granted(
     repo.mkdir()
     (repo / "body.md").symlink_to("/etc/hosts")
     assert not guard.grantable("gh issue comment 1 --body-file body.md", repo, repo)
+
+
+# Only the reviewed guard grants (D3)
+
+
+def with_origin_main(repo: Repo, guard_text: str | None) -> Path:
+    """Commit a scripts/guard.py (or none) and point origin/main at that commit."""
+    if guard_text is not None:
+        repo.write("scripts/guard.py", guard_text)
+        git(repo.path, "add", "-A")
+        git(repo.path, "commit", "-q", "-m", "chore: add the guard")
+    git(repo.path, "update-ref", "refs/remotes/origin/main", "HEAD")
+    return repo.path / "scripts" / "guard.py"
+
+
+def test_a_guard_identical_to_origin_main_is_reviewed(make_repo: Callable[[], Repo]) -> None:
+    repo = make_repo()
+    running = with_origin_main(repo, "print('guard')\n")
+    assert guard.guard_is_reviewed(repo.path, running)
+
+
+def test_a_guard_edited_since_origin_main_is_not_reviewed(make_repo: Callable[[], Repo]) -> None:
+    repo = make_repo()
+    running = with_origin_main(repo, "print('guard')\n")
+    running.write_text("print('edited')\n", encoding="utf-8")
+    assert not guard.guard_is_reviewed(repo.path, running)
+
+
+def test_no_origin_main_means_not_reviewed(make_repo: Callable[[], Repo]) -> None:
+    repo = make_repo()
+    running = repo.write("scripts/guard.py", "print('guard')\n")
+    assert not guard.guard_is_reviewed(repo.path, running)
+
+
+def test_origin_main_without_the_guard_means_not_reviewed(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = make_repo()
+    with_origin_main(repo, None)
+    running = repo.write("scripts/guard.py", "print('guard')\n")
+    assert not guard.guard_is_reviewed(repo.path, running)
