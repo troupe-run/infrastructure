@@ -1677,6 +1677,22 @@ def run_claude_pre_tool_use(payload: dict[str, object], stdout: TextIO | None = 
             }
         }
         print(json.dumps(deny), file=out)
+        return 0
+    # A grant comes only after every refusal, never for an override-excused command (grantable
+    # re-reads the rules), and only from the reviewed guard (design D4).
+    command = str(tool_input.get("command", ""))
+    if tool == "Bash" and grantable(command, cwd, root) and guard_is_reviewed(root):
+        words = shlex.split(command, posix=True)
+        allow = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": (
+                    f"guard: gh {words[1]} {words[2]} is on the guard's allow-list (granted)."
+                ),
+            }
+        }
+        print(json.dumps(allow), file=out)
     return 0
 
 

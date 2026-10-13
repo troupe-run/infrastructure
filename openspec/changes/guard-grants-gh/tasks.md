@@ -37,11 +37,11 @@
 
 ## 4. The hook
 
-- [ ] 4.1 Write failing tests in `scripts/tests/test_guard_claude.py` (design D4): a granted Bash command prints
+- [x] 4.1 Write failing tests in `scripts/tests/test_guard_claude.py` (design D4): a granted Bash command prints
       `permissionDecision: "allow"` with a reason starting `guard:`; the same command through PowerShell prints
       nothing; with the guard differing from `origin/main` it prints nothing; a refused command still prints `deny`;
       a refusal excused by an override prints nothing. Verify they fail
-- [ ] 4.2 Wire the grant into `run_claude_pre_tool_use` (design D4). Verify 4.1's tests and every existing hook test
+- [x] 4.2 Wire the grant into `run_claude_pre_tool_use` (design D4). Verify 4.1's tests and every existing hook test
       pass, and `uv run scripts/check.py` passes
 
 ## 5. Docs

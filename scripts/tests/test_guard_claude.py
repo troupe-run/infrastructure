@@ -475,3 +475,74 @@ def test_the_entry_point_writes_to_a_given_stream(make_repo: Callable[[], Repo])
     }
     assert guard.run_claude_pre_tool_use(payload, stdout=stream) == 0
     assert "edit-branch-change" in stream.getvalue()
+
+
+# Grants (guard-grants-gh design D4)
+
+
+def reviewed(repo: Repo) -> Repo:
+    """Put this guard on the repository's origin/main, so the hook running it is reviewed."""
+    # Bytes, not text: the reviewed check compares bytes, and text mode rewrites line endings
+    # on Windows.
+    (repo.path / "scripts").mkdir(exist_ok=True)
+    (repo.path / "scripts" / "guard.py").write_bytes((SCRIPTS / "guard.py").read_bytes())
+    git(repo.path, "add", "-A")
+    git(repo.path, "commit", "-q", "-m", "chore: add the guard")
+    git(repo.path, "update-ref", "refs/remotes/origin/main", "HEAD")
+    return repo
+
+
+def grant_reason(output: dict[str, object] | None) -> str:
+    assert output is not None, "expected a grant"
+    specific = output["hookSpecificOutput"]
+    assert isinstance(specific, dict)
+    assert specific["hookEventName"] == "PreToolUse"
+    assert specific["permissionDecision"] == "allow"
+    return str(specific["permissionDecisionReason"])
+
+
+def test_a_granted_bash_command_is_allowed_with_the_guard_s_reason(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = reviewed(make_repo())
+    output = pre_tool_use(repo.path, "Bash", {"command": "gh pr ready 74"})
+    assert grant_reason(output).startswith("guard: gh pr ready")
+
+
+def test_a_granted_command_through_powershell_gets_no_grant(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = reviewed(make_repo())
+    assert pre_tool_use(repo.path, "PowerShell", {"command": "gh pr ready 74"}) is None
+
+
+def test_a_guard_that_differs_from_origin_main_grants_nothing(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = make_repo()
+    repo.write("scripts/guard.py", "print('an older guard')\n")
+    git(repo.path, "add", "-A")
+    git(repo.path, "commit", "-q", "-m", "chore: add the guard")
+    git(repo.path, "update-ref", "refs/remotes/origin/main", "HEAD")
+    assert pre_tool_use(repo.path, "Bash", {"command": "gh pr ready 74"}) is None
+
+
+def test_a_refused_command_is_still_denied_by_the_reviewed_guard(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = reviewed(make_repo())
+    output = pre_tool_use(repo.path, "Bash", {"command": "gh auth status --show-token"})
+    assert "owner-only" in denial_reason(output)
+
+
+def test_a_refusal_excused_by_an_override_gets_no_grant(make_repo: Callable[[], Repo]) -> None:
+    repo = reviewed(make_repo())
+    guard.grant_override(repo.path, "owner-only", "testing")
+    assert pre_tool_use(repo.path, "Bash", {"command": "gh auth status --show-token"}) is None
+
+
+def test_a_command_the_guard_allows_but_doesn_t_grant_gets_nothing(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = reviewed(make_repo())
+    assert pre_tool_use(repo.path, "Bash", {"command": "gh pr merge 32 --rebase"}) is None
