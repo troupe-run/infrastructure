@@ -21,14 +21,14 @@
 
 ## 2. The repository comes from GitHub
 
-- [ ] 2.1 Write failing tests (design D2): `github_ci_inputs` returns `GITHUB_REPOSITORY` for a push and `None` when
+- [x] 2.1 Write failing tests (design D2): `github_ci_inputs` returns `GITHUB_REPOSITORY` for a push and `None` when
       it's unset; for a `pull_request` payload it returns `pull_request.head.repo.full_name` (the fork's name for a
       fork) and `None` when `head.repo` is `null`; for a `head.repo` that's present but not an object with a string
       `full_name`, `guard.py ci` exits 1 with a refusal saying it couldn't read the head repository, to re-run, and
       to tell the owner if it fails again; `guard.py ci --head <sha> --branch release-please--branches--main
       --repository troupe-run/troupe` on the bot's branch exits 0, and with `--repository troupe-run/infrastructure`
       exits 1 naming `commit-branch-change`. Verify they fail
-- [ ] 2.2 Add the repository to `github_ci_inputs`, `UnreadableHeadRepositoryError` reported by `run_ci_entry`, and
+- [x] 2.2 Add the repository to `github_ci_inputs`, `UnreadableHeadRepositoryError` reported by `run_ci_entry`, and
       `--repository` to `guard.py ci` (design D2). Verify 2.1's tests pass, all of `scripts/tests/` passes, and
       `uv run scripts/check.py` passes
 

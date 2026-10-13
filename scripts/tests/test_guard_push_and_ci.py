@@ -419,7 +419,7 @@ def test_the_github_inputs_of_a_pull_request_carry_its_title(
 ) -> None:
     repo, base = pr_repo(make_repo, tmp_path)
     pull_request_event(repo, tmp_path, monkeypatch, {"pull_request": {"title": "Release main"}})
-    assert guard.github_ci_inputs(repo.path) == (base, repo.head(), "add-thing", "Release main")
+    assert guard.github_ci_inputs(repo.path)[:4] == (base, repo.head(), "add-thing", "Release main")
 
 
 def test_a_pull_request_event_with_no_title_fails_saying_it_couldn_t_read_it(
@@ -446,3 +446,107 @@ def test_guard_ci_with_a_non_conventional_title_exits_1_and_prints_the_refusal(
     )  # fmt: skip
     assert result.returncode == 1
     assert "guard: commit-message: pull request title 'Release main'" in result.stderr
+
+
+# open-release-exemption: the repository comes from GitHub (design D2)
+
+
+def push_event(
+    repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, before: str, branch: str
+) -> None:
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"before": before}), encoding="utf-8")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    monkeypatch.setenv("GITHUB_REF_NAME", branch)
+
+
+def test_the_github_inputs_of_a_push_name_the_run_s_repository(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base = pr_repo(make_repo, tmp_path)
+    push_event(repo, tmp_path, monkeypatch, base, "add-thing")
+    monkeypatch.setenv("GITHUB_REPOSITORY", TROUPE)
+    assert guard.github_ci_inputs(repo.path) == (base, repo.head(), "add-thing", None, TROUPE)
+
+
+def test_the_github_inputs_of_a_push_with_no_repository_name_none(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base = pr_repo(make_repo, tmp_path)
+    push_event(repo, tmp_path, monkeypatch, base, "add-thing")
+    monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+    assert guard.github_ci_inputs(repo.path)[4] is None
+
+
+def test_the_github_inputs_of_a_pull_request_name_its_head_repository_not_the_run_s(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, _ = pr_repo(make_repo, tmp_path)
+    payload = {"pull_request": {"title": "chore: release main",
+                                "head": {"repo": {"full_name": "someone/troupe"}}}}  # fmt: skip
+    pull_request_event(repo, tmp_path, monkeypatch, payload)
+    monkeypatch.setenv("GITHUB_REPOSITORY", TROUPE)
+    assert guard.github_ci_inputs(repo.path)[4] == "someone/troupe"
+
+
+def test_the_github_inputs_of_a_pull_request_from_a_deleted_fork_name_none(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, _ = pr_repo(make_repo, tmp_path)
+    payload = {"pull_request": {"title": "chore: release main", "head": {"repo": None}}}
+    pull_request_event(repo, tmp_path, monkeypatch, payload)
+    monkeypatch.setenv("GITHUB_REPOSITORY", TROUPE)
+    assert guard.github_ci_inputs(repo.path)[4] is None
+
+
+@pytest.mark.parametrize("head_repo", ["troupe-run/troupe", {"full_name": 7}, {}, []])
+def test_a_pull_request_whose_head_repository_can_t_be_read_fails_saying_so(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    head_repo: object,
+) -> None:
+    repo, _ = pr_repo(make_repo, tmp_path)
+    payload = {"pull_request": {"title": "chore: release main", "head": {"repo": head_repo}}}
+    pull_request_event(repo, tmp_path, monkeypatch, payload)
+    assert guard.run_ci_entry(repo.path, None, None, None) == 1
+    err = capsys.readouterr().err
+    assert "couldn't read the pull request's head repository" in err
+    assert "Re-run the check" in err
+    assert "tell the owner" in err
+
+
+def guard_ci(repo: Repo, monkeypatch: pytest.MonkeyPatch, *args: str) -> int:
+    """guard.py ci run in-process, so the release bot's test address applies."""
+    monkeypatch.chdir(repo.path)
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    return guard.main(["ci", *args])
+
+
+def test_guard_ci_exempts_the_bot_s_release_branch_in_the_named_repository(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base = release_repo(make_repo, tmp_path, monkeypatch)
+    repo.switch(RELEASE_BRANCH)
+    commit_as(repo, TEST_BOT, "chore: release main", "CHANGELOG.md")
+    head = repo.head()
+    args = ["--base", base, "--head", head, "--branch", RELEASE_BRANCH, "--repository", TROUPE]
+    assert guard_ci(repo, monkeypatch, *args) == 0
+
+
+def test_guard_ci_refuses_the_bot_s_release_branch_in_another_repository(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo, base = release_repo(make_repo, tmp_path, monkeypatch)
+    repo.switch(RELEASE_BRANCH)
+    commit_as(repo, TEST_BOT, "chore: release main", "CHANGELOG.md")
+    head = repo.head()
+    args = ["--base", base, "--head", head, "--branch", RELEASE_BRANCH,
+            "--repository", "troupe-run/infrastructure"]  # fmt: skip
+    assert guard_ci(repo, monkeypatch, *args) == 1
+    assert "guard: commit-branch-change:" in capsys.readouterr().err
