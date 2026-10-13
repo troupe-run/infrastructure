@@ -185,6 +185,107 @@ def test_the_same_write_through_gh_issue_edit_is_allowed(command: str) -> None:
     assert rule(command) is None
 
 
+# A refused mutation is named, with the gh command that does the same (guard-issue-mutations
+# design D2, D3).
+
+D1_EQUIVALENTS = {
+    "updateIssue": "gh issue edit <n>",
+    "updateIssueIssueType": "gh issue edit <n> --type <name>",
+    "addBlockedBy": "gh issue edit <n> --add-blocked-by <m>",
+    "removeBlockedBy": "gh issue edit <n> --remove-blocked-by <m>",
+    "addSubIssue": "gh issue edit <n> --add-sub-issue <m>",
+    "removeSubIssue": "gh issue edit <n> --remove-sub-issue <m>",
+    "addComment": "gh issue comment <n>",
+    "addProjectV2ItemById": "gh project item-add <number> --owner <org> --url <url>",
+    "updateProjectV2ItemFieldValue": (
+        "gh project item-edit --id <item> --field-id <field> --project-id <project>"
+    ),
+}
+SAMPLES = {
+    "<n>": "29", "<m>": "63", "<number>": "2", "<name>": "Feature", "<login>": "octocat",
+    "<org>": "troupe-run", "<url>": "https://github.com/troupe-run/troupe/issues/1",
+    "<item>": "PVTI_1", "<field>": "PVTF_1", "<project>": "PVT_1", "<value>": "x",
+    "<title>": "t", "<file>": "body.md",
+}  # fmt: skip
+
+
+def graphql(*mutations: str) -> str:
+    fields = " ".join(f'{name}(input:{{id:"x"}}) {{ a }}' for name in mutations)
+    return f"gh api graphql -f query='mutation {{ {fields} }}'"
+
+
+@pytest.mark.parametrize(("mutation", "command"), sorted(D1_EQUIVALENTS.items()))
+def test_a_refused_everyday_mutation_is_named_and_its_fix_names_the_gh_command(
+    mutation: str, command: str
+) -> None:
+    found = refusal(graphql(mutation))
+    assert found is not None
+    assert found.problem == f"GraphQL mutation {mutation} isn't on the guard's gh allow-list."
+    assert f"For {mutation}, run {command}" in found.fix
+
+
+def test_a_refused_label_mutation_s_fix_names_gh_issue_edit_add_label() -> None:
+    found = refusal(graphql("addLabelsToLabelable"))
+    assert found is not None
+    assert "gh issue edit <n> --add-label <name>" in found.fix
+
+
+@pytest.mark.parametrize("mutation", ["deleteIssue", "addPullRequestReview"])
+def test_a_mutation_with_no_allowed_gh_command_is_named_and_no_command_is_offered(
+    mutation: str,
+) -> None:
+    found = refusal(graphql(mutation))
+    assert found is not None
+    assert found.problem == f"GraphQL mutation {mutation} isn't on the guard's gh allow-list."
+    assert " run gh " not in found.fix
+    assert "Ask the owner" in found.fix
+
+
+def test_several_mutations_are_each_named_once_in_query_order() -> None:
+    found = refusal(graphql("addComment", "addBlockedBy", "addComment"))
+    assert found is not None
+    assert found.problem == (
+        "GraphQL mutations addComment, addBlockedBy aren't on the guard's gh allow-list."
+    )
+    assert found.fix.index("For addComment") < found.fix.index("For addBlockedBy")
+    assert found.fix.count("For addComment") == 1
+
+
+def test_a_graphql_refusal_s_fix_leaves_out_the_rest_read_note() -> None:
+    found = refusal(graphql("addComment"))
+    assert found is not None
+    assert "-X GET" not in found.fix
+
+
+def test_a_rest_refusal_s_message_is_unchanged() -> None:
+    found = refusal("gh api -X POST repos/troupe-run/troupe/git/refs -f ref=refs/heads/x")
+    assert found is not None
+    assert found.problem == (
+        "gh api POST repos/troupe-run/troupe/git/refs isn't on the guard's gh allow-list."
+    )
+    assert found.fix == guard.NOT_LISTED_FIX
+
+
+def filled(command: str) -> str:
+    for placeholder, sample in SAMPLES.items():
+        command = command.replace(placeholder, sample)
+    assert "<" not in command, f"no sample for a placeholder in {command!r}"
+    return command
+
+
+def test_every_gh_command_the_hints_name_is_allowed() -> None:
+    commands = [c for cs in guard.GH_MUTATION_EQUIVALENTS.values() for c in cs]
+    assert commands
+    assert [c for c in commands if rule(filled(c)) is not None] == []
+
+
+def test_every_hinted_mutation_is_refused_as_unlisted() -> None:
+    hinted = set(guard.GH_MUTATION_EQUIVALENTS)
+    assert hinted >= set(D1_EQUIVALENTS)
+    assert hinted & guard.GH_MUTATIONS_ALLOWED == set()
+    assert hinted & set(guard.GH_MUTATIONS_OWNER_ONLY) == set()
+
+
 # owner-only (D3), with each message group (D5)
 
 
