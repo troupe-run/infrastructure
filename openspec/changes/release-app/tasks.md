@@ -28,7 +28,7 @@
       concatenate it into `repo_troupe`'s labels. Add a test to `scripts/tests/test_labels.py` that the release set
       holds exactly those two names, each with a description of 100 characters or fewer. Name the test for that, and
       verify it fails when a name is misspelt. Then verify `uv run scripts/check.py` passes
-- [ ] 2.3 Add `tofu/release.tf` (design D2, D3): the `release` environment on troupe, its `main` deployment policy,
+- [x] 2.3 Add `tofu/release.tf` (design D2, D3): the `release` environment on troupe, its `main` deployment policy,
       and `RELEASE_APP_CLIENT_ID` with the client ID from 1.3, each with a comment naming the spec. Verify `uv run scripts/check.py` passes (tofu fmt, validate)
 - [ ] 2.4 Document the steps done by hand in `oob/README.md` (design D4): creating and installing the App, storing
       and setting the key, rotating it, and a row for `troupe-run-release` with `troupe` in the table of
