@@ -14,6 +14,7 @@
   {
     "app_slug": "troupe-run-infrastructure",
     "permissions": {
+      "actions_variables": "write",
       "administration": "write",
       "contents": "write",
       "issues": "write",
@@ -21,6 +22,16 @@
       "metadata": "read",
       "organization_administration": "write",
       "workflows": "write"
+    },
+    "repository_selection": "selected"
+  },
+  {
+    "app_slug": "troupe-run-release",
+    "permissions": {
+      "contents": "write",
+      "issues": "write",
+      "metadata": "read",
+      "pull_requests": "write"
     },
     "repository_selection": "selected"
   }
