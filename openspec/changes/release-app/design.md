@@ -112,14 +112,61 @@ reads. Another repository that starts releasing adds the same set.
 
 ### D6. Verification without touching a live repository's behaviour
 
-- **The plan** is the evidence for D2, D3 and D5: it creates an environment, a branch policy, a variable and two
-  labels on troupe, and changes or destroys nothing.
+- **The plan** is the evidence for D2, D3, D5 and D7: it creates the ruleset, an environment, a branch policy, a
+  variable and two labels on troupe, and changes or destroys nothing else.
+- **The ruleset's behaviour** is shown by D8's probe, on a throwaway repository, before anything live changes.
 - **The branch policy** isn't re-probed. The ci-apply probe showed that an environment declared this way refuses a run
   from another branch. After the apply, `gh api repos/troupe-run/troupe/environments/release` shows
   `can_admins_bypass: false` and `custom_branch_policies: true`, and its `deployment-branch-policies` list exactly
   `main`. Testing on troupe itself would need a workflow on a branch of a live repository.
 - **The installation**: `uv run scripts/oob.py` is clean, and the owner confirms the repository list in the App's
   settings.
+
+### D7. A ruleset reserves the release branches for the release App (owner, 2026-10-13)
+
+#33 exempts a `release-please--` branch from the guard's branch-change rule when every commit it adds to `main` is
+authored by `troupe-run-release[bot]` (#33 design D5). A commit's author is self-declared (`git commit --author`), so
+the author check alone would let anyone with write access skip the rule. GitHub has to enforce who writes those
+branches.
+
+`github_repository_ruleset.release_branches` in `tofu/release.tf`, named `release branches`:
+
+- target `branch`, `ref_name` including `refs/heads/release-please--*`;
+- rules `creation`, `update` (with `update_allows_fetch_and_merge = false`) and `deletion`. There's no
+  `non_fast_forward`, because release-please force-pushes its branch as `main` moves;
+- one bypass actor: the release App (`Integration`, ID 5300488, `always`). There's no `OrganizationAdmin` bypass, so
+  a session with the owner's credentials can't write these branches either.
+
+It sits in `tofu/release.tf`, not the repository module, because the module protects `main` and this is specific to
+troupe's release. The precedent is `.github`'s `app only` ruleset, which restricts `update` and `deletion` with one
+App as the only bypass and holds on GitHub Free.
+
+Alternative: rely on #33's author check alone. That was rejected, because the author is self-declared.
+
+### D8. Probe first, on a throwaway repository
+
+The `creation` rule isn't used anywhere in the org yet, so the ruleset is shown on `troupe-run/infra-probe-20261013`
+before troupe gets it. `tofu/probe` gains a `probe_release_ruleset` variable that adds the same ruleset. The owner
+adds the probe repository to the infrastructure App's installation, and the infrastructure App stands in for the
+release App as the bypass actor. A bypass works the same way for any `Integration` actor, and installing the release
+App on the probe repository would widen the installation this change declares. The steps:
+
+1. The owner's `git push` creating `release-please--probe` is refused (`creation`).
+2. The App creates `release-please--probe` through `tofu/probe` (`github_branch`), and it succeeds.
+3. The owner's push and force-push to it are refused (`update`).
+4. The App commits a file to it through `tofu/probe` (`github_repository_file` on that branch), and it succeeds.
+5. The owner's `git push --delete` is refused (`deletion`).
+6. A pull request from it into `main`, merged by the owner, with delete-on-merge on (troupe's setting): does GitHub
+   delete the branch, or is the delete refused and the branch kept? Either is acceptable, because release-please
+   reuses its branch. The finding is recorded so neither outcome is a surprise on troupe.
+7. The App deletes the branch (destroying the `github_branch`), and it succeeds.
+8. The owner pushes a branch with another name, and it isn't refused.
+
+**Not probed: the App's force-push.** OpenTofu can't make one. A bypass applies per actor, not per rule, so step 4
+already shows the App bypassing the `update` rule that a force-push would meet. The real check is troupe#23's first
+rebase of the release branch.
+
+The findings go here. Then the probe repository and the probe's local state are deleted.
 
 ## Risks / Trade-offs
 
@@ -131,17 +178,23 @@ reads. Another repository that starts releasing adds the same set.
   drift-checked like the rest, and adds no reach beyond what workflows write already gives.
 - [release-please may use a label this repo doesn't declare, such as `autorelease: snapshot`, which is Java only] →
   The next plan would show it being removed, and the owner would see that before approving. Declare it then.
+- [The owner can't write a release branch by hand, even to fix one] → That's the intent. The break-glass is
+  editing the ruleset on GitHub, as for every ruleset (spec: rulesets); the next plan restores it.
+- [Delete-on-merge may be refused on a release branch] → D8 step 6 settles it before troupe gets the ruleset.
+- [#33's exemption stays closed until this applies] → It's the ordering #33 chose: its follow-up fills
+  `RELEASE_AUTHOR_EMAIL` only after this ruleset is on troupe.
 - [The App is created with more permissions than declared] → The drift check reports it (spec: release-credentials).
 
 ## Migration Plan
 
 1. **Owner:** create the App, install it on troupe only, store the key in 1Password, and record the client ID and bot
    user ID on #34. Also grant the infrastructure App "Variables: write" and accept it.
-2. **This branch:** the declarations, the docs, `scripts/check.py`, `uv run scripts/oob.py` clean, and a PR plan
+2. **This branch:** the probe (D8) and its findings, then the declarations, the docs, `scripts/check.py`, `uv run scripts/oob.py` clean, and a PR plan
    showing only the creations.
 3. **Merge, then approve the apply.**
-4. **Owner:** set the key's secret (D4). Then verify the environment, its secret and its variable by API.
+4. **Owner:** set the key's secret (D4). Then verify the ruleset, the environment, its secret and its variable by API.
+5. **Tell #33** that the ruleset is on troupe, so its follow-up can fill `RELEASE_AUTHOR_EMAIL`.
 
-Rollback: take the declarations out with `removed` blocks, or delete them and apply. Uninstall or delete the App in
+Rollback: take the declarations out (the ruleset with them) with `removed` blocks, or delete them and apply. Uninstall or delete the App in
 its settings, and remove its `oob/` entry. troupe's release workflow then can't mint a token, so it fails without
 writing anything.

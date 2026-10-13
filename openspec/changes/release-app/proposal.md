@@ -28,6 +28,11 @@ around it are part of the org, so they're declared here like the rest of it, and
 - **Labels `autorelease: pending` and `autorelease: tagged` on troupe.** Labels are declared in full, so any label
   release-please made by itself would be deleted by the next apply, and release-please finds its release PR by these
   labels. They're declared in a new label set, `tofu/labels/release.json` (design D5).
+- **A ruleset on troupe, `release branches`**: only the release App can create, update or delete a
+  `release-please--*` branch, and no owner bypasses it. #33's guard exempts such a branch when the release App's bot
+  authored every commit, but a commit's author is self-declared, so GitHub has to enforce who writes those branches
+  (#33 design D5; owner, 2026-10-13). The `creation` rule isn't used anywhere yet, so it's probed on a throwaway
+  repository first (design D7, D8).
 - **Docs:** `oob/README.md` records the steps done by hand: creating the App, installing it, and setting the key. It
   also says what to do when the key is rotated.
 
@@ -37,13 +42,15 @@ Out of scope:
 - A bypass of `protect main` for the release App. It never writes to `main` directly, only through a reviewed pull
   request, so it gets none.
 - A tag ruleset on troupe.
+- Filling #33's `RELEASE_AUTHOR_EMAIL`, which opens its exemption: a follow-up there, once this ruleset is applied.
 
 ## Capabilities
 
 ### New Capabilities
 
 - `release-credentials`: the credential troupe's release workflow uses to open pull requests, and where it may be
-  read: the release App's installation, the `release` environment that holds its key, and the variable naming the App.
+  read: the release App's installation, the `release` environment that holds its key, the variable naming the App,
+  and who may write the release branches.
 
 ### Modified Capabilities
 
@@ -53,14 +60,19 @@ Out of scope:
 
 ## Impact
 
-- `tofu/release.tf` (new): the `release` environment, its branch policy and the variable.
+- `tofu/release.tf` (new): the `release` environment, its branch policy, the variable and the `release branches`
+  ruleset.
+- `tofu/probe/main.tf`: a variable that adds the same ruleset to the probe repository.
 - `tofu/labels/release.json` (new) and `tofu/repositories.tf`: troupe's labels.
 - `oob/app-installations.json` and `oob/README.md`: the release App's declaration and the steps done by hand.
 - `README.md`: the layout table names the new files.
 - `openspec/specs/` on archive: the new `release-credentials` spec, plus `teams-and-access` and `labels`.
 - GitHub, done by the owner: the App is created and installed on troupe, the key is stored in 1Password and set as
   the environment's secret, and the infrastructure App gets "Variables: write".
-- GitHub, after the owner approves the plan: on troupe-run/troupe, the `release` environment and its branch policy,
+- GitHub, for the probe: a throwaway `troupe-run/infra-probe-*` repository, added by the owner to the infrastructure
+  App's installation while the probe runs, then deleted.
+- GitHub, after the owner approves the plan: on troupe-run/troupe, the `release branches` ruleset, the `release`
+  environment and its branch policy,
   the variable and the two labels are created. Nothing is changed or destroyed.
 - Unblocks troupe-run/troupe#23. The App's bot user ID, which #33 and troupe's `signoff` need, comes from the owner
   creating the App (task 1).
