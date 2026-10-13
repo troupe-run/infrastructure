@@ -2,10 +2,10 @@
 
 ## 1. What is granted
 
-- [ ] 1.1 Write failing tests in a new `scripts/tests/test_guard_grants.py`, each named for what it checks:
+- [x] 1.1 Write failing tests in a new `scripts/tests/test_guard_grants.py`, each named for what it checks:
       `GH_GRANTED` is a subset of `GH_READS ∪ GH_WORKFLOW_WRITES`; it holds no `pr merge`, `pr checkout`,
       `workflow run`, `run rerun` or `run cancel` (design D1). Verify they fail because the table doesn't exist
-- [ ] 1.2 Add `GH_GRANTED` to `scripts/guard.py` next to the allow-list tables (design D1). Verify 1.1's tests pass
+- [x] 1.2 Add `GH_GRANTED` to `scripts/guard.py` next to the allow-list tables (design D1). Verify 1.1's tests pass
 
 ## 2. Only plain commands are granted
 
