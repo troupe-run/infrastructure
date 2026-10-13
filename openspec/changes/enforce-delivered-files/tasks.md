@@ -65,7 +65,7 @@ task left is one that runs.
 
 ## 4. Pull request, apply and live check (design, Migration Plan)
 
-- [ ] 4.1 Open the pull request (`Closes #35`). Verify that every required check passes and that its CI plan, once
+- [x] 4.1 Open the pull request (#40) (`Closes #35`). Verify that every required check passes and that its CI plan, once
   the owner approves the run, shows:
   - **fallback path:** no changes.
 - [x] 4.3 Open the follow-up issue (#39) for the pre-merge check (design D5, option 2; the owner agreed 2026-10-13):
