@@ -7,6 +7,7 @@ locals {
   # Not a secret: it names the App, and minting a token also needs the key (design D3). The App's
   # IDs are recorded on #34.
   release_app_client_id = "Iv23liPmD0ygDtxCbwVX"
+  release_app_id        = 5300488
 }
 
 # Holds RELEASE_APP_PRIVATE_KEY, which the owner sets from 1Password (oob/README.md). Only a run on
@@ -35,4 +36,36 @@ resource "github_actions_variable" "release_app_client_id" {
   repository    = module.repo_troupe.name
   variable_name = "RELEASE_APP_CLIENT_ID"
   value         = local.release_app_client_id
+}
+
+# Only the release App creates, updates or deletes a release-please branch: the guard's exemption
+# for those branches trusts a commit's author, which anyone can set, so GitHub enforces who writes
+# them (#33 design D5). No non_fast_forward rule, because release-please force-pushes its branch, and
+# no owner bypass; the break-glass is editing the ruleset on GitHub. GitHub's delete-on-merge is
+# refused here too, so the branch persists between releases (design D7, D8).
+resource "github_repository_ruleset" "release_branches" {
+  name        = "release branches"
+  repository  = module.repo_troupe.name
+  target      = "branch"
+  enforcement = "active"
+
+  conditions {
+    ref_name {
+      include = ["refs/heads/release-please--*"]
+      exclude = []
+    }
+  }
+
+  rules {
+    creation                      = true
+    update                        = true
+    update_allows_fetch_and_merge = false
+    deletion                      = true
+  }
+
+  bypass_actors {
+    actor_type  = "Integration"
+    actor_id    = local.release_app_id
+    bypass_mode = "always"
+  }
 }
