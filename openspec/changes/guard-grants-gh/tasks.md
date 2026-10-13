@@ -29,10 +29,10 @@
 
 ## 3. Only the reviewed guard grants
 
-- [ ] 3.1 Write failing tests (design D3): with a test repository whose `origin/main` holds a byte-identical
+- [x] 3.1 Write failing tests (design D3): with a test repository whose `origin/main` holds a byte-identical
       `scripts/guard.py`, the guard is reviewed. It isn't when the file differs, when `origin/main` doesn't exist, or
       when `origin/main` has no `scripts/guard.py`. Verify they fail
-- [ ] 3.2 Implement the check, taking the running guard's path as a parameter defaulting to `Path(__file__)` so tests
+- [x] 3.2 Implement the check, taking the running guard's path as a parameter defaulting to `Path(__file__)` so tests
       can point it at a copy (design D3). Verify 3.1's tests pass
 
 ## 4. The hook
