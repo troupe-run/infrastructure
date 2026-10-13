@@ -74,6 +74,23 @@ forged author there is a test of GitHub, not a workaround of the guard.
   - has an optional `rules.file_path_restriction` block (at most one), whose `restricted_file_paths` is a required
     list of strings ("Prevent commits that include changes in specified file paths from being pushed to the commit
     graph").
+- *Push rulesets on a public repository (task 1.3, 2026-10-13).* Created on `troupe-run/infra-probe-20261013`
+  (public, Free), with `probe_main_ruleset = "none"` so the push ruleset would be tested alone. The plan showed the
+  `delivered files` ruleset as D2 declares it: `target = "push"`, the three paths, and the App as its only bypass.
+  The apply was refused:
+
+  ```
+  Error: POST https://api.github.com/repos/troupe-run/infra-probe-20261013/rulesets: 422 Validation Failed
+  [{Resource: Field: Code: Message:Source public repos cannot have push rules}]
+  ```
+
+  `gh api repos/troupe-run/infra-probe-20261013/rulesets` then listed none. In the same apply, the App's four
+  delivery commits landed on `main`, each verified by GitHub. **So push rulesets aren't available for `troupe`, and
+  this change takes the fallback path (D5).** D1 steps 2–5 and task 1.4 tested the ruleset's behaviour, so they
+  didn't run.
+- *The path (task 1.5).* The fallback. Task 1.5 reverted 1.2's module and probe additions, replaced the spec deltas
+  with D5's text (`rulesets` has none now), and removed task 1.4 and group 2 from tasks.md. D2 and D3 are kept as the
+  record of what was tried.
 
 ### D2. One push ruleset per governed repository, over the delivered paths
 
