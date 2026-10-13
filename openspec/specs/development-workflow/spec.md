@@ -208,14 +208,14 @@ caught.
 - **THEN** the GitHub check fails and names the rule
 
 ### Requirement: The release branch passes the branch rule, narrowly
-The GitHub check SHALL exempt a branch from the branch-change rule only when its name starts with `release-please--`
-and it adds at least one commit to `main`, every one authored by the release App's bot account. Every other rule,
-the commit-message rule included, SHALL still apply to its commits. Until the bot account's address is recorded in
-the guard, no branch SHALL be exempt.
+The GitHub check SHALL exempt a branch from the branch-change rule only when it's named `release-please--*`, adds at
+least one commit to `main`, all by the release App's bot, and lives in a repository (a pull request's head repository)
+whose ruleset lets only the release App write those branches. Other rules SHALL still apply. With no repository named,
+or no bot address in the guard, no branch SHALL be exempt.
 
 #### Scenario: A release pull request
-- **WHEN** a push or pull request is checked for `release-please--branches--main`, whose only commit, `chore: release
-  main`, is authored by the release App's bot account
+- **WHEN** a push or pull request in `troupe-run/troupe` is checked for `release-please--branches--main`, whose only
+  commit, `chore: release main`, is authored by the release App's bot account
 - **THEN** the GitHub check passes
 
 #### Scenario: The release branch name on someone else's commits
@@ -238,8 +238,27 @@ the guard, no branch SHALL be exempt.
 - **THEN** the GitHub check fails on the branch-change rule
 
 #### Scenario: Before the release App exists
-- **WHEN** the guard doesn't yet record the release App's bot account, and a release branch is checked
+- **WHEN** the guard doesn't record the release App's bot account, and a release branch is checked
 - **THEN** the GitHub check fails on the branch-change rule
+
+#### Scenario: A release branch in a repository without the release ruleset
+- **WHEN** a push to `troupe-run/infrastructure` is checked for `release-please--branches--main`, whose only commit is
+  authored by the release App's bot account
+- **THEN** the GitHub check fails on the branch-change rule
+
+#### Scenario: A release branch from a fork
+- **WHEN** a pull request into `troupe-run/troupe` comes from a fork's `release-please--branches--main`, whose only
+  commit is authored by the release App's bot account
+- **THEN** the GitHub check fails on the branch-change rule
+
+#### Scenario: A pull request whose head repository can't be read
+- **WHEN** a pull request's event payload holds a head repository that isn't an object with a name
+- **THEN** the GitHub check fails, saying it couldn't read the pull request's head repository and to re-run it
+
+#### Scenario: A check that can't name its repository
+- **WHEN** the check is run without a repository, and a release branch whose only commit is the release App's bot's is
+  checked
+- **THEN** the check fails on the branch-change rule
 
 #### Scenario: The release branch after main moves on
 - **WHEN** release-please rebuilds its branch on a newer `main` and force-pushes it
