@@ -4,6 +4,7 @@ GitHub for a push or a pull request."""
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
 from conftest import Repo, git
 
 import guard
@@ -163,3 +164,114 @@ def test_a_local_override_doesn_t_excuse_anything_on_github(
     guard.grant_override(repo.path, "commit-message", "trying to slip one through")
     [refusal] = guard.run_ci(repo.path, base, repo.head(), "add-thing")
     assert refusal.rule == "commit-message"
+
+
+# release-please-prs: the release branch passes the branch rule, narrowly (design D1, D2)
+
+RELEASE_BRANCH = "release-please--branches--main"
+TEST_BOT = "test-release[bot] <123+test-release[bot]@users.noreply.github.com>"
+TEST_BOT_EMAIL = "123+test-release[bot]@users.noreply.github.com"
+
+
+def commit_as(repo: Repo, author: str, message: str, name: str) -> str:
+    repo.write(name, f"{name}\n")
+    git(repo.path, "add", name)
+    git(repo.path, "commit", "-q", "--no-verify", f"--author={author}", "-m", message)
+    return repo.head()
+
+
+def release_repo(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Repo, str]:
+    """A repository whose main is on its remote, with the release bot recorded in the guard."""
+    monkeypatch.setattr(guard, "RELEASE_AUTHOR_EMAIL", TEST_BOT_EMAIL)
+    repo = make_repo()
+    with_remote(repo, tmp_path)
+    return repo, repo.head()
+
+
+def test_a_release_branch_whose_only_commit_is_the_bot_s_passes(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base = release_repo(make_repo, tmp_path, monkeypatch)
+    repo.switch(RELEASE_BRANCH)
+    commit_as(repo, TEST_BOT, "chore: release main", "CHANGELOG.md")
+    assert guard.run_ci(repo.path, base, repo.head(), RELEASE_BRANCH) == []
+
+
+def test_a_release_branch_with_only_someone_else_s_commit_fails_the_branch_rule(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base = release_repo(make_repo, tmp_path, monkeypatch)
+    repo.switch(RELEASE_BRANCH)
+    commit_without_hooks(repo, "chore: release main", "CHANGELOG.md")
+    [refusal] = guard.run_ci(repo.path, base, repo.head(), RELEASE_BRANCH)
+    assert refusal.rule == "commit-branch-change"
+
+
+def test_a_release_branch_with_someone_else_s_commit_after_the_bot_s_fails_the_branch_rule(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base = release_repo(make_repo, tmp_path, monkeypatch)
+    repo.switch(RELEASE_BRANCH)
+    commit_as(repo, TEST_BOT, "chore: release main", "CHANGELOG.md")
+    commit_without_hooks(repo, "fix: slip something in", "a.txt")
+    [refusal] = guard.run_ci(repo.path, base, repo.head(), RELEASE_BRANCH)
+    assert refusal.rule == "commit-branch-change"
+
+
+def test_the_bot_s_commits_on_a_branch_with_another_name_fail_the_branch_rule(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base = release_repo(make_repo, tmp_path, monkeypatch)
+    repo.switch("not-a-release")
+    commit_as(repo, TEST_BOT, "chore: release main", "CHANGELOG.md")
+    [refusal] = guard.run_ci(repo.path, base, repo.head(), "not-a-release")
+    assert refusal.rule == "commit-branch-change"
+
+
+def test_the_bot_s_non_conventional_commit_on_the_release_branch_fails_naming_it(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base = release_repo(make_repo, tmp_path, monkeypatch)
+    repo.switch(RELEASE_BRANCH)
+    bad = commit_as(repo, TEST_BOT, "Release main", "CHANGELOG.md")
+    [refusal] = guard.run_ci(repo.path, base, repo.head(), RELEASE_BRANCH)
+    assert refusal.rule == "commit-message"
+    assert bad[:7] in refusal.problem
+
+
+def test_a_release_branch_that_adds_no_commit_fails_the_branch_rule(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base = release_repo(make_repo, tmp_path, monkeypatch)
+    repo.switch(RELEASE_BRANCH)
+    [refusal] = guard.run_ci(repo.path, base, repo.head(), RELEASE_BRANCH)
+    assert refusal.rule == "commit-branch-change"
+
+
+def test_with_no_release_bot_recorded_the_bot_s_release_branch_fails_the_branch_rule(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base = release_repo(make_repo, tmp_path, monkeypatch)
+    monkeypatch.setattr(guard, "RELEASE_AUTHOR_EMAIL", None)
+    repo.switch(RELEASE_BRANCH)
+    commit_as(repo, TEST_BOT, "chore: release main", "CHANGELOG.md")
+    [refusal] = guard.run_ci(repo.path, base, repo.head(), RELEASE_BRANCH)
+    assert refusal.rule == "commit-branch-change"
+
+
+def test_a_release_branch_rebuilt_on_a_newer_main_passes_on_the_force_push_range(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, _ = release_repo(make_repo, tmp_path, monkeypatch)
+    repo.switch(RELEASE_BRANCH)
+    old_head = commit_as(repo, TEST_BOT, "chore: release main", "CHANGELOG.md")
+    git(repo.path, "switch", "-q", "main")
+    commit_without_hooks(repo, "feat: someone else's work on main", "b.txt")
+    git(repo.path, "push", "-q", "origin", "main")
+    git(repo.path, "switch", "-q", "-C", RELEASE_BRANCH, "main")
+    commit_as(repo, TEST_BOT, "chore: release main", "CHANGELOG.md")
+    # The push event's range holds main's new commit as well as the rebuilt release commit.
+    assert len(guard.commits_in_range(repo.path, old_head, repo.head())) == 2
+    assert guard.run_ci(repo.path, old_head, repo.head(), RELEASE_BRANCH) == []

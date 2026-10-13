@@ -63,6 +63,13 @@ DELIVERY_LIST = ".github/guard-delivery.json"
 """Present only in a repository that receives the guard: the files delivered to it."""
 DELIVERY_AUTHOR_EMAIL = "340938853+troupe-run-infrastructure[bot]@users.noreply.github.com"
 """The infrastructure App's bot account, which makes every delivery commit."""
+RELEASE_AUTHOR_EMAIL: str | None = None
+"""The release App's bot account, which makes release-please's commits. None until the App exists:
+then fill in "<id>+troupe-run-release[bot]@users.noreply.github.com", with the id from
+GET /users/troupe-run-release%5Bbot%5D, and only once the ruleset that lets only the App write
+release-please--* branches is applied (troupe-run/infrastructure#34). While None, no branch is
+exempt from the branch-change rule (release-please-prs design D2, D5)."""
+RELEASE_BRANCH_PREFIX = "release-please--"
 GUARD_DIR = "troupe-guard"
 CHECK_TIMEOUT_SECONDS = 600.0
 """How long the pre-commit check may run before the commit is refused. The default lives here
@@ -1348,11 +1355,31 @@ def delivered_changes_by_others(
     return _delivered_refusal(bad, "commits not made by the delivery change delivered files")
 
 
+def release_branch_by_the_bot(root: Path, head: str, branch: str | None) -> bool:
+    """A release-please branch whose commits not on main are all the release bot's, and there's at
+    least one. Judged by what the branch adds to main, not the event's range: release-please
+    force-pushes when main moves, and a push's range then holds main's new commits too
+    (release-please-prs design D1). The name and the author are both self-declared; a ruleset
+    that lets only the App write these branches is the hard check (design D5)."""
+    if RELEASE_AUTHOR_EMAIL is None or not (branch or "").startswith(RELEASE_BRANCH_PREFIX):
+        return False
+    result = subprocess.run(
+        ["git", "log", "--format=%ae", head, "--not", "origin/main"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_git_env(),
+    )
+    authors = result.stdout.splitlines()
+    return result.returncode == 0 and bool(authors) and set(authors) == {RELEASE_AUTHOR_EMAIL}
+
+
 def run_ci(root: Path, base: str | None, head: str, branch: str | None) -> list[Decision]:
     """The git-level rules, re-checked on GitHub for a push or a pull request (design D11)."""
     commits = commits_in_range(root, base, head)
     decisions = [nonconforming_commits(root, commits)]
-    if branch and branch != "main":
+    if branch and branch != "main" and not release_branch_by_the_bot(root, head, branch):
         decisions.append(commit_branch_change(root, branch))
     changed: list[str] = []
     for sha in commits:
