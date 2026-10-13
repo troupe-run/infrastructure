@@ -168,6 +168,29 @@ rebase of the release branch.
 
 The findings go here. Then the probe repository and the probe's local state are deleted.
 
+**Findings (2026-10-13, `troupe-run/infra-probe-20261013`, since deleted).** The ruleset, as GitHub stored it, has
+rules `creation`, `update` and `deletion` on `refs/heads/release-please--*`. Its one bypass is the App
+(`Integration`, `always`), and it reports `current_user_can_bypass: never` for the owner.
+
+1. **Owner creates:** refused. `git push origin release-please--probe` gave `GH013 … Cannot create ref due to
+   creations being restricted.`
+2. **App creates:** succeeded. `github_branch` created `release-please--probe` from `main`.
+3. **Owner updates:** refused, both ways, with `GH013 … Cannot update this protected ref.` A fast-forward push was
+   refused, and so was a force-push of an orphan commit, whose history doesn't descend from the branch. The branch
+   stayed at `2b35105`.
+4. **App updates:** succeeded. `github_repository_file` committed `884f92c` to the branch, authored by
+   `troupe-run-infrastructure[bot]` and verified.
+5. **Owner deletes:** refused. `git push origin --delete release-please--probe` gave `GH013 … Cannot delete this
+   branch`.
+6. **Delete-on-merge:** the branch is **kept**. With `delete_branch_on_merge = true`, the owner's
+   `gh pr merge 1 --rebase` merged probe#1. Its events are `merged` and `closed`, with no `head_ref_deleted`, and the
+   branch was still there afterwards. GitHub's automatic delete is refused like the owner's own. That's acceptable on
+   troupe: release-please force-pushes its existing branch for the next release, which the App may do. The branch
+   simply persists between releases.
+7. **App deletes:** succeeded. Destroying the resources committed the file's deletion to the branch, then deleted the
+   branch.
+8. **Other branches:** the owner's push of `some-change` succeeded, and so did its deletion.
+
 ## Risks / Trade-offs
 
 - [The drift check fails between the owner creating the App and this change merging] → Expected. The pull request
@@ -180,7 +203,8 @@ The findings go here. Then the probe repository and the probe's local state are 
   The next plan would show it being removed, and the owner would see that before approving. Declare it then.
 - [The owner can't write a release branch by hand, even to fix one] → That's the intent. The break-glass is
   editing the ruleset on GitHub, as for every ruleset (spec: rulesets); the next plan restores it.
-- [Delete-on-merge may be refused on a release branch] → D8 step 6 settles it before troupe gets the ruleset.
+- [GitHub's delete-on-merge is refused on a release branch, so it persists between releases (D8 step 6)] →
+  Harmless: release-please force-pushes the same branch for the next release. Nobody but the App can remove it.
 - [#33's exemption stays closed until this applies] → It's the ordering #33 chose: its follow-up fills
   `RELEASE_AUTHOR_EMAIL` only after this ruleset is on troupe.
 - [The App is created with more permissions than declared] → The drift check reports it (spec: release-credentials).
