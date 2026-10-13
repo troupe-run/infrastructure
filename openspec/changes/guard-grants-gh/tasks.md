@@ -61,10 +61,11 @@
         repository's `.claude/settings.local.json` (a real settings file, not `--settings`), still prompts or is
         refused. If a restricting rule there is ignored because the workspace isn't trusted, record that and ask the
         owner before changing any personal settings file.
-- [ ] 6.2 Rebase onto `main` if #33 has merged, and rerun `uv run scripts/check.py`
-- [ ] 6.3 Run `uv run scripts/tofu.py plan` and verify it shows only the delivered `scripts/guard.py` changing; keep it
+- [x] 6.2 Rebase onto `main` if #33 has merged, and rerun `uv run scripts/check.py` (#33 still open on 2026-10-13:
+      rebased onto `main` at 3a6c145 anyway, 647 passed; repeat if #33 lands before this merges)
+- [x] 6.3 Run `uv run scripts/tofu.py plan` and verify it shows only the delivered `scripts/guard.py` changing; keep it
       for the pull request
-- [ ] 6.4 Run `openspec validate guard-grants-gh --strict`, and verify that the synced spec would also pass
+- [x] 6.4 Run `openspec validate guard-grants-gh --strict`, and verify that the synced spec would also pass
       `openspec validate --specs --strict` (requirement text under 500 characters)
 
 ## Workflow follow-up
