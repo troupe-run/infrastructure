@@ -140,6 +140,11 @@
     "description": "Strict, language-neutral JSON Schema contracts in protocol/ and each plugin, for every surface"
   },
   {
+    "name": "cap:releases",
+    "color": "1D76DB",
+    "description": "Versions, changelogs and releases, derived from Conventional Commits through a release PR"
+  },
+  {
     "name": "cap:roles",
     "color": "1D76DB",
     "description": "Jobs in a process, such as reviewer; who holds each, and routing work to roles"
