@@ -18,9 +18,10 @@ that closes the issue. Specs live in `openspec/specs/`.
 |---|---|
 | `tofu/` | The OpenTofu root module and its encrypted, committed state |
 | `tofu/modules/repository/` | One managed repository: settings, labels, and protection against deletion |
-| `tofu/labels/` | Label sets as data. `troupe.json` is troupe's `cap:*` capability labels: a new capability gets its label by a pull request here |
+| `tofu/labels/` | Label sets as data. `troupe.json` is troupe's `cap:*` capability labels: a new capability gets its label by a pull request here. `release.json` is release-please's two labels on troupe |
 | `tofu/probe/` | Points the same module at a throwaway repo, to show drift behaviour without touching a live one |
 | `tofu/guard_delivery.tf` | The guard's files in each repository that receives it, and the generated list of them |
+| `tofu/release.tf` | What troupe's release workflow needs: the `release` environment, limited to `main`, and the release App's client ID. The App and its key are set up by hand ([oob/README.md](oob/README.md#troupes-release-app-set-up-by-hand)) |
 | `org-profile/` | The source of `troupe-run/.github`'s files, byte for byte |
 | `scripts/guard.py`, `.githooks/`, `.claude/settings.json`, `.github/workflows/guard.yml` | The guard: this repo's own, and the source of every delivered copy |
 | `docs/development-workflow.md` | Every rule the guard enforces, and how an override works |
