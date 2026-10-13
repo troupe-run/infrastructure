@@ -47,7 +47,7 @@ guard: commit-on-main: commits aren't made on main; work reaches main through a 
 | `pr-closes-issue` | Claude | `gh pr create` into this repository whose `--body` or `--body-file` doesn't close an issue, or that uses `--fill` or stdin. The target is named by `--repo`/`-R`, else `GH_REPO`, else it's this repository; a PR into another repository isn't checked, and a target that can't be read, or a clone with no remote, counts as this one | add `Closes #<issue>`, or name the other repository with `--repo` |
 | `skip-hooks` | Claude | `--no-verify`, `git commit -n`, and setting, unsetting or overriding `core.hooksPath` | fix what the hook reports |
 | `command-unparseable` | Claude | a `git` or `gh` command that can't be parsed (for example, unbalanced quotes) | simplify the command |
-| `delivered-file` | git | in a repository that receives the guard, a commit that changes a file listed in `.github/guard-delivery.json` (the Claude Code hook refuses the edit too, and the `guard` check fails such a commit unless the infrastructure App made it) | change the file in `troupe-run/infrastructure`, and deliver it from there |
+| `delivered-file` | git | in a repository that receives the guard, a commit that changes a file listed in `.github/guard-delivery.json` (the Claude Code hook refuses the edit too, and the `guard` check fails such a commit unless its author is the infrastructure App; one that gets past them shows in the daily plan) | change the file in `troupe-run/infrastructure`, and deliver it from there |
 | `owner-only` | Claude | a `gh` command doing what only the owner does, in any repository: merging past a pull request's rules (`gh pr merge --admin`, or any merge through the API), approving or rejecting a deployment, changing a ruleset, branch protection or environment, org and repository administration (secrets, variables, labels, repository settings, Pages, issue types, project definitions, transfers), and the login's credentials (`gh auth token`, `auth status --show-token`, login and logout). The throwaway repositories `troupe-run/infra-probe-*`, `spike-*` and `bakeoff-*` are exempt, except deleting, archiving, unarchiving or renaming a `spike-*` or `bakeoff-*` record. The list is `GH_OWNER_ONLY`, `GH_API_OWNER_ONLY` and `GH_MUTATIONS_OWNER_ONLY` in `scripts/guard.py` | ask the owner, or change it in `troupe-run/infrastructure` through a pull request |
 | `gh-allow-list` | Claude | any other `gh` command not on the allow-list (reads, and the everyday pull request, issue, comment, sub-issue, project-item and workflow-run writes): an unknown subcommand, an extension, an alias, an unlisted `gh api` write, any GraphQL mutation (each everyday write has one way to do it, its `gh` command: guard-issue-mutations, design D1), and a GraphQL query that can't be read before it runs (stdin, or a file not yet written). The list is the `GH_*` tables in `scripts/guard.py`, built from the commands agents ran in earlier sessions (refuse-admin-merge, design D4) | for a GraphQL mutation, the refusal names it and, when there is one, the `gh` command that does the same (`updateIssueIssueType` → `gh issue edit <n> --type <name>`); otherwise ask the owner, or add it to the list in `troupe-run/infrastructure`; a read with fields needs `-X GET` |
 | `guard-tamper` | Claude | running the override command, naming a path in the override directory, or editing under `.git/`. **No override unlocks this rule.** | ask the owner |
@@ -81,8 +81,9 @@ copies that the infrastructure App delivers straight to its `main`, after the ow
 - `.github/guard-delivery.json`, which lists the delivered files. Its presence is what marks a repository as one that
   receives the guard.
 
-A hand edit to a delivered file shows as drift in the next plan, and an apply restores it. The `delivered-file` rule
-refuses such an edit before it gets that far: change the file in `troupe-run/infrastructure` instead. The scripts'
+A hand edit to a delivered file shows as drift in the next plan, and an apply restores it. `main` is planned every
+day, so that is within a day of the edit landing. The `delivered-file` rule refuses such an edit before it gets that
+far: change the file in `troupe-run/infrastructure` instead. The scripts'
 own checks (`scripts/check.py`), and any other files, stay each repository's own.
 
 ## Where the templates come from
@@ -118,9 +119,13 @@ other org-wide files (specs: `development-workflow`, `org-profile`).
 - **The local hooks run the working tree's `guard.py`.** A commit that edits it can disable its own check. The
   `guard` check on GitHub runs the committed rules, and in a repository that receives the guard, the plan shows the
   edit as drift.
-- **The `delivered-file` check trusts the commit's author.** It accepts a change to a delivered file whose author is
-  the infrastructure App's bot. Commit metadata can be written by anyone, so this stops honest mistakes, not forgery.
-- **The release-branch exemption trusts the commit's author too.** A `release-please--` branch skips the
+- **A forged delivery reaches `main` and is caught afterwards.** The `guard` check accepts a change to a delivered
+  file whose author is the infrastructure App's bot, and anyone can write that into a commit. It also runs the pushed
+  copy of itself, so a push could change the check too. GitHub can't refuse the push either: it allows no push rules
+  on a public repository (enforce-delivered-files, design D1). So the guard's rule stops honest mistakes. A forged
+  change shows in the daily plan within a day of landing, and stays until the owner approves the apply that
+  restores it.
+- **The release-branch exemption trusts the commit's author.** A `release-please--` branch skips the
   branch-change rule when the release App's bot authored its commits, and anyone can write that author into a
   commit. The hard check is a ruleset that lets only the release App create, update or delete those branches
   (troupe-run/infrastructure#34). Until it's applied, the bot isn't recorded in the guard, so no branch is exempt.

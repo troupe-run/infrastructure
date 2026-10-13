@@ -48,7 +48,7 @@ task left is one that runs.
   - `scripts/check.py` passes, including `test_required_checks.py` (the plan job still isn't a pull request job);
   - `actionlint` passes, if it can be run with `uvx` or `brew`; otherwise say so;
   - a reread of the skip step shows a scheduled run on the state commit reaching the plan.
-- [ ] 3.2 Update the docs:
+- [x] 3.2 Update the docs:
   - `docs/development-workflow.md`: the `delivered-file` row and the delivery section (lines 50 and 84) say a change
     that gets past the guard shows in the daily plan. Known gaps: replace "The `delivered-file` check trusts the
     commit's author". A forged-author change passes `guard`, also because the check runs the pushed copy of itself.
