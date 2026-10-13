@@ -1,11 +1,14 @@
 """Tasks 7.2-7.3: commit messages checked before a push, and every git-level rule re-checked on
 GitHub for a push or a pull request."""
 
+import json
+import subprocess
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from conftest import Repo, git
+from conftest import SCRIPTS, Repo, clean_env, git
 
 import guard
 
@@ -275,3 +278,79 @@ def test_a_release_branch_rebuilt_on_a_newer_main_passes_on_the_force_push_range
     # The push event's range holds main's new commit as well as the rebuilt release commit.
     assert len(guard.commits_in_range(repo.path, old_head, repo.head())) == 2
     assert guard.run_ci(repo.path, old_head, repo.head(), RELEASE_BRANCH) == []
+
+
+# release-please-prs: pull request titles are Conventional Commits (design D3)
+
+
+def test_a_conventional_pull_request_title_passes(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base = pr_repo(make_repo, tmp_path)
+    commit_without_hooks(repo, "feat(thing): add a thing", "a.txt")
+    assert guard.run_ci(repo.path, base, repo.head(), "add-thing", "chore: release main") == []
+
+
+def test_a_non_conventional_title_fails_naming_it_and_says_to_edit_the_title(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base = pr_repo(make_repo, tmp_path)
+    commit_without_hooks(repo, "feat(thing): add a thing", "a.txt")
+    [refusal] = guard.run_ci(repo.path, base, repo.head(), "add-thing", "Release main")
+    assert refusal.rule == "commit-message"
+    assert "title 'Release main'" in refusal.problem
+    assert "gh pr edit" in refusal.fix
+    assert "--amend" not in refusal.fix
+
+
+def test_a_push_with_no_title_checks_no_title(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base = pr_repo(make_repo, tmp_path)
+    commit_without_hooks(repo, "feat(thing): add a thing", "a.txt")
+    assert guard.run_ci(repo.path, base, repo.head(), "add-thing", None) == []
+
+
+def pull_request_event(
+    repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, payload: object
+) -> None:
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    monkeypatch.setenv("GITHUB_BASE_REF", "main")
+    monkeypatch.setenv("GITHUB_HEAD_REF", "add-thing")
+
+
+def test_the_github_inputs_of_a_pull_request_carry_its_title(
+    make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base = pr_repo(make_repo, tmp_path)
+    pull_request_event(repo, tmp_path, monkeypatch, {"pull_request": {"title": "Release main"}})
+    assert guard.github_ci_inputs(repo.path) == (base, repo.head(), "add-thing", "Release main")
+
+
+def test_a_pull_request_event_with_no_title_fails_saying_it_couldn_t_read_it(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo, _ = pr_repo(make_repo, tmp_path)
+    pull_request_event(repo, tmp_path, monkeypatch, {"pull_request": {"title": None}})
+    assert guard.run_ci_entry(repo.path, None, None, None) == 1
+    assert "couldn't read the pull request's title" in capsys.readouterr().err
+
+
+def test_guard_ci_with_a_non_conventional_title_exits_1_and_prints_the_refusal(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base = pr_repo(make_repo, tmp_path)
+    env = {k: v for k, v in clean_env().items() if k != "CLAUDE_PROJECT_DIR"}
+    result = subprocess.run(
+        [sys.executable, str(SCRIPTS / "guard.py"), "ci", "--base", base, "--head", repo.head(),
+         "--branch", "add-thing", "--title", "Release main"],
+        cwd=repo.path, capture_output=True, text=True, check=False, env=env,
+    )  # fmt: skip
+    assert result.returncode == 1
+    assert "guard: commit-message: pull request title 'Release main'" in result.stderr
