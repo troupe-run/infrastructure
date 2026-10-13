@@ -32,10 +32,10 @@
 
 ## 3. The check re-runs when a title changes
 
-- [ ] 3.1 Write a failing test in `scripts/tests/test_required_checks.py` that `guard.yml`'s `pull_request` trigger
+- [x] 3.1 Write a failing test in `scripts/tests/test_required_checks.py` that `guard.yml`'s `pull_request` trigger
       has exactly the types `opened`, `edited`, `synchronize` and `reopened`, and that `push` still covers every
       branch. Verify it fails
-- [ ] 3.2 Add the types to `.github/workflows/guard.yml` and update its header comment to say titles are checked
+- [x] 3.2 Add the types to `.github/workflows/guard.yml` and update its header comment to say titles are checked
       (design D4). Verify 3.1's test passes and `uv run scripts/check.py` passes
 
 ## 4. Docs
