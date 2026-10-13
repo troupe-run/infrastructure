@@ -60,7 +60,8 @@ task left is one that runs.
 
   Verify:
   - `scripts/check.py` passes;
-  - `grep -n "trusts the commit's author" docs README.md` finds nothing;
+  - `grep -n "delivered-file. check trusts" docs README.md` finds nothing (the release-branch entry that
+    release-please-prs added keeps its own "trusts the commit's author");
   - a reread against D5's spec text finds no contradiction.
 
 ## 4. Pull request, apply and live check (design, Migration Plan)
