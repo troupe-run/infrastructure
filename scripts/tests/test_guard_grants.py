@@ -123,10 +123,16 @@ def test_a_body_file_under_the_temp_directory_is_granted(tmp_path: Path) -> None
     body = Path(tempfile.gettempdir()) / f"grant-test-{os.getpid()}.md"
     body.write_text("text\n", encoding="utf-8")
     try:
-        command = f"gh issue comment 1 --body-file={body}"
+        # Quoted, as a Windows path must be: an unquoted backslash is a shell escape.
+        command = f'gh issue comment 1 --body-file "{body}"'
         assert guard.grantable(command, tmp_path / "elsewhere", tmp_path / "elsewhere")
     finally:
         body.unlink()
+
+
+def test_an_unquoted_windows_path_is_not_granted(tmp_path: Path) -> None:
+    command = "gh issue comment 1 --body-file C:\\Users\\me\\body.md"
+    assert not guard.grantable(command, tmp_path, tmp_path)
 
 
 @pytest.mark.parametrize(
