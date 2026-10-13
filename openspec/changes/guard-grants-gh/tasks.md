@@ -46,7 +46,7 @@
 
 ## 5. Docs
 
-- [ ] 5.1 Add "What the guard grants" and the two Known gaps entries to `docs/development-workflow.md` (design D5).
+- [x] 5.1 Add "What the guard grants" and the two Known gaps entries to `docs/development-workflow.md` (design D5).
       Verify `test_guard_docs.py` and `uv run scripts/check.py` pass
 
 ## 6. Evidence

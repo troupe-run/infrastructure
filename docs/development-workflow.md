@@ -57,6 +57,25 @@ Windows, plus a one-time dependency download on a fresh clone. It's the same che
 locally passes CI. The check is announced before it starts, its output streams as it runs, and it's stopped and the
 commit refused after 10 minutes (`CHECK_TIMEOUT_SECONDS` in `scripts/guard.py`).
 
+## What the guard grants
+
+The Claude Code hook can also answer "allow", so a command runs without a prompt or auto mode's check
+(guard-grants-gh). It grants only when all of these hold:
+
+- **A granted `gh` command:** `GH_GRANTED` in `scripts/guard.py`. That's the allow-list's reads and everyday issue,
+  pull request, comment and project-item writes, such as `gh pr ready 74` or `gh issue edit 29 --type Feature`. It
+  doesn't include `gh pr merge`, `gh pr checkout`, `gh workflow run`, `gh run rerun`/`cancel`/`download`,
+  `gh repo clone`, `gh api`, or anything allowed only in a throwaway repository. Those get Claude Code's own check.
+- **A plain command, through the Bash tool:** exactly one `gh` command. Outside quotes it has no chaining,
+  substitution, variable, redirection, glob, comment or escape, and inside double quotes no `$` or backtick. No
+  environment prefix and no path to `gh`.
+- **Local files only from here:** every `--body-file`/`-F` is inside the repository or the system temp directory.
+- **No refusal:** no rule refuses it, including one an override would excuse.
+- **The reviewed guard:** the running `scripts/guard.py` is identical to the one on `origin/main`. A guard edited on a
+  branch refuses as usual but grants nothing.
+
+A person's own `deny` and `ask` permission rules still apply to a granted command, whichever settings file holds them.
+
 ## Overrides
 
 Only a person can grant an override, from their own terminal, never through an agent's tool calls:
@@ -104,6 +123,12 @@ other org-wide files (specs: `development-workflow`, `org-profile`).
 - **These hooks aren't a security boundary.** They stop honest shortcuts. A Bash command that writes a file isn't
   seen by the edit hook, though the git hooks catch it at commit time. A determined bypass is still possible.
   GitHub's rulesets and required checks are the hard backstop.
+- **A grant skips Claude Code's own checks.** When the guard answers "allow", auto mode's classifier isn't consulted,
+  even for its `hard_deny` rules (measured on 2026-10-13; the docs don't state it). So for a granted command, the
+  conditions under "What the guard grants" are the only check, apart from a person's own `deny` and `ask` rules. A
+  file in the temp directory can be posted with `--body-file` without a check.
+- **"The reviewed guard" is judged from local refs.** `origin/main` is a ref in the local clone, which an agent could
+  move with plumbing commands. The check stops an edited guard granting by accident, not on purpose.
 - **The `gh` rules see only `gh`.** An agent holds the owner's login, so any other HTTP client with its token
   (`curl`, a script, a `gh` extension the guard refuses to run but a script could) bypasses them, and so does an MCP
   tool, which the hook doesn't see. Refusing `gh auth token` makes the token harder to reach, not unreachable: it's
