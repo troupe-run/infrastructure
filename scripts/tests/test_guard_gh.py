@@ -148,6 +148,10 @@ def test_each_listed_api_write_is_allowed(command: str) -> None:
     assert rule(command) is None
 
 
+# No GraphQL mutation is allowed: each everyday write has one way to do it, its gh command
+# (guard-issue-mutations design D1).
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
@@ -157,10 +161,27 @@ def test_each_listed_api_write_is_allowed(command: str) -> None:
         "addComment",
         "addProjectV2ItemById",
         "updateProjectV2ItemFieldValue",
+        "updateIssueIssueType",
+        "addBlockedBy",
+        "removeBlockedBy",
     ],
 )
-def test_each_listed_graphql_mutation_is_allowed(mutation: str) -> None:
+def test_an_everyday_write_sent_as_a_graphql_mutation_is_refused(mutation: str) -> None:
     command = f"gh api graphql -f query='mutation {{ {mutation}(input:{{id:\"x\"}}) {{ a }} }}'"
+    assert rule(command) == "gh-allow-list"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh issue edit 29 --type Feature",
+        "gh issue edit 29 --remove-type",
+        "gh issue edit 29 --add-blocked-by 63",
+        "gh issue edit 29 --remove-blocked-by 63",
+        "gh issue edit 29 --add-sub-issue 64",
+    ],
+)
+def test_the_same_write_through_gh_issue_edit_is_allowed(command: str) -> None:
     assert rule(command) is None
 
 
@@ -349,10 +370,10 @@ def test_a_graphql_query_that_can_t_be_read_first_is_refused_with_the_fix(comman
     assert "earlier command" in found.fix
 
 
-def test_a_query_mixing_a_listed_and_an_unlisted_mutation_is_refused() -> None:
+def test_a_mutation_after_a_read_in_the_same_document_is_refused() -> None:
     command = (
-        "gh api graphql -f query='mutation { updateIssue(input:{a:1}) { b } "
-        "createCommitOnBranch(input:{a:1}) { c } }'"
+        "gh api graphql -f query='query { viewer { login } } "
+        "mutation { addComment(input:{a:1}) { c } }'"
     )
     assert rule(command) == "gh-allow-list"
 
@@ -485,7 +506,10 @@ SURVEY: list[tuple[str, str | None]] = [
     ("gh issue edit 1 -R troupe-run/infrastructure --body-file issue1.md", None),
     ("gh pr merge 2 -R troupe-run/infra-probe-20261012 --rebase", None),
     ("gh project item-add 2 --owner troupe-run --url https://github.com/x/y/issues/4", None),
-    ("gh api graphql -f query='mutation { updateIssue(input:{id:\"x\"}) { issue { id } } }'", None),
+    (
+        "gh api graphql -f query='mutation { updateIssue(input:{id:\"x\"}) { issue { id } } }'",
+        "gh-allow-list",
+    ),
     ("gh api repos/troupe-run/troupe/issues/3/sub_issues -F sub_issue_id=9", None),
     ("gh workflow run tofu.yml -R troupe-run/infrastructure --ref main", None),
     ("gh repo create troupe-run/infra-probe-20261012 --public --add-readme", None),
