@@ -64,6 +64,11 @@ key is ephemeral input, so a saved plan doesn't hold it either: applying a saved
 
 A local plan is read-only and always safe to run. Changes reach the org through CI (below).
 
+CI also plans `main` every day at 06:00 UTC, so drift (a change made on GitHub rather than declared here) shows within
+a day. A plan with changes waits for your approval like any plan of `main`; one with none asks nothing. GitHub pauses
+a public repository's scheduled workflows after 60 days without activity in it. `gh workflow enable tofu.yml` turns
+the daily plan back on.
+
 ## Changing the org
 
 Changes are planned and applied by the `tofu` workflow (`.github/workflows/tofu.yml`, spec `ci-apply`). Your part
@@ -193,7 +198,8 @@ troupe holds copies of the guard's files, delivered from this repo by the App st
 The probe showed how this behaves (design D3 and D8 of the `development-workflow` change):
 - troupe's ruleset lets only the App push to `main`; the owner's own push is still refused;
 - a hand edit to a delivered file in troupe fails troupe's `guard` check (`delivered-file`), and shows in the next
-  plan, whose apply restores the file;
+  plan, at the latest the next daily one, whose apply restores the file. A commit forging the App as its author
+  passes the check, and the daily plan is what catches it (enforce-delivered-files);
 - an unchanged file is never recommitted.
 
 **If a delivery breaks troupe,** fix the source here and deliver again: no troupe hook can block a delivery. A person
