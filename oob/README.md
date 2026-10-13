@@ -43,6 +43,45 @@ lists below are checked by hand in each App's settings, by any change that adds,
 |---|---|---|
 | `troupe-run-infrastructure` | `troupe`, `.github`, `infrastructure`, `website` | 2026-10-11, owner |
 | `dco` | `troupe`, `.github`, `infrastructure` | 2026-10-11, owner |
+| `troupe-run-release` | `troupe` | 2026-10-13, owner |
 
 A repository the infrastructure App isn't installed on shows only its public view to OpenTofu (merge settings read as
 off, no security settings), so the first plan after adding one will show that it's missing from this list.
+
+## troupe's release App (set up by hand)
+
+troupe's release workflow (troupe-run/troupe#23) opens release pull requests with the `troupe-run-release` App's
+token, because a pull request opened with `GITHUB_TOKEN` starts no workflows (spec: release-credentials). GitHub has no
+API for creating an App, and OpenTofu never holds a secret, so these steps are the owner's. The App's ID, client ID and
+bot user ID are recorded on #34. `tofu/release.tf` declares the `release` environment and the client-ID variable.
+
+**Creating it** (done 2026-10-13). In the org's settings, under GitHub Apps, create a new App:
+- name `troupe-run-release`, installable only on this account, webhook off;
+- repository permissions: contents, issues and pull requests read and write, metadata read. No organisation or
+  account permissions;
+- install it on `troupe` only, and add its row to the table above.
+
+Its installation is checked by `oob.py` against `app-installations.json`. Its client ID goes in `tofu/release.tf`.
+
+**Its key.** Generate a private key in the App's settings. Store it in 1Password as an SSH Key item named
+`troupe-run-release` in vault `troupe.run`, by importing the downloaded `.pem`, then delete the file. Once the
+`release` environment exists (after the apply that creates it), set the secret. Nothing is printed:
+
+```sh
+export OP_ACCOUNT=l-a-u.1password.com
+op read -n "op://troupe.run/troupe-run-release/private key" \
+  | gh secret set RELEASE_APP_PRIVATE_KEY --env release -R troupe-run/troupe
+```
+
+Check it by name, never by value:
+
+```sh
+gh api repos/troupe-run/troupe/environments/release/secrets --jq '.secrets[].name'
+```
+
+**Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run the
+command above again. Then delete the old key in the App's settings. A release run between the two steps still works,
+because both keys are valid until the old one is deleted.
+
+**The infrastructure App's "Variables: write"** was granted for this (2026-10-13), so OpenTofu can write
+`RELEASE_APP_CLIENT_ID`. It's declared in `app-installations.json`.

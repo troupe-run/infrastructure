@@ -30,7 +30,7 @@
       verify it fails when a name is misspelt. Then verify `uv run scripts/check.py` passes
 - [x] 2.3 Add `tofu/release.tf` (design D2, D3): the `release` environment on troupe, its `main` deployment policy,
       and `RELEASE_APP_CLIENT_ID` with the client ID from 1.3, each with a comment naming the spec. Verify `uv run scripts/check.py` passes (tofu fmt, validate)
-- [ ] 2.4 Document the steps done by hand in `oob/README.md` (design D4): creating and installing the App, storing
+- [x] 2.4 Document the steps done by hand in `oob/README.md` (design D4): creating and installing the App, storing
       and setting the key, rotating it, and a row for `troupe-run-release` with `troupe` in the table of
       repositories, confirmed by the owner with today's date. Add `tofu/release.tf` and `tofu/labels/release.json`
       to README.md's layout table. Verify the documented `gh api` check commands run as written, and that
