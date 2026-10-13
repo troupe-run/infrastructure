@@ -38,12 +38,12 @@
 
 ## 3. Evidence
 
-- [ ] 3.1 Run `uv run scripts/tofu.py plan`. Verify it creates exactly the `release` environment, its deployment
+- [x] 3.1 Run `uv run scripts/tofu.py plan`. Verify it creates exactly the `release` environment, its deployment
       policy, the variable and troupe's two labels. Verify it changes and destroys nothing, and leaves
       troupe's ruleset's bypass actors unchanged (spec: release-credentials). Grep every `+`, `~` and `-` line, and
       keep the plan for the pull request
-- [ ] 3.2 Run `uv run scripts/oob.py` and verify it reports no difference. Keep its output for the pull request
-- [ ] 3.3 Run `openspec validate release-app --strict` and verify it passes
+- [x] 3.2 Run `uv run scripts/oob.py` and verify it reports no difference. Keep its output for the pull request
+- [x] 3.3 Run `openspec validate release-app --strict` and verify it passes
 
 ## Workflow follow-up
 
