@@ -6,6 +6,7 @@ Compares each declaration in oob/ with GitHub, read with the owner's `gh`, print
 difference and exits 1 if there are any. It only reads: no call writes to GitHub.
 """
 
+import base64
 import json
 import subprocess
 import sys
@@ -127,6 +128,65 @@ def unlabelled_specs(specs: list[str], root: Path) -> list[str]:
     ]
 
 
+# The Purpose each troupe-spec-based cap: label's description was written from, verbatim with its
+# whitespace collapsed, so a Purpose troupe later rewrites shows up (spec: labels;
+# cap-label-descriptions design D1, D2).
+PURPOSES = "troupe-spec-purposes.json"
+
+
+def purpose_gh_args(spec: str) -> list[str]:
+    return [
+        "api",
+        f"repos/{ORG}/troupe/contents/openspec/specs/{spec}/spec.md",
+        "--jq",
+        "{content}",
+    ]
+
+
+def purpose(spec_md: str) -> str:
+    """The text of a spec's `## Purpose` section, whitespace collapsed; "" when there is none."""
+    lines: list[str] = []
+    inside = False
+    for line in spec_md.splitlines():
+        if line.startswith("## "):
+            if inside:
+                break
+            inside = line.strip() == "## Purpose"
+        elif inside:
+            lines.append(line)
+    return " ".join(" ".join(lines).split())
+
+
+def stale_descriptions(fetch: Fetch, specs: list[str], oob_dir: Path, root: Path) -> list[str]:
+    """Each labelled troupe spec whose Purpose isn't the one its label's description records."""
+    labels = {label["name"] for label in json.loads((root / TROUPE_LABELS).read_text())}
+    recorded: dict[str, str] = json.loads((oob_dir / PURPOSES).read_text())
+    record = f"oob/{PURPOSES}"
+    found: list[str] = []
+    for spec in sorted(specs):
+        label = f"cap:{spec}"
+        if label not in labels:
+            continue  # unlabelled_specs reports it
+        if label not in recorded:
+            found.append(
+                f"troupe labels: {label!r} description hasn't been checked against its spec's "
+                f"Purpose; record the Purpose in {record}"
+            )
+            continue
+        content = base64.b64decode(fetch(purpose_gh_args(spec))["content"]).decode()
+        if purpose(content) != " ".join(recorded[label].split()):
+            found.append(
+                f"troupe labels: {label!r} spec's Purpose has changed; review its description in "
+                f"{TROUPE_LABELS} and update {record}"
+            )
+    for label in sorted(recorded.keys() - {f"cap:{spec}" for spec in specs}):
+        found.append(
+            f"troupe labels: {label!r} has a recorded Purpose but troupe has no "
+            f"{label.removeprefix('cap:')} spec; remove it from {record}"
+        )
+    return found
+
+
 def differences(name: str, key: str, declared: list[Record], actual: list[Record]) -> list[str]:
     """Every item missing, extra or changed, in a stable order."""
     want = {item[key]: item for item in declared}
@@ -159,7 +219,9 @@ def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT) -> list[str]:
         else:
             declared = json.loads((oob_dir / check.declaration).read_text())
         found += differences(check.name, check.key, declared, fetch(check.gh_args))
-    found += unlabelled_specs(fetch(SPECS_GH_ARGS), root)
+    specs = fetch(SPECS_GH_ARGS)
+    found += unlabelled_specs(specs, root)
+    found += stale_descriptions(fetch, specs, oob_dir, root)
     return found
 
 
@@ -170,7 +232,10 @@ def main() -> int:
     if found:
         print(f"oob: {len(found)} difference(s). Fix GitHub, or update the declaration in oob/.")
         return 1
-    print(f"oob: no differences ({', '.join(c.name for c in CHECKS)}, troupe specs)")
+    print(
+        f"oob: no differences ({', '.join(c.name for c in CHECKS)}, "
+        "troupe specs, troupe label descriptions)"
+    )
     return 0
 
 
