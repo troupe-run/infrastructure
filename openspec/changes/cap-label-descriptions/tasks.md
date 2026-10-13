@@ -29,9 +29,9 @@
 
 ## 3. Evidence
 
-- [ ] 3.1 Run `uv run scripts/tofu.py plan` and verify it shows only description changes on troupe-run/troupe's
+- [x] 3.1 Run `uv run scripts/tofu.py plan` and verify it shows only description changes on troupe-run/troupe's
       labels resource (38), nothing created or removed; keep it for the pull request
-- [ ] 3.2 Run `openspec validate cap-label-descriptions --strict` and verify it passes
+- [x] 3.2 Run `openspec validate cap-label-descriptions --strict` and verify it passes
 
 ## Workflow follow-up
 
