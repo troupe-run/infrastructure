@@ -15,6 +15,13 @@ Checked against provider `integrations/github` 6.13.0 with `tofu providers schem
 | `org-settings.json` | org settings the provider has no attribute for: today, whether 2FA is required | `github_organization_settings` has no two-factor attribute | `gh api orgs/troupe-run` |
 | `projects.json` | the org's projects: number, title, public, closed, short description | the provider supports only classic Projects; ours are Projects v2 | `gh api graphql` (`projectsV2`) |
 | `tofu/labels/troupe.json` (derived) | a `cap:<name>` label for each folder in troupe's `openspec/specs/`. One way: a label with no spec isn't reported, since a label can come before its spec. The fix is a pull request adding the label (spec: labels) | OpenTofu manages the labels but can't read troupe's files | `gh api repos/troupe-run/troupe/contents/openspec/specs` |
+| `troupe-spec-purposes.json` | for each `cap:<name>` label whose troupe spec exists, the spec's Purpose its description was written from, verbatim. A Purpose that has changed, a labelled spec with nothing recorded, and a record with no spec are each reported (spec: labels) | OpenTofu manages the descriptions but can't read troupe's specs to tell when one is out of date | `gh api repos/troupe-run/troupe/contents/openspec/specs/<name>/spec.md` |
+
+**A new capability's label** gets a description of 100 characters or fewer that says what the capability covers
+(`scripts/tests/test_labels.py` refuses one that only repeats the name). If troupe has a spec for it, shorten the
+spec's Purpose and record that Purpose here, with its whitespace collapsed, in the same pull request. If nothing in
+troupe defines it yet, the description is `TBD`. When `oob.py` reports a changed Purpose, review the description
+against the new text and update both files together.
 
 Run it with your own `gh` login, which needs read access to the org:
 

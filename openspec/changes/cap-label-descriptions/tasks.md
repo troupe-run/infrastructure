@@ -24,7 +24,7 @@
 - [x] 2.3 Create `oob/troupe-spec-purposes.json` with the 14 labelled specs' Purposes read from troupe's `main`
       (design D1). Verify `uv run scripts/oob.py` reports nothing for troupe's labels, and that it reports `cap:runs`
       when its entry is edited locally (then restore it)
-- [ ] 2.4 Add a row for the new check to `oob/README.md`'s table, and say there how a new capability's label gets
+- [x] 2.4 Add a row for the new check to `oob/README.md`'s table, and say there how a new capability's label gets
       its description and recorded Purpose. Verify `uv run scripts/check.py` passes
 
 ## 3. Evidence
