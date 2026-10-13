@@ -64,12 +64,13 @@ DELIVERY_LIST = ".github/guard-delivery.json"
 """Present only in a repository that receives the guard: the files delivered to it."""
 DELIVERY_AUTHOR_EMAIL = "340938853+troupe-run-infrastructure[bot]@users.noreply.github.com"
 """The infrastructure App's bot account, which makes every delivery commit."""
-RELEASE_AUTHOR_EMAIL: str | None = None
-"""The release App's bot account, which makes release-please's commits. None until the App exists:
-then fill in "<id>+troupe-run-release[bot]@users.noreply.github.com", with the id from
-GET /users/troupe-run-release%5Bbot%5D, and only once the ruleset that lets only the App write
-release-please--* branches is applied (troupe-run/infrastructure#34). While None, no branch is
-exempt from the branch-change rule (release-please-prs design D2, D5)."""
+RELEASE_AUTHOR_EMAIL: str | None = "341990208+troupe-run-release[bot]@users.noreply.github.com"
+"""The release App's bot account, which makes release-please's commits; the id is from
+GET /users/troupe-run-release%5Bbot%5D. Filled once troupe's "release branches" ruleset, which lets
+only the App create, update or delete release-please--* branches, was applied (#41). That ruleset
+is the hard check: a commit's author is self-declared, so this check alone isn't, and it's trusted
+only in RELEASE_REPOSITORIES. None closes the exemption everywhere (release-please-prs design D2,
+D5; open-release-exemption design D3)."""
 RELEASE_BRANCH_PREFIX = "release-please--"
 RELEASE_REPOSITORIES = frozenset({"troupe-run/troupe"})
 """Where a ruleset lets only the release App write release-please--* branches (tofu/release.tf).

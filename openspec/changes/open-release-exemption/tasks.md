@@ -34,7 +34,7 @@
 
 ## 3. The address is filled
 
-- [ ] 3.1 Re-check the bot's ID with `gh api 'users/troupe-run-release%5Bbot%5D' --jq '{id,login,type}'` (expect
+- [x] 3.1 Re-check the bot's ID with `gh api 'users/troupe-run-release%5Bbot%5D' --jq '{id,login,type}'` (expect
       341990208, `troupe-run-release[bot]`, `Bot`). Then set
       `RELEASE_AUTHOR_EMAIL = "341990208+troupe-run-release[bot]@users.noreply.github.com"`, keeping its
       `str | None` type, and rewrite its docstring (design D3): filled after the `release branches` ruleset was applied
