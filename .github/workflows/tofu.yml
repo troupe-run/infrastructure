@@ -6,7 +6,10 @@ name: tofu
 #                         pr-plan   env plan-pr (owner approves)   plan posted on the PR, unless not
 #   CI green on main  --> plan      env plan-main (main only)      plan in the run summary
 #   or a manual run       apply     env apply (owner approves)     apply that saved plan, then commit
-#                                                                  the state to main as the App
+#   or daily at 06:00 UTC                                          the state to main as the App
+#
+# The daily run finds drift, such as a forged change to a file delivered to troupe, within a day
+# (spec: ci-apply; openspec/changes/enforce-delivered-files/design.md, D5).
 #
 # Every job authenticates as the troupe-run-infrastructure App, through scripts/tofu.py, with the
 # secrets of its environment. The owner sets them from 1Password (README); none is in this file.
@@ -17,6 +20,10 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+  # GitHub pauses this after 60 days without activity in the repository; `gh workflow enable
+  # tofu.yml` turns it back on (README, "Running a plan").
+  schedule:
+    - cron: "0 6 * * *"
 
 permissions:
   contents: read
@@ -135,7 +142,7 @@ jobs:
     name: plan (main)
     if: >-
       github.ref == 'refs/heads/main' && (
-        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' ||
         (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
       )
     runs-on: ubuntu-latest
@@ -160,12 +167,16 @@ jobs:
         with:
           ref: ${{ steps.sha.outputs.sha }}
           fetch-depth: 2
+      # Only after CI on a merge. A daily or manual run plans whatever main's head is: after an
+      # apply that is usually this very commit, and skipping it would leave drift unplanned.
       - name: Skip the App's own state commit
         id: skip
+        env:
+          EVENT: ${{ github.event_name }}
         run: |
           author=$(git log -1 --format=%ae)
           files=$(git diff-tree --no-commit-id --name-only -r HEAD)
-          if [ "$author" = "$STATE_AUTHOR" ] && [ "$files" = "tofu/terraform.tfstate" ]; then
+          if [ "$EVENT" = "workflow_run" ] && [ "$author" = "$STATE_AUTHOR" ] && [ "$files" = "tofu/terraform.tfstate" ]; then
             echo "::notice::This commit is the App's state commit after an apply; nothing to plan."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else

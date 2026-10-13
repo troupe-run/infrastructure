@@ -42,7 +42,7 @@ task left is one that runs.
 
 ## 3. Fallback path: a plan of main every day (design D4, D5)
 
-- [ ] 3.1 In `.github/workflows/tofu.yml`, add `schedule: - cron: "0 6 * * *"`, let `plan (main)` run for
+- [x] 3.1 In `.github/workflows/tofu.yml`, add `schedule: - cron: "0 6 * * *"`, let `plan (main)` run for
   `schedule` as for `workflow_dispatch`, and make "Skip the App's own state commit" skip only on `workflow_run`
   events. Update the workflow's header table with the scheduled row. Verify:
   - `scripts/check.py` passes, including `test_required_checks.py` (the plan job still isn't a pull request job);
