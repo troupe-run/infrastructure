@@ -13,15 +13,15 @@
 
 ## 2. The staleness check
 
-- [ ] 2.1 Write failing tests in `scripts/tests/test_oob.py`, each named for what it checks: a labelled spec with
+- [x] 2.1 Write failing tests in `scripts/tests/test_oob.py`, each named for what it checks: a labelled spec with
       no recorded Purpose is reported; a changed Purpose is reported, naming the label, `tofu/labels/troupe.json` and
       `oob/troupe-spec-purposes.json`; a Purpose differing only in line breaks or spacing isn't; a spec with no
       `## Purpose` section is reported as changed; a recorded entry with no spec is reported; an unlabelled spec is
       reported once, by the existing check only; the spec reads are reads (extend
       `test_every_github_call_is_a_read`). Verify they fail with `uv run pytest scripts/tests/test_oob.py`
-- [ ] 2.2 Add the check to `scripts/oob.py` (design D2) and name it in `main`'s "no differences" line. Verify 2.1's
+- [x] 2.2 Add the check to `scripts/oob.py` (design D2) and name it in `main`'s "no differences" line. Verify 2.1's
       tests and all existing `oob` tests pass, and `uv run scripts/check.py` passes (mypy --strict, ruff)
-- [ ] 2.3 Create `oob/troupe-spec-purposes.json` with the 14 labelled specs' Purposes read from troupe's `main`
+- [x] 2.3 Create `oob/troupe-spec-purposes.json` with the 14 labelled specs' Purposes read from troupe's `main`
       (design D1). Verify `uv run scripts/oob.py` reports nothing for troupe's labels, and that it reports `cap:runs`
       when its entry is edited locally (then restore it)
 - [ ] 2.4 Add a row for the new check to `oob/README.md`'s table, and say there how a new capability's label gets
