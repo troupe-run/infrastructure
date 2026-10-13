@@ -122,8 +122,9 @@ branch).
 - [release-please makes its commit with another identity than the App's bot (e.g. a configured author)] → troupe#23
   design D9 sets only `signoff`; the first real release PR shows the author. If it differs, the constant names that
   identity instead, in the follow-up that fills it.
-- [`edited` runs leave several `guard (workflow rules)` runs on one head SHA] → GitHub reports the latest run of a
-  check name for a SHA; the probe (task 5.1) confirms the renamed PR's check turns green.
+- [`edited` runs leave several `guard (workflow rules)` runs on one head SHA] → The earlier failure stays on the
+  commit and in the PR's check rollup, but a required check follows the latest run: the probe (task 5.1) showed a
+  renamed PR go `CLEAN`, and `BLOCKED` again when renamed back to a bad title.
 
 ## Migration Plan
 
