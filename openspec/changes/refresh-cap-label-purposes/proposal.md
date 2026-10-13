@@ -1,8 +1,8 @@
 # Proposal
 
-Issue: #29, the standing ticket that keeps troupe's `cap:` labels in step with troupe's specs. This change does the
-items that are ready now: `cap:platform` from the ticket's list, and `cap:protocol`, which drifted after the ticket
-was written. `cap:releases` waits for its spec to reach troupe's `main` (see Out of scope).
+Issue: #29, the standing ticket that keeps troupe's `cap:` labels in step with troupe's specs. This change does all of
+it: `cap:platform` from the ticket's list, `cap:protocol`, which drifted after the ticket was written, and
+`cap:releases`, declared ahead of its spec.
 
 ## Why
 
@@ -16,6 +16,10 @@ was written. `cap:releases` waits for its spec to reach troupe's `main` (see Out
 #29's sweep ran before #72 merged, which is why it names only `cap:platform`. Until both are fixed, `oob.py` can't
 report a clean result for troupe's labels, and a later drift would be hidden among these two.
 
+troupe-run/troupe#23 (`release-automation`) will add a `releases` spec, and there's no label to file its work under.
+The labels spec lets a label come before its spec, so adding `cap:releases` now finishes #29 instead of holding it
+open for a one-line addition.
+
 ## What Changes
 
 - **`cap:platform`'s recorded Purpose** in `oob/troupe-spec-purposes.json` is replaced with the spec's Purpose on
@@ -25,14 +29,16 @@ report a clean result for troupe's labels, and a later drift would be hidden amo
 - **`cap:protocol`'s Purpose is recorded** in `oob/troupe-spec-purposes.json`, verbatim with whitespace collapsed.
 - **`cap:protocol`'s description** gets the spec's two additions, "strict" and "each plugin", and keeps its existing
   wording otherwise, because 13 troupe issues already carry the label for that scope (design D2).
-- **No label is added, removed or renamed.** The plan updates two descriptions in place and changes nothing else.
+- **`cap:releases` is added** to `tofu/labels/troupe.json`, colour `1D76DB`, with #29's description "Versions,
+  changelogs and releases, derived from Conventional Commits through a release PR" (design D4).
+- **troupe-run/troupe#23 is labelled `cap:releases`** once the apply creates the label. It keeps `cap:infrastructure`.
+- **No label is removed or renamed.**
 
 Out of scope:
-- **`cap:releases`.** troupe-run/troupe#23 (`release-automation`) hasn't opened a pull request, and troupe's `main`
-  has no `openspec/specs/releases/` and no `openspec/changes/release-automation/`. #29 says to add the label when
-  that change archives. It stays on #29's list for a later change.
+- **Recording `cap:releases`'s Purpose.** troupe has no `releases` spec yet, so there's no Purpose to record, and
+  `oob.py` reports a recorded Purpose with no spec. `oob.py` asks for it once the spec lands (design D4).
 - `scripts/oob.py`, the labels spec and the workflow's labels, which #26 settled and #29 rules out.
-- Any change to troupe-run/troupe's files or issues.
+- Any change to troupe-run/troupe's files. Its only issue change is the label on #23.
 
 ## Capabilities
 
@@ -42,15 +48,17 @@ None.
 
 ### Modified Capabilities
 
-None. This is a data change under the existing `labels` requirements "A capability label says what it covers", "A
-description written from a spec records that spec's Purpose" and "A description that may be stale is reported", so
-the change sets `skip_specs: true`.
+None. This is a data change under the existing `labels` requirements "troupe's capability labels are declared here",
+"A capability label says what it covers", "A description written from a spec records that spec's Purpose" and "A
+description that may be stale is reported", so the change sets `skip_specs: true`.
 
 ## Impact
 
-- `tofu/labels/troupe.json`: two descriptions changed, still 39 labels.
+- `tofu/labels/troupe.json`: two descriptions changed and one label added, 39 → 40.
 - `oob/troupe-spec-purposes.json`: one entry changed, one added.
-- GitHub, after the owner approves the plan: two label descriptions updated on troupe-run/troupe. Changing a
-  description doesn't touch the issues that carry the label.
+- GitHub, after the owner approves the plan: `cap:releases` created on troupe-run/troupe, and two label descriptions
+  updated in place. Changing a description doesn't touch the issues that carry the label.
+- troupe-run/troupe#23: `cap:releases` added. From then on the label falls under "A capability label in use is never
+  removed or renamed".
 - `scripts/oob.py` reports nothing for troupe's labels once this merges, until troupe's next spec change.
-- #29 stays open for `cap:releases` (design, Open Questions).
+- #29 is closed by this change's pull request.
