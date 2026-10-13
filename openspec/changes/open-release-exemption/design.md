@@ -99,8 +99,10 @@ token; the daily plan already shows the live ruleset drifting from its declarati
 ### D5. The existing tests switch to the real address and a repository
 
 The release-please tests stop monkeypatching a test address and use `guard.RELEASE_AUTHOR_EMAIL` with a
-`troupe-run-release[bot]` name, and pass `troupe-run/troupe`. That makes "a branch written only by the bot is exempt" a
-test of the shipped value, as #42 asks. The `None` test keeps its monkeypatch. New tests: the bot's release branch in
+`troupe-run-release[bot]` name, and pass `troupe-run/troupe`. Their commits take their author from the same constant,
+so they check the exemption's logic, not the address: a wrong address would pass them. One more test compares the
+constant with the ID and login written out from the API reading, which catches a typo or a stray edit. Only troupe#23's
+first release PR shows that release-please's commits carry it. The `None` test keeps its monkeypatch. New tests: the bot's release branch in
 `troupe-run/infrastructure` fails; with no repository it fails; `github_ci_inputs` returns `GITHUB_REPOSITORY` for a
 push, the head repository for a pull request (a fork's name for a fork, `None` for a deleted one), and refuses a
 malformed `head.repo` naming it.
