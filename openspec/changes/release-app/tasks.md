@@ -38,17 +38,17 @@
 
 ## 3. The release-branch ruleset
 
-- [ ] 3.1 Create `troupe-run/infra-probe-20261013` (`gh repo create troupe-run/infra-probe-20261013 --public
+- [x] 3.1 Create `troupe-run/infra-probe-20261013` (`gh repo create troupe-run/infra-probe-20261013 --public
       --add-readme`). Owner: add it to `troupe-run-infrastructure`'s installation. Verify the owner confirms it in the
       installation's settings, and that a `tofu/probe` plan reads the repository's real merge settings
-- [ ] 3.2 Add a `probe_release_ruleset` variable to `tofu/probe/main.tf` that adds design D7's ruleset, with the
+- [x] 3.2 Add a `probe_release_ruleset` variable to `tofu/probe/main.tf` that adds design D7's ruleset, with the
       infrastructure App as the bypass actor, plus the `github_branch` and `github_repository_file` that D8's App
       steps need. Document it in the file's header comment. Verify `tofu fmt` and `tofu validate` pass in
       `tofu/probe`, and that a probe plan creates only the ruleset
-- [ ] 3.3 Run D8's steps 1 to 8 and record each in design D8 under Findings, with the command and GitHub's response.
+- [x] 3.3 Run D8's steps 1 to 8 and record each in design D8 under Findings, with the command and GitHub's response.
       Verify every step has an outcome. If any refusal or bypass doesn't behave as D7 expects, stop and revise the
       design before 3.5
-- [ ] 3.4 Delete the probe repository, then `tofu/probe`'s local state, `terraform.tfvars` and any other files the
+- [x] 3.4 Delete the probe repository, then `tofu/probe`'s local state, `terraform.tfvars` and any other files the
       probe made. Verify `gh repo view troupe-run/infra-probe-20261013` fails, and that `git status` shows only the
       intended changes to `tofu/probe/main.tf`
 - [ ] 3.5 Add `github_repository_ruleset.release_branches` to `tofu/release.tf` (design D7), with the release App's

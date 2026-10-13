@@ -20,6 +20,11 @@
 #
 # The required-checks probe (design D8) sets probe_main_ruleset and probe_required_checks.
 # probe_description makes the change; probe_environments adds the D2 environments.
+#
+# The release-app probe (design D8) sets probe_release_ruleset, which adds the "release branches"
+# ruleset of ../release.tf with this App standing in for the release App as its only bypass. Then
+# probe_release_branch makes the App create release-please--probe, and probe_release_commit makes it
+# commit to that branch; unsetting them makes it delete the file and the branch.
 
 terraform {
   required_version = ">= 1.8"
@@ -128,6 +133,24 @@ variable "probe_note" {
   description = "The content of probe-note.txt, changed between applies to test the commit message."
   type        = string
   default     = "first\n"
+}
+
+variable "probe_release_ruleset" {
+  description = "Add the release branches ruleset of ../release.tf, with this App as its bypass (release-app D8)."
+  type        = bool
+  default     = false
+}
+
+variable "probe_release_branch" {
+  description = "The App creates release-please--probe from main; false deletes it (release-app D8)."
+  type        = bool
+  default     = false
+}
+
+variable "probe_release_commit" {
+  description = "The App commits probe-release.txt to release-please--probe (release-app D8)."
+  type        = bool
+  default     = false
 }
 
 variable "declared" {
@@ -256,4 +279,54 @@ resource "github_repository_environment_deployment_policy" "apply_main" {
   repository     = var.probe_repo
   environment    = github_repository_environment.apply[0].environment
   branch_pattern = "main"
+}
+
+# The "release branches" ruleset of ../release.tf (release-app design D7), with the infrastructure
+# App as the only bypass in place of the release App, which isn't installed here (design D8).
+resource "github_repository_ruleset" "release_branches" {
+  count = var.probe_release_ruleset ? 1 : 0
+
+  name        = "release branches"
+  repository  = var.probe_repo
+  target      = "branch"
+  enforcement = "active"
+
+  conditions {
+    ref_name {
+      include = ["refs/heads/release-please--*"]
+      exclude = []
+    }
+  }
+
+  rules {
+    creation                      = true
+    update                        = true
+    update_allows_fetch_and_merge = false
+    deletion                      = true
+  }
+
+  bypass_actors {
+    actor_type  = "Integration"
+    actor_id    = 5272634
+    bypass_mode = "always"
+  }
+}
+
+resource "github_branch" "release" {
+  count = var.probe_release_branch ? 1 : 0
+
+  repository    = var.probe_repo
+  branch        = "release-please--probe"
+  source_branch = "main"
+}
+
+resource "github_repository_file" "release" {
+  count = var.probe_release_branch && var.probe_release_commit ? 1 : 0
+
+  repository          = var.probe_repo
+  branch              = github_branch.release[0].branch
+  file                = "probe-release.txt"
+  content             = "written by the App\n"
+  commit_message      = "chore: probe a commit by the App to a release branch"
+  overwrite_on_create = false
 }
