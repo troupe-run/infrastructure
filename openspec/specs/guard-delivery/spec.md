@@ -49,7 +49,9 @@ change it there. Each governed repository SHALL hold a delivered list of the fil
 ### Requirement: Delivered files are changed only at their source
 In a governed repository that receives delivered files, a commit that changes a delivered file SHALL be refused, and
 an agent's edit to one SHALL be refused. The guard's GitHub check SHALL fail on a commit that changes a delivered file
-unless the infrastructure App made it. The fix SHALL be to change the file in this repository.
+unless its author is the App. A commit's author is self-declared, so a change that gets past these SHALL show in a
+plan of `main` within a day, and an apply SHALL restore the file. The fix SHALL be to change the file in this
+repository.
 
 #### Scenario: Committing a change to a delivered file
 - **WHEN** a contributor in `troupe` commits a change to `.githooks/pre-commit`
@@ -62,6 +64,12 @@ unless the infrastructure App made it. The fix SHALL be to change the file in th
 #### Scenario: A pushed change to a delivered file
 - **WHEN** a branch is pushed to `troupe` carrying a commit, not made by the App, that changes a delivered file
 - **THEN** the guard's GitHub check for that push fails and names the commit and the file
+
+#### Scenario: A forged delivery author shows within a day
+- **WHEN** a commit that changes a delivered file, with the App's bot email written in as its author, reaches
+  `troupe`'s `main`
+- **THEN** a plan of `main` within a day shows the file returning to its source content, and applying it restores
+  that content
 
 #### Scenario: A delivery passes the check
 - **WHEN** the App's delivery commit is pushed to `troupe`'s `main`
