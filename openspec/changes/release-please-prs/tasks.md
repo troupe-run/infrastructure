@@ -40,7 +40,7 @@
 
 ## 4. Docs
 
-- [ ] 4.1 Update `docs/development-workflow.md`: the `guard` check row says it checks a pull request's title and
+- [x] 4.1 Update `docs/development-workflow.md`: the `guard` check row says it checks a pull request's title and
       re-runs on a rename; the `commit-branch-change` row names the release-branch exception and its two conditions;
       the `commit-message` row says a pull request title is checked the same way; Known gaps gains an entry that
       the release exemption trusts the commit's author, and that the hard check is the ruleset declared by #34

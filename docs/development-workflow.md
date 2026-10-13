@@ -14,7 +14,7 @@ drift apart:
 | Git hooks: `pre-commit`, `commit-msg` | on every commit, for everyone | the git rules below | yes, `--no-verify` (it's your machine) |
 | Git hook: `pre-push` | on every push, any branch | every commit being pushed is a Conventional Commit | yes, `--no-verify` |
 | Claude Code hooks (`.claude/settings.json`) | before an agent's tool call | the Claude rules below, including refusing `--no-verify` | no, for an agent following `CLAUDE.md` |
-| The `guard` GitHub check (`.github/workflows/guard.yml`) | on every push to every branch, and every pull request | commit messages, the branch-change match, archived tasks | no: it's a required check, so a pull request can't merge while it's red (`tofu/required-checks.json`) |
+| The `guard` GitHub check (`.github/workflows/guard.yml`) | on every push to every branch, and every pull request, re-run when its title is edited | commit messages, a pull request's title, the branch-change match, archived tasks | no: it's a required check, so a pull request can't merge while it's red (`tofu/required-checks.json`) |
 
 **The git hooks are on by default.** Git never runs hooks from a fresh clone, so the repository's own tooling turns
 them on: running `uv run scripts/check.py` does it, and so does starting a Claude Code session. Each says so when it
@@ -39,8 +39,8 @@ guard: commit-on-main: commits aren't made on main; work reaches main through a 
 | Rule | Layer | Refuses | Fix |
 |---|---|---|---|
 | `commit-on-main` | git | a commit with `main` checked out | create a branch named after the change |
-| `commit-branch-change` | git | a commit on a branch with no matching OpenSpec change (active, or archived on that branch), or on a detached HEAD | propose the change, or switch to its branch |
-| `commit-message` | git | a first line that isn't a Conventional Commit (`type(scope)!: subject`); `fixup!`, `squash!` and `amend!` are accepted when they name a Conventional Commit subject | use one of `feat fix docs build ci test refactor perf style chore revert` |
+| `commit-branch-change` | git | a commit on a branch with no matching OpenSpec change (active, or archived on that branch), or on a detached HEAD. On GitHub, a `release-please--` branch is exempt when it adds at least one commit to `main` and every one is authored by the release App's bot (`RELEASE_AUTHOR_EMAIL` in `scripts/guard.py`, empty until the App exists, so nothing is exempt yet) | propose the change, or switch to its branch |
+| `commit-message` | git | a first line that isn't a Conventional Commit (`type(scope)!: subject`); `fixup!`, `squash!` and `amend!` are accepted when they name a Conventional Commit subject. The `guard` check applies the same rule to a pull request's title, which becomes the commit message if squash merging is ever turned on | use one of `feat fix docs build ci test refactor perf style chore revert` |
 | `commit-checks` | git | a commit while tracked files have unstaged changes, or while `scripts/check.py` fails | stage or stash the changes; fix what the check reports |
 | `archive-incomplete` | git | a commit that adds an archived change with an unticked task | finish and tick every task first |
 | `edit-branch-change` | Claude | an Edit, Write, MultiEdit or NotebookEdit to a repository file when the branch has no matching change | switch to, or create, the change's branch |
@@ -120,6 +120,10 @@ other org-wide files (specs: `development-workflow`, `org-profile`).
   edit as drift.
 - **The `delivered-file` check trusts the commit's author.** It accepts a change to a delivered file whose author is
   the infrastructure App's bot. Commit metadata can be written by anyone, so this stops honest mistakes, not forgery.
+- **The release-branch exemption trusts the commit's author too.** A `release-please--` branch skips the
+  branch-change rule when the release App's bot authored its commits, and anyone can write that author into a
+  commit. The hard check is a ruleset that lets only the release App create, update or delete those branches
+  (troupe-run/infrastructure#34). Until it's applied, the bot isn't recorded in the guard, so no branch is exempt.
 - **Overrides are local.** The `guard` check on GitHub ignores them, so nothing granted on one machine excuses a
   commit on `main`.
 - **Bash parsing is heuristic.** When a `git` or `gh` command can't be parsed, it's refused rather than guessed at.
