@@ -46,7 +46,7 @@
 
 ## 4. Docs
 
-- [ ] 4.1 Update `docs/development-workflow.md`. The `commit-branch-change` row: the exemption is open, only in a
+- [x] 4.1 Update `docs/development-workflow.md`. The `commit-branch-change` row: the exemption is open, only in a
       repository named in `RELEASE_REPOSITORIES` (troupe), and for a pull request only from a branch in that same
       repository, not a fork; drop "empty until the App exists". The known gap "The release-branch exemption trusts
       the commit's author": the ruleset is applied on troupe, the exemption applies nowhere else, and a fork's branch

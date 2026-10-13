@@ -175,7 +175,8 @@ Every other managed repository has a ruleset named "protect main" on its default
 troupe also has a ruleset named "release branches" (`tofu/release.tf`): only the `troupe-run-release` App can create,
 update or delete a `release-please--*` branch, and the owner has no bypass. The guard exempts those branches from its
 branch rule only when the App authored every commit, and an author can be set by anyone, so GitHub enforces who writes
-them. GitHub's delete-on-merge is refused there too, so the release branch stays after its pull request merges, and
+them. That's why the exemption holds only on troupe (`RELEASE_REPOSITORIES` in `scripts/guard.py`), and never for a
+fork's branch. GitHub's delete-on-merge is refused there too, so the release branch stays after its pull request merges, and
 release-please reuses it. The break-glass is the same: edit or disable the ruleset on GitHub, and the next plan
 restores it.
 
