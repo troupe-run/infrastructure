@@ -186,11 +186,21 @@ def commit_as(repo: Repo, author: str, message: str, name: str) -> str:
 
 
 def release_repo(make_repo: Callable[[], Repo], tmp_path: Path) -> tuple[Repo, str]:
-    """A repository whose main is on its remote. The release bot is the guard's own, so these
-    tests check the shipped address (open-release-exemption design D5)."""
+    """A repository whose main is on its remote. Its commits are authored with the guard's own
+    release address, so these tests check the exemption's logic, not that the address is right:
+    test_the_release_address_is_the_bot_s_from_the_api checks that."""
     repo = make_repo()
     with_remote(repo, tmp_path)
     return repo, repo.head()
+
+
+def test_the_release_address_is_the_bot_s_from_the_api() -> None:
+    # Written out from `gh api 'users/troupe-run-release%5Bbot%5D' --jq .id` (341990208,
+    # 2026-10-14), not from the constant, so a typo or stray edit there fails here. Whether
+    # release-please's commits carry it shows only on troupe#23's first release pull request.
+    bot_id, login = 341990208, "troupe-run-release[bot]"
+    expected = f"{bot_id}+{login}@users.noreply.github.com"
+    assert expected == guard.RELEASE_AUTHOR_EMAIL
 
 
 def test_a_release_branch_whose_only_commit_is_the_bot_s_passes(
