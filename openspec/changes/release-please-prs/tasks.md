@@ -49,10 +49,17 @@
 
 ## 5. Evidence
 
-- [ ] 5.1 In a throwaway repository `troupe-run/infra-probe-pr-title` holding this branch's `guard.yml` and
+- [x] 5.1 In a throwaway repository `troupe-run/infra-probe-pr-title` holding this branch's `guard.yml` and
       `scripts/guard.py`, open a pull request titled `Release main` and confirm `guard (workflow rules)` fails naming
       the title; rename it to `chore: release main` with no new commit and confirm the check re-runs and the PR's
       `guard (workflow rules)` shows green. Record the run URLs, then delete the repository and confirm it's gone
+      Done 2026-10-13. `Release main`: the PR run failed with `guard: commit-message: pull request title 'Release
+      main' isn't a Conventional Commit.` while the push run on the same commit passed. Renamed to `chore: release
+      main` with no new commit: an `edited` run passed. The old failure stays on the commit and in the PR's check
+      rollup, so a ruleset requiring `guard (workflow rules)` was added to the probe: the PR was `CLEAN`; renamed back
+      to `Release main again`, the new run failed and the PR went `BLOCKED`. The required check follows the latest
+      run. Runs 38398862872 (fail), 38399366970 (pass), 38399470199 (fail); the URLs died with the repository, which
+      `gh repo view` confirms is gone
 - [ ] 5.2 Run `uv run scripts/tofu.py plan` and verify it shows only the delivered `scripts/guard.py` and
       `.github/workflows/guard.yml` changing in troupe; keep it for the pull request
 - [ ] 5.3 Run `openspec validate release-please-prs --strict` and verify it passes
