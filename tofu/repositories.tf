@@ -33,8 +33,14 @@ module "repo_troupe" {
   description  = "troupe: run your development process with agents and people in named roles"
   homepage_url = "https://troupe.run"
   # troupe.json is troupe's capability labels, declared here and changed by pull request: troupe
-  # keeps no separate list (spec: labels; owner, 2026-10-12, #22).
-  labels = concat(local.github_default_labels, local.workflow_labels, jsondecode(file("${path.module}/labels/troupe.json")))
+  # keeps no separate list (spec: labels; owner, 2026-10-12, #22). release.json is release-please's
+  # two labels, which it finds its release pull request by (release-app design D5).
+  labels = concat(
+    local.github_default_labels,
+    local.workflow_labels,
+    jsondecode(file("${path.module}/labels/troupe.json")),
+    jsondecode(file("${path.module}/labels/release.json")),
+  )
   # The org's roadmap (project 1) is linked here, and turning projects off would hide it from the
   # repository (required-checks design D8, finding 8).
   has_projects = true

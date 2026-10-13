@@ -58,3 +58,16 @@ def test_a_description_that_only_repeats_the_name_is_named() -> None:
 
 def test_tbd_passes_for_a_capability_troupe_has_not_defined() -> None:
     assert description_problems([label("cap:flows", "TBD")]) == []
+
+
+# release-please finds its release pull request by these exact names, so a misspelt declaration
+# would leave troupe's releases stuck with no error (spec: labels; release-app design D5).
+RELEASE_LABELS = REPO / "tofu" / "labels" / "release.json"
+RELEASE_PLEASE_LABELS = {"autorelease: pending", "autorelease: tagged"}
+
+
+def test_the_release_set_is_exactly_release_pleases_two_labels_within_the_limit() -> None:
+    labels = json.loads(RELEASE_LABELS.read_text(encoding="utf-8"))
+    assert {entry["name"] for entry in labels} == RELEASE_PLEASE_LABELS
+    assert len(labels) == len(RELEASE_PLEASE_LABELS)
+    assert [entry["name"] for entry in labels if len(entry["description"]) > GITHUB_LIMIT] == []

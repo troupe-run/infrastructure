@@ -101,8 +101,10 @@ deletes the old key in the App's settings. These steps go in `oob/README.md`.
 `ededed`, which GitHub gives a label created by applying it to an issue, so the colour matches what release-please
 would have produced alone. Their descriptions say what each one marks:
 
-- `autorelease: pending`: "Release PR merged; release-please has not yet tagged it"
-- `autorelease: tagged`: "Release PR whose release release-please has tagged and published"
+- `autorelease: pending`: "release-please's release PR, not yet released". release-please applies it when it opens
+  the pull request.
+- `autorelease: tagged`: "release-please's release PR, merged and released". release-please swaps it in once it has
+  tagged the merged pull request and created the GitHub release.
 
 The labels exist before release-please first runs, so it applies the declared ones. A separate file keeps them apart
 from the workflow's labels, which every repository gets, and from troupe's `cap:` labels, which the description test
