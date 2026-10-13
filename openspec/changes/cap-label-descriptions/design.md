@@ -84,6 +84,13 @@ over-length description only at apply time, after the merge.
 - [troupe stops using a `## Purpose` heading] → A spec with no Purpose section is reported as changed (empty Purpose),
   not skipped, following "a malformed input is an error".
 
+- [The plan shows each changed label as a whole block removed and re-added, which reads like deleting 38 labels]
+  → It isn't. `label` is a set, so OpenTofu shows a changed element as a removal and an addition. The provider
+  (integrations/github v6.13.0, `resource_github_issue_labels.go` lines 105–141) lists the repository's labels and
+  matches them to the declared ones by name: a changed description or colour is an `EditLabel`, and only a name no
+  longer declared is a `DeleteLabel`. Checked against the plan on 2026-10-13: the 38 removed and 38 added blocks
+  have the same names and colours, and differ only in description.
+
 ## Migration Plan
 
 One pull request: the descriptions, the record of all 14 Purposes, the check and the test. The owner approves the
