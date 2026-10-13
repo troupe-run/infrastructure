@@ -14,7 +14,7 @@
       docstring naming `tofu/release.tf`. Make `release_branch_by_the_bot` and `run_ci` take the repository, and exempt
       nothing unless it's in the set (design D1). Verify 1.1's tests pass, all of `scripts/tests/` passes, and
       `uv run scripts/check.py` passes (mypy --strict, ruff)
-- [ ] 1.3 Write a test that reads `tofu/release.tf` and checks that a `github_repository_ruleset` including
+- [x] 1.3 Write a test that reads `tofu/release.tf` and checks that a `github_repository_ruleset` including
       `refs/heads/release-please--*` is declared for each repository in `guard.RELEASE_REPOSITORIES`. Map
       `module.repo_troupe.name` to `troupe-run/troupe` the way `tofu/repositories.tf` names it (design D4). Verify it
       passes, and that it fails when the ruleset block is removed from a temporary copy of the file
