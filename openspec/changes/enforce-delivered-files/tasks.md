@@ -5,7 +5,7 @@ not (design D5; owner, 2026-10-13). Task 1.5 deletes the group not taken, so eve
 
 ## 1. Probe on a throwaway repository (design D1)
 
-- [ ] 1.1 Confirm the provider can declare the ruleset. In a scratch directory (not `tofu/`, whose `init` needs the
+- [x] 1.1 Confirm the provider can declare the ruleset. In a scratch directory (not `tofu/`, whose `init` needs the
   passphrase), run `tofu providers schema -json` for `integrations/github` 6.13.0. Check that
   `github_repository_ruleset` accepts `target = "push"`, a `rules.file_path_restriction.restricted_file_paths` list,
   and no `conditions` block. Verify: the schema excerpt is recorded under design D1. If any of the three is missing,

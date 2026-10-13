@@ -20,6 +20,10 @@
 #
 # The required-checks probe (design D8) sets probe_main_ruleset and probe_required_checks.
 # probe_description makes the change; probe_environments adds the D2 environments.
+#
+# The enforce-delivered-files probe (design D1) sets probe_delivery, probe_delivery_bypass and
+# probe_delivered_paths, which adds the module's push ruleset over those paths with the App as its
+# only bypass.
 
 terraform {
   required_version = ">= 1.8"
@@ -124,6 +128,12 @@ variable "probe_delivery_bypass" {
   default     = false
 }
 
+variable "probe_delivered_paths" {
+  description = "Passed to the module's delivered_paths: the paths only the App may push (enforce-delivered-files D1)."
+  type        = list(string)
+  default     = []
+}
+
 variable "probe_note" {
   description = "The content of probe-note.txt, changed between applies to test the commit message."
   type        = string
@@ -157,7 +167,8 @@ module "probe" {
   main_ruleset    = var.probe_main_ruleset
   required_checks = var.probe_required_checks
 
-  app_bypass_id = var.probe_delivery_bypass ? 5272634 : null
+  app_bypass_id   = var.probe_delivery_bypass ? 5272634 : null
+  delivered_paths = var.probe_delivered_paths
 }
 
 resource "github_repository_file" "probe" {
