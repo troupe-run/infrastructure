@@ -44,13 +44,14 @@
 
 ### D1. Grant a subset of the allow-list, named in its own table
 
-`GH_GRANTED` lists the `(group, subcommand)` pairs the hook grants: every `GH_READS` pair, and the writes from
+`GH_GRANTED` lists the `(group, subcommand)` pairs the hook grants: every pair in `GH_READS` and
 `GH_WORKFLOW_WRITES` except these.
 
 | Not granted | Why |
 |---|---|
 | `pr merge` | Merging is consequential. Rulesets stop most merges, but a prompt is cheap here. |
 | `pr checkout` | It switches the local branch under the session. |
+| `run download`, `repo clone` | Reads, but they write local files to any path the command names (`-D`, the clone's directory). Found during apply. |
 | `workflow run`, `run rerun`, `run cancel` | These start or stop CI, including the `apply` workflow's runs. |
 | `gh api` | Any endpoint, any method the allow-list allows, and `-F field=@file` reads local files. |
 | throwaway-repository writes | Allowed by naming convention, which is fine for "don't refuse" but too broad to grant. |

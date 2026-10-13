@@ -9,7 +9,7 @@
 
 ## 2. Only plain commands are granted
 
-- [ ] 2.1 Write failing tests for `grantable` (design D2), each named for what it checks. Granted:
+- [x] 2.1 Write failing tests for `grantable` (design D2), each named for what it checks. Granted:
       `gh pr ready 74`, `gh issue edit 29 --type Feature`, `gh issue comment 1 --body "Fix #3"`,
       `gh pr view 17 --json comments --jq '.comments[]'`, a `--body-file` inside the repository and one under the temp
       directory. Not granted, each on its own:
@@ -24,7 +24,7 @@
       - a command any rule refuses.
 
       Verify they fail
-- [ ] 2.2 Implement `grantable(command, root)` in `scripts/guard.py` (design D2). Verify 2.1's tests pass and
+- [x] 2.2 Implement `grantable(command, root)` in `scripts/guard.py` (design D2). Verify 2.1's tests pass and
       `uv run scripts/check.py` passes
 
 ## 3. Only the reviewed guard grants
