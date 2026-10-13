@@ -208,3 +208,11 @@ def test_a_name_it_can_t_evaluate_is_refused_rather_than_guessed() -> None:
     job = {"name": "build ${{ github.ref }}"}
     with pytest.raises(ValueError, match="can't evaluate"):
         job_names("build", job)
+
+
+def test_guard_re_runs_when_a_pull_request_is_renamed_and_still_runs_on_every_push() -> None:
+    """release-please-prs design D4: the title is checked, so editing it must re-run the check."""
+    workflow: dict[Any, Any] = load_yaml(WORKFLOWS / "guard.yml")
+    on = workflow["on"] if "on" in workflow else workflow[True]
+    assert on["pull_request"]["types"] == ["opened", "edited", "synchronize", "reopened"]
+    assert on["push"]["branches"] == ["**"]
