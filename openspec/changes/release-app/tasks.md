@@ -24,7 +24,7 @@
 - [x] 2.1 Add `troupe-run-release` to `oob/app-installations.json` (design D1). Add `actions_variables: write`
       to `troupe-run-infrastructure`. Verify `uv run scripts/oob.py` reports no
       difference for App installations, where before this edit it reported the new App
-- [ ] 2.2 Add `tofu/labels/release.json` with `autorelease: pending` and `autorelease: tagged` (design D5), and
+- [x] 2.2 Add `tofu/labels/release.json` with `autorelease: pending` and `autorelease: tagged` (design D5), and
       concatenate it into `repo_troupe`'s labels. Add a test to `scripts/tests/test_labels.py` that the release set
       holds exactly those two names, each with a description of 100 characters or fewer. Name the test for that, and
       verify it fails when a name is misspelt. Then verify `uv run scripts/check.py` passes

@@ -1,0 +1,12 @@
+[
+  {
+    "name": "autorelease: pending",
+    "color": "ededed",
+    "description": "release-please's release PR, not yet released"
+  },
+  {
+    "name": "autorelease: tagged",
+    "color": "ededed",
+    "description": "release-please's release PR, merged and released"
+  }
+]
