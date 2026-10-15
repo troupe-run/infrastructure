@@ -409,3 +409,17 @@ def test_a_malformed_declaration_refuses_the_commit_without_running_the_check(
     assert "`docs/*.md` uses a wildcard" in decision.problem
     assert "dir/**" in decision.fix
     assert runs(log) == []
+
+
+def test_a_path_in_two_overlapping_scopes_runs_both_scopes(make_repo: Callable[[], Repo]) -> None:
+    repo, log = declared_repo(
+        make_repo,
+        declaration=(
+            "version = 1\n"
+            '[scopes.blah]\npaths = ["path1/**", "another/**"]\n'
+            '[scopes.blech]\npaths = ["path1/**"]\n'
+        ),
+    )
+    decision, _ = checked(repo, "path1/blah.py")
+    assert decision == guard.ALLOW
+    assert runs(log) == ["--scope blah --scope blech"]
