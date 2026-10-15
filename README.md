@@ -23,7 +23,7 @@ that closes the issue. Specs live in `openspec/specs/`.
 | `tofu/guard_delivery.tf` | The guard's files in each repository that receives it, and the generated list of them |
 | `tofu/release.tf` | What troupe's release workflow needs: the `release` environment, limited to `main`, the release App's client ID, and the ruleset that reserves `release-please--*` branches for the App. The App and its key are set up by hand ([oob/README.md](oob/README.md#troupes-release-app-set-up-by-hand)) |
 | `org-profile/` | The source of `troupe-run/.github`'s files, byte for byte |
-| `scripts/guard.py`, `.githooks/`, `.claude/settings.json`, `.github/workflows/guard.yml` | The guard: this repo's own, and the source of every delivered copy |
+| `scripts/guard.py`, `scripts/guard_pytest.py`, `.githooks/`, `.claude/settings.json`, `.github/workflows/guard.yml` | The guard: this repo's own, and the source of every delivered copy |
 | `docs/development-workflow.md` | Every rule the guard enforces, and how an override works |
 | `oob/` | What OpenTofu can't manage, and `scripts/oob.py`'s declarations |
 | `scripts/` | `tofu.py` (the only way to run `tofu`), `oob.py` (drift checks), `check.py` (the repo's check), `guard.py` |
