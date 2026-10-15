@@ -316,13 +316,14 @@ CHECK_PATHS = "scripts/check-paths.toml"
 """Each repository's own declaration of what a change to its paths needs from scripts/check.py:
 nothing (skip), named scopes, or, for a path it doesn't name, the full check. Not delivered
 (commit-check-paths design D1)."""
-SCOPE_NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
+SCOPE_NAME = re.compile(r"[a-z][a-z0-9_]*\Z")
+"""A valid tag in any test runner: a Python attribute, a word in `pytest -m`, a JS identifier."""
 RESERVED_SCOPES = frozenset({"none", "full"})
 """check-scope's other answers, so no scope may be called by them (design D6)."""
 CHECK_PATHS_FIX = (
     f"Fix {CHECK_PATHS}: `version = 1`, then `[skip]` and `[scopes.<name>]` tables, each holding "
-    "only `paths`, a list of exact paths or `dir/**`, with no path in two groups. Or delete it to "
-    "run the full check on every commit."
+    "only `paths`, a list of exact paths or `dir/**`, with no path both skipped and in a scope. Or "
+    "delete it to run the full check on every commit."
 )
 
 
@@ -438,19 +439,19 @@ def check_paths(text: str) -> CheckPaths:
     for name, table in scopes_table.items():
         if not SCOPE_NAME.match(name) or name in RESERVED_SCOPES:
             raise CheckPathsError(
-                f"scope name `{name}` must match [a-z][a-z0-9-]* and not be `none` or `full`."
+                f"scope name `{name}` must match [a-z][a-z0-9_]* and not be `none` or `full`."
             )
         scopes.append((name, _check_paths_group(table, f"scopes.{name}")))
-    groups = [("skip", entry) for entry in skip] + [
-        (f"scopes.{name}", entry) for name, entries in scopes for entry in entries
-    ]
-    for index, (group, entry) in enumerate(groups):
-        for other_group, other in groups[index + 1 :]:
-            if other_group != group and _entries_overlap(entry, other):
-                raise CheckPathsError(
-                    f"`{entry}` in {group} overlaps `{other}` in {other_group}.",
-                    f"List each path in one group only, in {CHECK_PATHS}.",
-                )
+    # Scopes may overlap one another (a path then runs each), but not the skip list (design D2).
+    for name, entries in scopes:
+        for entry in entries:
+            for skipped in skip:
+                if _entries_overlap(skipped, entry):
+                    raise CheckPathsError(
+                        f"`{skipped}` in skip overlaps `{entry}` in scopes.{name}: a path can't "
+                        "be both unread and read by a scope's tests.",
+                        f"Take the path out of skip or out of scopes.{name}, in {CHECK_PATHS}.",
+                    )
     return CheckPaths(skip=skip, scopes=tuple(scopes))
 
 
@@ -462,7 +463,8 @@ def check_scope(paths: Iterable[str], declaration: CheckPaths | None) -> Scope:
     """What a change to these paths needs from scripts/check.py (design D4).
 
     The full check, unless there's a declaration, at least one path, the declaration isn't among
-    them, and every path is skipped or in a scope.
+    them, and every path is skipped or in a scope. Then every scope any path is in, sorted (none
+    means skip): scopes may overlap, and a path in two runs both.
     """
     changed = [path for path in paths if path]
     if declaration is None or not changed or CHECK_PATHS in changed:
@@ -473,13 +475,13 @@ def check_scope(paths: Iterable[str], declaration: CheckPaths | None) -> Scope:
     names: set[str] = set()
     matched: set[str] = set()
     for path in changed:
-        found = next(((name, entry) for name, entry in groups if _matches(entry, path)), None)
-        if found is None:
+        found = [(name, entry) for name, entry in groups if _matches(entry, path)]
+        if not found:
             return FULL_CHECK
-        name, entry = found
-        matched.add(entry)
-        if name is not None:
-            names.add(name)
+        for name, entry in found:
+            matched.add(entry)
+            if name is not None:
+                names.add(name)
     return Scope(full=False, names=tuple(sorted(names)), matched=tuple(sorted(matched)))
 
 

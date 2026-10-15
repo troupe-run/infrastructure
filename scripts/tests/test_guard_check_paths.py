@@ -87,9 +87,15 @@ def test_a_malformed_declaration_is_refused_naming_what_is_wrong(text: str, name
     assert names in problem(text)
 
 
-@pytest.mark.parametrize("name", ["Docs", "1x", "a_b", "-a", "none", "full"])
+@pytest.mark.parametrize("name", ["Docs", "1x", "a-b", "_a", "-a", "none", "full"])
 def test_a_bad_or_reserved_scope_name_is_refused(name: str) -> None:
     assert f"`{name}`" in problem(f'version = 1\n[scopes."{name}"]\npaths = ["x/**"]\n')
+
+
+@pytest.mark.parametrize("name", ["a_b", "docs2", "docs"])
+def test_a_scope_name_that_is_a_tag_in_any_runner_is_accepted(name: str) -> None:
+    text = f'version = 1\n[scopes."{name}"]\npaths = ["x/**"]\n'
+    assert declared(text).scopes == ((name, ("x/**",)),)
 
 
 def test_an_empty_scope_name_is_refused() -> None:
@@ -109,22 +115,28 @@ def test_an_entry_that_is_neither_an_exact_path_nor_a_directory_is_refused(entry
     ("first", "second"),
     [("a/**", "a/b/**"), ("a/b/**", "a/**"), ("a/**", "a/b.md"), ("x.md", "x.md")],
 )
-@pytest.mark.parametrize(
-    ("group_one", "group_two", "table_one", "table_two"),
-    [
-        ("skip", "scopes.docs", "[skip]", "[scopes.docs]"),
-        ("scopes.api", "scopes.docs", "[scopes.api]", "[scopes.docs]"),
-    ],
-)
-def test_entries_that_overlap_across_groups_are_refused_naming_both(
-    first: str, second: str, group_one: str, group_two: str, table_one: str, table_two: str
+@pytest.mark.parametrize("skip_first", [True, False])
+def test_a_skip_entry_that_overlaps_a_scope_entry_is_refused_naming_both(
+    first: str, second: str, skip_first: bool
 ) -> None:
-    text = f'version = 1\n{table_one}\npaths = ["{first}"]\n{table_two}\npaths = ["{second}"]\n'
+    tables = ["[skip]", "[scopes.docs]"] if skip_first else ["[scopes.docs]", "[skip]"]
+    text = f'version = 1\n{tables[0]}\npaths = ["{first}"]\n{tables[1]}\npaths = ["{second}"]\n'
     found = problem(text)
     assert f"`{first}`" in found
     assert f"`{second}`" in found
-    assert group_one in found
-    assert group_two in found
+    assert "skip" in found
+    assert "scopes.docs" in found
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [("a/**", "a/b/**"), ("a/**", "a/b.md"), ("x.md", "x.md"), ("path1/**", "path1/**")],
+)
+def test_scopes_may_overlap_one_another(first: str, second: str) -> None:
+    text = (
+        f'version = 1\n[scopes.blah]\npaths = ["{first}"]\n[scopes.blech]\npaths = ["{second}"]\n'
+    )
+    assert declared(text).scopes == (("blah", (first,)), ("blech", (second,)))
 
 
 def test_entries_with_a_shared_prefix_but_different_directories_do_not_overlap() -> None:
@@ -169,6 +181,27 @@ def test_scoped_and_skipped_paths_run_the_scopes_they_touch_sorted() -> None:
     assert scope.args == ("--scope", "api", "--scope", "docs")
 
 
+OVERLAPPING = """\
+version = 1
+
+[scopes.blah]
+paths = ["path1/**", "another/**"]
+
+[scopes.blech]
+paths = ["path1/**"]
+"""
+
+
+def test_a_path_in_two_overlapping_scopes_runs_both() -> None:
+    scope = guard.check_scope(["path1/blah.py"], declared(OVERLAPPING))
+    assert (scope.full, scope.names) == (False, ("blah", "blech"))
+    assert scope.args == ("--scope", "blah", "--scope", "blech")
+
+
+def test_a_path_in_one_of_two_overlapping_scopes_runs_that_one() -> None:
+    assert guard.check_scope(["another/x"], declared(OVERLAPPING)).names == ("blah",)
+
+
 def test_the_full_check_has_no_arguments() -> None:
     scope = guard.check_scope(["README.md"], declared())
     assert scope.label == "full"
@@ -195,44 +228,50 @@ def test_a_directory_matches_at_any_depth_and_an_exact_entry_only_itself(
 
 # A property: the decision is exactly the groups of the paths (design D4)
 
-GROUPS = (None, "skip", "a", "b")
+# Each top-level name is in no group (empty), the skip list, or one or more scopes.
+MEMBERSHIP = st.one_of(
+    st.just(frozenset[str]()),
+    st.just(frozenset({"skip"})),
+    st.frozensets(st.sampled_from(["a", "b", "c"]), min_size=1),
+)
 
 
 @given(
-    layout=st.lists(st.tuples(st.sampled_from(GROUPS), st.booleans()), min_size=1, max_size=6),
+    layout=st.lists(st.tuples(MEMBERSHIP, st.booleans()), min_size=1, max_size=6),
     picks=st.lists(st.integers(min_value=0, max_value=6), max_size=8),
 )
-def test_the_decision_is_full_or_exactly_the_scopes_the_paths_touch(
-    layout: list[tuple[str | None, bool]], picks: list[int]
+def test_the_decision_is_full_or_exactly_the_scopes_the_paths_are_in(
+    layout: list[tuple[frozenset[str], bool]], picks: list[int]
 ) -> None:
-    # Top-level names t0..tn, each a directory or a file, each in one group or none; index
-    # len(layout) is a path under `other/`, which no group names.
+    # Top-level names t0..tn, each a directory or a file; index len(layout) is a path under
+    # `other/`, which no group names. A name in several scopes is listed in each of them.
     skip: list[str] = []
     scopes: dict[str, list[str]] = {}
-    for index, (group, is_dir) in enumerate(layout):
+    for index, (groups, is_dir) in enumerate(layout):
         entry = f"t{index}/**" if is_dir else f"t{index}.md"
-        if group == "skip":
-            skip.append(entry)
-        elif group is not None:
-            scopes.setdefault(group, []).append(entry)
+        for group in sorted(groups):
+            if group == "skip":
+                skip.append(entry)
+            else:
+                scopes.setdefault(group, []).append(entry)
     declaration = guard.CheckPaths(
         skip=tuple(skip), scopes=tuple((name, tuple(entries)) for name, entries in scopes.items())
     )
     paths: list[str] = []
-    groups: list[str | None] = []
+    memberships: list[frozenset[str]] = []
     for pick in picks:
         if pick >= len(layout):
             paths.append("other/x.py")
-            groups.append(None)
+            memberships.append(frozenset())
         else:
-            group, is_dir = layout[pick]
+            groups, is_dir = layout[pick]
             paths.append(f"t{pick}/x/y.py" if is_dir else f"t{pick}.md")
-            groups.append(group)
+            memberships.append(groups)
 
     scope = guard.check_scope(paths, declaration)
 
-    if not paths or None in groups:
+    if not paths or frozenset() in memberships:
         assert scope.full
     else:
         assert not scope.full
-        assert scope.names == tuple(sorted({g for g in groups if g is not None and g != "skip"}))
+        assert scope.names == tuple(sorted(set().union(*memberships) - {"skip"}))

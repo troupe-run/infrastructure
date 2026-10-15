@@ -32,14 +32,14 @@
       `scripts/guard.py`, as pure functions beside the delivered-file rule (design D2, D4, D5). Verify 1.1's tests
       pass, and that `uv run scripts/check.py` passes (mypy --strict, ruff)
 
-- [ ] 1.3 Change 1.1's tests to the revised rules (design D1, D2, D4), and verify the changed ones fail:
+- [x] 1.3 Change 1.1's tests to the revised rules (design D1, D2, D4), and verify the changed ones fail:
       - scopes may overlap: `blah` (`path1/**`, `another/**`) and `blech` (`path1/**`) are accepted, and
         `check_scope(["path1/blah.py"])` gives `blah`, `blech`; `another/x` gives `blah` alone;
       - skip still may not overlap a scope (`a/**` with `a/b/**`, `a/**` with `a/b.md`, `x.md` with `x.md`), and the
         message names both entries and both groups;
       - scope names: `a_b` and `docs2` are accepted; `a-b`, `Docs`, `1x`, `_a`, `""`, `none` and `full` are refused;
       - the property test lets one top-level name belong to several scopes, and expects every scope a path is in.
-- [ ] 1.4 Make `check_paths` refuse only skip-with-scope overlaps, narrow `SCOPE_NAME` to `[a-z][a-z0-9_]*`, and make
+- [x] 1.4 Make `check_paths` refuse only skip-with-scope overlaps, narrow `SCOPE_NAME` to `[a-z][a-z0-9_]*`, and make
       `check_scope` collect every scope a path's entries match rather than the first. Verify 1.3's tests pass, the
       rest of `scripts/tests/` passes, and `uv run scripts/check.py` passes
 
@@ -74,7 +74,7 @@
       per scope, announced and streamed and with the same timeout and failure handling. Or run the full check as today.
       A malformed declaration refuses as D5 says. Verify 2.1's tests pass, the existing `commit_checks` tests pass
       unchanged, and `uv run scripts/check.py` passes
-- [ ] 2.3 Add a test in `scripts/tests/test_guard_commit_rules.py`: with scopes `blah` (`path1/**`, `another/**`) and
+- [x] 2.3 Add a test in `scripts/tests/test_guard_commit_rules.py`: with scopes `blah` (`path1/**`, `another/**`) and
       `blech` (`path1/**`) declared, committing `path1/blah.py` records `--scope blah --scope blech`. Verify it passes
       after 1.4 (no change to `commit_checks` is expected; if one is needed, it's made here)
 - [ ] 2.4 Update `docs/development-workflow.md`:
