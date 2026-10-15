@@ -75,12 +75,22 @@ def activate_git_hooks(root: Path) -> str | None:
     return guard.activate_hooks(root)
 
 
-def run_gates(steps: list[tuple[str, list[str]]], cwd: Path) -> int:
+NO_TESTS_RAN = 5
+"""pytest's exit code when it selected no tests, as `-m` does for a scope no test is tagged with."""
+
+
+def run_gates(steps: list[tuple[str, list[str]]], cwd: Path, scopes: tuple[str, ...] = ()) -> int:
     for label, command in steps:
         print(f"==> {label}", flush=True)
         started = time.monotonic()
         result = subprocess.run(command, cwd=cwd, check=False)
         elapsed = time.monotonic() - started
+        if scopes and label == "tests" and result.returncode == NO_TESTS_RAN:
+            # Safe: guard_pytest fails any test that reads a scope's paths untagged, so no tagged
+            # tests means no test reads them (commit-check-paths design D8).
+            tags = " or ".join(f"`{name}`" for name in scopes)
+            print(f"    no test is tagged {tags}, so there was nothing to test", flush=True)
+            continue
         if result.returncode != 0:
             code = result.returncode
             print(f"check: {label} failed (exit {code}) after {elapsed:.1f}s", flush=True)
@@ -105,7 +115,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     activated = activate_git_hooks(ROOT)
     if activated is not None:
         print(f"check: {activated}", flush=True)
-    return run_gates(gates(scopes), ROOT)
+    return run_gates(gates(scopes), ROOT, scopes)
 
 
 if __name__ == "__main__":

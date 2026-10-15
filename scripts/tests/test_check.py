@@ -111,3 +111,26 @@ def test_two_scopes_select_tests_tagged_with_either() -> None:
 
 def test_the_full_check_gives_pytest_no_marker_expression() -> None:
     assert "-m" not in pytest_command(())
+
+
+# A scope no test is tagged with (commit-check-paths task 4.7, design D8)
+
+
+def test_a_scoped_test_run_that_selects_nothing_passes_and_says_so(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    gates = [step("tests", 5, tmp_path / "tests"), step("after", 0, tmp_path / "after")]
+    assert check.run_gates(gates, tmp_path, scopes=("api", "docs")) == 0
+    assert (tmp_path / "after").exists()
+    assert "no test is tagged `api` or `docs`, so there was nothing to test" in (
+        capsys.readouterr().out
+    )
+
+
+def test_a_full_test_run_that_collects_nothing_still_fails(tmp_path: Path) -> None:
+    assert check.run_gates([step("tests", 5, tmp_path / "tests")], tmp_path) == 5
+
+
+def test_exit_5_from_another_gate_still_fails_a_scoped_run(tmp_path: Path) -> None:
+    gates = [step("mypy --strict", 5, tmp_path / "mypy")]
+    assert check.run_gates(gates, tmp_path, scopes=("docs",)) == 5

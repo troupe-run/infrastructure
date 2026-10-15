@@ -111,6 +111,10 @@ its tests, to those tagged with any of the scopes. It SHALL refuse a scope its d
 - **WHEN** `scripts/check.py --scope nope` runs and the declaration lists no scope `nope`
 - **THEN** the check fails before running any gate, naming the scope and `scripts/check-paths.toml`
 
+#### Scenario: A scope no test is tagged with
+- **WHEN** `scripts/check.py --scope docs` runs, every other gate passes, and no test is tagged `docs`
+- **THEN** the check passes, and says that no test is tagged `docs`, so there was nothing to test
+
 ### Requirement: Test tags cover what each test reads
 Whenever a repository's tests run, a test SHALL fail if it reads a file under a scope's paths without that scope's
 tag, or reads a file under a skipped path. Only files inside the repository count. The message SHALL name the test,

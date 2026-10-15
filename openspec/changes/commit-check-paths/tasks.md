@@ -151,6 +151,13 @@
       runner, such as vitest, follows the same contract with its own adapter. Add `scripts/guard_pytest.py` to the
       list of delivered files. Verify `uv run scripts/check.py` passes
 
+- [x] 4.7 Make a scope with no tagged tests pass (design D8; pytest exits 5 when `-m` selects nothing). Write a
+      failing test in `scripts/tests/test_check.py`: a scoped run whose tests gate exits 5 passes and prints that no
+      test is tagged with the scopes; the same exit 5 in a full run, or from any other gate, still fails. Then make
+      `run_gates` take the scopes and treat 5 from the tests gate as a pass only when scoped. Verify the test passes,
+      `uv run scripts/check.py` passes, and add the behaviour to the scope contract in
+      `docs/development-workflow.md`
+
 ## 5. This repository adopts it
 
 - [x] 5.1 Confirm that no gate here reads `openspec/`: `git grep -n openspec -- 'scripts/tests/*.py'` shows only
