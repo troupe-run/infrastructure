@@ -74,23 +74,27 @@ reserves its own release branches.
 - **THEN** troupe's "protect main" ruleset's bypass actors are unchanged: the org admins on pull requests, and the
   infrastructure App
 
-### Requirement: Only the release App writes release branches
-troupe SHALL have a ruleset that refuses the creation, update and deletion of any `release-please--*` branch to
-everyone but the release App, with no bypass for org owners. It SHALL NOT refuse the release App's force-push,
-because release-please rewrites its branch as `main` moves. A change to the ruleset on GitHub SHALL show in the next
-plan.
+### Requirement: Only the release App creates or updates release branches
+troupe SHALL have a ruleset that refuses the creation and update of any `release-please--*` branch to everyone but
+the release App, with no bypass for org owners. It SHALL NOT refuse the release App's force-push, because
+release-please rewrites its branch as `main` moves. It SHALL NOT refuse deletion, so GitHub's delete-on-merge removes
+the branch once its pull request merges. A change to the ruleset on GitHub SHALL show in the next plan.
 
 #### Scenario: An owner creates a release branch
 - **WHEN** an org owner pushes a new branch named `release-please--anything` to troupe
 - **THEN** GitHub refuses the push
 
-#### Scenario: An owner writes to or deletes a release branch
-- **WHEN** an org owner pushes to, force-pushes to or deletes an existing `release-please--*` branch on troupe
+#### Scenario: An owner writes to a release branch
+- **WHEN** an org owner pushes or force-pushes to an existing `release-please--*` branch on troupe
 - **THEN** GitHub refuses it, and the branch is unchanged
 
 #### Scenario: The release App writes its branch
-- **WHEN** the release App creates, updates, force-updates or deletes a `release-please--*` branch on troupe
+- **WHEN** the release App creates, updates or force-updates a `release-please--*` branch on troupe
 - **THEN** GitHub allows it
+
+#### Scenario: A merged release pull request
+- **WHEN** a pull request from a `release-please--*` branch on troupe is merged, with delete-on-merge on
+- **THEN** GitHub deletes the branch, and only the release App can create it again
 
 #### Scenario: Other branches are unaffected
 - **WHEN** anyone with write access pushes a branch with any other name, such as one named after an OpenSpec change
