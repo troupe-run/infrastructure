@@ -241,8 +241,13 @@ already loads its `protocol_guard` plugin. A `pytest_plugins` line works only in
 repository has. It:
 - reads `scripts/check-paths.toml` at the start of the session (a malformed one fails the session with D5's message),
   and registers each scope as a marker, so `--strict-markers` accepts them and the declaration is the one list;
-- records the `open` audit event (`sys.addaudithook`, standard library) for every file opened during each test's
-  setup, call and teardown, keeping only files inside the repository;
+- records the `open` audit event (`sys.addaudithook`, standard library) for every file inside the repository, and
+  attributes each read to the tests it was made for:
+  - what a test opens during its own setup, call and teardown;
+  - what its module, and each collector above it, opens while being collected. That covers a module-level
+    `TEXT = DOC.read_text()` and parameters built from a file, which troupe's doc tests use. The first version
+    recorded only the test's own window, and the troupe dry run (task 6.1) showed it missing these;
+  - what each fixture it uses opens while being set up, even when an earlier test set that fixture up;
 - after each test, fails it if `tag_violations` finds anything, so the failure names the test as pytest reports it.
 
 An audit hook can't be removed, so the plugin installs one hook per process. It records only while a test is running.
