@@ -92,6 +92,27 @@ Unset the toggles, then delete the probe repository and the probe's local state.
 **If step 4 keeps the branch,** GitHub's delete is refused by something other than `deletion`. Stop and ask the owner.
 Don't add workarounds.
 
+**Findings (2026-10-15, `troupe-run/infra-probe-20261015`, since deleted).** As GitHub stored it, the ruleset (id
+25144363) has the rules `creation` and `update` on `refs/heads/release-please--*`. Its one bypass is the
+infrastructure App (`Integration` 5272634, `always`), and it reports `current_user_can_bypass: never` for the owner.
+The repository had `delete_branch_on_merge: true` and rebase merges only.
+
+1. **App creates:** succeeded. `github_branch` created `release-please--probe` from `main` (`6aaae48`).
+2. **Owner updates:** refused. A push and a force-push from the owner's login both gave `GH013 … Cannot update this
+   protected ref.`, and the branch stayed at `6aaae48`.
+3. **App commits:** succeeded. `github_repository_file` committed `739cf53` to the branch, authored by
+   `troupe-run-infrastructure[bot]` and verified.
+4. **Delete-on-merge:** the branch is **deleted**. The owner's login opened probe#1 from the branch and merged it with
+   `gh pr merge 1 --rebase`. Its events are `merged`, `closed` and `head_ref_deleted`, and
+   `gh api repos/troupe-run/infra-probe-20261015/branches/release-please--probe` returned 404. This is the opposite
+   of release-app D8 step 6, where `deletion` made GitHub keep the branch.
+5. **Owner recreates:** refused. Pushing `release-please--probe` from the owner's login gave `GH013 … Cannot create
+   ref due to creations being restricted.`
+6. **App recreates:** succeeded. A re-apply saw the branch gone and created it again.
+
+So dropping `deletion` gives delete-on-merge back, and the name stays reserved: only the App can create the branch
+again.
+
 ### D4. One apply updates the ruleset and delivers the guard
 
 After the merge, the plan of `main` holds:

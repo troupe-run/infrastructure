@@ -4,11 +4,11 @@
 
 - [x] 1.1 Remove `deletion = true` from the probe's copy of the ruleset in `tofu/probe/main.tf` and update its comment
       (design D2, D3). Verify with `tofu fmt -check` and `tofu validate` on `tofu/probe`
-- [ ] 1.2 Owner: create a throwaway `troupe-run/infra-probe-<date>` with delete-on-merge on, and add it to the
+- [x] 1.2 Owner: create a throwaway `troupe-run/infra-probe-<date>` with delete-on-merge on, and add it to the
       infrastructure App's installation. Run D3's steps 1–6 through `tofu/probe`, with the owner's own pushes and
       merge. Verify each step's outcome as D3 states it, with the GitHub output quoted. If step 4 keeps the branch,
       stop and ask the owner before going on
-- [ ] 1.3 Record the findings in design.md under D3, then unset the toggles, delete the probe repository and remove
+- [x] 1.3 Record the findings in design.md under D3, then unset the toggles, delete the probe repository and remove
       the probe's local state. Verify with `gh repo view troupe-run/infra-probe-<date>`, which reports not found, and
       `git status`, which shows no probe state
 
@@ -36,11 +36,11 @@
 
 ## 3. The ruleset allows deletion
 
-- [ ] 3.1 Remove `deletion = true` from `github_repository_ruleset.release_branches` in `tofu/release.tf`, and reword
+- [x] 3.1 Remove `deletion = true` from `github_repository_ruleset.release_branches` in `tofu/release.tf`, and reword
       its comment: it reserves creation and update so the name is proof on troupe, and allows deletion so
       delete-on-merge removes the branch (design D2). Verify that `uv run scripts/check.py` passes (fmt, validate
       and 2.3's coverage tests)
-- [ ] 3.2 Reword README's "release branches" paragraph and its `tofu/release.tf` table row (design D5). Verify with
+- [x] 3.2 Reword README's "release branches" paragraph and its `tofu/release.tf` table row (design D5). Verify with
       `grep -rn "RELEASE_AUTHOR_EMAIL\|delete-on-merge\|authored every commit" README.md docs scripts tofu`, which
       should match nothing stale
 
