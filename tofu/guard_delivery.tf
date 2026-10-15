@@ -7,6 +7,8 @@ locals {
 
   guard_files = toset([
     "scripts/guard.py",
+    # The pytest adapter for the guard's tag check (commit-check-paths design D9).
+    "scripts/guard_pytest.py",
     ".githooks/pre-commit",
     ".githooks/commit-msg",
     ".githooks/pre-push",

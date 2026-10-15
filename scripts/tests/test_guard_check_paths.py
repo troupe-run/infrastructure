@@ -358,3 +358,70 @@ def test_check_scope_with_a_malformed_declaration_fails_and_answers_nothing(
     with pytest.raises(guard.CheckPathsError) as error:
         guard.check_paths('version = 1\n[skip]\npaths = ["docs/*.md"]\n')
     assert error.value.decision().text() in result.stderr
+
+
+# Scopes are test tags (commit-check-paths tasks 4.1-4.2, design D8, D9)
+
+TAGGED = """\
+version = 1
+
+[skip]
+paths = ["openspec/**"]
+
+[scopes.docs]
+paths = ["docs/**"]
+
+[scopes.blah]
+paths = ["path1/**"]
+
+[scopes.blech]
+paths = ["path1/**"]
+"""
+
+
+def violations(*reads: str, tags: frozenset[str] = frozenset()) -> list[str]:
+    test = guard.TestReads(test="tests/test_x.py::test_y", tags=tags, reads=frozenset(reads))
+    return guard.tag_violations(test, declared(TAGGED))
+
+
+def test_the_marker_expression_joins_scopes_with_or() -> None:
+    assert guard.marker_expression(("api", "docs")) == "api or docs"
+    assert guard.marker_expression(("docs",)) == "docs"
+
+
+def test_an_untagged_test_reading_a_scope_s_path_is_told_to_add_the_tag() -> None:
+    found = violations("docs/runs.md")
+    assert len(found) == 1
+    assert "tests/test_x.py::test_y" in found[0]
+    assert "docs/runs.md" in found[0]
+    assert "`docs`" in found[0]
+
+
+def test_a_test_reading_a_path_in_two_scopes_needs_both_tags() -> None:
+    found = violations("path1/x.json", tags=frozenset({"blah"}))
+    assert len(found) == 1
+    assert "`blech`" in found[0]
+    assert "`blah`" not in found[0]
+
+
+@pytest.mark.parametrize("tags", [frozenset[str](), frozenset({"docs", "blah", "blech"})])
+def test_a_test_reading_a_skipped_path_is_refused_whatever_its_tags(tags: frozenset[str]) -> None:
+    found = violations("openspec/a.md", tags=tags)
+    assert len(found) == 1
+    assert "openspec/a.md" in found[0]
+    assert "`openspec/**`" in found[0]
+
+
+@pytest.mark.parametrize(
+    ("reads", "tags"),
+    [
+        (("README.md",), frozenset[str]()),
+        (("docs/runs.md",), frozenset({"docs"})),
+        (("path1/x.json", "docs/a.md", "src/b.py"), frozenset({"blah", "blech", "docs"})),
+        ((), frozenset[str]()),
+    ],
+)
+def test_tags_that_cover_every_read_have_no_violations(
+    reads: tuple[str, ...], tags: frozenset[str]
+) -> None:
+    assert violations(*reads, tags=tags) == []

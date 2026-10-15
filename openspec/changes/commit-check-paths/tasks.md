@@ -109,7 +109,7 @@
 
 ## 4. Scopes are test tags, and every test run checks them
 
-- [ ] 4.1 Write failing tests in `scripts/tests/test_guard_check_paths.py` for the pure functions (design D8, D9):
+- [x] 4.1 Write failing tests in `scripts/tests/test_guard_check_paths.py` for the pure functions (design D8, D9):
       - `marker_expression(("api", "docs"))` is `"api or docs"`, and one name is just the name;
       - `tag_violations(TestReads(...), declaration)`, with skip `openspec/**`, scopes `docs` (`docs/**`), `blah`
         (`path1/**`) and `blech` (`path1/**`):
@@ -119,9 +119,9 @@
         - a test reading only `README.md`, or `docs/runs.md` while tagged `docs`, gets none.
 
       Verify they fail
-- [ ] 4.2 Add `TestReads`, `tag_violations` and `marker_expression` to `scripts/guard.py` as pure functions beside
+- [x] 4.2 Add `TestReads`, `tag_violations` and `marker_expression` to `scripts/guard.py` as pure functions beside
       `check_scope`. Verify 4.1's tests pass and `uv run scripts/check.py` passes
-- [ ] 4.3 Write failing tests in a new `scripts/tests/test_guard_pytest.py` that run pytest in a subprocess on a
+- [x] 4.3 Write failing tests in a new `scripts/tests/test_guard_pytest.py` that run pytest in a subprocess on a
       throwaway project (`tmp_path`, with `scripts/guard.py`, `scripts/guard_pytest.py`, a `conftest.py` holding
       `pytest_plugins = ["guard_pytest"]`, and a declaration with skip `openspec/**` and scope `docs`):
       - a test that reads `docs/a.md` through `Path.read_text` without a marker fails, and the output names the test,
@@ -133,7 +133,7 @@
       - with a malformed declaration, the session fails with D5's message.
 
       Verify they fail
-- [ ] 4.4 Add `scripts/guard_pytest.py` (design D9): the source note on its first line, as `guard.py` has; at session
+- [x] 4.4 Add `scripts/guard_pytest.py` (design D9): the source note on its first line, as `guard.py` has; at session
       start, read the declaration from the root directory, register each scope as a marker, and install one audit
       hook; record files opened inside the repository during each test's setup, call and teardown; fail the test with
       every violation `tag_violations` finds. Add it to `guard_files` in `tofu/guard_delivery.tf`, and to the

@@ -38,7 +38,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TextIO
+from typing import ClassVar, TextIO
 
 # Rule ids, as named in refusals, overrides and the rules doc (design D7).
 OVERRIDABLE_RULES = (
@@ -484,6 +484,50 @@ def check_scope(paths: Iterable[str], declaration: CheckPaths | None) -> Scope:
             if name is not None:
                 names.add(name)
     return Scope(full=False, names=tuple(sorted(names)), matched=tuple(sorted(matched)))
+
+
+def marker_expression(names: Iterable[str]) -> str:
+    """pytest's `-m` expression selecting the tests tagged with any of these scopes (design D8)."""
+    return " or ".join(names)
+
+
+@dataclass(frozen=True)
+class TestReads:
+    """What one test read, from any test runner: its id, its tags, and the repository-relative
+    POSIX paths it opened (design D9). A runner's adapter collects it; tag_violations judges it."""
+
+    __test__: ClassVar[bool] = False  # not a pytest test class, despite the name
+
+    test: str
+    tags: frozenset[str]
+    reads: frozenset[str]
+
+
+def tag_violations(test: TestReads, declaration: CheckPaths) -> list[str]:
+    """Each read the test's tags don't cover: a skipped path, or a scope's path without its tag.
+
+    Paths in no group are fine: the full check covers them (design D9).
+    """
+    found = []
+    for path in sorted(test.reads):
+        skipped = next((entry for entry in declaration.skip if _matches(entry, path)), None)
+        if skipped is not None:
+            found.append(
+                f"{test.test} reads {path}, but {CHECK_PATHS} skips `{skipped}`, so a change to it "
+                "would run no test. Take it out of skip (and into a scope), or don't read it."
+            )
+            continue
+        needed = sorted(
+            {name for name, entries in declaration.scopes for e in entries if _matches(e, path)}
+        )
+        missing = [name for name in needed if name not in test.tags]
+        if missing:
+            tags = " and ".join(f"`{name}`" for name in missing)
+            found.append(
+                f"{test.test} reads {path}, which {CHECK_PATHS} puts in scope {tags}, so a change "
+                f"to it wouldn't run this test. Tag the test {tags} (pytest: @pytest.mark.<name>)."
+            )
+    return found
 
 
 def read_working_tree(root: Path) -> Callable[[str], str | None]:
