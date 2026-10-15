@@ -38,11 +38,12 @@ resource "github_actions_variable" "release_app_client_id" {
   value         = local.release_app_client_id
 }
 
-# Only the release App creates, updates or deletes a release-please branch: the guard's exemption
-# for those branches trusts a commit's author, which anyone can set, so GitHub enforces who writes
-# them (#33 design D5). No non_fast_forward rule, because release-please force-pushes its branch, and
-# no owner bypass; the break-glass is editing the ruleset on GitHub. GitHub's delete-on-merge is
-# refused here too, so the branch persists between releases (design D7, D8).
+# Only the release App creates or updates a release-please branch, so on troupe the branch's name is
+# proof of who wrote it, and the guard exempts it by that name (drop-forgery-resistance design D1,
+# D2). No non_fast_forward rule, because release-please force-pushes its branch, and no owner
+# bypass; the break-glass is editing the ruleset on GitHub. No deletion rule, so GitHub's
+# delete-on-merge removes the branch once its pull request merges; only the App can create it again
+# (probed: drop-forgery-resistance design D3).
 resource "github_repository_ruleset" "release_branches" {
   name        = "release branches"
   repository  = module.repo_troupe.name
@@ -60,7 +61,6 @@ resource "github_repository_ruleset" "release_branches" {
     creation                      = true
     update                        = true
     update_allows_fetch_and_merge = false
-    deletion                      = true
   }
 
   bypass_actors {
