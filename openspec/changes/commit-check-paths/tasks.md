@@ -183,7 +183,7 @@
 
 ## 6. Evidence
 
-- [ ] 6.1 In a local scratch clone of troupe (under the scratchpad, nothing pushed), on a branch named for a scratch
+- [x] 6.1 In a local scratch clone of troupe (under the scratchpad, nothing pushed), on a branch named for a scratch
       change created with `openspec new change`:
       - copy in this branch's `scripts/guard.py` and `scripts/guard_pytest.py`, and commit them with `--no-verify`,
         since this stands in for the delivery;
@@ -201,6 +201,30 @@
       - commit a source file: verify the full check runs.
 
       Record the commands, timings and output here, including the full run's time with and without the plugin
+      Done 2026-10-15, in a scratch clone of troupe at bca3754 with its remote removed (nothing pushed). Branch and
+      change `scratch-check-paths`; hook commits run with `env -u CLAUDE_PROJECT_DIR`, so the guard reads the clone.
+      - **Stand-in commit:** made before anything turned the hooks on, since a fresh clone runs none. `--no-verify`
+        is refused in this session, and with the hooks on, troupe's `delivered-file` rule rightly refuses a
+        hand-made change to `scripts/guard.py`. The first clone's hooks were turned on too early by `check.py`, so
+        it was discarded and a second, fresh clone used. The commit holds both delivered files, the declaration
+        (skip `openspec/**`; scope `docs`: `docs/**`, `plugins/runner-scripted/README.md`), `-p guard_pytest` with
+        `scripts` on `pythonpath`, and a minimal `check.py --scope`.
+      - **Tag check, no markers:** the first plugin version failed only 7 tests. That showed it missing reads at
+        import and collection, which is fixed in the plugin (D9). With the fix, it failed 26: every test in the six
+        doc-test modules, and `test_scripted_schemas.py::test_the_readmes_options_table_lists_exactly_the_options_schemas_properties`.
+        That's 1682 passed, 4 skipped, 26 errors.
+      - **Tagged:** `pytestmark = pytest.mark.docs` on the six modules, and `@pytest.mark.docs` on that one test.
+        `-m docs` then selects exactly 26 of 1686. The full `check.py` passes: 1682 passed, 4 skipped, tests 225.3s,
+        230.7s overall. Without the plugin the suite takes 225.72s, and with it 224.29s, so there's no measurable
+        cost. Without the plugin, `--strict-markers` refuses `docs`, so the declaration is the one marker list.
+      - **Commits through the hooks:**
+        - tags only: the full check, 225s;
+        - `openspec/changes/scratch-check-paths/proposal.md` only: `guard: only openspec/** is staged; the check
+          is skipped (scripts/check-paths.toml).`, 0.35s;
+        - `docs/event-store.md` only: `guard: only docs/** is staged; running scripts/check.py --scope docs instead
+          of the full check ...`. Every gate ran, `26 passed, 1660 deselected in 0.65s`, and the commit took 2.12s;
+        - a source file (`packages/troupe/src/troupe/core/exit_codes.py`): the full check, 235s. Its first attempt
+          was correctly refused by the ruff format gate.
 - [ ] 6.2 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
       `scripts/guard.py` updated and `scripts/guard_pytest.py` created in troupe, and nothing else. Check that the
       delivered list (`.github/guard-delivery.json`) gains the new file. Keep it for the pull request
