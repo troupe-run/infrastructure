@@ -39,7 +39,7 @@ guard: commit-on-main: commits aren't made on main; work reaches main through a 
 | Rule | Layer | Refuses | Fix |
 |---|---|---|---|
 | `commit-on-main` | git | a commit with `main` checked out | create a branch named after the change |
-| `commit-branch-change` | git | a commit on a branch with no matching OpenSpec change (active, or archived on that branch), or on a detached HEAD. On GitHub, a `release-please--` branch is exempt when it adds at least one commit to `main`, every one is authored by the release App's bot (`RELEASE_AUTHOR_EMAIL` in `scripts/guard.py`), and the branch lives in a repository whose ruleset reserves those branches for the App (`RELEASE_REPOSITORIES`: troupe only). For a pull request that's its head repository, so a fork's branch is never exempt; a run that names no repository exempts nothing | propose the change, or switch to its branch |
+| `commit-branch-change` | git | a commit on a branch with no matching OpenSpec change (active, or archived on that branch), or on a detached HEAD. On GitHub, a `release-please--` branch is exempt by its name when it lives in a repository whose ruleset lets only the release App create or update those branches (`RELEASE_REPOSITORIES` in `scripts/guard.py`: troupe only). Who authored its commits isn't asked. For a pull request that's its head repository, so a fork's branch is never exempt; a run that names no repository exempts nothing | propose the change, or switch to its branch |
 | `commit-message` | git | a first line that isn't a Conventional Commit (`type(scope)!: subject`); `fixup!`, `squash!` and `amend!` are accepted when they name a Conventional Commit subject. The `guard` check applies the same rule to a pull request's title, which becomes the commit message if squash merging is ever turned on | use one of `feat fix docs build ci test refactor perf style chore revert` |
 | `commit-checks` | git | a commit while tracked files have unstaged changes, while `scripts/check.py` fails, or while `scripts/check-paths.toml` is malformed. The check runs only what the staged paths need (see below) | stage or stash the changes; fix what the check reports, or the declaration |
 | `archive-incomplete` | git | a commit that adds an archived change with an unticked task | finish and tick every task first |
@@ -211,9 +211,16 @@ other org-wide files (specs: `development-workflow`, `org-profile`).
 
 ## Known gaps
 
+GitHub enforces rules that apply to everyone, or that protect a secret, such as an App's key. It doesn't try to tell
+an agent from the owner: agents work with the owner's `gh` login, so GitHub sees one identity. Agents are governed
+locally, by the guard's hooks and `gh` allow-list. The owner's review at merge is the gate, and required checks are
+evidence for that review. A GitHub check that a pusher can satisfy by writing an author, naming a branch or editing a
+workflow catches mistakes, not forgery. A rule that GitHub enforces for everyone but an App, like `protect main` or
+troupe's release ruleset, is different: getting past it takes the App's key (#47).
+
 - **These hooks aren't a security boundary.** They stop honest shortcuts. A Bash command that writes a file isn't
   seen by the edit hook, though the git hooks catch it at commit time. A determined bypass is still possible.
-  GitHub's rulesets and required checks are the hard backstop.
+  GitHub's rulesets and required checks back them up, and the owner's review at merge is the gate.
 - **A grant skips Claude Code's own checks.** When the guard answers "allow", auto mode's classifier isn't consulted,
   even for its `hard_deny` rules (measured on 2026-10-13; the docs don't state it). So for a granted command, the
   conditions under "What the guard grants" are the only check, apart from a person's own `deny` and `ask` rules. A
@@ -235,18 +242,17 @@ other org-wide files (specs: `development-workflow`, `org-profile`).
 - **The local hooks run the working tree's `guard.py`.** A commit that edits it can disable its own check. The
   `guard` check on GitHub runs the committed rules, and in a repository that receives the guard, the plan shows the
   edit as drift.
-- **A forged delivery reaches `main` and is caught afterwards.** The `guard` check accepts a change to a delivered
+- **The `delivered-file` check catches mistakes, not forgery.** The `guard` check accepts a change to a delivered
   file whose author is the infrastructure App's bot, and anyone can write that into a commit. It also runs the pushed
   copy of itself, so a push could change the check too. GitHub can't refuse the push either: it allows no push rules
-  on a public repository (enforce-delivered-files, design D1). So the guard's rule stops honest mistakes. A forged
-  change shows in the daily plan within a day of landing, and stays until the owner approves the apply that
-  restores it.
-- **The release-branch exemption trusts the commit's author.** A `release-please--` branch skips the
-  branch-change rule when the release App's bot authored its commits, and anyone can write that author into a
-  commit. The hard check is troupe's "release branches" ruleset (`tofu/release.tf`), which lets only the release App
-  create, update or delete those branches, so on troupe the branch name is the proof. The exemption applies nowhere
-  else: not in this repository, which has no such ruleset, and not to a fork's branch, which troupe's ruleset doesn't
-  cover. A test fails if an exempt repository loses its declared ruleset.
+  on a public repository (enforce-delivered-files, design D1). A change that gets past it, by any route, is drift: it
+  shows in the daily plan within a day of landing, and stays until the owner approves the apply that restores it.
+- **The release-branch exemption is by name, on troupe only.** A `release-please--` branch skips the branch-change
+  rule on GitHub when it lives in troupe, whoever authored its commits. troupe's "release branches" ruleset
+  (`tofu/release.tf`) lets only the release App create or update those branches, so there the name is proof. The
+  exemption applies nowhere else: not in this repository, which has no such ruleset, and not to a fork's branch,
+  which troupe's ruleset doesn't cover. A test fails if an exempt repository loses its declared ruleset, or the
+  ruleset stops reserving creation or update.
 - **Overrides are local.** The `guard` check on GitHub ignores them, so nothing granted on one machine excuses a
   commit on `main`.
 - **Bash parsing is heuristic.** When a `git` or `gh` command can't be parsed, it's refused rather than guessed at.

@@ -207,8 +207,8 @@ troupe holds copies of the guard's files, delivered from this repo by the App st
 The probe showed how this behaves (design D3 and D8 of the `development-workflow` change):
 - troupe's ruleset lets only the App push to `main`; the owner's own push is still refused;
 - a hand edit to a delivered file in troupe fails troupe's `guard` check (`delivered-file`), and shows in the next
-  plan, at the latest the next daily one, whose apply restores the file. A commit forging the App as its author
-  passes the check, and the daily plan is what catches it (enforce-delivered-files);
+  plan, at the latest the next daily one, whose apply restores the file. The check catches mistakes, not forgery: a
+  change that gets past it is drift like any other (docs/development-workflow.md, Known gaps);
 - an unchanged file is never recommitted.
 
 **If a delivery breaks troupe,** fix the source here and deliver again: no troupe hook can block a delivery. A person

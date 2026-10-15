@@ -46,18 +46,20 @@
 
 ## 4. The principle is written down
 
-- [ ] 4.1 In `docs/development-workflow.md`:
+- [x] 4.1 In `docs/development-workflow.md`:
       - add D5's principle paragraph at the head of Known gaps;
       - rewrite the forged-delivery entry and the release-exemption entry;
       - update the `commit-branch-change` row of the rules table to say that on GitHub, a `release-please--` branch
         in troupe is exempt by its name.
 
       Verify `uv run pytest scripts/tests/test_guard_docs.py` passes
-- [ ] 4.2 Reword README's delivery bullet on forged authors and `.github/workflows/tofu.yml`'s header comment as drift
+- [x] 4.2 Reword README's delivery bullet on forged authors and `.github/workflows/tofu.yml`'s header comment as drift
       detection (design D5). Verify with `grep -rn -i "forg" README.md .github docs` that each remaining mention
       describes the check as catching mistakes, not forgery
-- [ ] 4.3 Add one constraint to `openspec/config.yaml`'s context stating the principle, and cite #47. Verify that
-      `openspec validate drop-forgery-resistance --strict` passes and that `openspec context --json` shows the line
+- [x] 4.3 Add one constraint to `openspec/config.yaml`'s context stating the principle, and cite #47. Verify that
+      `openspec validate drop-forgery-resistance --strict` passes and that the `context` of
+      `openspec instructions apply --change drop-forgery-resistance --json` shows the line (`openspec context --json`
+      doesn't return the config's context)
 
 ## 5. Evidence
 

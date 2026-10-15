@@ -34,6 +34,9 @@ context: |
   - The guard is Python 3.12+, managed with uv, standard library only, and works offline on Linux, macOS and
     Windows. Hooks refuse with the rule and the fix, and an override is granted only by the owner.
   - GitHub Free, public repos. Commit-message rules can't be enforced by GitHub; rulesets can.
+  - GitHub enforces rules for everyone, or ones that protect a secret such as an App's key. It never tries to tell an
+    agent from the owner: they share the owner's gh login. Don't design GitHub checks against forgery by someone
+    holding that login. Agents are governed locally by the guard, and the owner's review is the gate (#47).
 
   Quality bar:
   - Python: mypy --strict and ruff clean; every behaviour has a test that fails when it breaks, named for what its
