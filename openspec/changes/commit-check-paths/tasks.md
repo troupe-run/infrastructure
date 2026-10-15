@@ -77,7 +77,7 @@
 - [x] 2.3 Add a test in `scripts/tests/test_guard_commit_rules.py`: with scopes `blah` (`path1/**`, `another/**`) and
       `blech` (`path1/**`) declared, committing `path1/blah.py` records `--scope blah --scope blech`. Verify it passes
       after 1.4 (no change to `commit_checks` is expected; if one is needed, it's made here)
-- [ ] 2.4 Update `docs/development-workflow.md`:
+- [x] 2.4 Update `docs/development-workflow.md`:
       - the `commit-checks` row: add "or while `scripts/check-paths.toml` is malformed", and say a commit runs only
         what its staged paths need;
       - the paragraph after the rules table: rewrite it to cover the declaration's format (skip and scopes, the two
@@ -90,7 +90,7 @@
 
 ## 3. CI reads the same declaration
 
-- [ ] 3.1 Write failing tests for `guard.py check-scope` (design D6), run as a subprocess in a `make_repo` repository
+- [x] 3.1 Write failing tests for `guard.py check-scope` (design D6), run as a subprocess in a `make_repo` repository
       holding 2.1's declaration plus the overlapping `blah`/`blech` scopes from 2.3, with the paths on stdin:
       - `openspec/a.md` alone prints `scope=none` and `check-args=`, and exits 0;
       - `docs/a.md` plus `openspec/a.md` prints `scope=docs` and `check-args=--scope docs`;
@@ -101,9 +101,9 @@
       - a malformed declaration exits 1, prints the commit hook's refusal text to stderr, and prints nothing to stdout.
 
       Verify they fail
-- [ ] 3.2 Add the `check-scope` subcommand to `main`, reading `CHECK_PATHS` from the working tree, and list it in the
+- [x] 3.2 Add the `check-scope` subcommand to `main`, reading `CHECK_PATHS` from the working tree, and list it in the
       module docstring's entry points. Verify 3.1's tests pass and `uv run scripts/check.py` passes
-- [ ] 3.3 Document `check-scope` in `docs/development-workflow.md`. Cover the `git diff ... | uv run --no-project
+- [x] 3.3 Document `check-scope` in `docs/development-workflow.md`. Cover the `git diff ... | uv run --no-project
       scripts/guard.py check-scope` line, its outputs, how a job uses `scope` and `check-args`, and what CI still
       decides itself (the base, and passing an empty list when it can't). Verify `uv run scripts/check.py` passes
 

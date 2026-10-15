@@ -41,7 +41,7 @@ guard: commit-on-main: commits aren't made on main; work reaches main through a 
 | `commit-on-main` | git | a commit with `main` checked out | create a branch named after the change |
 | `commit-branch-change` | git | a commit on a branch with no matching OpenSpec change (active, or archived on that branch), or on a detached HEAD. On GitHub, a `release-please--` branch is exempt when it adds at least one commit to `main`, every one is authored by the release App's bot (`RELEASE_AUTHOR_EMAIL` in `scripts/guard.py`), and the branch lives in a repository whose ruleset reserves those branches for the App (`RELEASE_REPOSITORIES`: troupe only). For a pull request that's its head repository, so a fork's branch is never exempt; a run that names no repository exempts nothing | propose the change, or switch to its branch |
 | `commit-message` | git | a first line that isn't a Conventional Commit (`type(scope)!: subject`); `fixup!`, `squash!` and `amend!` are accepted when they name a Conventional Commit subject. The `guard` check applies the same rule to a pull request's title, which becomes the commit message if squash merging is ever turned on | use one of `feat fix docs build ci test refactor perf style chore revert` |
-| `commit-checks` | git | a commit while tracked files have unstaged changes, or while `scripts/check.py` fails | stage or stash the changes; fix what the check reports |
+| `commit-checks` | git | a commit while tracked files have unstaged changes, while `scripts/check.py` fails, or while `scripts/check-paths.toml` is malformed. The check runs only what the staged paths need (see below) | stage or stash the changes; fix what the check reports, or the declaration |
 | `archive-incomplete` | git | a commit that adds an archived change with an unticked task | finish and tick every task first |
 | `edit-branch-change` | Claude | an Edit, Write, MultiEdit or NotebookEdit to a repository file when the branch has no matching change | switch to, or create, the change's branch |
 | `pr-closes-issue` | Claude | `gh pr create` into this repository whose `--body` or `--body-file` doesn't close an issue, or that uses `--fill` or stdin. The target is named by `--repo`/`-R`, else `GH_REPO`, else it's this repository; a PR into another repository isn't checked, and a target that can't be read, or a clone with no remote, counts as this one | add `Closes #<issue>`, or name the other repository with `--repo` |
@@ -52,10 +52,64 @@ guard: commit-on-main: commits aren't made on main; work reaches main through a 
 | `gh-allow-list` | Claude | any other `gh` command not on the allow-list (reads, and the everyday pull request, issue, comment, sub-issue, project-item and workflow-run writes): an unknown subcommand, an extension, an alias, an unlisted `gh api` write, any GraphQL mutation (each everyday write has one way to do it, its `gh` command: guard-issue-mutations, design D1), and a GraphQL query that can't be read before it runs (stdin, or a file not yet written). The list is the `GH_*` tables in `scripts/guard.py`, built from the commands agents ran in earlier sessions (refuse-admin-merge, design D4) | for a GraphQL mutation, the refusal names it and, when there is one, the `gh` command that does the same (`updateIssueIssueType` → `gh issue edit <n> --type <name>`); otherwise ask the owner, or add it to the list in `troupe-run/infrastructure`; a read with fields needs `-X GET` |
 | `guard-tamper` | Claude | running the override command, naming a path in the override directory, or editing under `.git/`. **No override unlocks this rule.** | ask the owner |
 
-The pre-commit check runs the full `scripts/check.py`. That takes 10–15 seconds on macOS and about a minute on
-Windows, plus a one-time dependency download on a fresh clone. It's the same check CI runs, so a commit that passes
-locally passes CI. The check is announced before it starts, its output streams as it runs, and it's stopped and the
-commit refused after 10 minutes (`CHECK_TIMEOUT_SECONDS` in `scripts/guard.py`).
+## What a commit runs
+
+Before a commit, the guard runs `scripts/check.py`, the same check CI runs. Here the full check takes about 65
+seconds on macOS (measured 2026-10-15), plus a one-time dependency download on a fresh clone. Whatever runs is
+announced before it starts, its output streams as it runs, and it's stopped and the commit refused after 10 minutes
+(`CHECK_TIMEOUT_SECONDS` in `scripts/guard.py`).
+
+A repository can say that some paths need less than the full check, in `scripts/check-paths.toml`. The file is the
+repository's own and isn't delivered, because what its tests read is its own knowledge:
+
+```toml
+version = 1
+
+[skip]          # no test reads these
+paths = ["openspec/**"]
+
+[scopes.docs]   # only the tests tagged `docs` read these
+paths = ["docs/**", "plugins/runner-scripted/README.md"]
+```
+
+- **Entries** are an exact path (`plugins/runner-scripted/README.md`) or a directory and everything under it
+  (`docs/**`). No other wildcard is accepted.
+- **Scopes may overlap.** A path in two scopes runs both. A path can't be both skipped and in a scope.
+- **Scope names** match `[a-z][a-z0-9_]*`, so each is a valid tag in any test runner. `none` and `full` are reserved.
+- **Anything else is malformed**, and refuses the commit, naming the file, the problem and the fix. That includes
+  other keys or tables, another `version`, and the bad entries above. A malformed file is never treated as missing.
+
+The guard lists the staged paths with rename detection off, so a file moved from `src/` into `openspec/` counts by
+both names. Then:
+
+| Staged paths | What runs |
+|---|---|
+| all skipped | nothing; the guard says `only openspec/** is staged; the check is skipped (scripts/check-paths.toml).` |
+| all skipped or in scopes | `scripts/check.py --scope <a> --scope <b>`, for every scope a path is in, sorted |
+| any path in no group, none at all, or `scripts/check-paths.toml` itself | the full check |
+
+With no `scripts/check-paths.toml`, every commit runs the full check. A commit that changes the declaration always
+runs the full check, so it can't widen itself and benefit in the same commit. This repository skips `openspec/**`.
+
+**CI gets the same answer from the same code.** A workflow pipes the changed paths into `check-scope`:
+
+```bash
+git diff --name-only --no-renames "$BASE...$HEAD" | uv run --no-project scripts/guard.py check-scope >> "$GITHUB_OUTPUT"
+```
+
+It prints two lines:
+
+| Decision | Output |
+|---|---|
+| nothing | `scope=none` and `check-args=` |
+| scopes | `scope=api,docs` and `check-args=--scope api --scope docs` |
+| full | `scope=full` and `check-args=` |
+
+A job reports success when `scope` is `none`, and otherwise runs `uv run scripts/check.py <check-args>`. That keeps
+a required check reporting even when nothing needs to run, which `paths-ignore` wouldn't. A malformed declaration
+fails the step, prints the same message as the commit hook, and prints no answer. CI still decides two things for
+itself: the base to compare against, and what to do when it can't work one out (a new branch, a force push, a shallow
+history). Then it passes no paths, and the answer is `full`.
 
 ## What the guard grants
 

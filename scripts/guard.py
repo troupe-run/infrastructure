@@ -10,6 +10,7 @@ the rules, honour a person-granted override, and refuse or allow:
     guard.py claude-session-start    Claude Code SessionStart hook
     guard.py pre-push                git hook (.githooks/pre-push)
     guard.py ci                      the same rules on GitHub, for a push or pull request
+    guard.py check-scope             CI: what changed paths (stdin) need from scripts/check.py
     guard.py override RULE --reason  a person grants one override, from their own terminal
 
 Standard library only, so it runs under `uv run --no-project` without installing anything.
@@ -1894,6 +1895,23 @@ def run_pre_commit(root: Path) -> int:
     return 0
 
 
+def run_check_scope(root: Path, paths: Iterable[str], stdout: TextIO | None = None) -> int:
+    """CI's entry to the commit hook's decision: `scope=` and `check-args=` for $GITHUB_OUTPUT.
+
+    Reads the declaration from the working tree, which CI has checked out at the head. No paths
+    means the full check; a malformed declaration fails and answers nothing (design D6).
+    """
+    out = sys.stdout if stdout is None else stdout
+    text = read_working_tree(root)(CHECK_PATHS)
+    try:
+        scope = check_scope(paths, None if text is None else check_paths(text))
+    except CheckPathsError as error:
+        print(error.decision().text(), file=sys.stderr)
+        return 1
+    print(f"scope={scope.label}\ncheck-args={' '.join(scope.args)}", file=out)
+    return 0
+
+
 def run_commit_msg(root: Path, message_file: Path) -> int:
     message = message_file.read_text(encoding="utf-8")
     first = next((line for line in message.splitlines() if line.strip()), "")
@@ -2030,6 +2048,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--repository",
         help="owner/name of the repository the branch lives in (default: from GitHub)",
     )
+    sub.add_parser(
+        "check-scope", help="what changed paths (stdin) need from scripts/check.py, for CI"
+    )
     grant = sub.add_parser("override", help="grant one override (a person, in a terminal)")
     grant.add_argument("rule", choices=OVERRIDABLE_RULES)
     grant.add_argument("--reason", required=True)
@@ -2053,6 +2074,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_pre_push(root, sys.stdin.read().splitlines())
     if args.entry == "ci":
         return run_ci_entry(root, args.base, args.head, args.branch, args.title, args.repository)
+    if args.entry == "check-scope":
+        return run_check_scope(root, sys.stdin.read().splitlines())
     path = grant_override(root, args.rule, args.reason)
     print(f"guard: override granted for '{args.rule}' (one action). Recorded in {path.parent}.")
     return 0

@@ -1,6 +1,11 @@
 """commit-check-paths tasks 1.1-1.2: the check-paths declaration, read and decided (D1-D5)."""
 
+import subprocess
+import sys
+from collections.abc import Callable
+
 import pytest
+from conftest import SCRIPTS, Repo, clean_env
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -275,3 +280,81 @@ def test_the_decision_is_full_or_exactly_the_scopes_the_paths_are_in(
     else:
         assert not scope.full
         assert scope.names == tuple(sorted(set().union(*memberships) - {"skip"}))
+
+
+# CI's entry: guard.py check-scope (commit-check-paths tasks 3.1-3.2, design D6)
+
+CI_DECLARATION = """\
+version = 1
+
+[skip]
+paths = ["openspec/**"]
+
+[scopes.docs]
+paths = ["docs/**"]
+
+[scopes.api]
+paths = ["api/**"]
+
+[scopes.blah]
+paths = ["path1/**", "another/**"]
+
+[scopes.blech]
+paths = ["path1/**"]
+"""
+
+
+def check_scope_cli(
+    make_repo: Callable[[], Repo], stdin: str, declaration: str | None = CI_DECLARATION
+) -> subprocess.CompletedProcess[str]:
+    repo = make_repo()
+    if declaration is not None:
+        repo.write(guard.CHECK_PATHS, declaration)
+    env = {key: value for key, value in clean_env().items() if key != "CLAUDE_PROJECT_DIR"}
+    return subprocess.run(
+        [sys.executable, str(SCRIPTS / "guard.py"), "check-scope"],
+        input=stdin,
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo.path,
+        env=env,
+    )
+
+
+@pytest.mark.parametrize(
+    ("stdin", "scope", "args"),
+    [
+        ("openspec/a.md\n", "none", ""),
+        ("docs/a.md\nopenspec/a.md\n", "docs", "--scope docs"),
+        ("docs/a.md\napi/b.py\n", "api,docs", "--scope api --scope docs"),
+        ("path1/blah.py\n", "blah,blech", "--scope blah --scope blech"),
+        ("README.md\nopenspec/a.md\n", "full", ""),
+        ("", "full", ""),
+        ("\n\n", "full", ""),
+    ],
+)
+def test_check_scope_prints_the_scope_and_the_check_s_arguments(
+    make_repo: Callable[[], Repo], stdin: str, scope: str, args: str
+) -> None:
+    result = check_scope_cli(make_repo, stdin)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == f"scope={scope}\ncheck-args={args}\n"
+
+
+def test_check_scope_without_a_declaration_answers_full(make_repo: Callable[[], Repo]) -> None:
+    result = check_scope_cli(make_repo, "openspec/a.md\n", declaration=None)
+    assert result.stdout == "scope=full\ncheck-args=\n"
+
+
+def test_check_scope_with_a_malformed_declaration_fails_and_answers_nothing(
+    make_repo: Callable[[], Repo],
+) -> None:
+    result = check_scope_cli(
+        make_repo, "openspec/a.md\n", declaration='version = 1\n[skip]\npaths = ["docs/*.md"]\n'
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    with pytest.raises(guard.CheckPathsError) as error:
+        guard.check_paths('version = 1\n[skip]\npaths = ["docs/*.md"]\n')
+    assert error.value.decision().text() in result.stderr
