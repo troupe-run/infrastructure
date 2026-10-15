@@ -42,5 +42,6 @@ mypy_path = ["scripts", "scripts/tests"]
 [tool.pytest.ini_options]
 testpaths = ["scripts/tests"]
 pythonpath = ["scripts"]
-addopts = ["-ra", "--strict-markers", "--strict-config"]
+# guard_pytest checks each test's markers against what it reads (scripts/check-paths.toml).
+addopts = ["-ra", "--strict-markers", "--strict-config", "-p", "guard_pytest"]
 xfail_strict = true

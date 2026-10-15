@@ -186,9 +186,9 @@ This repository gets the whole pattern, so it's proven here before troupe relies
 - `scripts/check-paths.toml` with `[skip] paths = ["openspec/**"]` and no scopes. Its gates don't read `openspec/`
   (see Context).
 - `--scope` in its `check.py`. With no scopes declared, every name is refused, but the contract is in place.
-- The plugin loaded from `scripts/tests/conftest.py`, so every test run here proves that no test reads `openspec/`.
+- The plugin loaded from `pyproject.toml`, so every test run here proves that no test reads `openspec/`.
 
-troupe's declaration, its `docs` markers, its `check.py --scope` and its `conftest.py` line are troupe's own files,
+troupe's declaration, its `docs` markers, its `check.py --scope` and its pytest configuration are troupe's own files,
 so they reach troupe through troupe#101's change. Until that lands, troupe's commits run the full check as they do
 today. The guard ignores a missing declaration, so the order of the two doesn't matter.
 
@@ -236,7 +236,9 @@ match it. Each violation names the test, the file, and either the tags to add or
 in no group are ignored: the full check covers them.
 
 The pytest adapter is a plugin, `scripts/guard_pytest.py`. It's delivered with the guard, so both repositories run
-one copy, and loaded with `pytest_plugins = ["guard_pytest"]` in the repository's root `conftest.py`. It:
+one copy. It's loaded with `-p guard_pytest` in `addopts`, with `scripts` on pytest's `pythonpath`, the way troupe
+already loads its `protocol_guard` plugin. A `pytest_plugins` line works only in a root `conftest.py`, which neither
+repository has. It:
 - reads `scripts/check-paths.toml` at the start of the session (a malformed one fails the session with D5's message),
   and registers each scope as a marker, so `--strict-markers` accepts them and the declaration is the one list;
 - records the `open` audit event (`sys.addaudithook`, standard library) for every file opened during each test's
@@ -277,7 +279,7 @@ the plugin as code each repository copies (two copies drift; delivering it keeps
 1. Merge here: the guard reads declarations, the plugin checks tags, and this repository skips `openspec/**`.
 2. Deliver `scripts/guard.py` and `scripts/guard_pytest.py` to troupe (CI green on all three OSes, then the owner
    approves the plan). troupe has no declaration and doesn't load the plugin yet, so nothing changes there.
-3. troupe#101's change adds troupe's declaration, its `docs` markers, the `conftest.py` line, `check.py --scope`, and
+3. troupe#101's change adds troupe's declaration, its `docs` markers, `-p guard_pytest`, `check.py --scope`, and
    its CI use of `check-scope`. From then on, troupe's `openspec/`-only commits skip the check, its `docs/`-only commits
    run the doc tests, and every test run checks the tags.
 

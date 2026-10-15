@@ -26,7 +26,7 @@ that closes the issue. Specs live in `openspec/specs/`.
 | `scripts/guard.py`, `scripts/guard_pytest.py`, `.githooks/`, `.claude/settings.json`, `.github/workflows/guard.yml` | The guard: this repo's own, and the source of every delivered copy |
 | `docs/development-workflow.md` | Every rule the guard enforces, and how an override works |
 | `oob/` | What OpenTofu can't manage, and `scripts/oob.py`'s declarations |
-| `scripts/` | `tofu.py` (the only way to run `tofu`), `oob.py` (drift checks), `check.py` (the repo's check), `guard.py` |
+| `scripts/` | `tofu.py` (the only way to run `tofu`), `oob.py` (drift checks), `check.py` (the repo's check), `check-paths.toml` (what a change to each path needs from the check), `guard.py` |
 
 ## Setup
 

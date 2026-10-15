@@ -128,10 +128,12 @@ on a module. `check.py` runs `pytest -m "api or docs"`, built by `guard.marker_e
 **Every test run checks the tags.** A test fails if it reads a file under a scope's paths without that scope's tag,
 or reads a skipped path at all. The message names the test, the file and the tag to add. So a new test that reads
 `docs/` can't be left out of the `docs` scope unnoticed: the next full run fails it. For pytest, the check is the
-delivered plugin `scripts/guard_pytest.py`, loaded from the root `conftest.py`:
+delivered plugin `scripts/guard_pytest.py`, loaded from the pytest configuration in `pyproject.toml`:
 
-```python
-pytest_plugins = ["guard_pytest"]  # with scripts/ on sys.path
+```toml
+[tool.pytest.ini_options]
+pythonpath = ["scripts"]                  # wherever the repository keeps it on the path
+addopts = ["-p", "guard_pytest"]
 ```
 
 It registers each declared scope as a marker, so `--strict-markers` accepts them and the declaration is the one

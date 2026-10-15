@@ -1,0 +1,10 @@
+# What a change to these paths needs from scripts/check.py. Read by scripts/guard.py, before each commit and for
+# CI (`guard.py check-scope`), and by the guard_pytest plugin on every test run (spec: development-workflow;
+# docs/development-workflow.md). A path in no group needs the full check. This file is this repository's own; it
+# isn't delivered.
+version = 1
+
+# No gate reads these. ruff and mypy read Python, tofu reads tofu/, and the tests build their OpenSpec trees in
+# temporary directories. guard_pytest fails any test that reads a file here, so this stays true.
+[skip]
+paths = ["openspec/**"]
