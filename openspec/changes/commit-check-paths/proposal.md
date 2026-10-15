@@ -36,7 +36,7 @@ what each test actually reads.
   tag fails, and so does a test that reads a skipped path. The rule is a pure guard function over plain data (each
   test's id, tags and files read). pytest uses it through a delivered plugin, `scripts/guard_pytest.py`, which records
   each test's reads through Python's audit hook and registers each declared scope as a marker. A repository loads it
-  from `conftest.py` with one line.
+  with `-p guard_pytest` in its pytest configuration.
 - **The pre-commit hook uses the decision.** The staged paths are listed with rename detection off, so a file moved
   out of a read path counts by both its old and its new name (design D3). Whatever runs is announced first, naming the
   paths and the file that decided, for example `guard: only openspec/** is staged; the check is skipped
@@ -50,8 +50,8 @@ what each test actually reads.
   `check.py`, for `$GITHUB_OUTPUT`. It's shaped like `scripts/plan_needed.py`. No input means `full`, and a malformed
   declaration exits non-zero (design D6).
 - **This repository adopts it all:** `[skip] paths = ["openspec/**"]`, `--scope` in its `check.py` (it has no scopes
-  yet, so every name is refused), and the plugin in its `conftest.py`, which proves on every run that no test reads
-  `openspec/`. troupe's declaration, its `check.py --scope`, its `docs` markers and its `conftest.py` line land through
+  yet, so every name is refused), and the plugin in its pytest configuration, which proves on every run that no test reads
+  `openspec/`. troupe's declaration, its `check.py --scope`, its `docs` markers and its pytest configuration land through
   troupe#101's change (design D7). The troupe case is verified here first, on a local scratch clone of troupe.
 - **Docs:** `docs/development-workflow.md` covers the declaration, scopes as tags, the tag check and `check-scope`.
   troupe-run/troupe#101 gets a comment naming all of it.
@@ -85,7 +85,7 @@ more entry in `tofu/guard_delivery.tf`.
 - `scripts/guard_pytest.py`: new, the pytest adapter. Delivered.
 - `tofu/guard_delivery.tf`: `scripts/guard_pytest.py` added to the delivered files.
 - `scripts/check-paths.toml`: new, skipping `openspec/**` for this repository.
-- `scripts/check.py`, `scripts/tests/conftest.py`: `--scope`, and loading the plugin.
+- `scripts/check.py`, `pyproject.toml`: `--scope`, and loading the plugin.
 - `scripts/tests/`: tests for the declaration, each outcome, the malformed refusal, renames, `check-scope`, the tag
   rule, the plugin and `check.py --scope`.
 - `docs/development-workflow.md`, `openspec/specs/development-workflow/spec.md`.

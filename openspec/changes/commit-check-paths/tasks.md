@@ -153,14 +153,20 @@
 
 ## 5. This repository adopts it
 
-- [ ] 5.1 Confirm that no gate here reads `openspec/`: `git grep -n openspec -- 'scripts/tests/*.py'` shows only
+- [x] 5.1 Confirm that no gate here reads `openspec/`: `git grep -n openspec -- 'scripts/tests/*.py'` shows only
       temporary trees, fake API paths and commit messages, and `scripts/check.py` runs no gate over it. Record the
       result in this task. Then add `scripts/check-paths.toml` with `version = 1` and `[skip] paths =
       ["openspec/**"]`. Its comment says what the file is, what reads it, that a path in no group runs the full check,
-      and why `openspec/**` is safe. Load the plugin from `scripts/tests/conftest.py` with
-      `pytest_plugins = ["guard_pytest"]`. Verify `uv run scripts/check.py` passes with the tag check active, which
+      and why `openspec/**` is safe. Load the plugin with `-p guard_pytest` in `pyproject.toml`'s pytest
+      `addopts` (a `pytest_plugins` line only works in a root `conftest.py`, which this repository doesn't have). Verify `uv run scripts/check.py` passes with the tag check active, which
       shows no test here reads `openspec/`, and record the test time before and after loading the plugin. Commit, and
       verify that commit runs the full check (the declaration is staged)
+      Done 2026-10-15. `git grep -n openspec -- 'scripts/tests/*.py'` hits only `make_repo` trees under `tmp_path`
+      (`conftest.py` `Repo.change`), commit messages (`docs(openspec): ...`), declarations and staged paths in the
+      new tests, `test_oob.py`'s fake API path, and `test_plan_needed.py`'s path strings; `scripts/check.py` names no
+      `openspec` path. With the plugin loaded: 796 passed in 70.86s, against 70.09s before (796 passed). A
+      temporary probe test reading `openspec/config.yaml` failed at teardown with `guard: ...::test_reads_spec reads
+      openspec/config.yaml, but scripts/check-paths.toml skips \`openspec/**\` ...`, and was deleted
 - [ ] 5.2 Make the next `openspec/`-only commit on this branch, such as ticking 5.1, and verify the guard announces
       the skip and the commit is made without the check running. Record the output in this task
 
@@ -172,7 +178,8 @@
         since this stands in for the delivery;
       - add a declaration that skips `openspec/**` and has a `docs` scope (`docs/**`,
         `plugins/runner-scripted/README.md`);
-      - load the plugin from troupe's pytest configuration, and give `check.py` `--scope` as in 4.5;
+      - load the plugin with `-p guard_pytest` in troupe's pytest `addopts` (with `scripts` on its `pythonpath`), and
+        give `check.py` `--scope` as in 4.5;
       - run the full check once with no markers, and record which tests the tag check fails. Expect the six doc tests
         and `test_scripted_schemas.py`. Then mark them `docs`, rerun, and verify the full check passes. Commit (a full
         check, since the declaration is staged).
