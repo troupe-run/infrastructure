@@ -529,6 +529,8 @@ def commit_checks(
 ) -> Decision:
     """Refuse unless the tracked work equals what's staged and scripts/check.py passes (D4).
 
+    What runs is what the staged paths need, by the repository's check-paths declaration:
+    nothing, `check.py --scope <name>...`, or the full check (commit-check-paths design D4, D8).
     The check never runs silently: it is announced, its output is streamed to ``progress``
     (stderr by default) as it runs, and it is stopped after ``timeout`` seconds.
     """
@@ -542,16 +544,42 @@ def commit_checks(
             "being committed.",
             "Stage them (git add) or set them aside (git stash --keep-index), then commit again.",
         )
+    staged = git(root, "diff", "--cached", "--name-only", "--no-renames").splitlines()
+    text = ReadStaged(root)(CHECK_PATHS)
+    try:
+        scope = check_scope(staged, None if text is None else check_paths(text))
+    except CheckPathsError as error:
+        return error.decision()
+    if not scope.full:
+        *rest, last = scope.matched
+        listed = f"{', '.join(rest)} and {last}" if rest else last
+        verb = "are" if rest else "is"
+        if not scope.names:
+            print(
+                f"guard: only {listed} {verb} staged; the check is skipped ({CHECK_PATHS}).",
+                file=out,
+                flush=True,
+            )
+            return ALLOW
+        command = " ".join(("scripts/check.py", *scope.args))
+        print(
+            f"guard: only {listed} {verb} staged; running {command} instead of the full check "
+            f"({CHECK_PATHS}; gives up after {timeout:.0f}s)...",
+            file=out,
+            flush=True,
+        )
+    else:
+        command = "scripts/check.py"
+        print(
+            f"guard: running scripts/check.py, the same check CI runs (gives up after "
+            f"{timeout:.0f}s)...",
+            file=out,
+            flush=True,
+        )
     check = root / "scripts" / "check.py"
-    print(
-        f"guard: running scripts/check.py, the same check CI runs (gives up after "
-        f"{timeout:.0f}s)...",
-        file=out,
-        flush=True,
-    )
     started = time.monotonic()
     process = subprocess.Popen(
-        ["uv", "run", "--quiet", str(check)],
+        ["uv", "run", "--quiet", str(check), *scope.args],
         cwd=root,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -581,8 +609,7 @@ def commit_checks(
         return Decision(
             "commit-checks",
             f"the check was still running after {timeout:.0f}s, so it was stopped.",
-            "Run `uv run scripts/check.py` on its own to see what is slow or stuck, then commit "
-            "again.",
+            f"Run `uv run {command}` on its own to see what is slow or stuck, then commit again.",
         )
     if process.returncode != 0:
         failed = re.search(r"^check: (.+?) failed", "".join(output), re.MULTILINE)
@@ -590,9 +617,10 @@ def commit_checks(
         return Decision(
             "commit-checks",
             f"the {gate} gate failed.",
-            "Run `uv run scripts/check.py`, fix what it reports, then commit again.",
+            f"Run `uv run {command}`, fix what it reports, then commit again.",
         )
-    print(f"guard: the check passed in {elapsed:.0f}s.", file=out, flush=True)
+    what = "the check" if scope.full else command
+    print(f"guard: {what} passed in {elapsed:.0f}s.", file=out, flush=True)
     return ALLOW
 
 

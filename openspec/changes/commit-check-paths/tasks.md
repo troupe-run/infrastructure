@@ -33,7 +33,7 @@
 
 ## 2. The pre-commit check runs what the staged paths need
 
-- [ ] 2.1 Write failing tests in `scripts/tests/test_guard_commit_rules.py`, using `make_repo` and a check script that
+- [x] 2.1 Write failing tests in `scripts/tests/test_guard_commit_rules.py`, using `make_repo` and a check script that
       appends its arguments to a marker file, so a test can tell whether it ran and with what (design D3, D4, D5, D8).
       Commit a declaration that skips `openspec/**` and has scopes `docs` (`docs/**`) and `api` (`api/**`). Then:
       - **Skipped:**
@@ -56,7 +56,7 @@
         `scripts/check-paths.toml`, the problem and the fix, and nothing is recorded.
 
       Verify they fail
-- [ ] 2.2 In `commit_checks`, after the unstaged-changes refusal, list the staged paths with
+- [x] 2.2 In `commit_checks`, after the unstaged-changes refusal, list the staged paths with
       `git diff --cached --name-only --no-renames`, read the staged declaration with `ReadStaged`, decide with
       `check_scope`, and then do one of three things. Skip with the announcement. Run `check.py` with one `--scope`
       per scope, announced and streamed and with the same timeout and failure handling. Or run the full check as today.
