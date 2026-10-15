@@ -2,7 +2,7 @@
 
 ## 1. The declaration is read, validated and decided
 
-- [ ] 1.1 Write failing tests in a new `scripts/tests/test_guard_check_paths.py`, each named for what its body checks
+- [x] 1.1 Write failing tests in a new `scripts/tests/test_guard_check_paths.py`, each named for what its body checks
       (design D1, D2, D4, D5).
       - **Accepted:** `check_paths(text)` accepts a file with only `version = 1`, one with only `[skip]`, one with
         only scopes, and one with both.
@@ -26,7 +26,7 @@
         declaration). Otherwise it's the set of scopes some path is in, or nothing when that set is empty.
 
       Verify the new tests fail with `uv run pytest scripts/tests/test_guard_check_paths.py`
-- [ ] 1.2 Add `CHECK_PATHS = "scripts/check-paths.toml"`, the frozen `CheckPaths` dataclass, the `Scope` result,
+- [x] 1.2 Add `CHECK_PATHS = "scripts/check-paths.toml"`, the frozen `CheckPaths` dataclass, the `Scope` result,
       `CheckPathsError`, `check_paths(text)` (using `tomllib`) and `check_scope(paths, declaration)` to
       `scripts/guard.py`, as pure functions beside the delivered-file rule (design D2, D4, D5). Verify 1.1's tests
       pass, and that `uv run scripts/check.py` passes (mypy --strict, ruff)
