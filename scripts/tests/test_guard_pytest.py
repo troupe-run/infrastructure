@@ -128,3 +128,59 @@ def test_a_malformed_declaration_fails_the_session_with_the_guard_s_message(
     output = result.stdout + result.stderr
     assert "scripts/check-paths.toml is malformed" in output
     assert "`docs/*.md` uses a wildcard" in output
+
+
+def test_a_read_at_import_counts_for_every_test_in_the_module(tmp_path: Path) -> None:
+    """Found in troupe: test_runs_doc.py reads its doc at module level, outside any test."""
+    root = project(
+        tmp_path,
+        'TEXT = (ROOT / "docs/a.md").read_text()\n\n'
+        "def test_one():\n    assert TEXT\n\n"
+        "def test_two():\n    assert TEXT\n",
+    )
+    result = run_pytest(root)
+    assert result.returncode != 0, result.stdout
+    assert "test_reads.py::test_one reads docs/a.md" in result.stdout
+    assert "test_reads.py::test_two reads docs/a.md" in result.stdout
+
+
+def test_a_read_while_collecting_parameters_counts_for_each_generated_test(
+    tmp_path: Path,
+) -> None:
+    """Found in troupe: test_cli_docs.py parametrizes from its doc during collection."""
+    root = project(
+        tmp_path,
+        "def lines():\n"
+        '    return (ROOT / "docs/a.md").read_text().splitlines()\n\n'
+        '@pytest.mark.parametrize("line", lines())\n'
+        "def test_line(line):\n    assert line\n",
+    )
+    result = run_pytest(root)
+    assert result.returncode != 0, result.stdout
+    assert "test_reads.py::test_line[docs] reads docs/a.md" in result.stdout
+
+
+def test_a_module_marked_with_the_scope_covers_its_import_time_reads(tmp_path: Path) -> None:
+    root = project(
+        tmp_path,
+        "pytestmark = pytest.mark.docs\n\n"
+        'TEXT = (ROOT / "docs/a.md").read_text()\n\n'
+        "def test_one():\n    assert TEXT\n",
+    )
+    assert run_pytest(root).returncode == 0
+
+
+def test_a_shared_fixture_s_read_counts_for_every_test_that_uses_it(tmp_path: Path) -> None:
+    root = project(
+        tmp_path,
+        '@pytest.fixture(scope="session")\n'
+        "def doc():\n"
+        '    return (ROOT / "docs/a.md").read_text()\n\n'
+        "@pytest.mark.docs\n"
+        "def test_first(doc):\n    assert doc\n\n"
+        "def test_second(doc):\n    assert doc\n",
+    )
+    result = run_pytest(root)
+    assert result.returncode != 0, result.stdout
+    assert "test_reads.py::test_second reads docs/a.md" in result.stdout
+    assert "test_first reads" not in result.stdout
