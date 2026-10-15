@@ -63,12 +63,18 @@
 
 ## 5. Evidence
 
-- [ ] 5.1 Run `uv run scripts/check.py` on the branch head and record that it passes
-- [ ] 5.2 Fast-forward onto `origin/main`, then run a local plan. Verify it shows exactly two changes (design D4):
+- [x] 5.1 Run `uv run scripts/check.py` on the branch head and record that it passes
+      Done 2026-10-15 on `38410cf`: `check: all gates passed`, 679 tests
+- [x] 5.2 Fast-forward onto `origin/main`, then run a local plan. Verify it shows exactly two changes (design D4):
       - the in-place update of troupe's "release branches" ruleset, dropping `deletion`;
       - the update of troupe's `scripts/guard.py`.
 
       Record the summary in the change
+
+      Done 2026-10-15 on `38410cf`, level with `origin/main` (its state commit included): `Plan: 0 to add, 2 to
+      change, 0 to destroy.` The changes are `github_repository_file.guard["troupe:scripts/guard.py"]` updated in
+      place (`875ae341dab2` -> `9e73796813c2`), and `github_repository_ruleset.release_branches` (id 25004049) updated
+      in place with `- deletion = true -> null`, the rest unchanged
 
 ## Workflow follow-up
 
