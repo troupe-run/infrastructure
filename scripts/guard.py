@@ -32,6 +32,7 @@ import sys
 import tempfile
 import threading
 import time
+import tomllib
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -309,6 +310,177 @@ def delivered_file_staged(staged: Iterable[str], delivered: frozenset[str]) -> D
     if not touched:
         return ALLOW
     return _delivered_refusal(touched, "this commit changes delivered files")
+
+
+CHECK_PATHS = "scripts/check-paths.toml"
+"""Each repository's own declaration of what a change to its paths needs from scripts/check.py:
+nothing (skip), named scopes, or, for a path it doesn't name, the full check. Not delivered
+(commit-check-paths design D1)."""
+SCOPE_NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
+RESERVED_SCOPES = frozenset({"none", "full"})
+"""check-scope's other answers, so no scope may be called by them (design D6)."""
+CHECK_PATHS_FIX = (
+    f"Fix {CHECK_PATHS}: `version = 1`, then `[skip]` and `[scopes.<name>]` tables, each holding "
+    "only `paths`, a list of exact paths or `dir/**`, with no path in two groups. Or delete it to "
+    "run the full check on every commit."
+)
+
+
+class CheckPathsError(ValueError):
+    """The declaration is present but malformed: an error, never treated as absent (design D5)."""
+
+    def __init__(self, problem: str, fix: str = CHECK_PATHS_FIX) -> None:
+        super().__init__(problem)
+        self.problem = problem
+        self.fix = fix
+
+    def decision(self) -> Decision:
+        return Decision("commit-checks", f"{CHECK_PATHS} is malformed: {self.problem}", self.fix)
+
+
+@dataclass(frozen=True)
+class CheckPaths:
+    """A parsed declaration: the skipped entries, and each scope's entries, in file order."""
+
+    skip: tuple[str, ...]
+    scopes: tuple[tuple[str, tuple[str, ...]], ...]
+
+
+@dataclass(frozen=True)
+class Scope:
+    """What a change needs: the full check, or the named scopes (none at all means skip)."""
+
+    full: bool
+    names: tuple[str, ...] = ()
+    matched: tuple[str, ...] = ()
+    """The declared entries the paths matched, as written, for the announcement."""
+
+    @property
+    def label(self) -> str:
+        return "full" if self.full else ",".join(self.names) or "none"
+
+    @property
+    def args(self) -> tuple[str, ...]:
+        return tuple(word for name in self.names for word in ("--scope", name))
+
+
+FULL_CHECK = Scope(full=True)
+
+
+def _check_paths_entry(entry: object, where: str) -> str:
+    """An exact relative path, or a directory written `dir/**` (design D2)."""
+    if not isinstance(entry, str):
+        raise CheckPathsError(f"{where} is not a string.")
+    base = entry.removesuffix("/**")
+    problem = None
+    if not base or base == "**":
+        problem = "is empty" if not entry else "covers every path"
+    elif "\\" in base:
+        problem = "uses a backslash; write paths with `/`"
+    elif any(char in base for char in "*?["):
+        problem = "uses a wildcard other than a trailing `/**`"
+    elif base.startswith("/"):
+        problem = "is absolute; write it relative to the repository root"
+    elif any(segment in ("", ".", "..") for segment in base.split("/")):
+        problem = "has an empty, `.` or `..` segment"
+    if problem is not None:
+        raise CheckPathsError(f"{where} `{entry}` {problem}.")
+    return entry
+
+
+def _check_paths_group(table: object, where: str) -> tuple[str, ...]:
+    if not isinstance(table, dict):
+        raise CheckPathsError(f"{where} is not a table.")
+    unknown = sorted(set(table) - {"paths"})
+    if unknown:
+        raise CheckPathsError(f"{where} has an unknown key `{unknown[0]}`; only `paths` is read.")
+    if "paths" not in table:
+        raise CheckPathsError(f"{where}.paths is missing.")
+    paths = table["paths"]
+    if not isinstance(paths, list):
+        raise CheckPathsError(f"{where}.paths is not a list.")
+    return tuple(
+        _check_paths_entry(entry, f"{where}.paths[{index}]") for index, entry in enumerate(paths)
+    )
+
+
+def _entries_overlap(first: str, second: str) -> bool:
+    """Whether some path matches both entries. Exact for the two forms D2 allows."""
+    first_dir, second_dir = first.endswith("/**"), second.endswith("/**")
+    if first_dir and second_dir:
+        return first[:-2].startswith(second[:-2]) or second[:-2].startswith(first[:-2])
+    if first_dir:
+        return second.startswith(first[:-2])
+    if second_dir:
+        return first.startswith(second[:-2])
+    return first == second
+
+
+def check_paths(text: str) -> CheckPaths:
+    """Parse and validate a declaration, or raise CheckPathsError naming what's wrong."""
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as error:
+        raise CheckPathsError(f"it isn't valid TOML ({error}).") from None
+    unknown = sorted(set(data) - {"version", "skip", "scopes"})
+    if unknown:
+        raise CheckPathsError(
+            f"unknown key `{unknown[0]}`; only `version`, `skip` and `scopes` are read."
+        )
+    version = data.get("version")
+    if type(version) is not int or version != 1:
+        raise CheckPathsError(f"`version` must be 1, not {version!r}.")
+    skip = _check_paths_group(data["skip"], "skip") if "skip" in data else ()
+    scopes_table = data.get("scopes", {})
+    if not isinstance(scopes_table, dict):
+        raise CheckPathsError("scopes is not a table of `[scopes.<name>]` tables.")
+    scopes = []
+    for name, table in scopes_table.items():
+        if not SCOPE_NAME.match(name) or name in RESERVED_SCOPES:
+            raise CheckPathsError(
+                f"scope name `{name}` must match [a-z][a-z0-9-]* and not be `none` or `full`."
+            )
+        scopes.append((name, _check_paths_group(table, f"scopes.{name}")))
+    groups = [("skip", entry) for entry in skip] + [
+        (f"scopes.{name}", entry) for name, entries in scopes for entry in entries
+    ]
+    for index, (group, entry) in enumerate(groups):
+        for other_group, other in groups[index + 1 :]:
+            if other_group != group and _entries_overlap(entry, other):
+                raise CheckPathsError(
+                    f"`{entry}` in {group} overlaps `{other}` in {other_group}.",
+                    f"List each path in one group only, in {CHECK_PATHS}.",
+                )
+    return CheckPaths(skip=skip, scopes=tuple(scopes))
+
+
+def _matches(entry: str, path: str) -> bool:
+    return path.startswith(entry[:-2]) if entry.endswith("/**") else path == entry
+
+
+def check_scope(paths: Iterable[str], declaration: CheckPaths | None) -> Scope:
+    """What a change to these paths needs from scripts/check.py (design D4).
+
+    The full check, unless there's a declaration, at least one path, the declaration isn't among
+    them, and every path is skipped or in a scope.
+    """
+    changed = [path for path in paths if path]
+    if declaration is None or not changed or CHECK_PATHS in changed:
+        return FULL_CHECK
+    groups = [(None, entry) for entry in declaration.skip] + [
+        (name, entry) for name, entries in declaration.scopes for entry in entries
+    ]
+    names: set[str] = set()
+    matched: set[str] = set()
+    for path in changed:
+        found = next(((name, entry) for name, entry in groups if _matches(entry, path)), None)
+        if found is None:
+            return FULL_CHECK
+        name, entry = found
+        matched.add(entry)
+        if name is not None:
+            names.add(name)
+    return Scope(full=False, names=tuple(sorted(names)), matched=tuple(sorted(matched)))
 
 
 def read_working_tree(root: Path) -> Callable[[str], str | None]:
