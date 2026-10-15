@@ -228,7 +228,7 @@
 - [ ] 6.2 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
       `scripts/guard.py` updated and `scripts/guard_pytest.py` created in troupe, and nothing else. Check that the
       delivered list (`.github/guard-delivery.json`) gains the new file. Keep it for the pull request
-- [ ] 6.3 Run `openspec validate commit-check-paths --strict` and verify it passes
+- [x] 6.3 Run `openspec validate commit-check-paths --strict` and verify it passes
 
 ## Workflow follow-up
 
