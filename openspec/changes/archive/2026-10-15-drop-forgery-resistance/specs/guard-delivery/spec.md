@@ -1,11 +1,10 @@
 ## MODIFIED Requirements
 
 ### Requirement: Delivered files are changed only at their source
-In a governed repository that receives delivered files, a commit that changes a delivered file SHALL be refused, and
-an agent's edit to one SHALL be refused. The guard's GitHub check SHALL fail on a commit that changes a delivered file
-unless its author is the App. The check catches honest mistakes and outside contributors, not forgery. A change that
-gets past these, by any route, is drift: it SHALL show in a plan of `main` within a day, and an apply SHALL restore
-the file. The fix SHALL be to change the file in this repository.
+In a governed repository that receives delivered files, a commit or an agent's edit that changes a delivered file
+SHALL be refused, and the guard's GitHub check SHALL fail on such a commit unless its author is the App. That check
+catches mistakes, not forgery. A change that gets past these, by any route, is drift: a plan of `main` SHALL show it
+within a day, and an apply SHALL restore the file. The fix SHALL be to change the file in this repository.
 
 #### Scenario: Committing a change to a delivered file
 - **WHEN** a contributor in `troupe` commits a change to `.githooks/pre-commit`
