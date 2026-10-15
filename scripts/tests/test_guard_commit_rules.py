@@ -3,6 +3,7 @@
 import io
 import time
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from conftest import FAILING_CHECK, PASSING_CHECK, Repo, git
@@ -223,3 +224,188 @@ def test_a_passing_check_with_everything_staged_is_allowed(make_repo: Callable[[
     repo.write("scripts/check.py", PASSING_CHECK)
     git(repo.path, "add", "-A")
     assert guard.commit_checks(repo.path) == guard.ALLOW
+
+
+# Rule: commit-checks, with a check-paths declaration (commit-check-paths tasks 2.1-2.2)
+
+DECLARATION = """\
+version = 1
+
+[skip]
+paths = ["openspec/**"]
+
+[scopes.docs]
+paths = ["docs/**"]
+
+[scopes.api]
+paths = ["api/**"]
+"""
+
+
+def recording_check(log: Path, exit_code: int = 0) -> str:
+    """A check that appends its arguments to `log` (outside the repository), so a test can see
+    whether it ran and with what."""
+    gate = "check: all gates passed" if exit_code == 0 else "check: docs tests failed (exit 1)"
+    return (
+        "import sys\n"
+        f"with open({str(log)!r}, 'a', encoding='utf-8') as log:\n"
+        "    log.write(' '.join(sys.argv[1:]) + '\\n')\n"
+        f"print({gate!r})\n"
+        f"sys.exit({exit_code})\n"
+    )
+
+
+def declared_repo(
+    make_repo: Callable[[], Repo], declaration: str | None = DECLARATION, exit_code: int = 0
+) -> tuple[Repo, Path]:
+    repo = make_repo()
+    log = repo.path.parent / f"{repo.path.name}-check.log"
+    repo.write("scripts/check.py", recording_check(log, exit_code))
+    if declaration is not None:
+        repo.write(guard.CHECK_PATHS, declaration)
+    repo.write("src.py", "x = 1\n")
+    repo.change("add-thing")
+    git(repo.path, "add", "-A")
+    git(repo.path, "commit", "-q", "-m", "chore: set up")
+    return repo, log
+
+
+def runs(log: Path) -> list[str]:
+    """The arguments of each run of the check, in order; empty when it never ran."""
+    return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+
+
+def checked(repo: Repo, *paths: str) -> tuple[guard.Decision, str]:
+    for path in paths:
+        repo.write(path, f"{path}\n")
+    git(repo.path, "add", "-A")
+    progress = io.StringIO()
+    return guard.commit_checks(repo.path, progress=progress), progress.getvalue()
+
+
+def test_only_skipped_paths_staged_skip_the_check_and_say_so(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo, log = declared_repo(make_repo)
+    decision, said = checked(repo, "openspec/changes/add-thing/design.md")
+    assert decision == guard.ALLOW
+    assert runs(log) == []
+    assert (
+        "guard: only openspec/** is staged; the check is skipped (scripts/check-paths.toml)."
+        in said
+    )
+
+
+def test_archiving_a_change_moves_it_within_skipped_paths_and_skips_the_check(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo, log = declared_repo(make_repo)
+    (repo.path / "openspec/changes/archive").mkdir(parents=True)
+    git(
+        repo.path,
+        "mv",
+        "openspec/changes/add-thing",
+        "openspec/changes/archive/2026-10-15-add-thing",
+    )
+    decision, said = checked(repo)
+    assert decision == guard.ALLOW
+    assert runs(log) == []
+    assert "the check is skipped" in said
+
+
+@pytest.mark.parametrize("paths", [("docs/a.md",), ("docs/a.md", "openspec/b.md")])
+def test_only_one_scope_s_paths_staged_run_that_scope_and_say_so(
+    make_repo: Callable[[], Repo], paths: tuple[str, ...]
+) -> None:
+    repo, log = declared_repo(make_repo)
+    decision, said = checked(repo, *paths)
+    assert decision == guard.ALLOW
+    assert runs(log) == ["--scope docs"]
+    assert "running scripts/check.py --scope docs instead of the full check" in said
+
+
+def test_two_scopes_paths_staged_run_both_scopes_sorted(make_repo: Callable[[], Repo]) -> None:
+    repo, log = declared_repo(make_repo)
+    decision, _ = checked(repo, "docs/a.md", "api/b.py")
+    assert decision == guard.ALLOW
+    assert runs(log) == ["--scope api --scope docs"]
+
+
+def test_a_failing_scope_refuses_the_commit_naming_the_gate(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo, log = declared_repo(make_repo, exit_code=1)
+    decision, _ = checked(repo, "docs/a.md")
+    assert decision.rule == "commit-checks"
+    assert "docs tests" in decision.problem
+    assert "uv run scripts/check.py --scope docs" in decision.fix
+    assert runs(log) == ["--scope docs"]
+
+
+def test_a_path_in_no_group_runs_the_full_check(make_repo: Callable[[], Repo]) -> None:
+    repo, log = declared_repo(make_repo)
+    decision, said = checked(repo, "openspec/a.md", "README.md")
+    assert decision == guard.ALLOW
+    assert runs(log) == [""]
+    assert said.startswith("guard: running scripts/check.py, the same check CI runs")
+
+
+def test_a_file_moved_into_skipped_paths_runs_the_full_check(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo, log = declared_repo(make_repo)
+    git(repo.path, "mv", "src.py", "openspec/src.py")
+    decision, _ = checked(repo)
+    assert decision == guard.ALLOW
+    assert runs(log) == [""]
+
+
+def test_staging_the_declaration_runs_the_full_check_even_when_it_skips_itself(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo, log = declared_repo(make_repo)
+    repo.write(guard.CHECK_PATHS, 'version = 1\n[skip]\npaths = ["scripts/**", "openspec/**"]\n')
+    decision, _ = checked(repo)
+    assert decision == guard.ALLOW
+    assert runs(log) == [""]
+
+
+def test_an_empty_commit_runs_the_full_check(make_repo: Callable[[], Repo]) -> None:
+    repo, log = declared_repo(make_repo)
+    decision, _ = checked(repo)
+    assert decision == guard.ALLOW
+    assert runs(log) == [""]
+
+
+def test_unstaged_changes_still_refuse_a_commit_that_would_skip(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo, log = declared_repo(make_repo)
+    repo.write("openspec/a.md", "staged\n")
+    git(repo.path, "add", "openspec/a.md")
+    repo.write("src.py", "changed but not staged\n")
+    decision = guard.commit_checks(repo.path, progress=io.StringIO())
+    assert decision.rule == "commit-checks"
+    assert "unstaged changes (src.py)" in decision.problem
+    assert runs(log) == []
+
+
+def test_with_no_declaration_skipped_looking_paths_run_the_full_check(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo, log = declared_repo(make_repo, declaration=None)
+    decision, _ = checked(repo, "openspec/a.md")
+    assert decision == guard.ALLOW
+    assert runs(log) == [""]
+
+
+def test_a_malformed_declaration_refuses_the_commit_without_running_the_check(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo, log = declared_repo(make_repo, declaration='version = 1\n[skip]\npaths = ["docs/*.md"]\n')
+    decision, _ = checked(repo, "openspec/a.md")
+    assert decision.rule == "commit-checks"
+    assert guard.CHECK_PATHS in decision.problem
+    assert "`docs/*.md` uses a wildcard" in decision.problem
+    assert "dir/**" in decision.fix
+    assert runs(log) == []
