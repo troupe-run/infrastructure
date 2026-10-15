@@ -25,11 +25,23 @@
         generated paths, the result is full exactly when some path is in no group (or the list is empty, or holds the
         declaration). Otherwise it's the set of scopes some path is in, or nothing when that set is empty.
 
-      Verify the new tests fail with `uv run pytest scripts/tests/test_guard_check_paths.py`
+      Verify the new tests fail with `uv run pytest scripts/tests/test_guard_check_paths.py`. (Done as written; 1.3
+      then allows scopes to overlap one another and narrows scope names to `[a-z][a-z0-9_]*`, design D1, D2.)
 - [x] 1.2 Add `CHECK_PATHS = "scripts/check-paths.toml"`, the frozen `CheckPaths` dataclass, the `Scope` result,
       `CheckPathsError`, `check_paths(text)` (using `tomllib`) and `check_scope(paths, declaration)` to
       `scripts/guard.py`, as pure functions beside the delivered-file rule (design D2, D4, D5). Verify 1.1's tests
       pass, and that `uv run scripts/check.py` passes (mypy --strict, ruff)
+
+- [ ] 1.3 Change 1.1's tests to the revised rules (design D1, D2, D4), and verify the changed ones fail:
+      - scopes may overlap: `blah` (`path1/**`, `another/**`) and `blech` (`path1/**`) are accepted, and
+        `check_scope(["path1/blah.py"])` gives `blah`, `blech`; `another/x` gives `blah` alone;
+      - skip still may not overlap a scope (`a/**` with `a/b/**`, `a/**` with `a/b.md`, `x.md` with `x.md`), and the
+        message names both entries and both groups;
+      - scope names: `a_b` and `docs2` are accepted; `a-b`, `Docs`, `1x`, `_a`, `""`, `none` and `full` are refused;
+      - the property test lets one top-level name belong to several scopes, and expects every scope a path is in.
+- [ ] 1.4 Make `check_paths` refuse only skip-with-scope overlaps, narrow `SCOPE_NAME` to `[a-z][a-z0-9_]*`, and make
+      `check_scope` collect every scope a path's entries match rather than the first. Verify 1.3's tests pass, the
+      rest of `scripts/tests/` passes, and `uv run scripts/check.py` passes
 
 ## 2. The pre-commit check runs what the staged paths need
 
@@ -62,13 +74,16 @@
       per scope, announced and streamed and with the same timeout and failure handling. Or run the full check as today.
       A malformed declaration refuses as D5 says. Verify 2.1's tests pass, the existing `commit_checks` tests pass
       unchanged, and `uv run scripts/check.py` passes
-- [ ] 2.3 Update `docs/development-workflow.md`:
+- [ ] 2.3 Add a test in `scripts/tests/test_guard_commit_rules.py`: with scopes `blah` (`path1/**`, `another/**`) and
+      `blech` (`path1/**`) declared, committing `path1/blah.py` records `--scope blah --scope blech`. Verify it passes
+      after 1.4 (no change to `commit_checks` is expected; if one is needed, it's made here)
+- [ ] 2.4 Update `docs/development-workflow.md`:
       - the `commit-checks` row: add "or while `scripts/check-paths.toml` is malformed", and say a commit runs only
         what its staged paths need;
       - the paragraph after the rules table: rewrite it to cover the declaration's format (skip and scopes, the two
-        kinds of entry, no overlaps, reserved names), the decision table, what always runs the full check, the
-        `--scope` contract a repository's `check.py` takes on when it declares a scope, and that the file is each
-        repository's own and isn't delivered;
+        kinds of entry, overlapping scopes allowed but not skip with a scope, scope names and reserved names), the
+        decision table, what always runs the full check, and that the file is each repository's own and isn't
+        delivered;
       - replace "10–15 seconds" there with a current measured time for this repository.
 
       Verify `uv run pytest scripts/tests/test_guard_docs.py` and `uv run scripts/check.py` pass
@@ -76,10 +91,11 @@
 ## 3. CI reads the same declaration
 
 - [ ] 3.1 Write failing tests for `guard.py check-scope` (design D6), run as a subprocess in a `make_repo` repository
-      holding 2.1's declaration, with the paths on stdin:
+      holding 2.1's declaration plus the overlapping `blah`/`blech` scopes from 2.3, with the paths on stdin:
       - `openspec/a.md` alone prints `scope=none` and `check-args=`, and exits 0;
       - `docs/a.md` plus `openspec/a.md` prints `scope=docs` and `check-args=--scope docs`;
       - `docs/a.md` plus `api/b.py` prints `scope=api,docs` and `check-args=--scope api --scope docs`;
+      - `path1/blah.py` prints `scope=blah,blech`;
       - `README.md` with anything prints `scope=full` and `check-args=`;
       - empty stdin prints `scope=full`, and so does no declaration;
       - a malformed declaration exits 1, prints the commit hook's refusal text to stderr, and prints nothing to stdout.
@@ -91,51 +107,101 @@
       scripts/guard.py check-scope` line, its outputs, how a job uses `scope` and `check-args`, and what CI still
       decides itself (the base, and passing an empty list when it can't). Verify `uv run scripts/check.py` passes
 
-## 4. This repository skips `openspec/**`
+## 4. Scopes are test tags, and every test run checks them
 
-- [ ] 4.1 Confirm that no gate here reads `openspec/`: `git grep -n openspec -- 'scripts/tests/*.py'` shows only
+- [ ] 4.1 Write failing tests in `scripts/tests/test_guard_check_paths.py` for the pure functions (design D8, D9):
+      - `marker_expression(("api", "docs"))` is `"api or docs"`, and one name is just the name;
+      - `tag_violations(TestReads(...), declaration)`, with skip `openspec/**`, scopes `docs` (`docs/**`), `blah`
+        (`path1/**`) and `blech` (`path1/**`):
+        - a test reading `docs/runs.md` untagged gets one violation naming the test, the file and the tag `docs`;
+        - a test tagged `blah` reading `path1/x.json` gets one naming `blech`;
+        - a test reading `openspec/a.md` gets one naming the file and the skip entry `openspec/**`, whatever its tags;
+        - a test reading only `README.md`, or `docs/runs.md` while tagged `docs`, gets none.
+
+      Verify they fail
+- [ ] 4.2 Add `TestReads`, `tag_violations` and `marker_expression` to `scripts/guard.py` as pure functions beside
+      `check_scope`. Verify 4.1's tests pass and `uv run scripts/check.py` passes
+- [ ] 4.3 Write failing tests in a new `scripts/tests/test_guard_pytest.py` that run pytest in a subprocess on a
+      throwaway project (`tmp_path`, with `scripts/guard.py`, `scripts/guard_pytest.py`, a `conftest.py` holding
+      `pytest_plugins = ["guard_pytest"]`, and a declaration with skip `openspec/**` and scope `docs`):
+      - a test that reads `docs/a.md` through `Path.read_text` without a marker fails, and the output names the test,
+        `docs/a.md` and `docs`; the same test marked `docs` passes;
+      - a test that reads `openspec/a.md` through `open` fails, naming the skip entry;
+      - a test that reads a file it wrote under its own `tmp_path` passes;
+      - `--strict-markers` accepts `@pytest.mark.docs`, which nothing else registered;
+      - with no declaration, every test passes and nothing is registered;
+      - with a malformed declaration, the session fails with D5's message.
+
+      Verify they fail
+- [ ] 4.4 Add `scripts/guard_pytest.py` (design D9): the source note on its first line, as `guard.py` has; at session
+      start, read the declaration from the root directory, register each scope as a marker, and install one audit
+      hook; record files opened inside the repository during each test's setup, call and teardown; fail the test with
+      every violation `tag_violations` finds. Add it to `guard_files` in `tofu/guard_delivery.tf`, and to the
+      delivered list in `scripts/tests/test_guard_delivery.py` if that test enumerates them. Verify 4.3's tests pass,
+      `tofu validate` passes, and `uv run scripts/check.py` passes
+- [ ] 4.5 Write failing tests in `scripts/tests/test_check.py` for this repository's `check.py --scope` (design D8):
+      `--scope nope` exits non-zero before any gate runs, naming `nope` and `scripts/check-paths.toml`; the gate list
+      for a declared scope `docs` (in a declaration passed to `gates()`) keeps every gate and gives pytest
+      `-m docs`; with two scopes, `-m "api or docs"`; with none, pytest gets no `-m`. Then add `--scope`
+      (`action="append"`) to `check.py`, reading the declaration through `guard.check_paths` and building the
+      expression with `guard.marker_expression`. Verify the tests pass and `uv run scripts/check.py` passes
+- [ ] 4.6 Document scopes as tags in `docs/development-workflow.md`: the `--scope` contract every `check.py` takes on
+      (every gate runs, the tests narrow, an undeclared scope is refused), the pytest convention (a marker per scope,
+      `-m`), the tag check and the plugin, what the audit hook can't see (reads in subprocesses), and that another
+      runner, such as vitest, follows the same contract with its own adapter. Add `scripts/guard_pytest.py` to the
+      list of delivered files. Verify `uv run scripts/check.py` passes
+
+## 5. This repository adopts it
+
+- [ ] 5.1 Confirm that no gate here reads `openspec/`: `git grep -n openspec -- 'scripts/tests/*.py'` shows only
       temporary trees, fake API paths and commit messages, and `scripts/check.py` runs no gate over it. Record the
       result in this task. Then add `scripts/check-paths.toml` with `version = 1` and `[skip] paths =
       ["openspec/**"]`. Its comment says what the file is, what reads it, that a path in no group runs the full check,
-      and why `openspec/**` is safe. Commit it on its own, and verify that commit runs the full check (the declaration
-      is staged)
-- [ ] 4.2 Make the next `openspec/`-only commit on this branch, such as ticking 4.1, and verify the guard announces
+      and why `openspec/**` is safe. Load the plugin from `scripts/tests/conftest.py` with
+      `pytest_plugins = ["guard_pytest"]`. Verify `uv run scripts/check.py` passes with the tag check active, which
+      shows no test here reads `openspec/`, and record the test time before and after loading the plugin. Commit, and
+      verify that commit runs the full check (the declaration is staged)
+- [ ] 5.2 Make the next `openspec/`-only commit on this branch, such as ticking 5.1, and verify the guard announces
       the skip and the commit is made without the check running. Record the output in this task
 
-## 5. Evidence
+## 6. Evidence
 
-- [ ] 5.1 In a local scratch clone of troupe (under the scratchpad, nothing pushed), on a branch named for a scratch
+- [ ] 6.1 In a local scratch clone of troupe (under the scratchpad, nothing pushed), on a branch named for a scratch
       change created with `openspec new change`:
-      - copy in this branch's `scripts/guard.py` and commit it with `--no-verify`, since this stands in for the
-        delivery;
+      - copy in this branch's `scripts/guard.py` and `scripts/guard_pytest.py`, and commit them with `--no-verify`,
+        since this stands in for the delivery;
       - add a declaration that skips `openspec/**` and has a `docs` scope (`docs/**`,
         `plugins/runner-scripted/README.md`);
-      - add a minimal `--scope docs` to its `check.py` that runs the six doc tests, as D7 describes, and commit both
-        (a full check, since the declaration is staged).
+      - load the plugin from troupe's pytest configuration, and give `check.py` `--scope` as in 4.5;
+      - run the full check once with no markers, and record which tests the tag check fails. Expect the six doc tests
+        and `test_scripted_schemas.py`. Then mark them `docs`, rerun, and verify the full check passes. Commit (a full
+        check, since the declaration is staged).
 
       Then:
       - commit only an `openspec/` file: verify the skip is announced and the commit is made in seconds;
-      - commit a `docs/` file: verify only `--scope docs` runs, and time it;
+      - commit a `docs/` file: verify `--scope docs` runs every gate but only the marked tests, and time it;
       - commit a source file: verify the full check runs.
 
-      Record the commands, timings and output here
-- [ ] 5.2 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows only the
-      delivered `scripts/guard.py` changing in troupe. Keep it for the pull request
-- [ ] 5.3 Run `openspec validate commit-check-paths --strict` and verify it passes
+      Record the commands, timings and output here, including the full run's time with and without the plugin
+- [ ] 6.2 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
+      `scripts/guard.py` updated and `scripts/guard_pytest.py` created in troupe, and nothing else. Check that the
+      delivered list (`.github/guard-delivery.json`) gains the new file. Keep it for the pull request
+- [ ] 6.3 Run `openspec validate commit-check-paths --strict` and verify it passes
 
 ## Workflow follow-up
 
-- Open the pull request with a Conventional title and `Closes #45`, the evidence from 4.2 and 5.1, and the plan from
-  5.2. CI must be green on all three OSes before the delivery is planned.
+- Open the pull request with a Conventional title and `Closes #45`, the evidence from 5.2 and 6.1, and the plan from
+  6.2. CI must be green on all three OSes before the delivery is planned.
 - Comment on troupe-run/troupe#101 with what it can use:
-  - the declaration, `scripts/check-paths.toml` (format in design D1 and D2), with the docs scope from 5.1 as a
+  - the declaration, `scripts/check-paths.toml` (format in design D1 and D2), with the docs scope from 6.1 as a
     starting point;
-  - the `--scope` contract its `check.py` takes on (D8);
+  - scopes as markers, the `--scope` contract its `check.py` takes on, and `guard.marker_expression` (D8);
+  - the tag check and loading `guard_pytest` (D9), with the list of tests 6.1 found needing `docs`;
   - `guard.py check-scope` and its outputs (D6);
-  - that troupe's file lands with #101's change (D7).
+  - that troupe's files land with #101's change (D7).
 
   That records that both issues use one declaration.
 - Archive the change on the branch before merging. The owner merges by rebase and approves the `apply` job, which
-  delivers `scripts/guard.py` to troupe.
-- After the apply, confirm troupe's `scripts/guard.py` matches `main` here. Then comment on #45 with the pull request
-  and the archived change, close it, and check its roadmap card says Done.
+  delivers `scripts/guard.py` and `scripts/guard_pytest.py` to troupe.
+- After the apply, confirm troupe's delivered files match `main` here. Then comment on #45 with the pull request and
+  the archived change, close it, and check its roadmap card says Done.

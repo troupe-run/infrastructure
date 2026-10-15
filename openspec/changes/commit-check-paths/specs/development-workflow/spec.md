@@ -26,9 +26,14 @@ it, and every staged path is declared, the commit needs only what those paths ne
   under `docs/`, with or without files under `openspec/`
 - **THEN** `scripts/check.py --scope docs` runs instead of the full check, and the guard says so
 
-#### Scenario: Two scopes' paths are staged
+#### Scenario: Paths in two scopes are staged
 - **WHEN** the declaration has scopes `api` and `docs`, and a commit stages a path in each
 - **THEN** `scripts/check.py --scope api --scope docs` runs, with the names sorted, instead of the full check
+
+#### Scenario: A path in two overlapping scopes is staged
+- **WHEN** the declaration has a scope `blah` covering `path1/**` and `another/**`, and a scope `blech` covering
+  `path1/**`, and a commit stages `path1/blah.py`
+- **THEN** `scripts/check.py --scope blah --scope blech` runs
 
 #### Scenario: A failing scope
 - **WHEN** a scope runs before a commit and one of its gates fails
@@ -52,8 +57,8 @@ it, and every staged path is declared, the commit needs only what those paths ne
 
 #### Scenario: A malformed declaration
 - **WHEN** the staged `scripts/check-paths.toml` can't be parsed, has an unknown version, table or key, lists an
-  entry that is neither an exact path nor a directory written `dir/**`, has two groups whose entries overlap, or names
-  a scope with a bad or reserved name (`none`, `full`)
+  entry that is neither an exact path nor a directory written `dir/**`, has an entry in the skip list that overlaps
+  an entry in a scope, or names a scope outside `[a-z][a-z0-9_]*` or with a reserved name (`none`, `full`)
 - **THEN** the commit is refused under `commit-checks`, and the message names the file, what's wrong with it and how
   to fix it
 
@@ -89,3 +94,45 @@ hook's message.
 #### Scenario: A malformed declaration in CI
 - **WHEN** CI asks while the repository's declaration is malformed
 - **THEN** the guard fails, naming the file, what's wrong and the fix, and gives no answer
+
+### Requirement: A scope narrows only the tests
+Given one or more scopes, a repository's check SHALL run every gate it runs for the full check, and SHALL narrow only
+its tests, to those tagged with any of the scopes. It SHALL refuse a scope its declaration doesn't list.
+
+#### Scenario: A scoped check
+- **WHEN** `scripts/check.py --scope docs` runs in a repository that declares the scope `docs`
+- **THEN** every gate runs, and the tests that run are exactly those tagged `docs`
+
+#### Scenario: Two scopes
+- **WHEN** `scripts/check.py --scope api --scope docs` runs
+- **THEN** the tests that run are those tagged `api` or `docs`
+
+#### Scenario: An undeclared scope
+- **WHEN** `scripts/check.py --scope nope` runs and the declaration lists no scope `nope`
+- **THEN** the check fails before running any gate, naming the scope and `scripts/check-paths.toml`
+
+### Requirement: Test tags cover what each test reads
+Whenever a repository's tests run, a test SHALL fail if it reads a file under a scope's paths without that scope's
+tag, or reads a file under a skipped path. Only files inside the repository count. The message SHALL name the test,
+the file, and the tag to add or the skip entry it contradicts.
+
+#### Scenario: A test reads a scope's path without its tag
+- **WHEN** the declaration has a scope `docs` covering `docs/**`, and a test without the `docs` tag reads
+  `docs/runs.md`
+- **THEN** that test fails, naming `docs/runs.md` and saying to tag it `docs`
+
+#### Scenario: A test reads a path in two scopes
+- **WHEN** scopes `blah` and `blech` both cover `path1/**`, and a test tagged only `blah` reads `path1/x.json`
+- **THEN** that test fails, saying to tag it `blech` too
+
+#### Scenario: A test reads a skipped path
+- **WHEN** the declaration skips `openspec/**`, and any test reads a file under `openspec/` in the repository
+- **THEN** that test fails, naming the file and the skip entry, since the skip would let a change to it go untested
+
+#### Scenario: Tags that cover the reads
+- **WHEN** every file a test reads in the repository is in no group, or in scopes the test is tagged with
+- **THEN** the tag check doesn't fail it
+
+#### Scenario: Files outside the repository
+- **WHEN** a test reads files in a temporary directory that its own fixture created
+- **THEN** those reads don't count
