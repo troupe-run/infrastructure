@@ -54,9 +54,22 @@ import {
   id = "website"
 }
 
-# The files troupe already had when it was adopted; the generated list is created, not imported.
+# The files troupe already had when it was adopted. The generated list, and any file delivered since
+# (scripts/guard_pytest.py, commit-check-paths), is created, not imported: importing a file troupe
+# doesn't have fails the plan with a 404.
+locals {
+  guard_adopted_files = toset([
+    "scripts/guard.py",
+    ".githooks/pre-commit",
+    ".githooks/commit-msg",
+    ".githooks/pre-push",
+    ".claude/settings.json",
+    ".github/workflows/guard.yml",
+  ])
+}
+
 import {
-  for_each = { for key, delivery in local.guard_deliveries : key => delivery if delivery.file != local.guard_list_path }
+  for_each = { for key, delivery in local.guard_deliveries : key => delivery if contains(local.guard_adopted_files, delivery.file) }
   to       = github_repository_file.guard[each.key]
   id       = "${each.value.repository}:${each.value.file}:"
 }

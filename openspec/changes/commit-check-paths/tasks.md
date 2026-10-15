@@ -158,6 +158,12 @@
       `uv run scripts/check.py` passes, and add the behaviour to the scope contract in
       `docs/development-workflow.md`
 
+- [x] 4.8 Import only the guard files troupe had when it was adopted (`tofu/imports.tf`). The first plan (6.2)
+      failed with a 404 because the import block covered every delivered file but the list, so it tried to import
+      `scripts/guard_pytest.py`, which troupe doesn't have yet. Name the six adopted files there, as `85ab33b` did
+      for `.github`. Verify `tofu fmt` and `tofu validate` pass, and that the plan creates the new file
+      Done 2026-10-15: `tofu fmt` and `tofu validate` pass, and the plan creates the file (6.2)
+
 ## 5. This repository adopts it
 
 - [x] 5.1 Confirm that no gate here reads `openspec/`: `git grep -n openspec -- 'scripts/tests/*.py'` shows only
@@ -225,9 +231,13 @@
           of the full check ...`. Every gate ran, `26 passed, 1660 deselected in 0.65s`, and the commit took 2.12s;
         - a source file (`packages/troupe/src/troupe/core/exit_codes.py`): the full check, 235s. Its first attempt
           was correctly refused by the ruff format gate.
-- [ ] 6.2 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
+- [x] 6.2 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
       `scripts/guard.py` updated and `scripts/guard_pytest.py` created in troupe, and nothing else. Check that the
       delivered list (`.github/guard-delivery.json`) gains the new file. Keep it for the pull request
+      Done 2026-10-15 on a branch containing `origin/main` (f866429): the first plan failed with a 404 when it tried to
+      import `scripts/guard_pytest.py` (fixed in 4.8). After that, `Plan: 1 to add, 2 to change, 0 to destroy.`:
+      `troupe:scripts/guard_pytest.py` will be created; `troupe:scripts/guard.py` and
+      `troupe:.github/guard-delivery.json` will be updated in place, and the list gains `"scripts/guard_pytest.py"`
 - [x] 6.3 Run `openspec validate commit-check-paths --strict` and verify it passes
 
 ## Workflow follow-up
