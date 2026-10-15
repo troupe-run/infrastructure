@@ -8,8 +8,8 @@ name: tofu
 #   or a manual run       apply     env apply (owner approves)     apply that saved plan, then commit
 #   or daily at 06:00 UTC                                          the state to main as the App
 #
-# The daily run finds drift, such as a forged change to a file delivered to troupe, within a day
-# (spec: ci-apply; openspec/changes/enforce-delivered-files/design.md, D5).
+# The daily run finds drift in anything OpenTofu manages, a file delivered to troupe included,
+# within a day (spec: ci-apply).
 #
 # Every job authenticates as the troupe-run-infrastructure App, through scripts/tofu.py, with the
 # secrets of its environment. The owner sets them from 1Password (README); none is in this file.
