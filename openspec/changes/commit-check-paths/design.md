@@ -208,6 +208,11 @@ The contract for each repository's `check.py`, whatever its language:
 - **The tests narrow to those tagged with any of the scopes.**
 - **A scope the declaration doesn't list is refused**, before any gate runs, naming the scope and the file. The guard
   never passes one, so this catches only a hand-typed mistake.
+- **A scope with no tagged tests passes**, after every other gate, and says there was nothing to test. The tag check
+  (D9) makes this safe: every full run fails a test that reads a scope's paths without its tag, so no tagged tests
+  means no test reads those paths. pytest exits 5 ("no tests ran") when `-m` selects nothing, so `check.py` treats
+  5 from a scoped test run as a pass. Running the full check instead was the alternative. The owner had no
+  preference, and asked only that the behaviour be stated (2026-10-15).
 
 For pytest, the tag is a marker named for the scope: `@pytest.mark.docs` on a test, or `pytestmark = pytest.mark.docs`
 on a module. `check.py` runs `pytest -m "api or docs"`. pytest's `-m` takes a boolean expression, and
@@ -267,9 +272,9 @@ the plugin as code each repository copies (two copies drift; delivering it keeps
   process, so that read isn't checked. troupe's doc tests call `main()` in-process, so they're seen. A scope whose
   tests read through subprocesses needs its tags kept by hand, and the declaration's comment should say so. Pushes to
   `main` still run everything (#101).
-- [A declared scope isn't implemented by `check.py`] → `check.py` refuses an undeclared scope, and a declared one
-  with no tagged tests runs no tests but still every other gate. The tag check fails any test that reads the scope's
-  paths untagged, so an empty scope can only stay empty while no test reads its paths.
+- [A scope is declared before its tests are tagged] → The scope passes with no tests (D8), and the next full run
+  fails every test that reads the scope's paths untagged, so the gap lasts at most until the next commit that
+  touches anything else, or the push to `main`. Tagging the tests in the same change as the declaration avoids it.
 - [The audit hook slows the tests] → It does a string comparison per opened file while a test runs. That's
   negligible next to the tests, and it's measured in the evidence task.
 - [A skip or scope hides a slow or broken full check from the person committing] → Each run is announced, and the

@@ -120,6 +120,9 @@ keep this contract, whatever language it's in:
   error. Only the tests, the slow part, are narrowed.
 - **The tests narrow to those tagged with any of the scopes.**
 - **A scope the declaration doesn't list is refused**, before any gate runs, naming the scope and the file.
+- **A scope no test is tagged with passes**, after every other gate, and says there was nothing to test. The tag
+  check below makes that safe: a test that read the scope's paths without the tag would fail the next full run. (pytest
+  exits 5 when `-m` selects nothing, and this repository's `check.py` reads that as a pass, only in a scoped run.)
 
 With pytest, the tag is a marker named for the scope: `@pytest.mark.docs` on a test, or `pytestmark = pytest.mark.docs`
 on a module. `check.py` runs `pytest -m "api or docs"`, built by `guard.marker_expression`. This repository's
