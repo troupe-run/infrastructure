@@ -1,20 +1,28 @@
 """Run every quality gate, in order, stopping at the first failure.
 
-Usage: uv run scripts/check.py
+Usage: uv run scripts/check.py [--scope NAME ...]
+
+With --scope, every gate still runs, but the tests narrow to those marked with any of the scopes
+declared in scripts/check-paths.toml. The guard passes scopes when a commit stages only paths
+they cover (spec: development-workflow; commit-check-paths design D8).
 
 The same script runs locally and in CI, so the two can't diverge (design D8). It needs no
 secret: `tofu validate` reads neither state nor variable values. Every repo the org builds in
 has a scripts/check.py; the development-workflow guard runs it before every commit.
 """
 
+import argparse
 import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 BIN = Path(sys.executable).parent
+sys.path.insert(0, str(ROOT / "scripts"))
+import guard  # noqa: E402  (scripts/guard.py reads the declaration and activates the hooks)
 
 
 def tool(name: str, path: str | None = str(BIN)) -> str:
@@ -27,13 +35,29 @@ def tool(name: str, path: str | None = str(BIN)) -> str:
     return found
 
 
-def gates() -> list[tuple[str, list[str]]]:
+def requested_scopes(names: Sequence[str], declaration: guard.CheckPaths | None) -> tuple[str, ...]:
+    """The scopes to run, sorted and once each; exits naming any the declaration doesn't list."""
+    declared = {name for name, _ in declaration.scopes} if declaration is not None else set()
+    unknown = sorted(set(names) - declared)
+    if unknown:
+        listed = ", ".join(f"`{name}`" for name in unknown)
+        sys.exit(
+            f"check: scope {listed} isn't declared in scripts/check-paths.toml. Fix: declare it "
+            "there, or run the check without --scope."
+        )
+    return tuple(sorted(set(names)))
+
+
+def gates(scopes: tuple[str, ...] = ()) -> list[tuple[str, list[str]]]:
     tofu = tool("tofu", path=None)
+    pytest = [tool("pytest")]
+    if scopes:
+        pytest += ["-m", guard.marker_expression(scopes)]
     return [
         ("ruff lint", [tool("ruff"), "check", "."]),
         ("ruff format", [tool("ruff"), "format", "--check", "."]),
         ("mypy --strict", [tool("mypy")]),
-        ("tests", [tool("pytest")]),
+        ("tests", pytest),
         ("tofu fmt", [tofu, "fmt", "-check", "-recursive", "tofu"]),
         ("tofu init", [tofu, "-chdir=tofu", "init", "-backend=false", "-input=false"]),
         ("tofu validate", [tofu, "-chdir=tofu", "validate"]),
@@ -48,9 +72,6 @@ def activate_git_hooks(root: Path) -> str | None:
     """
     if not (root / ".git").exists():
         return None  # not a git checkout (for example, an unpacked source archive)
-    sys.path.insert(0, str(root / "scripts"))
-    import guard
-
     return guard.activate_hooks(root)
 
 
@@ -69,11 +90,22 @@ def run_gates(steps: list[tuple[str, list[str]]], cwd: Path) -> int:
     return 0
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--scope", action="append", default=[], help="a declared scope")
+    names = parser.parse_args(argv).scope
+    scopes: tuple[str, ...] = ()
+    if names:
+        text = guard.read_working_tree(ROOT)(guard.CHECK_PATHS)
+        try:
+            declaration = None if text is None else guard.check_paths(text)
+        except guard.CheckPathsError as error:
+            sys.exit(f"check: {error.decision().text()}")
+        scopes = requested_scopes(names, declaration)
     activated = activate_git_hooks(ROOT)
     if activated is not None:
         print(f"check: {activated}", flush=True)
-    return run_gates(gates(), ROOT)
+    return run_gates(gates(scopes), ROOT)
 
 
 if __name__ == "__main__":

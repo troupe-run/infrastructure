@@ -111,6 +111,37 @@ fails the step, prints the same message as the commit hook, and prints no answer
 itself: the base to compare against, and what to do when it can't work one out (a new branch, a force push, a shallow
 history). Then it passes no paths, and the answer is `full`.
 
+### A scope is a test tag
+
+The guard passes scope names and doesn't know what they run. A repository that declares a scope makes its `check.py`
+keep this contract, whatever language it's in:
+
+- **Every gate still runs.** Linters, type checkers and `tofu validate` take seconds, so a scope can't skip a lint
+  error. Only the tests, the slow part, are narrowed.
+- **The tests narrow to those tagged with any of the scopes.**
+- **A scope the declaration doesn't list is refused**, before any gate runs, naming the scope and the file.
+
+With pytest, the tag is a marker named for the scope: `@pytest.mark.docs` on a test, or `pytestmark = pytest.mark.docs`
+on a module. `check.py` runs `pytest -m "api or docs"`, built by `guard.marker_expression`. This repository's
+`check.py` takes `--scope` too. It declares no scope, so it refuses every name.
+
+**Every test run checks the tags.** A test fails if it reads a file under a scope's paths without that scope's tag,
+or reads a skipped path at all. The message names the test, the file and the tag to add. So a new test that reads
+`docs/` can't be left out of the `docs` scope unnoticed: the next full run fails it. For pytest, the check is the
+delivered plugin `scripts/guard_pytest.py`, loaded from the root `conftest.py`:
+
+```python
+pytest_plugins = ["guard_pytest"]  # with scripts/ on sys.path
+```
+
+It registers each declared scope as a marker, so `--strict-markers` accepts them and the declaration is the one
+list. It records each test's file reads through Python's `open` audit event, counting only files inside the
+repository. Reads made by a subprocess the test starts aren't seen. A scope whose tests read that way keeps its tags
+by hand, and its comment in `scripts/check-paths.toml` should say so.
+
+The rule itself is `guard.tag_violations`, which takes plain data: a test's id, its tags and the files it read.
+Another runner, such as vitest, follows the same contract with its own adapter that collects that data.
+
 ## What the guard grants
 
 The Claude Code hook can also answer "allow", so a command runs without a prompt or auto mode's check
@@ -150,7 +181,8 @@ uv run scripts/guard.py override commit-on-main --reason "hotfix while CI is dow
 The guard is maintained in `troupe-run/infrastructure` (spec: `guard-delivery`). Each other governed repository holds
 copies that the infrastructure App delivers straight to its `main`, after the owner approves the plan:
 
-- `scripts/guard.py`, `.githooks/`, `.claude/settings.json` and `.github/workflows/guard.yml`;
+- `scripts/guard.py`, `scripts/guard_pytest.py`, `.githooks/`, `.claude/settings.json` and
+  `.github/workflows/guard.yml`;
 - `.github/guard-delivery.json`, which lists the delivered files. Its presence is what marks a repository as one that
   receives the guard.
 

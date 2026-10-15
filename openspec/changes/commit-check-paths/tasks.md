@@ -139,13 +139,13 @@
       every violation `tag_violations` finds. Add it to `guard_files` in `tofu/guard_delivery.tf`, and to the
       delivered list in `scripts/tests/test_guard_delivery.py` if that test enumerates them. Verify 4.3's tests pass,
       `tofu validate` passes, and `uv run scripts/check.py` passes
-- [ ] 4.5 Write failing tests in `scripts/tests/test_check.py` for this repository's `check.py --scope` (design D8):
+- [x] 4.5 Write failing tests in `scripts/tests/test_check.py` for this repository's `check.py --scope` (design D8):
       `--scope nope` exits non-zero before any gate runs, naming `nope` and `scripts/check-paths.toml`; the gate list
       for a declared scope `docs` (in a declaration passed to `gates()`) keeps every gate and gives pytest
       `-m docs`; with two scopes, `-m "api or docs"`; with none, pytest gets no `-m`. Then add `--scope`
       (`action="append"`) to `check.py`, reading the declaration through `guard.check_paths` and building the
       expression with `guard.marker_expression`. Verify the tests pass and `uv run scripts/check.py` passes
-- [ ] 4.6 Document scopes as tags in `docs/development-workflow.md`: the `--scope` contract every `check.py` takes on
+- [x] 4.6 Document scopes as tags in `docs/development-workflow.md`: the `--scope` contract every `check.py` takes on
       (every gate runs, the tests narrow, an undeclared scope is refused), the pytest convention (a marker per scope,
       `-m`), the tag check and the plugin, what the audit hook can't see (reads in subprocesses), and that another
       runner, such as vitest, follows the same contract with its own adapter. Add `scripts/guard_pytest.py` to the
