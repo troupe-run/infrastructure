@@ -167,7 +167,7 @@
       `openspec` path. With the plugin loaded: 796 passed in 70.86s, against 70.09s before (796 passed). A
       temporary probe test reading `openspec/config.yaml` failed at teardown with `guard: ...::test_reads_spec reads
       openspec/config.yaml, but scripts/check-paths.toml skips \`openspec/**\` ...`, and was deleted
-- [ ] 5.2 Make the next `openspec/`-only commit on this branch, such as ticking 5.1, and verify the guard announces
+- [x] 5.2 Make the next `openspec/`-only commit on this branch, such as ticking 5.1, and verify the guard announces
       the skip and the commit is made without the check running. Record the output in this task
 
 ## 6. Evidence
