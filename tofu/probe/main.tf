@@ -25,6 +25,8 @@
 # ruleset of ../release.tf with this App standing in for the release App as its only bypass. Then
 # probe_release_branch makes the App create release-please--probe, and probe_release_commit makes it
 # commit to that branch; unsetting them makes it delete the file and the branch.
+# drop-forgery-resistance (design D3) reruns it without the deletion rule, merging a pull request
+# from the branch to show that delete-on-merge removes it.
 
 terraform {
   required_version = ">= 1.8"
@@ -282,7 +284,8 @@ resource "github_repository_environment_deployment_policy" "apply_main" {
 }
 
 # The "release branches" ruleset of ../release.tf (release-app design D7), with the infrastructure
-# App as the only bypass in place of the release App, which isn't installed here (design D8).
+# App as the only bypass in place of the release App, which isn't installed here (design D8). No
+# deletion rule, so delete-on-merge removes the branch (drop-forgery-resistance design D2, D3).
 resource "github_repository_ruleset" "release_branches" {
   count = var.probe_release_ruleset ? 1 : 0
 
@@ -302,7 +305,6 @@ resource "github_repository_ruleset" "release_branches" {
     creation                      = true
     update                        = true
     update_allows_fetch_and_merge = false
-    deletion                      = true
   }
 
   bypass_actors {

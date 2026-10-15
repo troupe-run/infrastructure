@@ -2,7 +2,7 @@
 
 ## 1. Probe delete-on-merge without the deletion rule
 
-- [ ] 1.1 Remove `deletion = true` from the probe's copy of the ruleset in `tofu/probe/main.tf` and update its comment
+- [x] 1.1 Remove `deletion = true` from the probe's copy of the ruleset in `tofu/probe/main.tf` and update its comment
       (design D2, D3). Verify with `tofu fmt -check` and `tofu validate` on `tofu/probe`
 - [ ] 1.2 Owner: create a throwaway `troupe-run/infra-probe-<date>` with delete-on-merge on, and add it to the
       infrastructure App's installation. Run D3's steps 1–6 through `tofu/probe`, with the owner's own pushes and
@@ -14,19 +14,19 @@
 
 ## 2. The release exemption drops the author check
 
-- [ ] 2.1 Pin what must keep applying on a release branch in troupe before the change (design D6, differential rule).
+- [x] 2.1 Pin what must keep applying on a release branch in troupe before the change (design D6, differential rule).
       With the current bot-authored setup, add the delivered-file case: a commit changing a file listed in
       `.github/guard-delivery.json` fails `delivered-file`. Verify it and the existing message and force-push cases
       pass on the current code, with `uv run pytest scripts/tests/test_guard_push_and_ci.py`
-- [ ] 2.2 Rewrite the release-please section's tests per design D6's table, each named for what its body checks, with
+- [x] 2.2 Rewrite the release-please section's tests per design D6's table, each named for what its body checks, with
       an ordinary author and no monkeypatched address. Delete the four tests D6 lists for removal, and switch the
       `--repository` tests to an ordinary author. Verify the "Any author" and ordinary-author cases fail on the
       current code only on `commit-branch-change`
-- [ ] 2.3 Extend `release_ruleset_repositories` to require `creation = true` and `update = true` in the ruleset block,
+- [x] 2.3 Extend `release_ruleset_repositories` to require `creation = true` and `update = true` in the ruleset block,
       and add a removal test with `creation = false` in a copy of the file (design D6). Verify both tests pass
       against the real `tofu/release.tf`, that the new one fails if the check is removed, and that the old one still
       passes
-- [ ] 2.4 In `scripts/guard.py`:
+- [x] 2.4 In `scripts/guard.py`:
       - replace `release_branch_by_the_bot` with `reserved_release_branch(branch, repository)`, a check of the name
         and `RELEASE_REPOSITORIES`;
       - remove `RELEASE_AUTHOR_EMAIL`;
