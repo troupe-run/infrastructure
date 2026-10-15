@@ -169,6 +169,10 @@
       openspec/config.yaml, but scripts/check-paths.toml skips \`openspec/**\` ...`, and was deleted
 - [x] 5.2 Make the next `openspec/`-only commit on this branch, such as ticking 5.1, and verify the guard announces
       the skip and the commit is made without the check running. Record the output in this task
+      Done 2026-10-15: commit 3136be9 staged only `openspec/changes/commit-check-paths/tasks.md`. The guard printed
+      `guard: only openspec/** is staged; the check is skipped (scripts/check-paths.toml).` and the commit took
+      0.50s, against 62-79s for each commit on this branch before the declaration. The commit recording this is
+      skipped the same way
 
 ## 6. Evidence
 
