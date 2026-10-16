@@ -23,11 +23,17 @@
       `uv run scripts/check.py` passes
       Done 2026-10-16: `test_required_checks.py`, 14 passed. `check.py`: all gates passed. The old comment's "plans
       run on the owner's machine" line was out of date (CI plans since ci-apply) and is gone
-- [ ] 1.3 Check the tests catch the drifts design D3 names: on scratch copies of the workflows (not the real files),
+- [x] 1.3 Check the tests catch the drifts design D3 names: on scratch copies of the workflows (not the real files),
       rename `CI`, and rename the state file in `ci.yml`'s `paths-ignore` only, and verify the matching test fails
       on each, naming the mismatch. Record the results here
-- [ ] 1.4 Check that no doc describes CI as running on every push: `grep -rn -i "every push" README.md docs
+      Done 2026-10-16, as committed tests on in-memory copies of the workflows (the file's existing idiom, as in
+      `test_a_renamed_matrix_leg_no_longer_matches_the_required_names`), so the drift stays checked: renaming `CI`,
+      pushes without `main`, a different state path, and a path filter on `pull_request` each produce exactly the
+      expected problem. `test_required_checks.py`: 18 passed; mypy --strict and ruff clean
+- [x] 1.4 Check that no doc describes CI as running on every push: `grep -rn -i "every push" README.md docs
       .github/workflows`. Verify the only hits are about `guard` and the `pre-push` hook, which don't change
+      Done 2026-10-16: two hits, `docs/development-workflow.md:15` (`pre-push`) and `:17` (`guard`). README's "guard and
+      CI runs" (line 229) is about receiving repositories' runs on delivered commits on `main`, which still run
 
 ## 2. Evidence on GitHub
 

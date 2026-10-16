@@ -299,6 +299,38 @@ def test_main_s_plan_follows_the_ci_run_main_s_pushes_start() -> None:
     assert plan_trigger_problems(workflows["ci.yml"], workflows["tofu.yml"]) == []
 
 
+def test_a_renamed_ci_workflow_is_named_as_no_longer_followed_by_main_s_plan() -> None:
+    workflows = real_workflows()
+    workflows["ci.yml"]["name"] = "Tests"
+    assert plan_trigger_problems(workflows["ci.yml"], workflows["tofu.yml"]) == [
+        "tofu.yml follows ['CI']; ci.yml is 'Tests'"
+    ]
+
+
+def test_ci_pushes_without_main_are_named_as_never_starting_main_s_plan() -> None:
+    workflows = real_workflows()
+    events(workflows["ci.yml"])["push"]["branches"] = ["release"]
+    assert plan_trigger_problems(workflows["ci.yml"], workflows["tofu.yml"]) == [
+        "tofu.yml follows CI on ['main'], which ci.yml's pushes don't list"
+    ]
+
+
+def test_a_state_path_that_tofu_yml_doesn_t_skip_is_named() -> None:
+    workflows = real_workflows()
+    events(workflows["ci.yml"])["push"]["paths-ignore"] = ["tofu/state.tfstate"]
+    assert ci_trigger_problems(workflows["ci.yml"], workflows["tofu.yml"]) == [
+        "push ignores ['tofu/state.tfstate'], not ['tofu/terraform.tfstate']"
+    ]
+
+
+def test_a_path_filter_on_pull_requests_is_named() -> None:
+    workflows = real_workflows()
+    events(workflows["ci.yml"])["pull_request"] = {"paths-ignore": ["docs/**"]}
+    assert ci_trigger_problems(workflows["ci.yml"], workflows["tofu.yml"]) == [
+        "pull_request has ['paths-ignore']; a required check would never report"
+    ]
+
+
 def test_guard_re_runs_when_a_pull_request_is_renamed_and_still_runs_on_every_push() -> None:
     """release-please-prs design D4: the title is checked, so editing it must re-run the check."""
     workflow: dict[Any, Any] = load_yaml(WORKFLOWS / "guard.yml")
