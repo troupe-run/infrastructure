@@ -99,7 +99,9 @@ Alternatives:
 **Removing a repository from management** is already safe. The README's `removed { from = module.repo_<name> ...
 destroy = false }` forgets the whole module, so it forgets both new resources too, and turns nothing off. The danger
 is narrower: deleting either resource from the module, or setting `count` on it, destroys it, and that turns its
-feature off in every repository. The module's comment on the two resources says so.
+feature off in every repository. So both carry `prevent_destroy`, as the repository and the Pages site do: a plan
+that would destroy one fails (owner, 2026-10-16). Deleting the resource block gets past `prevent_destroy`, so the
+module's comment on the two resources says not to.
 
 ### D2. Secret scanning and push protection enabled in the module, for every repository
 
@@ -217,8 +219,9 @@ and whether it's a real secret that needs rotating (the owner's job) or a false 
   dependency graph shows only when someone runs `oob.py`, with every plan as `oob/README.md` says: nothing checks
   those daily yet. If the graph is turned off by hand, Dependabot goes quiet until the next run. Running `oob.py`
   daily in CI is #62 (owner, 2026-10-16).
-- [Deleting one of the new resources from the module turns its feature off everywhere] → D1: the module's comment
-  says so, and the plan would show four destroys of that resource for the owner to refuse.
+- [Deleting one of the new resources from the module turns its feature off everywhere] → D1: `prevent_destroy`
+  fails a plan that would destroy one. Deleting the block itself gets past that, so the module's comment says not
+  to, and the plan would show four destroys for the owner to refuse.
 - [The live PATCH changes a setting nobody meant to change] → D3's first probe, then the live plan must show only the
   intended diffs before the owner approves it.
 - [A Dependabot pull request sits open and red in troupe or infrastructure] → D5 says what to do with it, and alerts
