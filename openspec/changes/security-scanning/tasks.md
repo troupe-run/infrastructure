@@ -131,7 +131,9 @@
       output for the pull request
       2026-10-16: 5 differences, none from this change: the infrastructure App holds `pages: write`, which isn't
       declared (likely website-pages, #51/#57); troupe specs `flake-hunt`, `python-support` and `quality-check` have
-      no `cap:` label; `cap:releases`'s Purpose isn't recorded. Left open for the owner
+      no `cap:` label; `cap:releases`'s Purpose isn't recorded. After rebasing onto b8e2ee3, which records
+      `pages: write` (website-pages), 4 remain. They're unrelated to this change, tracked in #63 (owner,
+      2026-10-16), and noted as such in the pull request
 
 
 ## 6. Evidence on GitHub
