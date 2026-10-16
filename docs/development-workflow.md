@@ -18,7 +18,10 @@ drift apart:
 
 **The git hooks are on by default.** Git never runs hooks from a fresh clone, so the repository's own tooling turns
 them on: running `uv run scripts/check.py` does it, and so does starting a Claude Code session. Each says so when it
-does. You can also run `git config core.hooksPath .githooks` yourself.
+does. You can also run `git config core.hooksPath .githooks` yourself. Git only runs a hook that is executable, so
+both also name any hook in `.githooks/` that isn't: git skips it. That's a notice, not a refusal. A delivered hook is
+fixed in `troupe-run/infrastructure`, whose next plan sets its mode; don't change it in the clone. Git for Windows runs
+a hook whatever its mode, so nothing is reported there.
 
 **GitHub can't reject a non-conforming push on our plan, or on GitHub Team.** We tested this on 2026-10-11. A
 commit-message ruleset is accepted, but not enforced, on Free (`troupe-run`) and on Team (`hpsgd`, public and
