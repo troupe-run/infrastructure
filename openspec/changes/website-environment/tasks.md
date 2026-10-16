@@ -24,9 +24,9 @@
       Record the summary here. If it shows any change, fix the declaration to match GitHub and re-plan before going on
       Done 2026-10-16, on 4268fb7's state: `Plan: 2 to import, 0 to add, 0 to change, 0 to destroy.` The two imports
       are the environment and `github_pages_main_only`, with no attribute changes
-- [ ] 1.5 Verify `prevent_destroy` works: with the environment's resource commented out locally (not committed), a
-      plan fails with OpenTofu's `prevent_destroy` error naming `github_repository_environment.github_pages`. Restore
-      the file, check `git diff` shows nothing from this task, and record the error line here
+- 1.5 (moved to the workflow follow-up, owner 2026-10-16) `prevent_destroy` can only be checked once the environment
+      is in state, which the apply's import does. Before that, removing the declaration only drops the pending import,
+      so no plan fails
 - [x] 1.6 Commit the adoption (`feat(tofu): adopt the website's github-pages environment and its main-only policy`)
       Done 2026-10-16: 770d906
 
@@ -58,6 +58,9 @@
   `false`, the protection rule is still `branch_policy`, and `.../deployment-branch-policies` still lists only
   `main`. Then verify the next deploy of the website's `main` succeeds and https://troupe.run answers 200 (spec
   scenario "main still deploys"). If no website change is pending, re-run the latest Deploy run.
+- After the apply, check `prevent_destroy` (task 1.5): with `github_repository_environment.github_pages`, its import
+  and the policy commented out locally (not committed), a local plan fails with OpenTofu's `prevent_destroy` error
+  naming the environment. Restore the file, check `git diff` is empty, and record the error line on #52.
 - After #51's apply (whichever lands second), re-read the environment and check `main`'s next plan shows no drift on
   it (design, Risks).
 - Comment on #52 with the pull request and the archived change, check it's closed, and set its card to Done.
