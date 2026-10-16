@@ -300,6 +300,41 @@ def code_security(fetch: Fetch, oob_dir: Path) -> list[str]:
     return found
 
 
+# The release milestones, which OpenTofu manages only as declared: a milestone made by hand on a
+# listed repository never shows in a plan (spec: milestones; release-milestones design D5). One way,
+# like the spec labels: a declared milestone that's missing or different is the plan's business.
+MILESTONES = "tofu/milestones.json"
+
+
+def milestones_gh_args(repository: str) -> list[str]:
+    return [
+        "api",
+        f"repos/{ORG}/{repository}/milestones?state=all&per_page=100",
+        "--jq",
+        "[.[] | .title]",
+    ]
+
+
+def undeclared_milestones(fetch: Fetch, root: Path) -> list[str]:
+    """Each milestone, open or closed, on a listed repository whose title isn't declared."""
+    declared = json.loads((root / MILESTONES).read_text())
+    titles = {milestone["title"] for milestone in declared["milestones"]}
+    found: list[str] = []
+    for repository in declared["repositories"]:
+        try:
+            actual: list[str] = fetch(milestones_gh_args(repository))
+        except Exception as error:
+            raise UnreadableError(
+                f"milestones: couldn't read {repository!r}'s milestones ({error})"
+            ) from error
+        found += [
+            f"milestones: {repository}: {title!r} is on GitHub but not declared; "
+            f"declare it in {MILESTONES}"
+            for title in sorted(set(actual) - titles)
+        ]
+    return found
+
+
 def differences(name: str, key: str, declared: list[Record], actual: list[Record]) -> list[str]:
     """Every item missing, extra or changed, in a stable order."""
     want = {item[key]: item for item in declared}
@@ -344,6 +379,7 @@ def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT) -> list[str]:
     found += unlabelled_specs(specs, root)
     found += stale_descriptions(fetch, specs, oob_dir, root)
     found += code_security(fetch, oob_dir)
+    found += undeclared_milestones(fetch, root)
     return found
 
 
@@ -360,7 +396,7 @@ def main() -> int:
         return 1
     print(
         f"oob: no differences ({', '.join(c.name for c in CHECKS)}, "
-        "troupe specs, troupe label descriptions, code security)"
+        "troupe specs, troupe label descriptions, code security, milestones)"
     )
     return 0
 

@@ -46,6 +46,14 @@ CODE_SECURITY = {
         for r in ("troupe", "website")
     ],
 }
+MILESTONES = {
+    "repositories": ["troupe", "website"],
+    "milestones": [
+        {"key": "0.1.0", "title": "0.1.0", "state": "open", "description": "now"},
+        {"key": "0.2.0", "title": "0.2.0", "state": "closed", "description": "next"},
+    ],
+}
+DECLARED_MILESTONES = ["0.1.0", "0.2.0"]
 
 
 @pytest.fixture
@@ -63,6 +71,7 @@ def oob_dir(tmp_path: Path) -> Path:
     labels.write_text(json.dumps(CAP_LABELS))
     (tmp_path / "troupe-spec-purposes.json").write_text(json.dumps(PURPOSES))
     (tmp_path / "code-security.json").write_text(json.dumps(CODE_SECURITY))
+    (tmp_path / "tofu" / "milestones.json").write_text(json.dumps(MILESTONES))
     return tmp_path
 
 
@@ -79,6 +88,7 @@ def fake_github(
     defaults: list[Any] = DEFAULTS,
     attachments: dict[str, Any] | None = None,
     graphs: dict[str, BaseException] | None = None,
+    milestones: dict[str, Any] | None = None,
 ) -> oob.Fetch:
     """GitHub as declared. attachments maps a repository to its attachment (None: 204, nothing
     attached); graphs maps a repository to what reading its dependency graph raises."""
@@ -86,9 +96,15 @@ def fake_github(
     configs = [BASELINE] if configurations is None else configurations
     attached = attachments or {}
     graph_errors = graphs or {}
+    milestone_titles = milestones or {}
 
     def fetch(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
         calls.append(args)
+        if "/milestones?" in args[1]:
+            found = milestone_titles.get(args[1].split("/")[2], DECLARED_MILESTONES)
+            if isinstance(found, BaseException):
+                raise found
+            return found
         if args[1].endswith("/code-security/configurations"):
             return configs
         if args[1].endswith("/code-security/configurations/defaults"):
@@ -301,6 +317,7 @@ def test_every_github_call_is_a_read() -> None:
         ("defaults", oob.DEFAULTS_GH_ARGS),
         ("attachment", oob.attachment_gh_args("troupe")),
         ("sbom", oob.sbom_gh_args("troupe")),
+        ("milestones", oob.milestones_gh_args("troupe")),
     ]:
         assert args[0] == "api"
         assert not write_flags & set(args), name
@@ -386,3 +403,48 @@ def test_gh_reports_a_404_as_not_found_and_other_failures_as_errors(
         oob.gh(["api", "repos/x/y/dependency-graph/sbom"])
     monkeypatch.setattr(subprocess, "run", fake_run("", 0))
     assert oob.gh(["api", "repos/x/y/code-security-configuration"]) is None
+
+
+# release-milestones design D5: a milestone made by hand on a listed repository.
+
+
+def test_a_milestone_made_by_hand_is_reported_naming_the_repository_and_the_file(
+    oob_dir: Path,
+) -> None:
+    made = {"website": [*DECLARED_MILESTONES, "0.3.0"]}
+    found = RUN(fake_github(TYPES, PROJECTS, [], milestones=made), oob_dir)
+    assert found == [
+        "milestones: website: '0.3.0' is on GitHub but not declared; "
+        "declare it in tofu/milestones.json"
+    ]
+
+
+def test_a_closed_milestone_made_by_hand_is_reported_too(oob_dir: Path) -> None:
+    calls: list[list[str]] = []
+    made = {"troupe": ["alpha-0", *DECLARED_MILESTONES]}
+    found = RUN(fake_github(TYPES, PROJECTS, calls, milestones=made), oob_dir)
+    assert found == [
+        "milestones: troupe: 'alpha-0' is on GitHub but not declared; "
+        "declare it in tofu/milestones.json"
+    ]
+    assert any("milestones?state=all" in c[1] for c in calls)
+
+
+def test_every_declared_milestone_on_every_listed_repository_reports_nothing(
+    oob_dir: Path,
+) -> None:
+    calls: list[list[str]] = []
+    assert RUN(fake_github(TYPES, PROJECTS, calls), oob_dir) == []
+    read = sorted(c[1].split("/")[2] for c in calls if "/milestones?" in c[1])
+    assert read == ["troupe", "website"]
+
+
+def test_a_declared_milestone_missing_on_github_is_left_to_the_plan(oob_dir: Path) -> None:
+    found = RUN(fake_github(TYPES, PROJECTS, [], milestones={"troupe": ["0.1.0"]}), oob_dir)
+    assert found == []
+
+
+def test_milestones_that_can_t_be_read_are_an_error_naming_the_repository(oob_dir: Path) -> None:
+    errors = {"website": RuntimeError("HTTP 502")}
+    with pytest.raises(oob.UnreadableError, match=r"'website'.*milestones.*HTTP 502"):
+        RUN(fake_github(TYPES, PROJECTS, [], milestones=errors), oob_dir)
