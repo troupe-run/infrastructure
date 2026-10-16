@@ -68,7 +68,7 @@ repository SHALL keep them on, and its declaration SHALL say why.
 
 #### Scenario: The org's roadmap stays linked
 - **WHEN** the managed repositories' settings have been applied
-- **THEN** the org's project is still linked to `troupe`, and still holds every item it held before
+- **THEN** the org's project is still linked to `troupe` and `website`, and still holds every item it held before
 
 ### Requirement: The website deploys from main only
 The `website` repository SHALL have an environment named `github-pages`, the one its deploy job uses, whose

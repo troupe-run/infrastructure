@@ -333,8 +333,8 @@ hooks is still caught.
 - **THEN** the GitHub check fails and names the rule
 
 #### Scenario: A Dependabot pull request in a governed repository
-- **WHEN** a pull request in `troupe-run/troupe` or `troupe-run/infrastructure` comes from a branch named
-  `dependabot/<ecosystem>/<package>-<version>`, which has no matching OpenSpec change
+- **WHEN** a pull request in `troupe-run/troupe`, `troupe-run/infrastructure` or `troupe-run/website` comes from a
+  branch named `dependabot/<ecosystem>/<package>-<version>`, which has no matching OpenSpec change
 - **THEN** the GitHub check fails on the branch-change rule: no exemption covers a Dependabot branch
 
 ### Requirement: Pull request titles are Conventional Commits
