@@ -21,8 +21,9 @@
       branch). On `main`: `openspec/config.yaml`, `scripts/check.py`, `scripts/check-paths.toml` (skips `openspec/**`,
       `.claude/**`, `docs/**` and the contributor docs), CONTRIBUTING.md with D8's text, and CLAUDE.md. All eight
       delivered paths 404. CI's job is still `test` and runs `uv run scripts/check.py`. Full check on macOS: 38.3 s
-- [ ] 1.4 Owner: confirm that the infrastructure App's installation lists `website` in the App's settings
+- [x] 1.4 Owner: confirm that the infrastructure App's installation lists `website` in the App's settings
       (teams-and-access), and record that here
+      Done 2026-10-16: the owner confirmed `website` is in the installation's repository list
 
 ## 2. The website receives the guard
 
