@@ -62,7 +62,8 @@ import {
 
 # The files troupe already had when it was adopted. The generated list, and any file delivered since
 # (scripts/guard_pytest.py, commit-check-paths), is created, not imported: importing a file troupe
-# doesn't have fails the plan with a 404.
+# doesn't have fails the plan with a 404. Only troupe's were adopted: a repository that joins the
+# guard later has none of them, so each of its files is created (govern-website).
 locals {
   guard_adopted_files = toset([
     "scripts/guard.py",
@@ -75,7 +76,7 @@ locals {
 }
 
 import {
-  for_each = { for key, delivery in local.guard_deliveries : key => delivery if contains(local.guard_adopted_files, delivery.file) }
+  for_each = { for key, delivery in local.guard_deliveries : key => delivery if delivery.repository == module.repo_troupe.name && contains(local.guard_adopted_files, delivery.file) }
   to       = github_repository_file.guard[each.key]
   id       = "${each.value.repository}:${each.value.file}:"
 }
