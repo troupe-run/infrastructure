@@ -52,7 +52,9 @@
       Dependabot branch, with a conventional commit, in `troupe-run/troupe` and in `troupe-run/infrastructure`
       (parametrised). It checks that the branch-change rule refuses it. Name it for what it checks. Verify it passes,
       and that it fails when `reserved_release_branch` is made to return `True` for that branch (revert afterwards)
-- [ ] 3.2 Add a "Dependabot pull requests" section to `docs/development-workflow.md`. In troupe and infrastructure,
+      Test added 2026-10-16 with Dependabot's documented branch shape: 2 passed; with `reserved_release_branch`
+      returning `True` for `dependabot/` branches, both failed (reverted). Waiting on 2.5 for the observed branch
+- [x] 3.2 Add a "Dependabot pull requests" section to `docs/development-workflow.md`. In troupe and infrastructure,
       such a pull request is an alert with a fix: take the bump into an issue and an OpenSpec change, and close
       Dependabot's pull request with a link. On the website it merges once `test` passes. Add a Known gaps entry: a
       security fix waits for a person. Verify `uv run scripts/check.py` passes, the docs tests included

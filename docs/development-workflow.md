@@ -209,6 +209,20 @@ other org-wide files (specs: `development-workflow`, `org-profile`).
   `scripts/tests/test_org_profile.py` checks each form's `type:` against `oob/issue-types.json`, and its labels
   against `tofu/labels/workflow.json`, which every managed repository gets.
 
+## Dependabot pull requests
+
+Every managed repository has Dependabot alerts and security updates on (spec: `repositories`). When an alert has a
+fix, Dependabot opens a pull request for it.
+
+- **In a governed repository** (troupe, infrastructure), Dependabot's pull request is an alert that comes with a fix.
+  It can't merge as it is: its `dependabot/...` branch matches no OpenSpec change, so the `guard` check fails, and its
+  commits carry no sign-off, so DCO fails. Take the fix into an issue and an OpenSpec change like any other change:
+  make the same bump on a branch named after the change, with a pull request that closes the issue. Then close
+  Dependabot's pull request with a comment linking that change. There's no exemption for Dependabot's branches, and a
+  test fails if one appears (security-scanning, design D5).
+- **On the website**, which has no guard or DCO, Dependabot's pull request merges by rebase once `test` passes, like
+  any other pull request there.
+
 ## Known gaps
 
 GitHub enforces rules that apply to everyone, or that protect a secret, such as an App's key. It doesn't try to tell
@@ -253,6 +267,9 @@ troupe's release ruleset, is different: getting past it takes the App's key (#47
   exemption applies nowhere else: not in this repository, which has no such ruleset, and not to a fork's branch,
   which troupe's ruleset doesn't cover. A test fails if an exempt repository loses its declared ruleset, or the
   ruleset stops reserving creation or update.
+- **A security fix waits for a person.** In a governed repository, Dependabot's pull request can't merge, so a fix for
+  a vulnerable dependency lands only once someone takes it into a change. The alert is emailed to the owner and stays
+  open until the vulnerable version is gone from `main`.
 - **Overrides are local.** The `guard` check on GitHub ignores them, so nothing granted on one machine excuses a
   commit on `main`.
 - **Bash parsing is heuristic.** When a `git` or `gh` command can't be parsed, it's refused rather than guessed at.
