@@ -84,9 +84,11 @@
       `build:` history), author `49699333+dependabot[bot]@users.noreply.github.com`, and signed off as
       `dependabot[bot] <support@github.com>`. It does have a sign-off, so the design's "no sign-off, DCO fails" was
       corrected in the docs, design and proposal: the branch rule is what stops it
-- [ ] 2.7 Delete the probe repository, then the probe's scratch copy. Verify `gh api
+- [x] 2.7 Delete the probe repository, then the probe's scratch copy. Verify `gh api
       repos/troupe-run/infra-probe-security` returns 404 and `git status --short --ignored tofu/probe` shows nothing
       but caches
+      Done 2026-10-16: deleted; `gh api repos/troupe-run/infra-probe-security` returns 404; the scratch copy is
+      removed, and `git status --short --ignored tofu/probe` prints nothing
 
 ## 3. The configuration on the live repositories (design D4, D6, D7)
 
