@@ -24,6 +24,7 @@ that closes the issue. Specs live in `openspec/specs/`.
 | `tofu/guard_delivery.tf` | The guard's files in each repository that receives it, and the generated list of them |
 | `tofu/environments.tf` | CI's three environments on infrastructure (`plan-pr`, `plan-main`, `apply`), and the website's `github-pages`, which only `main` may deploy through |
 | `tofu/release.tf` | What troupe's release workflow needs: the `release` environment, limited to `main`, the release App's client ID, and the ruleset that lets only the App create or update `release-please--*` branches. The App and its key are set up by hand ([oob/README.md](oob/README.md#troupes-release-app-set-up-by-hand)) |
+| `tofu/milestones.json`, `tofu/milestones.tf` | The release milestones (0.1.0, 0.2.0, 1.0.0), the same in every managed repository so the roadmap board groups them by title. A finished release is closed by setting its state, never removed, and a milestone's key never changes, so a rename happens in place |
 | `org-profile/` | The source of `troupe-run/.github`'s files, byte for byte |
 | `scripts/guard.py`, `scripts/guard_pytest.py`, `.githooks/`, `.claude/settings.json`, `.github/workflows/guard.yml` | The guard: this repo's own, and the source of every delivered copy |
 | `docs/development-workflow.md` | Every rule the guard enforces, and how an override works |

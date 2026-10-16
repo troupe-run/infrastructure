@@ -1,0 +1,28 @@
+{
+  "repositories": [
+    "troupe",
+    "infrastructure",
+    "website",
+    ".github"
+  ],
+  "milestones": [
+    {
+      "key": "0.1.0",
+      "title": "0.1.0",
+      "state": "open",
+      "description": "Walking skeleton: troupe perform runs one actor end to end; status and logs read from projections"
+    },
+    {
+      "key": "0.2.0",
+      "title": "0.2.0",
+      "state": "open",
+      "description": "Actors defined in config, run through Claude Code on a local worktree stage"
+    },
+    {
+      "key": "1.0.0",
+      "title": "1.0.0",
+      "state": "open",
+      "description": "The first stable release: roles, gates, the house and plugins; split into earlier releases as work comes up"
+    }
+  ]
+}
