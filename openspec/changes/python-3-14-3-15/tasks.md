@@ -36,11 +36,17 @@
 
 ## 2. Evidence on GitHub
 
-- [ ] 2.1 Push the branch and open the pull request (`Closes #43`). Verify all eleven `guard tests` legs report and
+- [x] 2.1 Push the branch and open the pull request (`Closes #43`). Verify all eleven `guard tests` legs report and
       pass on it, and that its posted plan matches 1.5's. Fix anything a leg finds on this branch (design, Risks) and
       record it here
-- [ ] 2.2 Before the apply, list open pull requests in troupe and infrastructure, and verify each reports the new
+      2026-10-16, PR #50 at f2dc353: all eleven `guard tests` legs passed on both the push and the
+      pull_request runs, as did `check`, `guard (workflow rules)` and DCO. Nothing needed fixing. After the owner
+      approved it, `plan (pull request)` passed, and its comment matches 1.5: `Plan: 0 to add, 2 to change, 0 to
+      destroy.`, the same two rulesets, the same twelve added contexts (36 added lines, none removed)
+- [x] 2.2 Before the apply, list open pull requests in troupe and infrastructure, and verify each reports the new
       jobs, or note which need a rebase (design, Risks)
+      Done 2026-10-16: troupe #89 and #103, and infrastructure #50, each report six `Python 3.14|3.15` jobs on their
+      head commits. None needs a rebase
 
 ## Workflow follow-up
 
