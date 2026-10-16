@@ -58,7 +58,7 @@
       Done 2026-10-16: refused, `GH013: Repository rule violations found` / `GITHUB PUSH PROTECTION` / "Push cannot
       contain secrets", detected as "GitHub Personal Access Token" at `fake-token.txt:1`. The commit was dropped
       locally and never reached GitHub
-- [ ] 2.5 The owner creates the "troupe-run baseline" configuration (design D4) and attaches it to the probe only,
+- [x] 2.5 The owner creates the "troupe-run baseline" configuration (design D4) and attaches it to the probe only,
       with the commands given at the time (`gh api -X POST orgs/troupe-run/code-security/configurations ...`, then
       `.../{id}/attach` with `scope: selected` and the probe's ID, 1421864669). Verify `gh api
       orgs/troupe-run/code-security/configurations` lists it with exactly D4's settings, `gh api
@@ -66,6 +66,13 @@
       `dependency-graph/sbom` returns 200
       The vulnerable pin (`requirements.txt`, `requests==2.19.0`, 5e43181) was pushed at 08:37 UTC, before the
       configuration: no alert and no pull request after an hour, and the SBOM returned 404 (design, Context)
+      Done 2026-10-16. The owner created "troupe-run baseline" (id 284304) on the third try: GitHub refused
+      `code_security`/`secret_protection` on this plan, then needed `advanced_security: enabled` (design D4).
+      Read back: `advanced_security`, `dependency_graph`, `dependabot_alerts`, `dependabot_security_updates`,
+      `secret_scanning` and `secret_scanning_push_protection` `enabled`, every other feature `not_set`,
+      `enforcement: unenforced`. Attached to the probe (`scope: selected`, 1421864669):
+      `code-security-configuration` reads `attached`, "troupe-run baseline"; the SBOM returns 200 and lists
+      `requests`; `security_and_analysis` still reads on
 - [ ] 2.6 Wait for Dependabot's alert and its security-update pull request on the probe. Verify `gh api
       repos/troupe-run/infra-probe-security/dependabot/alerts` lists the `requests` alert. Record the pull request's
       branch name, commit message, author and whether it has `Signed-off-by`. If none opens within an hour of the
