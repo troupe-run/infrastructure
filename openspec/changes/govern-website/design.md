@@ -98,8 +98,11 @@ as troupe's. Turning projects off would hide the linked board from the repositor
   a delta can't change it. It's edited in place, in this change's branch.
 - README "Delivering the guard" and "To stop delivering" become "each repository that receives the guard". The
   stop-delivering steps name `app_bypass_id` on the repository being stopped, not `repo_troupe` alone.
-- The README layout table and `docs/development-workflow.md` already say "each other governed repository" and need
-  no change.
+- The README layout table already says "each other governed repository" and needs no change.
+- `docs/development-workflow.md`'s "Dependabot pull requests" said the website's would merge once `test` passed,
+  since it had no guard. That changes here: the website is listed with troupe and infrastructure, and the
+  `development-workflow` scenario for a Dependabot pull request names it too. This was found during apply, after
+  security-scanning (#53) merged.
 
 ### D6. The redeploys are accepted
 

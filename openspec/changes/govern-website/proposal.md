@@ -56,6 +56,8 @@ None.
 - `rulesets`: "Each repository requires its own checks" gives the website the `guard` check alongside its CI test,
   and says DCO isn't required there.
 - `repositories`: "Unused features are off" keeps the roadmap linked to the website as well as troupe.
+- `development-workflow`: "The rules are re-checked on GitHub" names the website among the repositories where a
+  Dependabot pull request fails the branch rule. The website's Dependabot alerts arrived with security-scanning (#53).
 - `org-settings`: "Issue types and the org project are checked for drift" also covers which repositories the org's
   project is linked to.
 

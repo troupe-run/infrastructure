@@ -62,6 +62,12 @@
       (5272634) as a bypass actor and `guard (workflow rules)` (15368). Nothing for troupe, infrastructure or
       `.github`. 4.1 is still run again once the website has bootstrapped
 
+- [x] 2.7 Make `docs/development-workflow.md`'s "Dependabot pull requests" list the website among the governed
+      repositories, and drop its line saying a website Dependabot pull request merges once `test` passes. Add a
+      `development-workflow` delta naming the website in "A Dependabot pull request in a governed repository" (design
+      D5). Added during apply, after security-scanning merged. Verify `openspec validate govern-website --strict` and
+      `uv run scripts/check.py` pass
+
 ## 3. The roadmap is linked and checked
 
 - [x] 3.1 In `scripts/tests/test_oob.py`, add a test for the projects check: a declaration listing
