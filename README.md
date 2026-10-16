@@ -17,7 +17,7 @@ that closes the issue. Specs live in `openspec/specs/`.
 | Path | What it holds |
 |---|---|
 | `tofu/` | The OpenTofu root module and its encrypted, committed state |
-| `tofu/modules/repository/` | One managed repository: settings, labels, and protection against deletion |
+| `tofu/modules/repository/` | One managed repository: settings, labels, security features (Dependabot alerts and security updates, secret scanning and push protection), and protection against deletion |
 | `tofu/labels/` | Label sets as data. `troupe.json` is troupe's `cap:*` capability labels: a new capability gets its label by a pull request here. `release.json` is release-please's two labels on troupe |
 | `tofu/probe/` | Points the same module at a throwaway repo, to show drift behaviour without touching a live one |
 | `tofu/guard_delivery.tf` | The guard's files in each repository that receives it, and the generated list of them |
@@ -165,7 +165,8 @@ removed {
 
 **Adding a repository:** add it to the `troupe-run-infrastructure` App's installation first, and update the list in
 `oob/README.md`. Without the App, OpenTofu sees only the repository's public view. A new repository gets the "protect
-main" ruleset unless its `module` block sets `main_ruleset` to `app-only` or `none`.
+main" ruleset unless its `module` block sets `main_ruleset` to `app-only` or `none`. It gets Dependabot alerts and
+security updates, secret scanning and push protection from the module too.
 
 ## How main is protected
 
