@@ -14,8 +14,9 @@ either. adopt-org left this for "a later change, if Pages settings are to be man
   plan must show it imported with no change.
 - The shared repository module gains an optional `pages` variable. Only `repo_website` sets it, so the other three
   repositories plan no change.
-- An apply can't take the site down. The resource has `prevent_destroy`, as `github_repository` does, because
-  destroying it disables Pages. Stopping management uses a `removed` block, as the README already says for
+- Unsetting `pages` can't take the site down. The resource has `prevent_destroy`, as `github_repository` does,
+  because destroying it disables Pages. (Deleting the resource block or the module removes that guard with it, so
+  the owner's review of the plan is the gate there.) Stopping management uses a `removed` block, as the README already says for
   repositories.
 - The comment above `module "repo_website"` saying Pages isn't declared goes.
 - The `troupe-run-infrastructure` App gains the **Pages** repository permission (read and write), and
@@ -34,8 +35,9 @@ None.
 
 ### Modified Capabilities
 
-- `repositories`: a new requirement, "The website's Pages settings are declared". It says which settings are
-  declared, that a change to any of them on GitHub shows as drift, and that no plan or apply disables the site.
+- `repositories`: two new requirements. "The website's Pages settings are declared" says which settings are declared
+  and that a change to any of them on GitHub shows as drift. "Unsetting the website's Pages settings doesn't disable
+  it" says removing `pages` fails the plan.
 
 `teams-and-access` needs no change: "Each App's installation is declared" already covers a new permission, which is a
 change to the declaration's data.

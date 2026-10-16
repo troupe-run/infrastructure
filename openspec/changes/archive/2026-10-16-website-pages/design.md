@@ -83,9 +83,13 @@ repository's settings across two places. Or a variable for each attribute: that'
 
 Destroying `github_repository_pages` disables Pages, which takes https://troupe.run down and gives up the custom
 domain. That's the same harm as deleting a repository, so it gets the same guard: `lifecycle { prevent_destroy = true }`.
-Setting `pages = null`, or removing the module, fails the plan instead of disabling the site. To stop managing the
-site, a `removed` block with `destroy = false` forgets it (README, "Changing the org", which gains this address as an
-example).
+Setting `pages = null` fails the plan instead of disabling the site. Deleting the resource block, or the whole
+`module "repo_website"` call, doesn't: `prevent_destroy` goes with the block, and the plan shows the destroy
+(website-environment found this on 2026-10-16). Unlike `github_repository`, Pages has no `archive_on_destroy`
+backstop, so the owner's review of the plan is the gate there. To stop managing the
+site, the resource block is deleted from the module and a `removed` block with `destroy = false`, from
+`module.repo_website.github_repository_pages.this`, forgets it (README, "Changing the org"). A `removed` block takes no
+instance key and refuses to run while the resource block exists, so `pages = null` alone isn't enough.
 
 `repository` forces replacement, which `prevent_destroy` would also refuse. A rename doesn't trigger it: the
 provider's `diffRepository` compares the repository ID and keeps the resource when the ID is the same.
@@ -123,7 +127,7 @@ The live site is never changed to test drift. Each spec scenario is shown this w
 | Scenario | Shown by |
 |---|---|
 | Adopting the site changes nothing | the local plan and the pull request's plan (D4) |
-| Removing the declaration doesn't take the site down | a local plan with `pages` unset on `repo_website`, which must fail on `prevent_destroy`. It's a plan only, and the edit is reverted |
+| Removing the pages setting doesn't take the site down | a local plan with `pages` unset on `repo_website`, which must fail on `prevent_destroy`. It's a plan only, and the edit is reverted |
 | Deploying from a branch shows as drift | the probe (`tofu/probe`): a throwaway repository with a site deployed from Actions, declared by `github_repository_pages`. Switch it to a branch with `gh api`, and the next probe plan shows `build_type` changing back |
 | The custom domain, or HTTPS, changed by hand | can't be probed: a domain belongs to one repository, and `troupe.run` can't be lent to a probe (rename-website design). Shown by the provider's Read, which sets `cname` and `https_enforced` from the API on every refresh, so a difference from the declared value is a planned change. The task cites the lines, and says that this is reasoning from source, not a run |
 
