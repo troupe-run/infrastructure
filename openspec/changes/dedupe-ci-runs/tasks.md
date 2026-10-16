@@ -37,12 +37,17 @@
 
 ## 2. Evidence on GitHub
 
-- [ ] 2.1 Push the branch and open the pull request (`Closes #66`). Verify on its head commit, with
+- [x] 2.1 Push the branch and open the pull request (`Closes #66`). Verify on its head commit, with
       `gh api repos/troupe-run/infrastructure/commits/<sha>/check-runs --jq '.check_runs[].name' | sort | uniq -c`,
       that `check` and each of the eleven `guard tests` legs report exactly once and pass, and that
       `guard (workflow rules)` still reports twice (push and pull request). Record the counts here
-- [ ] 2.2 After the owner approves the pull request's plan run, verify `plan (pull request)` passes with no changes,
+      Done 2026-10-16, PR #67 at 4d9597b: 19 check runs, against 31 on #64. `check` and each of the eleven
+      `guard tests` legs reported once and passed; `guard (workflow rules)` twice, both passed; `DCO`,
+      `does it need a plan?` and `plan (pull request)` once each, passed; `plan (main)` and `apply (main)` skipped
+- [x] 2.2 After the owner approves the pull request's plan run, verify `plan (pull request)` passes with no changes,
       and record its summary line
+      Done 2026-10-16: `plan (pull request)` passed (run 38900303457). Its comment on #67: "No changes. Your
+      infrastructure matches the configuration."
 
 ## Workflow follow-up
 
