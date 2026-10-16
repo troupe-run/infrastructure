@@ -76,8 +76,10 @@
       Done 2026-10-16: 23 passed in `test_oob.py`; `check.py` all gates passed (805 tests). Against GitHub,
       `oob.py` reports `projects: 1 repositories is ['troupe'] on GitHub, declared ['troupe', 'website']`, which
       3.3 resolves. Its other four lines are troupe label drift that predates this change
-- [ ] 3.3 Owner: run `gh project link 1 --owner troupe-run --repo troupe-run/website`. Verify `uv run scripts/oob.py`
+- [x] 3.3 Owner: run `gh project link 1 --owner troupe-run --repo troupe-run/website`. Verify `uv run scripts/oob.py`
       reports no difference, and record its output here
+      Done 2026-10-16: the owner linked it. `oob.py` no longer reports `projects`. Its five remaining lines aren't this
+      change's: the App's `pages: write` (from `website-pages`, which declares it) and the four troupe label lines
 
 ## 4. Plan and evidence
 
