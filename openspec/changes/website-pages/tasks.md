@@ -101,8 +101,11 @@
 
 ## 4. Evidence on GitHub
 
-- [ ] 4.1 Run `uv run scripts/check.py`, then push the branch and open the pull request (`Closes #51`). Verify its
+- [x] 4.1 Run `uv run scripts/check.py`, then push the branch and open the pull request (`Closes #51`). Verify its
       checks pass and, once the owner approves the run, that its posted plan matches 2.1. Record it here
+      2026-10-16, PR #57 at 992e566: every guard tests leg, `check` and DCO passed. After the owner approved it,
+      `plan (pull request)` passed, and its comment says `Plan: 1 to import, 0 to add, 0 to change, 0 to destroy.`,
+      importing only `module.repo_website.github_repository_pages.this[0]`, as in 2.1
 
 ## Workflow follow-up
 
