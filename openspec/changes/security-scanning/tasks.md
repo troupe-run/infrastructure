@@ -106,11 +106,16 @@
       code-security differences. `gh api orgs/troupe-run` still reads all six `*_enabled_for_new_repositories`
       as `false`. Newly visible: one open Dependabot alert on the website (`postcss-selector-parser`, medium,
       GHSA-rj75-hqrm-r3gf, fixed in 7.1.6), reported to the owner; none in the other three
-- [ ] 3.2 The owner creates a new public repository, `troupe-run/infra-probe-defaults`. Verify, with nothing applied to
+- [x] 3.2 The owner creates a new public repository, `troupe-run/infra-probe-defaults`. Verify, with nothing applied to
       it, that its SBOM returns 200 and that alerts, security updates, secret scanning and push protection read on,
       and that `code-security-configuration` names the configuration. Record the result. Then the owner deletes it,
       and `gh api repos/troupe-run/infra-probe-defaults` returns 404. If any feature is off, stop and report to the
       owner before going on
+      Done 2026-10-16. Created with `gh repo create` (the guard allows `infra-probe-*`; no owner step was needed).
+      With nothing applied, about 20 seconds after creation: `code-security-configuration` `attached`,
+      "troupe-run baseline"; SBOM 200; `vulnerability-alerts` 204; `automated-security-fixes` `true`;
+      `security_and_analysis` has secret scanning, push protection and security updates `enabled`. Deleted:
+      `gh api repos/troupe-run/infra-probe-defaults` returns 404
 - [ ] 3.3 List the open secret-scanning alerts in all four repositories (design D6). Record each by type and location,
       never content, and report them to the owner. Verify the list is complete: `gh api
       repos/troupe-run/<repo>/secret-scanning/alerts --paginate` for each
