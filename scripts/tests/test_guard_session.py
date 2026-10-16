@@ -2,8 +2,10 @@
 
 import io
 import json
+import os
 from collections.abc import Callable
 
+import pytest
 from conftest import Repo, git
 
 import guard
@@ -71,3 +73,70 @@ def test_the_context_says_when_the_branch_matches_a_change(make_repo: Callable[[
     repo.switch("add-thing")
     context = session_start(repo)
     assert "Branch 'add-thing' matches the OpenSpec change openspec/changes/add-thing" in context
+
+
+# --- a hook git would skip (spec: development-workflow; executable-hooks design D6) -----------
+
+posix_only = pytest.mark.skipif(os.name == "nt", reason="Git for Windows has no executable bit")
+
+
+def add_hook(repo: Repo, name: str, executable: bool) -> None:
+    repo.write(f".githooks/{name}", "#!/bin/sh\nexit 0\n")
+    (repo.path / ".githooks" / name).chmod(0o755 if executable else 0o644)
+
+
+def deliver(repo: Repo, *paths: str) -> None:
+    repo.write(".github/guard-delivery.json", json.dumps({"files": list(paths)}))
+
+
+@posix_only
+def test_a_delivered_hook_that_isn_t_executable_is_reported_with_its_source(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = make_repo()
+    add_hook(repo, "pre-push", executable=False)
+    deliver(repo, ".githooks/pre-push")
+    context = session_start(repo)
+    assert "Git skips .githooks/pre-push: it isn't executable." in context
+    assert "delivered from troupe-run/infrastructure" in context
+    assert "don't change it here" in context
+    assert os.access(repo.path / ".githooks" / "pre-push", os.X_OK) is False
+
+
+@posix_only
+def test_a_source_hook_that_isn_t_executable_says_how_to_make_it_executable(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = make_repo()
+    add_hook(repo, "commit-msg", executable=False)
+    context = session_start(repo)
+    assert "Git skips .githooks/commit-msg" in context
+    assert "git update-index --chmod=+x .githooks/commit-msg" in context
+
+
+@posix_only
+def test_only_the_hooks_that_aren_t_executable_are_named(make_repo: Callable[[], Repo]) -> None:
+    repo = make_repo()
+    add_hook(repo, "pre-commit", executable=True)
+    add_hook(repo, "pre-push", executable=False)
+    context = session_start(repo)
+    assert ".githooks/pre-push" in context
+    assert ".githooks/pre-commit" not in context
+
+
+def test_executable_hooks_are_not_mentioned(make_repo: Callable[[], Repo]) -> None:
+    repo = make_repo()
+    git(repo.path, "config", "core.hooksPath", ".githooks")
+    add_hook(repo, "pre-push", executable=True)
+    assert guard.activate_hooks(repo.path) is None
+    assert "Git skips" not in session_start(repo)
+
+
+def test_nothing_is_reported_where_git_ignores_the_mode(
+    make_repo: Callable[[], Repo], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = make_repo()
+    git(repo.path, "config", "core.hooksPath", ".githooks")
+    add_hook(repo, "pre-push", executable=False)
+    monkeypatch.setattr(os, "name", "nt")
+    assert guard.activate_hooks(repo.path) is None
