@@ -116,9 +116,12 @@
       "troupe-run baseline"; SBOM 200; `vulnerability-alerts` 204; `automated-security-fixes` `true`;
       `security_and_analysis` has secret scanning, push protection and security updates `enabled`. Deleted:
       `gh api repos/troupe-run/infra-probe-defaults` returns 404
-- [ ] 3.3 List the open secret-scanning alerts in all four repositories (design D6). Record each by type and location,
+- [x] 3.3 List the open secret-scanning alerts in all four repositories (design D6). Record each by type and location,
       never content, and report them to the owner. Verify the list is complete: `gh api
       repos/troupe-run/<repo>/secret-scanning/alerts --paginate` for each
+      Done 2026-10-16, about 15 minutes after attaching: no alerts in any of the four, open or closed. Whether the
+      history scan had finished can't be read: `secret-scanning/scan-history` refuses with "Advanced Security is
+      disabled on this repository" (404). So the list is re-checked after the merge (Workflow follow-up)
 - [ ] 3.4 Write `oob/code-security.json` (design D7): the configuration by name with D4's settings, its default, and the
       four repositories it's attached to. Add the checks to `scripts/oob.py`: the configuration (including any
       undeclared one), the default, each managed repository's attachment, and each managed repository's dependency
@@ -180,4 +183,6 @@
   `automated-security-fixes` reads `enabled: true`, `security_and_analysis` has secret scanning and push protection
   `enabled`, and the next daily plan is clean. Check that the App's state commit after the apply landed (push
   protection didn't refuse it), and that `uv run scripts/oob.py` reports none of the code-security checks.
+- After the apply, list secret-scanning alerts in all four repositories again (design D6; 3.3 couldn't confirm the
+  history scan had finished). Report each one to the owner by type and location, never by content.
 - Comment on #53 with the pull request and the archived change, check it's closed, and set its card to Done.
