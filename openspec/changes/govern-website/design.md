@@ -52,7 +52,8 @@ roadmap) merges:
   site's build and e2e suite;
 - the CI job `test`, which runs `uv run scripts/check.py`, so local and CI checks can't diverge. The job keeps its
   name, so the required check doesn't change;
-- CONTRIBUTING.md and a CLAUDE.md: install uv, follow the workflow, Conventional Commits, no sign-off.
+- CONTRIBUTING.md and a CLAUDE.md: install uv, follow the workflow, Conventional Commits, no sign-off. CONTRIBUTING
+  also says how an outside fix is taken in (D8).
 
 It must add none of the delivered paths. `overwrite_on_create = false` would fail the delivery of any it had.
 
@@ -107,13 +108,32 @@ deploys of an unchanged site queue behind one another (`concurrency: pages`, not
 it happens only on the first delivery and on later guard changes. Skipping CI for delivered paths would lose the only
 check that a delivery didn't break the site's build, so the website keeps running it.
 
-### D7. History rewrite stays outside this change
+### D7. The existing history is not rewritten
 
-The guard checks the commits a push or pull request adds, never older history, so this change works the same whether
-or not the website's 54 earlier commits are rewritten. If the owner chooses to rewrite them, it goes first: before
-D1's bootstrap, while no App delivery commits exist to rewrite as well. It needs the owner's break-glass on
-`protect main` (lift, force-push with committer dates kept, restore, then a clean plan). The recommendation stays
-not to rewrite (issue #54).
+Decided by the owner on 2026-10-16: the website's 54 earlier commits stay as they are. The guard checks the commits a
+push or pull request adds, never older history, so nothing here depends on them. Rewriting would have needed the
+owner's break-glass on `protect main`, and would have broken the existing commit links.
+
+### D8. A maintainer carries an outside fix through the workflow
+
+Every docs page has an **Improve this page** link. It opens GitHub's web editor, which makes a fork, a branch such as
+`patch-1`, and a commit such as "Update index.md". The guard's CI refuses that pull request twice. Its branch matches
+no OpenSpec change (`commit-branch-change`), and a fork's branch is never exempt. Its commit and title aren't
+Conventional (`commit-message`). The owner could merge past the failing check, but a rebase merge would then put the
+commit on `main`, and the guard run on that push would fail.
+
+Decided by the owner on 2026-10-16: the link and the guard stay as they are. A maintainer takes the fix onto a change
+branch of their own, with its OpenSpec change and a Conventional Commit. They credit the author with a
+`Co-authored-by:` trailer, link the fork pull request from theirs, and close the fork pull request when theirs
+merges. Taking it in this way needs no sign-off, because the website takes none. The website's CONTRIBUTING says
+this, so an outside contributor knows their pull request's red check is expected.
+
+Alternatives considered:
+- The owner merges past the rules each time. Rejected: it leaves non-Conventional commits on `main` and a failed guard
+  run on each such push.
+- The link opens an issue instead of the editor. Rejected: contributors lose the ready-made diff.
+- The guard exempts fork pull requests. Rejected: it's a guard change delivered to troupe too, and it weakens two
+  rules for every outside contribution.
 
 ## Risks / Trade-offs
 
@@ -127,12 +147,14 @@ not to rewrite (issue #54).
   rebases. Its plan is made after `main`'s state commit (memory: plan against current state).
 - [The App's installation doesn't actually cover the website] → it manages the website's ruleset and labels today,
   so it does. The App's repository list is still confirmed by hand before the plan (teams-and-access).
+- [An outside contributor's fork pull request shows a failed `guard` check] → expected (D8). The maintainer carries
+  it, and the website's CONTRIBUTING says so up front.
 - [A delivery lands while a website pull request is open] → that pull request's `guard` check reports once it next
   runs. Its branch already matches a change after D1, so it passes.
 
 ## Migration Plan
 
-1. Owner: decide on the history rewrite (D7). If yes, it's done before step 2.
+1. Owner: decided 2026-10-16, no rewrite (D7), and a maintainer carries outside fixes (D8).
 2. Website: D1's issue and pull request, merged by rebase.
 3. Owner: confirm the App's installation lists `website`, and link the roadmap (D4).
 4. Here: the pull request's plan shows exactly D2's changes, and `scripts/oob.py` is clean. The owner approves.

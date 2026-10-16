@@ -29,13 +29,15 @@ process (it deploys on every merge to `main`).
 
 **Prerequisite, in the website (not this repository):** before this change's plan is applied, the website's own pull
 request must have merged `openspec/`, `scripts/check.py` (wrapping its CI's npm steps), `scripts/check-paths.toml`
-and its contributor docs (uv, the workflow, no DCO). That pull request goes through the website's own checks,
+and its contributor docs (uv, the workflow, no DCO, how an outside fix is taken in). That pull request goes through the website's own checks,
 because only the guard's files may arrive by delivery. It has its own issue in the website repository.
 
+**Outside contributions:** the website's **Improve this page** pull requests (from GitHub's web editor, on a fork)
+will fail the newly required `guard` check. A maintainer carries each one through the workflow and credits its
+author, and the website's CONTRIBUTING says so (owner, 2026-10-16; design D8).
+
 Out of scope:
-- Rewriting the website's existing history to Conventional Commits. The issue leaves it to the owner, with a
-  recommendation not to. The guard checks new commits, not history, so this change works either way. If the owner
-  chooses to rewrite, it is done first (design D7).
+- Rewriting the website's existing history to Conventional Commits: decided against (owner, 2026-10-16; design D7).
 - A release process for the website (decided: none).
 - The website's Pages settings (#51, `website-pages`), its `github-pages` environment (#52, `website-environment`)
   and its DNS (#55). They touch the same module and spec, so whichever merges second rebases.
