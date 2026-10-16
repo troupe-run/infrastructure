@@ -2,16 +2,18 @@
 
 ## 1. Before anything is planned
 
-- [ ] 1.1 Ask the owner whether the website's existing history is rewritten (design D7). Record the answer and its
+- [x] 1.1 Ask the owner whether the website's existing history is rewritten (design D7). Record the answer and its
       date here, and on #54. If it's yes, the owner's break-glass rewrite is done and verified (`git log --format=%s`
       on the website's `main` shows only Conventional Commits, its "Last updated" dates are unchanged on a docs
       page, and a plan shows no ruleset drift once `protect main` is restored) before 1.2 starts
+      Done 2026-10-16: no rewrite (design D7). The owner also decided how outside "Improve this page" pull requests
+      are handled: a maintainer carries them (design D8). Both recorded on #54
 - [ ] 1.2 Open the website's bootstrap issue in `troupe-run/website` with `--project "troupe roadmap"`, describing
-      design D1's contents and linking #54. Verify it's on the board with
+      design D1's contents, including D8's CONTRIBUTING text for outside fixes, and linking #54. Verify it's on the board with
       `gh issue view <n> -R troupe-run/website --json projectItems`
 - [ ] 1.3 Check that the website's bootstrap pull request (D1) is merged. Its `main` holds `openspec/`,
-      `scripts/check.py`, `scripts/check-paths.toml` (skipping at least `openspec/**`), CONTRIBUTING.md and
-      CLAUDE.md, and none of the delivered paths. The CI job is still named `test` and runs `uv run scripts/check.py`.
+      `scripts/check.py`, `scripts/check-paths.toml` (skipping at least `openspec/**`), CONTRIBUTING.md (with D8's
+      text on outside fixes) and CLAUDE.md, and none of the delivered paths. The CI job is still named `test` and runs `uv run scripts/check.py`.
       Verify with `gh api repos/troupe-run/website/contents/<path>` for each, a 404 for each delivered path, and the
       full check's macOS time recorded in that pull request, under the guard's 10-minute limit
 - [ ] 1.4 Owner: confirm that the infrastructure App's installation lists `website` in the App's settings
