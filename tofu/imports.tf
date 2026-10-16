@@ -135,3 +135,10 @@ import {
   to = module.repo_website.github_repository_dependabot_security_updates.this
   id = "website"
 }
+
+# troupe's alpha-0, adopted as its 0.1.0 and renamed in place, so its issues keep it (owner,
+# 2026-10-17; release-milestones design D3).
+import {
+  to = github_repository_milestone.release["troupe/0.1.0"]
+  id = "troupe-run/troupe/1"
+}
