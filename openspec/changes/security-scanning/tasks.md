@@ -164,6 +164,8 @@
       Done 2026-10-16 on b8e2ee3's state (nothing ahead on `origin/main`), after group 3: `Plan: 8 to import, 0 to
       add, 0 to change, 0 to destroy.` The eight are each repository's `vulnerability_alerts` and
       `dependabot_security_updates`, imported with no change. No `~`, `+` or `-` lines
+      Re-run after adding `prevent_destroy` to both resources (owner, 2026-10-16): the same, `8 to import, 0 to
+      add, 0 to change, 0 to destroy.`, no `~`, `+` or `-` lines
       First run, before the configuration (2026-10-16), on 4268fb7's state (nothing ahead on `origin/main`): `Plan: 8 to import, 0 to add, 9 to
       change, 0 to destroy.` Exactly the list above: the four alerts imports change nothing; each repository's
       `github_repository.this` changes only the two `status` values; the org changes only the five attributes.

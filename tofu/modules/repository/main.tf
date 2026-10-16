@@ -74,11 +74,16 @@ resource "github_repository_pages" "this" {
 
 # Dependabot alerts, and the security updates that answer them (spec: repositories;
 # security-scanning design D1). Separate resources, because github_repository's
-# vulnerability_alerts is deprecated. Destroying either one turns its feature off, so don't delete
-# them or give them a count: removing a whole repository with a `removed` block forgets them safely.
+# vulnerability_alerts is deprecated. Destroying either one turns its feature off, so they can't be
+# destroyed. Deleting a resource block gets past prevent_destroy, so don't: removing a whole
+# repository with a `removed` block forgets them safely.
 resource "github_repository_vulnerability_alerts" "this" {
   repository = github_repository.this.name
   enabled    = true
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # GitHub turns security updates on only once alerts are on.
@@ -87,6 +92,10 @@ resource "github_repository_dependabot_security_updates" "this" {
   enabled    = true
 
   depends_on = [github_repository_vulnerability_alerts.this]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "github_issue_labels" "this" {
