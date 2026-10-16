@@ -27,7 +27,8 @@
 - [ ] 1.5 Verify `prevent_destroy` works: with the environment's resource commented out locally (not committed), a
       plan fails with OpenTofu's `prevent_destroy` error naming `github_repository_environment.github_pages`. Restore
       the file, check `git diff` shows nothing from this task, and record the error line here
-- [ ] 1.6 Commit the adoption (`feat(tofu): adopt the website's github-pages environment and its main-only policy`)
+- [x] 1.6 Commit the adoption (`feat(tofu): adopt the website's github-pages environment and its main-only policy`)
+      Done 2026-10-16: 770d906
 
 ## 2. No admin can bypass it (D2 step 2, D3)
 
