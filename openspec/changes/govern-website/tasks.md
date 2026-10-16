@@ -8,9 +8,10 @@
       page, and a plan shows no ruleset drift once `protect main` is restored) before 1.2 starts
       Done 2026-10-16: no rewrite (design D7). The owner also decided how outside "Improve this page" pull requests
       are handled: a maintainer carries them (design D8). Both recorded on #54
-- [ ] 1.2 Open the website's bootstrap issue in `troupe-run/website` with `--project "troupe roadmap"`, describing
+- [x] 1.2 Open the website's bootstrap issue in `troupe-run/website` with `--project "troupe roadmap"`, describing
       design D1's contents, including D8's CONTRIBUTING text for outside fixes, and linking #54. Verify it's on the board with
       `gh issue view <n> -R troupe-run/website --json projectItems`
+      Done 2026-10-16: troupe-run/website#7, on "troupe roadmap" (Todo)
 - [ ] 1.3 Check that the website's bootstrap pull request (D1) is merged. Its `main` holds `openspec/`,
       `scripts/check.py`, `scripts/check-paths.toml` (skipping at least `openspec/**`), CONTRIBUTING.md (with D8's
       text on outside fixes) and CLAUDE.md, and none of the delivered paths. The CI job is still named `test` and runs `uv run scripts/check.py`.
