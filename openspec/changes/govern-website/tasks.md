@@ -45,6 +45,15 @@
       Done 2026-10-16: the grep leaves only lines about troupe's own matrix and release branches. README also
       gains "To add a repository". `test_guard_docs.py` passed in `uv run scripts/check.py` (all gates passed)
 
+- [x] 2.6 Limit the guard files' `import` block in `tofu/imports.tf` to troupe, the only repository whose files were
+      adopted. Added during apply: the first local plan failed with a 404 for each of the six adopted paths on the
+      website, because the block imported them for every target. Verify `tofu fmt` and `tofu validate` pass and the
+      plan creates all eight website files
+      Done 2026-10-16 (preview plan, before 1.3): `Plan: 8 to add, 2 to change, 0 to destroy.` The eight
+      `guard["website:…"]` files, `repo_website`'s `has_projects` false -> true, and its ruleset gaining the App
+      (5272634) as a bypass actor and `guard (workflow rules)` (15368). Nothing for troupe, infrastructure or
+      `.github`. 4.1 is still run again once the website has bootstrapped
+
 ## 3. The roadmap is linked and checked
 
 - [x] 3.1 In `scripts/tests/test_oob.py`, add a test for the projects check: a declaration listing
