@@ -60,9 +60,11 @@ resource "github_repository_environment_deployment_policy" "main_only" {
 # Only main may deploy troupe.run. No reviewers: the website's pull requests are reviewed before
 # they merge, and every push to main that passes CI deploys (design D4).
 resource "github_repository_environment" "github_pages" {
-  repository          = module.repo_website.name
-  environment         = "github-pages"
-  can_admins_bypass   = true
+  repository  = module.repo_website.name
+  environment = "github-pages"
+  # GitHub's default was true, which lets admins bypass the branch rule, and agents share
+  # the owner's admin login (#47), so no admin may bypass it, as for apply and release (design D3).
+  can_admins_bypass   = false
   prevent_self_review = false
 
   deployment_branch_policy {
