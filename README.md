@@ -146,13 +146,17 @@ removed {
 
 The plan then shows it as "forget", with nothing destroyed.
 
-**An apply can't disable the website.** Destroying a Pages site turns Pages off and takes https://troupe.run down, so
-the website's Pages site has `prevent_destroy` too, and removing its `pages` setting fails the plan. To stop managing
-the site but keep it serving, remove `pages` from `module "repo_website"` and add:
+**Unsetting the website's Pages settings can't disable it.** Destroying a Pages site turns Pages off and takes
+https://troupe.run down, so the website's Pages site has `prevent_destroy` too, and removing its `pages` setting fails
+the plan. Deleting `module "repo_website"` removes that guard with it, so read a plan for a destroyed
+`github_repository_pages` before approving it. To stop managing the site but keep it serving, remove `pages` from
+`module "repo_website"`, delete the `github_repository_pages` block (and the `pages` variable) from
+`tofu/modules/repository/`, and add the block below. A `removed` block refuses an instance key such as `[0]`, and
+refuses to run while the resource block still exists.
 
 ```hcl
 removed {
-  from = module.repo_website.github_repository_pages.this[0]
+  from = module.repo_website.github_repository_pages.this
   lifecycle {
     destroy = false
   }

@@ -61,6 +61,14 @@
       2.1's plan
       Done 2026-10-16: README "Changing the org" gains "An apply can't disable the website", with a `removed` block
       for `module.repo_website.github_repository_pages.this[0]`, the address 2.1 imports and 2.2 refuses to destroy
+      Corrected 2026-10-16, after archiving: that block didn't work. Tested the same way as 2.2 (imported into the
+      local state only, then restored, with `cmp` identical): `from = ...this[0]` fails with "Resource instance address
+      with keys is not allowed", and `from = ...this` fails with "Removed resource block still exists" while the
+      counted block is in the module. With the block deleted from the module, `pages` removed and
+      `from = module.repo_website.github_repository_pages.this`: `Plan: 0 to add, 0 to change, 0 to destroy, 1 to
+      forget.` The README now gives that procedure. It also no longer claims that removing the module is refused:
+      `prevent_destroy` goes with its block (found by website-environment, #52), so there the owner's review of the plan
+      is the gate. The spec and design say the same
 
 ## 3. Drift in the Pages settings shows in a plan (probe)
 

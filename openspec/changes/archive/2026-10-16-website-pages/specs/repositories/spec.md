@@ -22,10 +22,16 @@ and deploys from GitHub Actions. A difference from GitHub in any of these SHALL 
 - **WHEN** an owner switches the website's Pages source from GitHub Actions to a branch
 - **THEN** the next plan shows it changing back to GitHub Actions
 
-### Requirement: An apply never disables the website
-No plan or apply SHALL disable the website's Pages site. Removing the site's declaration SHALL leave the site serving
-on GitHub as it is.
+### Requirement: Unsetting the website's Pages settings doesn't disable it
+Removing the `pages` setting from the website's declaration SHALL fail the plan rather than disable the site. Deleting
+the Pages resource's block or the website's whole declaration removes this guard with it, so such a plan shows the
+site being destroyed, and the owner's review of the plan is what stops it.
 
-#### Scenario: Removing the declaration doesn't take the site down
-- **WHEN** the site's declaration is removed and a plan runs
-- **THEN** the plan refuses to destroy it, and https://troupe.run keeps serving
+#### Scenario: Removing the pages setting doesn't take the site down
+- **WHEN** the `pages` setting is removed from the website's declaration and a plan runs
+- **THEN** the plan refuses to destroy the site, and https://troupe.run keeps serving
+
+#### Scenario: Stopping management leaves the site serving
+- **WHEN** the `pages` setting and the Pages resource's block are removed, and a `removed` block that doesn't destroy
+  it takes their place
+- **THEN** the plan shows the site forgotten, with nothing destroyed, and https://troupe.run keeps serving
