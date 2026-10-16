@@ -214,15 +214,16 @@ other org-wide files (specs: `development-workflow`, `org-profile`).
 Every managed repository has Dependabot alerts and security updates on (spec: `repositories`). When an alert has a
 fix, Dependabot opens a pull request for it.
 
-- **In a governed repository** (troupe, infrastructure), Dependabot's pull request is an alert that comes with a fix.
+- **In a governed repository** (troupe, infrastructure, website), Dependabot's pull request is an alert that comes
+  with a fix.
   It can't merge as it is: its `dependabot/...` branch matches no OpenSpec change, so the `guard` check fails. (Its
   commit is a Conventional Commit, and it's signed off as `dependabot[bot] <support@github.com>`, so the branch is
   what stops it.) Take the fix into an issue and an OpenSpec change like any other change:
   make the same bump on a branch named after the change, with a pull request that closes the issue. Then close
   Dependabot's pull request with a comment linking that change. There's no exemption for Dependabot's branches, and a
   test fails if one appears (security-scanning, design D5).
-- **On the website**, which has no guard or DCO, Dependabot's pull request merges by rebase once `test` passes, like
-  any other pull request there.
+- The website has no DCO, so there the branch is the only thing that stops it. It's handled the same way
+  (govern-website).
 
 ## Known gaps
 
