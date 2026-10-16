@@ -64,7 +64,7 @@
       Done 2026-10-17: five differences. The new one is `milestones: troupe: 'alpha-0' is on GitHub but not declared;
       declare it in tofu/milestones.json`. The other four (no `cap:flake-hunt`, `cap:python-support` or
       `cap:quality-check` label, and `cap:releases`'s Purpose unrecorded) were already there and are #63
-- [ ] 4.3 Commit (`feat(oob): report a milestone that isn't declared`)
+- [x] 4.3 Commit (`feat(oob): report a milestone that isn't declared`)
 
 ## 5. Pull request
 
