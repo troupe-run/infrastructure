@@ -95,6 +95,12 @@
 - [ ] 4.2 Push the branch and open the pull request (`Closes #54`). Verify `check`, every `guard tests` leg,
       `guard (workflow rules)` and DCO pass. Verify that the posted plan, once the owner has approved its run,
       matches 4.1, and attach `scripts/oob.py`'s output
+      Not done, 2026-10-16: PR #64 at 59ae1dd passed `check`, every `guard tests` leg, `guard (workflow rules)` and
+      DCO, and the owner approved its plan run. But its plan is `8 to add, 5 to change`, not 4.1's `2 to change`. It
+      also turns secret scanning and push protection off on `.github`, infrastructure, troupe and the website. The
+      owner had attached the "troupe-run baseline" configuration to those four repositories in the meantime
+      (security-scanning task 3.1). That change declares them, and it hasn't merged yet. This PR waits for it:
+      rebase onto `main` after its apply, then plan again and check for `8 to add, 2 to change`
 - [ ] 4.3 Before the owner approves the plan, list open pull requests in `troupe-run/website`. Verify that none is
       open, or note each one that will need its `guard` check to run again after the apply (design, Risks)
 
