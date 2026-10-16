@@ -35,6 +35,19 @@ See proposal.md for why. What was found on 2026-10-16, before anything was writt
   commits carry no `Signed-off-by`, so `DCO` fails too. `delivered_changes_by_others` would also refuse a Dependabot
   change to a delivered file in troupe (for example, an action version in `guard.yml`). The website requires only
   `test`, and has no guard or DCO.
+- **The dependency graph is off** (found during the probe, 2026-10-16). `GET
+  /repos/troupe-run/<repo>/dependency-graph/sbom` returns 404 for all four managed repositories and for the probe,
+  while `cli/cli` returns 297 packages to the same login. A probe repository with `requests==2.19.0` and alerts and
+  security updates on got no alert and no pull request in an hour. Alerts that read "on" can't fire without the
+  graph. Nothing in the provider, in `security_and_analysis` or in the org's settings turns it on for an existing
+  repository. The routes left are each repository's settings page, or a code security configuration.
+- **Code security configurations** (REST docs, 2026-10-16). `POST /orgs/{org}/code-security/configurations` creates
+  one; each feature is `enabled`, `disabled` or `not_set`, where `not_set` leaves a repository's own setting alone,
+  and `enforcement` is `enforced` or `unenforced`. `POST .../{id}/attach` with `scope: selected` attaches it to
+  listed repository IDs, and `PUT .../{id}/defaults` with `default_for_new_repos: public` makes it the default.
+  `GET /repos/{owner}/{repo}/code-security-configuration` reads a repository's attachment, and returns 204 when
+  there's none, as it does for the probe today. Writing needs `write:org`, which makes it the owner's action: the
+  guard refuses org administration writes from agents.
 - **Known provider behaviour**: any update to `github_repository` PATCHes the whole
   repository, and once turned a null homepage into `""`. An update to `security_and_analysis` is such an update, so it
   is proven on a throwaway repository first.
@@ -42,7 +55,9 @@ See proposal.md for why. What was found on 2026-10-16, before anything was writt
 ## Goals / Non-Goals
 
 **Goals:**
-- All four features on in every managed repository, each declared, so turning one off shows in a plan.
+- All five features (the dependency graph and the four #53 names) on in every managed repository, each declared, so
+  turning one off shows in a plan or in `oob.py`.
+- Dependabot alerts can actually fire: shown by a real alert and pull request on the probe.
 - New repositories start with them on, and that is shown on a real new repository, not only read from the org's
   settings.
 - Nothing the org's own automation commits is refused by push protection.
@@ -55,7 +70,7 @@ See proposal.md for why. What was found on 2026-10-16, before anything was writt
   prefix (owner, 2026-10-16).
 - Code scanning, non-provider patterns, validity checks and AI detection. They weren't asked for, and some need
   Advanced Security on private repositories.
-- Moving the org's defaults to a code security configuration while the declared settings still work (D4).
+- Managing the configuration in OpenTofu: the provider has no resource for it (D4, D7).
 
 ## Decisions
 
@@ -100,34 +115,56 @@ The probe (`tofu/probe/`) uses the same module, so after D1 and D2 it gets the s
    `probe_delivery = true`, which goes through the API as the live delivery does. Both must be accepted. As a
    positive control, so the result isn't meaningless, `git push` a file holding a fake token with a valid format and
    checksum. It must be refused. A probe that refuses nothing proves nothing.
-3. **What Dependabot sends.** Add a manifest that pins a dependency with a published advisory, then record the
+3. **What Dependabot sends.** Attach the configuration (D4) to the probe only, and check that its dependency graph
+   is on (the SBOM returns 200). Add a manifest that pins a dependency with a published advisory, then record the
    security-update pull request's branch name, commit message, author and whether it has a sign-off. That shape is
    what the guard test (D5) uses, and what `docs/development-workflow.md` describes.
 
 The repository is deleted afterwards, along with the probe's local state, as the probe's header says.
 
-### D4. The org's defaults stay declared in `org.tf`, and are proven on a new repository
+### D4. A code security configuration turns the features on, and is the default for new repositories
 
-`org.tf` sets these to `true`: `dependabot_alerts_enabled_for_new_repositories`,
-`dependabot_security_updates_enabled_for_new_repositories`, `dependency_graph_enabled_for_new_repositories`,
-`secret_scanning_enabled_for_new_repositories` and `secret_scanning_push_protection_enabled_for_new_repositories`.
-The dependency graph is always on for public repositories, but Dependabot alerts need it, and members can create
-private ones. `advanced_security_enabled_for_new_repositories` stays `false`: it's always on for public repositories,
-and it's paid for private ones.
+The owner creates one configuration, "troupe-run baseline":
 
-These parameters are closing down, so reading them back isn't enough. GitHub could accept the PATCH, return `true`
-and still apply nothing to a new repository. After the apply, the owner creates a new `infra-probe-*` repository
-(creating a repository is the owner's action), and its security settings are read. All four must be on with nothing
-applied to it. Then it's deleted.
+| Setting | Value |
+|---|---|
+| `dependency_graph`, `dependabot_alerts`, `dependabot_security_updates`, `secret_scanning`, `secret_scanning_push_protection` | `enabled` |
+| every other feature (code scanning, the secret-scanning extras, private vulnerability reporting, delegated bypass and dismissal, autosubmit) | `not_set` |
+| `enforcement` | `unenforced` |
 
-**Fallback, if the probe shows them off:** a custom code security configuration with exactly these features, set as
-the default for new public repositories. The provider can't manage it, so it's declared in `oob/` and checked by
-`scripts/oob.py`, as issue types are. The owner creates it, since it's an org administration write. The five
-`org.tf` attributes then go back to whatever GitHub reads, so the plan stays clean, with a comment pointing to the
-`oob/` declaration. This is decided now, so the apply step doesn't stall on a new design question.
+It's attached to the four managed repositories (`scope: selected`), and set as the default for new public
+repositories. `not_set` leaves everything #53 didn't ask for as each repository has it. `unenforced` can't lock the
+owner out of a repository's settings, and it keeps OpenTofu's drift meaningful: a feature turned off by hand still
+shows in the plan, rather than being impossible to turn off.
 
-Alternative: go straight to a code security configuration. It moves a setting OpenTofu can declare today out of
-OpenTofu, before GitHub has stopped honouring it, and the issue asks for the defaults in `org.tf`.
+The order is: the probe first (D3, step 3), then the four live repositories and the default, before the pull request.
+So the pull request's plan and `oob.py` output are evidence of the end state, and a new `infra-probe-*` repository,
+created by the owner after the default is set, shows the org-settings scenario before merge. It's deleted afterwards.
+
+**`org.tf` no longer decides anything here.** Its five `*_enabled_for_new_repositories` attributes are set to
+whatever `GET /orgs/troupe-run` reads once the configuration is the default, so the plan stays clean. Their comment
+says the configuration in `oob/` is what decides, and that GitHub has marked the parameters as closing down.
+`advanced_security_enabled_for_new_repositories` stays `false`.
+
+Alternatives:
+- **The `org.tf` parameters, as first designed.** They're closing down, and they can't turn the graph on in an
+  existing repository, which is the gap that matters.
+- **Turning the graph on in each repository's settings by hand, with `oob.py` checking it.** That leaves new
+  repositories relying on the closing-down parameters, and adds one hand step per new repository. The owner chose the
+  configuration (2026-10-16).
+
+### D7. `oob.py` checks the configuration, its attachments, the default and each dependency graph
+
+`oob/code-security.json` declares the configuration by name, with every setting from D4, the default
+(`default_for_new_repos: public`), and the repositories it's attached to: the four managed ones. `scripts/oob.py`
+reads `GET /orgs/troupe-run/code-security/configurations`, `.../defaults` and each managed repository's
+`code-security-configuration`, and reports any difference, as its other checks do. A configuration on GitHub that
+isn't declared is reported too.
+
+It also reads each managed repository's `dependency-graph/sbom`. A 200 means the graph is on, and a 404 means it's
+off, which is reported. Any other status, or a response it can't read, is an error that names the repository and
+the status. It's never treated as "off", or as "on" (the malformed-input rule). Each check has a test that fails when
+it breaks, in `scripts/tests/test_oob.py`. `oob/README.md` gains the row for it.
 
 ### D5. A Dependabot pull request is an alert that comes with a fix
 
@@ -149,10 +186,10 @@ pull requests turn out to be frequent.
 
 ### D6. Secret scanning's first scan is triaged in this change
 
-Turning secret scanning on scans each repository's full history. After the apply, the open alerts in all four
-repositories are listed (`GET /repos/troupe-run/<repo>/secret-scanning/alerts`). Each one is triaged in the pull
-request's evidence: what it is, and whether it's a real secret that needs rotating (the owner's job) or a false
-positive the owner dismisses. Alert contents are never pasted: the location and type only.
+Turning secret scanning on scans each repository's full history. Once the configuration is attached to the four
+repositories (D4), before the pull request, the open alerts in all four repositories are listed (`GET
+/repos/troupe-run/<repo>/secret-scanning/alerts`). Each one is triaged in the pull request's evidence: what it is,
+and whether it's a real secret that needs rotating (the owner's job) or a false positive the owner dismisses. Alert contents are never pasted: the location and type only.
 
 ## Risks / Trade-offs
 
@@ -160,8 +197,10 @@ positive the owner dismisses. Alert contents are never pasted: the location and 
   real encrypted state to a protected throwaway repository. The state's ciphertext is base64 in JSON, and GitHub's
   provider patterns are prefixed, checksummed formats, so a match by chance is very unlikely. If it ever happens, the
   run fails and keeps the state as its `state-after-apply` artifact, and the README's recovery for that case applies.
-- [The org's defaults are accepted and ignored] → D4 checks them on a real new repository, with a fallback already
-  decided.
+- [Attaching the configuration turns the features on outside a plan] → it's the owner's own write, made for this
+  change. The next plan shows what OpenTofu still needs to adopt, and the pull request carries that plan.
+- [The configuration and OpenTofu disagree later] → each declares the same five features. A difference shows in the
+  daily plan or in `oob.py`.
 - [Deleting one of the new resources from the module turns its feature off everywhere] → D1: the module's comment
   says so, and the plan would show four destroys of that resource for the owner to refuse.
 - [The live PATCH changes a setting nobody meant to change] → D3's first probe, then the live plan must show only the
@@ -169,4 +208,4 @@ positive the owner dismisses. Alert contents are never pasted: the location and 
 - [A Dependabot pull request sits open and red in troupe or infrastructure] → D5 says what to do with it, and alerts
   are emailed to the owner as before. It's the cost of no exemption, and the owner chose it.
 - [GitHub removes the closing-down parameters entirely] → the provider would then error or show drift on `org.tf`.
-  D4's fallback is the fix, and the daily plan shows it within a day.
+  Nothing depends on them any more (D4), so the fix is deleting the five attributes.
