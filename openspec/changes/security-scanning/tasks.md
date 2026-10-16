@@ -2,20 +2,20 @@
 
 ## 1. The features are declared in the module and the org's defaults
 
-- [ ] 1.1 In `tofu/modules/repository/main.tf`, set `secret_scanning` and `secret_scanning_push_protection` to
+- [x] 1.1 In `tofu/modules/repository/main.tf`, set `secret_scanning` and `secret_scanning_push_protection` to
       `enabled` (design D2). Add `github_repository_vulnerability_alerts.this` and
       `github_repository_dependabot_security_updates.this`, both `enabled = true`; the second gets
       `depends_on = [github_repository_vulnerability_alerts.this]` (D1). Comment that deleting either resource turns
       its feature off in every repository. Verify `tofu fmt -check` and `tofu validate` pass, through
       `uv run scripts/check.py`
-- [ ] 1.2 Add import blocks to `tofu/imports.tf` for both resources in each of `repo_troupe`, `repo_github`,
+- [x] 1.2 Add import blocks to `tofu/imports.tf` for both resources in each of `repo_troupe`, `repo_github`,
       `repo_infrastructure` and `repo_website` (id: the repository's name), in the file's existing pattern (D1).
       Verify `tofu validate` passes
-- [ ] 1.3 In `tofu/org.tf`, set the five `*_enabled_for_new_repositories` attributes for Dependabot alerts, security
+- [x] 1.3 In `tofu/org.tf`, set the five `*_enabled_for_new_repositories` attributes for Dependabot alerts, security
       updates, dependency graph, secret scanning and push protection to `true`, and leave
       `advanced_security_enabled_for_new_repositories` `false`. Rewrite the comment above them to give D4's reasons:
       Advanced Security, and the closing-down notice with its fallback. Verify `tofu validate` passes
-- [ ] 1.4 Update the README: the layout row for `tofu/modules/repository/` names the security features, and "Adding a
+- [x] 1.4 Update the README: the layout row for `tofu/modules/repository/` names the security features, and "Adding a
       repository" says a new repository gets them from the module. Verify `uv run scripts/check.py` passes, the docs
       tests included
 

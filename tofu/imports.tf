@@ -91,3 +91,46 @@ import {
   to = github_repository_environment_deployment_policy.github_pages_main_only
   id = "website:github-pages:62248502"
 }
+
+# Dependabot alerts were already on in all four repositories, so their import plans no change;
+# security updates were off, so theirs plans one (security-scanning design D1).
+
+import {
+  to = module.repo_troupe.github_repository_vulnerability_alerts.this
+  id = "troupe"
+}
+
+import {
+  to = module.repo_troupe.github_repository_dependabot_security_updates.this
+  id = "troupe"
+}
+
+import {
+  to = module.repo_github.github_repository_vulnerability_alerts.this
+  id = ".github"
+}
+
+import {
+  to = module.repo_github.github_repository_dependabot_security_updates.this
+  id = ".github"
+}
+
+import {
+  to = module.repo_infrastructure.github_repository_vulnerability_alerts.this
+  id = "infrastructure"
+}
+
+import {
+  to = module.repo_infrastructure.github_repository_dependabot_security_updates.this
+  id = "infrastructure"
+}
+
+import {
+  to = module.repo_website.github_repository_vulnerability_alerts.this
+  id = "website"
+}
+
+import {
+  to = module.repo_website.github_repository_dependabot_security_updates.this
+  id = "website"
+}

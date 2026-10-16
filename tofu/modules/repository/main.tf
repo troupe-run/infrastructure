@@ -34,12 +34,14 @@ resource "github_repository" "this" {
   squash_merge_commit_message = "COMMIT_MESSAGES"
   web_commit_signoff_required = false
 
+  # Every managed repository is public, so these are free, and none may turn them off
+  # (spec: repositories; security-scanning design D2).
   security_and_analysis {
     secret_scanning {
-      status = "disabled"
+      status = "enabled"
     }
     secret_scanning_push_protection {
-      status = "disabled"
+      status = "enabled"
     }
   }
 
@@ -68,6 +70,23 @@ resource "github_repository_pages" "this" {
   lifecycle {
     prevent_destroy = true
   }
+}
+
+# Dependabot alerts, and the security updates that answer them (spec: repositories;
+# security-scanning design D1). Separate resources, because github_repository's
+# vulnerability_alerts is deprecated. Destroying either one turns its feature off, so don't delete
+# them or give them a count: removing a whole repository with a `removed` block forgets them safely.
+resource "github_repository_vulnerability_alerts" "this" {
+  repository = github_repository.this.name
+  enabled    = true
+}
+
+# GitHub turns security updates on only once alerts are on.
+resource "github_repository_dependabot_security_updates" "this" {
+  repository = github_repository.this.name
+  enabled    = true
+
+  depends_on = [github_repository_vulnerability_alerts.this]
 }
 
 resource "github_issue_labels" "this" {
