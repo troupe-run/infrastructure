@@ -73,3 +73,15 @@ import {
   to       = github_repository_file.guard[each.key]
   id       = "${each.value.repository}:${each.value.file}:"
 }
+
+# The website's github-pages environment and its one deployment branch policy, main, which GitHub
+# created with Pages (website-environment design D2).
+import {
+  to = github_repository_environment.github_pages
+  id = "website:github-pages"
+}
+
+import {
+  to = github_repository_environment_deployment_policy.github_pages_main_only
+  id = "website:github-pages:62248502"
+}
