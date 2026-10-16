@@ -2,15 +2,22 @@
 
 ## 1. The App can read and update the website's Pages site
 
-- [ ] 1.1 Read GitHub's REST reference for "Get a GitHub Pages site" and "Update information about a GitHub Pages
+- [x] 1.1 Read GitHub's REST reference for "Get a GitHub Pages site" and "Update information about a GitHub Pages
       site", and record the fine-grained permissions each needs in this task (design D5). Verify by quoting the two
       permission lines and their URLs
-- [ ] 1.2 Add the `pages` variable to `tofu/modules/repository/variables.tf` and the counted `github_repository_pages`
+      Done 2026-10-16. https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps lists,
+      under Repository permissions for "Pages": `GET /repos/{owner}/{repo}/pages | read | UAT, IAT | ✗` and
+      `PUT /repos/{owner}/{repo}/pages | write | UAT, IAT | ✓`; under "Administration" it lists only the PUT. The
+      endpoint pages (https://docs.github.com/en/rest/pages/pages) give no fine-grained line. So reading the site needs
+      Pages read, which the App doesn't have: 1.3 is expected to be refused
+- [x] 1.2 Add the `pages` variable to `tofu/modules/repository/variables.tf` and the counted `github_repository_pages`
       resource to `tofu/modules/repository/main.tf`, with `build_type = "workflow"`, no `source`, and
       `prevent_destroy`, each commented with why (design D2, D3). Set `pages = { cname = "troupe.run" }` on
       `repo_website` in `tofu/repositories.tf`, and replace the stale comment above it with one saying what's declared
       and that a domain removed by hand takes two applies to restore (design, Risks). Add the `import` block to
       `tofu/imports.tf` (design D4). Verify `tofu fmt -check` and `tofu validate` are clean
+      Done 2026-10-16: `tofu fmt -check -recursive` clean; `uv run scripts/check.py`: all gates passed, `tofu validate`
+      included
 - [ ] 1.3 Fast-forward onto `origin/main` and run a local plan. If the App's read of the site is refused, stop and ask
       the owner to add Pages read and write to `troupe-run-infrastructure` and accept it on the org's installation
       (design D5), then plan again. Verify, and record here, which it was: the plan read the site with the existing
