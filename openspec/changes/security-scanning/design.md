@@ -129,8 +129,17 @@ The owner creates one configuration, "troupe-run baseline":
 | Setting | Value |
 |---|---|
 | `dependency_graph`, `dependabot_alerts`, `dependabot_security_updates`, `secret_scanning`, `secret_scanning_push_protection` | `enabled` |
+| `advanced_security` | `enabled` |
 | every other feature (code scanning, the secret-scanning extras, private vulnerability reporting, delegated bypass and dismissal, autosubmit) | `not_set` |
+| `code_security`, `secret_protection` | left out |
 | `enforcement` | `unenforced` |
+
+GitHub decided two of these rows when the configuration was created (2026-10-16). It refuses `code_security` and
+`secret_protection`, even as `not_set`, on an org without the unbundled Advanced Security plan. And it needs
+`advanced_security: enabled` whenever a feature it counts as Advanced Security, such as secret scanning, is
+`enabled`. That costs nothing on public repositories, which always have it. GitHub's own "GitHub recommended"
+configuration in the org sets it the same way. The configuration is attached only to public repositories and is the
+default only for new public ones, so it never reaches a private repository, where it would be paid for.
 
 It's attached to the four managed repositories (`scope: selected`), and set as the default for new public
 repositories. `not_set` leaves everything #53 didn't ask for as each repository has it. `unenforced` can't lock the
