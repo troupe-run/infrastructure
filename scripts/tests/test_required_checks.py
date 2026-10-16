@@ -21,6 +21,8 @@ CHECKS = REPO / "tofu" / "required-checks.json"
 REPOSITORIES_TF = REPO / "tofu" / "repositories.tf"
 GUARD_DELIVERY_TF = REPO / "tofu" / "guard_delivery.tf"
 WORKFLOWS = REPO / ".github" / "workflows"
+# The encrypted state, which the App alone commits to main after an apply.
+STATE_FILE = "tofu/terraform.tfstate"
 
 # The workflows whose pull-request jobs infrastructure requires, and the jobs deliberately left
 # out: `changes` only decides whether to plan, and a failure there makes the plan run (design D2).
@@ -241,6 +243,60 @@ def test_a_name_it_can_t_evaluate_is_refused_rather_than_guessed() -> None:
     job = {"name": "build ${{ github.ref }}"}
     with pytest.raises(ValueError, match="can't evaluate"):
         job_names("build", job)
+
+
+def events(workflow: dict[Any, Any]) -> dict[str, Any]:
+    """A workflow's `on` as a mapping of event to its filters (None for a bare event)."""
+    on = workflow["on"] if "on" in workflow else workflow[True]
+    assert isinstance(on, dict), f"`on` isn't a mapping: {on!r}"
+    return on
+
+
+def ci_trigger_problems(ci: dict[Any, Any], tofu: dict[Any, Any]) -> list[str]:
+    """dedupe-ci-runs design D2, D3: CI tests a pull request once, from its pull_request run, with
+    no path filter (so its required checks always report), and main after every push except the
+    App's state commit, which tofu.yml's plan skips by the same path."""
+    problems = []
+    on = events(ci)
+    pull_request = on.get("pull_request") or {}
+    if filtered := sorted({"paths", "paths-ignore"} & set(pull_request)):
+        problems.append(f"pull_request has {filtered}; a required check would never report")
+    push = on.get("push") or {}
+    if push.get("branches") != ["main"]:
+        problems.append(f"push runs on {push.get('branches')!r}, not ['main']")
+    if push.get("paths-ignore") != [STATE_FILE]:
+        problems.append(f"push ignores {push.get('paths-ignore')!r}, not [{STATE_FILE!r}]")
+    skip = [
+        step
+        for step in tofu["jobs"]["plan"]["steps"]
+        if step.get("name") == "Skip the App's own state commit"
+    ]
+    if not skip or STATE_FILE not in skip[0]["run"]:
+        problems.append(f"tofu.yml's state-commit skip doesn't read {STATE_FILE}")
+    return problems
+
+
+def plan_trigger_problems(ci: dict[Any, Any], tofu: dict[Any, Any]) -> list[str]:
+    """dedupe-ci-runs design D3: main is planned after CI, so tofu.yml's workflow_run must name
+    ci.yml's workflow, on branches ci.yml's pushes run on (by name: no glob matching)."""
+    problems = []
+    follows = events(tofu)["workflow_run"]
+    if follows["workflows"] != [ci["name"]]:
+        problems.append(f"tofu.yml follows {follows['workflows']!r}; ci.yml is {ci['name']!r}")
+    pushed = (events(ci).get("push") or {}).get("branches", [])
+    if missing := [branch for branch in follows["branches"] if branch not in pushed]:
+        problems.append(f"tofu.yml follows CI on {missing}, which ci.yml's pushes don't list")
+    return problems
+
+
+def test_ci_tests_pull_requests_unfiltered_and_main_s_pushes_except_the_state_commit() -> None:
+    workflows = real_workflows()
+    assert ci_trigger_problems(workflows["ci.yml"], workflows["tofu.yml"]) == []
+
+
+def test_main_s_plan_follows_the_ci_run_main_s_pushes_start() -> None:
+    workflows = real_workflows()
+    assert plan_trigger_problems(workflows["ci.yml"], workflows["tofu.yml"]) == []
 
 
 def test_guard_re_runs_when_a_pull_request_is_renamed_and_still_runs_on_every_push() -> None:

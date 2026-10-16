@@ -1,11 +1,18 @@
 name: CI
 
-# The repo's check (scripts/check.py, design D8) on every push and pull request. It needs no
-# secret: plans run on the owner's machine until a later change adds an approved environment.
+# The repo's check (scripts/check.py, design D8) and the guard's tests. It needs no secret.
+#
+# Each run tests something no other run does (#66, dedupe-ci-runs):
+# - a pull request, once, merged onto main. A branch's own push doesn't run it again: nothing
+#   reaches main without a pull request.
+# - main after every merge. tofu.yml's plan of main follows this run.
+# - not the App's state commit after an apply: it changes only the state file, and tofu.yml's
+#   plan skips it too.
 on:
   pull_request:
   push:
-    branches: ["**"]
+    branches: [main]
+    paths-ignore: [tofu/terraform.tfstate]
 
 permissions:
   contents: read
