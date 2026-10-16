@@ -122,13 +122,17 @@
       Done 2026-10-16, about 15 minutes after attaching: no alerts in any of the four, open or closed. Whether the
       history scan had finished can't be read: `secret-scanning/scan-history` refuses with "Advanced Security is
       disabled on this repository" (404). So the list is re-checked after the merge (Workflow follow-up)
-- [ ] 3.4 Write `oob/code-security.json` (design D7): the configuration by name with D4's settings, its default, and the
+- [x] 3.4 Write `oob/code-security.json` (design D7): the configuration by name with D4's settings, its default, and the
       four repositories it's attached to. Add the checks to `scripts/oob.py`: the configuration (including any
       undeclared one), the default, each managed repository's attachment, and each managed repository's dependency
       graph, where 200 is on, 404 is reported as off, and any other status is an error naming the repository and the
       status. Add tests to `scripts/tests/test_oob.py`, one per behaviour, each named for what it checks, including
       that a non-404 error is never read as "off". Add the row to `oob/README.md`. Verify `uv run scripts/check.py`
       passes, and that `uv run scripts/oob.py` reports none of these checks as different
+      Done 2026-10-16 (7e33a2e): `oob/code-security.json` written from the configuration as GitHub stored it; 8
+      new tests in `test_oob.py` (29 pass), including a non-404 graph read raising `UnreadableError` and `main`
+      exiting 1 naming the repository; `check.py` passes. Before 3.1, `oob.py` reported exactly the 13 expected
+      code-security differences; after it, none (only #63's four remain)
 - [x] 3.5 In `tofu/org.tf`, set the five `*_enabled_for_new_repositories` attributes to 3.1's recorded values, and
       rewrite their comment: the configuration in `oob/code-security.json` decides new repositories' defaults, and
       these closing-down parameters are only kept in step with what GitHub reads (D4). Verify `uv run
@@ -153,21 +157,25 @@
 
 ## 5. Local plan
 
-- [ ] 5.1 Fast-forward onto `origin/main` (`git log HEAD..origin/main` shows only state commits, or nothing), then
+- [x] 5.1 Fast-forward onto `origin/main` (`git log HEAD..origin/main` shows only state commits, or nothing), then
       `uv run scripts/tofu.py plan`, after group 3. Verify the plan has 8 imports (two per repository), each one
       changing nothing, because the configuration has already turned the features on. Any remaining change must be
       one this change declares: list each, and grep every `~`, `+` and `-` line. Record the summary line
+      Done 2026-10-16 on b8e2ee3's state (nothing ahead on `origin/main`), after group 3: `Plan: 8 to import, 0 to
+      add, 0 to change, 0 to destroy.` The eight are each repository's `vulnerability_alerts` and
+      `dependabot_security_updates`, imported with no change. No `~`, `+` or `-` lines
       First run, before the configuration (2026-10-16), on 4268fb7's state (nothing ahead on `origin/main`): `Plan: 8 to import, 0 to add, 9 to
       change, 0 to destroy.` Exactly the list above: the four alerts imports change nothing; each repository's
       `github_repository.this` changes only the two `status` values; the org changes only the five attributes.
       No `+` or `-` lines
-- [ ] 5.2 Run `uv run scripts/oob.py`. Verify it reports none of the code-security checks as different, and record its
+- [x] 5.2 Run `uv run scripts/oob.py`. Verify it reports none of the code-security checks as different, and record its
       output for the pull request
       2026-10-16: 5 differences, none from this change: the infrastructure App holds `pages: write`, which isn't
       declared (likely website-pages, #51/#57); troupe specs `flake-hunt`, `python-support` and `quality-check` have
       no `cap:` label; `cap:releases`'s Purpose isn't recorded. After rebasing onto b8e2ee3, which records
       `pages: write` (website-pages), 4 remain. They're unrelated to this change, tracked in #63 (owner,
       2026-10-16), and noted as such in the pull request
+      Done 2026-10-16, after 3.1: `oob: 4 difference(s)`, exactly #63's four; no code-security differences
 
 
 ## 6. Evidence on GitHub
