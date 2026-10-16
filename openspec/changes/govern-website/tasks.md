@@ -98,7 +98,7 @@
       add, 2 to change, 0 to destroy.` The eight `guard["website:…"]` files; `repo_website`'s `has_projects`
       false -> true and nothing else; its ruleset gains only the App (5272634, `always`) as a bypass actor and
       `guard (workflow rules)` (15368). `check.py` all gates passed. `oob.py`: only the four troupe label lines
-- [ ] 4.2 Push the branch and open the pull request (`Closes #54`). Verify `check`, every `guard tests` leg,
+- [x] 4.2 Push the branch and open the pull request (`Closes #54`). Verify `check`, every `guard tests` leg,
       `guard (workflow rules)` and DCO pass. Verify that the posted plan, once the owner has approved its run,
       matches 4.1, and attach `scripts/oob.py`'s output
       Not done, 2026-10-16: PR #64 at 59ae1dd passed `check`, every `guard tests` leg, `guard (workflow rules)` and
@@ -111,8 +111,13 @@
       rebased onto it: `Plan: 8 to add, 2 to change, 0 to destroy.`, the same resources and attributes as 4.1, and no
       `security_and_analysis` change. `oob.py`: only the four troupe label lines (#63). The PR's own plan is
       checked against this once the owner approves its run
-- [ ] 4.3 Before the owner approves the plan, list open pull requests in `troupe-run/website`. Verify that none is
+      Done 2026-10-16, PR #64 at 5ee03de: 29 checks pass (`check`, all 22 `guard tests` legs, `guard (workflow
+      rules)` and DCO), 2 skipped (`plan (main)`, `apply (main)`). After the owner approved it, `plan (pull request)`
+      (run 38897234622) shows `Plan: 8 to add, 2 to change, 0 to destroy.`, the same resources and attributes as the
+      re-plan above. Its comment is cut off inside `scripts/guard.py`, so this was read from the run's log
+- [x] 4.3 Before the owner approves the plan, list open pull requests in `troupe-run/website`. Verify that none is
       open, or note each one that will need its `guard` check to run again after the apply (design, Risks)
+      Done 2026-10-16: no pull request is open in `troupe-run/website`
 
 ## Workflow follow-up
 
