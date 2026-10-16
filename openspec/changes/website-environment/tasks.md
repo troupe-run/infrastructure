@@ -2,22 +2,28 @@
 
 ## 1. Adopt the environment as it is (D1, D2 step 1, D4, D5)
 
-- [ ] 1.1 Before writing anything, re-read the live environment and its policies
+- [x] 1.1 Before writing anything, re-read the live environment and its policies
       (`gh api repos/troupe-run/website/environments/github-pages` and `.../deployment-branch-policies`). Verify they
       still match design.md's Context: `can_admins_bypass: true`, custom branch policies only, no reviewers or wait
       timer, and one policy, `main`, ID `62248502`. If anything differs, stop and update the design first
-- [ ] 1.2 In `tofu/environments.tf`, add `github_repository_environment.github_pages` on `module.repo_website.name`
+      Done 2026-10-16: `can_admins_bypass: true`, custom branch policies only, one `branch_policy` rule, one policy
+      `main` (ID `62248502`). Matches the design
+- [x] 1.2 In `tofu/environments.tf`, add `github_repository_environment.github_pages` on `module.repo_website.name`
       with the live values (`can_admins_bypass = true` for now, `prevent_self_review = false`, the
       `deployment_branch_policy` block, `lifecycle { prevent_destroy = true }` with a comment naming the `removed`
       block as the way out), and `github_repository_environment_deployment_policy.github_pages_main_only`
       (`branch_pattern = "main"`). Widen the file's header and table to cover the website's deploy environment, citing
       spec: repositories and #52. Add the two `import` blocks to `tofu/imports.tf` (`website:github-pages`,
       `website:github-pages:62248502`). Verify `uv run scripts/check.py` passes (`tofu fmt -check`, `tofu validate`)
-- [ ] 1.3 Add a `tofu/environments.tf` row to README.md's Layout table, saying it holds CI's three environments on
+      Done 2026-10-16: all gates passed (802 tests, `tofu fmt`, `tofu validate`)
+- [x] 1.3 Add a `tofu/environments.tf` row to README.md's Layout table, saying it holds CI's three environments on
       infrastructure and the website's `github-pages`, limited to `main`. Verify `uv run scripts/check.py` passes
-- [ ] 1.4 Fast-forward onto `origin/main`, then run a local plan. Verify its summary is
+      Done 2026-10-16: all gates passed
+- [x] 1.4 Fast-forward onto `origin/main`, then run a local plan. Verify its summary is
       `Plan: 2 to import, 0 to add, 0 to change, 0 to destroy.`, with the environment and the policy as the two imports.
       Record the summary here. If it shows any change, fix the declaration to match GitHub and re-plan before going on
+      Done 2026-10-16, on 4268fb7's state: `Plan: 2 to import, 0 to add, 0 to change, 0 to destroy.` The two imports
+      are the environment and `github_pages_main_only`, with no attribute changes
 - [ ] 1.5 Verify `prevent_destroy` works: with the environment's resource commented out locally (not committed), a
       plan fails with OpenTofu's `prevent_destroy` error naming `github_repository_environment.github_pages`. Restore
       the file, check `git diff` shows nothing from this task, and record the error line here

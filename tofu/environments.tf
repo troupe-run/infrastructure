@@ -1,10 +1,16 @@
-# The environments that gate CI's plans and applies on this repository (spec: ci-apply, design D2).
-# Each holds the App's key, the state passphrase and the billing email, set by the owner from
-# 1Password (README); OpenTofu never manages the values.
+# The environments this repo declares (spec: ci-apply, design D2; spec: repositories, #52).
+#
+# CI's, on this repository, gate its plans and applies. Each holds the App's key, the state
+# passphrase and the billing email, set by the owner from 1Password (README); OpenTofu never
+# manages the values.
 #
 #   plan-pr    any branch   the owner approves each run   a pull request's plan
 #   plan-main  main only    no approval                   the plan after a merge, and manual runs
 #   apply      main only    the owner approves            the apply
+#
+# The website's, which its deploy job publishes troupe.run through:
+#
+#   github-pages  main only  no approval  the website's deploy (deploy.yml)
 
 locals {
   # The owner, the only required reviewer.
@@ -47,5 +53,32 @@ resource "github_repository_environment_deployment_policy" "main_only" {
 
   repository     = module.repo_infrastructure.name
   environment    = github_repository_environment.ci[each.key].environment
+  branch_pattern = "main"
+}
+
+# GitHub created it when Pages was set up; adopted by import (website-environment design D2).
+# Only main may deploy troupe.run. No reviewers: the website's pull requests are reviewed before
+# they merge, and every push to main that passes CI deploys (design D4).
+resource "github_repository_environment" "github_pages" {
+  repository          = module.repo_website.name
+  environment         = "github-pages"
+  can_admins_bypass   = true
+  prevent_self_review = false
+
+  deployment_branch_policy {
+    protected_branches     = false
+    custom_branch_policies = true
+  }
+
+  # Deleting it would let the next deploy recreate it with no branch rule (design D5). To stop
+  # managing it, use a `removed` block, which leaves it on GitHub.
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "github_repository_environment_deployment_policy" "github_pages_main_only" {
+  repository     = module.repo_website.name
+  environment    = github_repository_environment.github_pages.environment
   branch_pattern = "main"
 }

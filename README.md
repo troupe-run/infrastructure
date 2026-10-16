@@ -21,6 +21,7 @@ that closes the issue. Specs live in `openspec/specs/`.
 | `tofu/labels/` | Label sets as data. `troupe.json` is troupe's `cap:*` capability labels: a new capability gets its label by a pull request here. `release.json` is release-please's two labels on troupe |
 | `tofu/probe/` | Points the same module at a throwaway repo, to show drift behaviour without touching a live one |
 | `tofu/guard_delivery.tf` | The guard's files in each repository that receives it, and the generated list of them |
+| `tofu/environments.tf` | CI's three environments on infrastructure (`plan-pr`, `plan-main`, `apply`), and the website's `github-pages`, which only `main` may deploy through |
 | `tofu/release.tf` | What troupe's release workflow needs: the `release` environment, limited to `main`, the release App's client ID, and the ruleset that lets only the App create or update `release-please--*` branches. The App and its key are set up by hand ([oob/README.md](oob/README.md#troupes-release-app-set-up-by-hand)) |
 | `org-profile/` | The source of `troupe-run/.github`'s files, byte for byte |
 | `scripts/guard.py`, `scripts/guard_pytest.py`, `.githooks/`, `.claude/settings.json`, `.github/workflows/guard.yml` | The guard: this repo's own, and the source of every delivered copy |
