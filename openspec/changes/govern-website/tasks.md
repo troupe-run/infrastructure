@@ -19,24 +19,31 @@
 
 ## 2. The website receives the guard
 
-- [ ] 2.1 In `scripts/tests/test_required_checks.py`, add a test that reads `guard_targets` from
+- [x] 2.1 In `scripts/tests/test_required_checks.py`, add a test that reads `guard_targets` from
       `tofu/guard_delivery.tf` and checks that each repository it names requires `guard (workflow rules)` from
       `github-actions` in `tofu/required-checks.json` (design D3). Verify it passes on `main`'s data (troupe only).
       Then add `module.repo_website.name` to `guard_targets` on its own and verify the test fails, naming `website`
-- [ ] 2.2 Add `{"context": "guard (workflow rules)", "app": "github-actions"}` to the `website` entry of
+      Done 2026-10-16: 12 passed on main's data; with only `guard_targets` changed it failed with
+      `{'website': ['guard (workflow rules)']}`. It replaces troupe's own guard-check test, which it generalises
+- [x] 2.2 Add `{"context": "guard (workflow rules)", "app": "github-actions"}` to the `website` entry of
       `tofu/required-checks.json`, and leave DCO out (design D3). Update the module's comment if it names the
       checks. Verify the 2.1 test passes
-- [ ] 2.3 In `tofu/guard_delivery.tf`, make `guard_targets` name both repositories, and make `depends_on` list
+      Done 2026-10-16: 12 passed
+- [x] 2.3 In `tofu/guard_delivery.tf`, make `guard_targets` name both repositories, and make `depends_on` list
       `module.repo_troupe` and `module.repo_website` (design D2). Update the comments that assume troupe alone. In
       `tofu/repositories.tf`, give `repo_website` `app_bypass_id = local.infrastructure_app_id` and
       `has_projects = true`, each with a comment giving the reason, as `repo_troupe`'s do. Verify `tofu fmt -check` and
       `tofu validate` are clean
-- [ ] 2.4 Edit the `development-workflow` spec's Purpose in `openspec/specs/development-workflow/spec.md` so it names
+      Done 2026-10-16: `tofu fmt -check -recursive` clean; `tofu validate` passed in `check.py`
+- [x] 2.4 Edit the `development-workflow` spec's Purpose in `openspec/specs/development-workflow/spec.md` so it names
       this repository, `troupe` and `website` (design D5). Verify `openspec validate --specs --strict` passes
-- [ ] 2.5 Update README.md "Delivering the guard" and "To stop delivering" so they speak of each repository that
+      Done 2026-10-16: `openspec validate --specs --strict`: 11 passed, 0 failed
+- [x] 2.5 Update README.md "Delivering the guard" and "To stop delivering" so they speak of each repository that
       receives the guard, and so the stop steps name that repository's `app_bypass_id` (design D5). Verify
       `uv run pytest scripts/tests/test_guard_docs.py` passes, and
       `grep -n "troupe" README.md` shows no remaining line that means "every governed repository"
+      Done 2026-10-16: the grep leaves only lines about troupe's own matrix and release branches. README also
+      gains "To add a repository". `test_guard_docs.py` passed in `uv run scripts/check.py` (all gates passed)
 
 ## 3. The roadmap is linked and checked
 

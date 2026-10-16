@@ -123,6 +123,10 @@
     {
       "context": "test",
       "app": "github-actions"
+    },
+    {
+      "context": "guard (workflow rules)",
+      "app": "github-actions"
     }
   ]
 }

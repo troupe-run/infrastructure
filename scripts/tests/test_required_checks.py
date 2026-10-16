@@ -2,8 +2,9 @@
 run on a pull request, as GitHub reports them (spec: rulesets; required-checks design D1).
 
 A required name that no job reports blocks every pull request, and a job left out can fail
-without blocking anything. troupe's and website's names can't be read from here, so they are
-not tested.
+without blocking anything. troupe's and website's own jobs can't be read from here, so they are
+not tested; the guard check each repository receiving the guard requires is, since its workflow is
+delivered from here.
 """
 
 import itertools
@@ -18,6 +19,7 @@ from conftest import REPO
 
 CHECKS = REPO / "tofu" / "required-checks.json"
 REPOSITORIES_TF = REPO / "tofu" / "repositories.tf"
+GUARD_DELIVERY_TF = REPO / "tofu" / "guard_delivery.tf"
 WORKFLOWS = REPO / ".github" / "workflows"
 
 # The workflows whose pull-request jobs infrastructure requires, and the jobs deliberately left
@@ -148,13 +150,44 @@ def test_infrastructure_requires_dco_from_the_dco_app() -> None:
     assert required("infrastructure", "dco") == {"DCO"}
 
 
-def test_troupe_requires_the_delivered_guard_check_by_its_name_here() -> None:
+def guard_targets() -> set[str]:
+    """The repositories guard_delivery.tf delivers the guard to, by name (spec: guard-delivery)."""
+    targets = re.search(
+        r"guard_targets\s*=\s*toset\(\[(.*?)\]\)",
+        GUARD_DELIVERY_TF.read_text(encoding="utf-8"),
+        re.S,
+    )
+    assert targets is not None, (
+        "guard_targets isn't toset([module.<name>.name, ...]); update this test"
+    )
+    modules = re.findall(r"module\.(\w+)\.name", targets.group(1))
+    names = dict(
+        re.findall(
+            r'module "(\w+)" \{\s*source\s*=\s*"[^"]*"\s*name\s*=\s*"([^"]+)"',
+            REPOSITORIES_TF.read_text(encoding="utf-8"),
+        )
+    )
+    assert modules, "guard_targets names no module; update this test"
+    unknown = [module for module in modules if module not in names]
+    assert not unknown, f"guard_targets names modules repositories.tf doesn't declare: {unknown}"
+    return {names[module] for module in modules}
+
+
+def test_guard_targets_are_read_as_repository_names() -> None:
+    assert "troupe" in guard_targets()
+
+
+def test_every_repository_receiving_the_guard_requires_its_check_by_its_name_here() -> None:
+    """govern-website design D3: a new guard target without the guard check fails here."""
     guard_jobs = {
         name
         for job_id, job in load_yaml(WORKFLOWS / "guard.yml")["jobs"].items()
         for name in job_names(job_id, job)
     }
-    assert guard_jobs <= required("troupe", "github-actions")
+    missing = {
+        repo: sorted(guard_jobs - required(repo, "github-actions")) for repo in guard_targets()
+    }
+    assert {repo: jobs for repo, jobs in missing.items() if jobs} == {}
 
 
 def test_every_required_check_names_an_app_opentofu_maps_to_an_id() -> None:

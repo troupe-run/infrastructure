@@ -3,8 +3,8 @@
 ## Purpose
 The rules every governed repository enforces on its own development, for every contributor, human or agent: which
 actions are refused, how a refusal reads, and how an owner-granted override is recorded. A governed repository is one
-that receives the guard: this repository and `troupe`. These rules govern how the org builds software; they are not
-features of any product.
+that receives the guard: this repository, `troupe` and `website`. These rules govern how the org builds software; they
+are not features of any product.
 
 ## Requirements
 
