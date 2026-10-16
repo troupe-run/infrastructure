@@ -9,7 +9,8 @@
       under Repository permissions for "Pages": `GET /repos/{owner}/{repo}/pages | read | UAT, IAT | ✗` and
       `PUT /repos/{owner}/{repo}/pages | write | UAT, IAT | ✓`; under "Administration" it lists only the PUT. The
       endpoint pages (https://docs.github.com/en/rest/pages/pages) give no fine-grained line. So reading the site needs
-      Pages read, which the App doesn't have: 1.3 is expected to be refused
+      Pages read, which the App doesn't have: 1.3 is expected to be refused. (1.3 shows it wasn't: the table
+      doesn't match what GitHub does for this App on a public repository)
 - [x] 1.2 Add the `pages` variable to `tofu/modules/repository/variables.tf` and the counted `github_repository_pages`
       resource to `tofu/modules/repository/main.tf`, with `build_type = "workflow"`, no `source`, and
       `prevent_destroy`, each commented with why (design D2, D3). Set `pages = { cname = "troupe.run" }` on
@@ -18,24 +19,43 @@
       `tofu/imports.tf` (design D4). Verify `tofu fmt -check` and `tofu validate` are clean
       Done 2026-10-16: `tofu fmt -check -recursive` clean; `uv run scripts/check.py`: all gates passed, `tofu validate`
       included
-- [ ] 1.3 Fast-forward onto `origin/main` and run a local plan. If the App's read of the site is refused, stop and ask
+- [x] 1.3 Fast-forward onto `origin/main` and run a local plan. If the App's read of the site is refused, stop and ask
       the owner to add Pages read and write to `troupe-run-infrastructure` and accept it on the org's installation
       (design D5), then plan again. Verify, and record here, which it was: the plan read the site with the existing
       permissions, or after the owner's change (with the date)
-- [ ] 1.4 Only if 1.3 needed the permission: add `"pages": "write"` to `troupe-run-infrastructure` in
+      Done 2026-10-16, on 92e2554 (0 commits behind `origin/main`): the plan read the site with the existing
+      permissions. The App's installation still has no Pages permission (`gh api orgs/troupe-run/installations`:
+      actions_variables, administration, contents, issues, members, organization_administration and workflows
+      write; metadata read). Whether a corrective apply can write without it isn't known: the PUT is also listed under
+      Administration write, which the App has. If one is ever refused, D5's step applies then
+- [x] 1.4 Only if 1.3 needed the permission: add `"pages": "write"` to `troupe-run-infrastructure` in
       `oob/app-installations.json`. Verify `uv run scripts/oob.py` reports no drift, and quote its output
+      Not needed, 2026-10-16: 1.3 read the site without the permission, so the App and its declaration are unchanged
 
 ## 2. Adopting the site changes nothing, and nothing can disable it
 
-- [ ] 2.1 Read the local plan from 1.3. Verify it says `1 to import, 0 to add, 0 to change, 0 to destroy`, that the
+- [x] 2.1 Read the local plan from 1.3. Verify it says `1 to import, 0 to add, 0 to change, 0 to destroy`, that the
       import is `module.repo_website.github_repository_pages.this[0]`, and that it shows `cname = "troupe.run"`,
       `https_enforced = true` and `build_type = "workflow"`. Record the summary line. If anything is planned to
       change, fix the configuration, never the site
-- [ ] 2.2 Temporarily remove `pages` from `repo_website` and run a local plan. Verify it fails on `prevent_destroy` for
+      Done 2026-10-16: `Plan: 1 to import, 0 to add, 0 to change, 0 to destroy.` The one import is
+      `module.repo_website.github_repository_pages.this[0]` (imported from "website", id 1408722166), with
+      `build_type = "workflow"`, `cname = "troupe.run"`, `https_enforced = true` and `public = true`, and no `source`
+- [x] 2.2 Temporarily remove `pages` from `repo_website` and run a local plan. Verify it fails on `prevent_destroy` for
       the Pages resource, and record the error. Revert the edit, and verify `git diff` shows it gone
-- [ ] 2.3 In the README's "Changing the org", add the Pages resource's address to the `removed`-block guidance, so
+      Done 2026-10-16, with one step added: as written, the plan stops first on "Configuration for import target does
+      not exist", because before the apply the site isn't in state, so there's nothing to refuse. So the site was
+      imported into the local state file only (`tofu.py import`, which reads GitHub and writes nothing there), and
+      the plan ran with `pages` and the import block both commented out: `Plan: 0 to add, 0 to change, 1 to
+      destroy.`, then `Error: Resource instance cannot be destroyed ... module.repo_website.github_repository_pages.
+      this[0] has prevent_destroy set`. `git checkout` restored `repositories.tf`, `imports.tf` and
+      `terraform.tfstate`; `git status` shows no tofu changes, and `cmp` with a copy taken first says the state is
+      identical
+- [x] 2.3 In the README's "Changing the org", add the Pages resource's address to the `removed`-block guidance, so
       stopping management forgets the site rather than disabling it (design D3). Verify the address matches the one in
       2.1's plan
+      Done 2026-10-16: README "Changing the org" gains "An apply can't disable the website", with a `removed` block
+      for `module.repo_website.github_repository_pages.this[0]`, the address 2.1 imports and 2.2 refuses to destroy
 
 ## 3. Drift in the Pages settings shows in a plan (probe)
 

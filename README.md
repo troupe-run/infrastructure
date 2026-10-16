@@ -146,6 +146,19 @@ removed {
 
 The plan then shows it as "forget", with nothing destroyed.
 
+**An apply can't disable the website.** Destroying a Pages site turns Pages off and takes https://troupe.run down, so
+the website's Pages site has `prevent_destroy` too, and removing its `pages` setting fails the plan. To stop managing
+the site but keep it serving, remove `pages` from `module "repo_website"` and add:
+
+```hcl
+removed {
+  from = module.repo_website.github_repository_pages.this[0]
+  lifecycle {
+    destroy = false
+  }
+}
+```
+
 **Adding a repository:** add it to the `troupe-run-infrastructure` App's installation first, and update the list in
 `oob/README.md`. Without the App, OpenTofu sees only the repository's public view. A new repository gets the "protect
 main" ruleset unless its `module` block sets `main_ruleset` to `app-only` or `none`.
