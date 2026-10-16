@@ -15,6 +15,7 @@
       updates, dependency graph, secret scanning and push protection to `true`, and leave
       `advanced_security_enabled_for_new_repositories` `false`. Rewrite the comment above them to give D4's reasons:
       Advanced Security, and the closing-down notice with its fallback. Verify `tofu validate` passes
+      Superseded by 3.5: design D4 was revised on 2026-10-16, after the dependency graph was found off
 - [x] 1.4 Update the README: the layout row for `tofu/modules/repository/` names the security features, and "Adding a
       repository" says a new repository gets them from the module. Verify `uv run scripts/check.py` passes, the docs
       tests included
@@ -57,63 +58,93 @@
       Done 2026-10-16: refused, `GH013: Repository rule violations found` / `GITHUB PUSH PROTECTION` / "Push cannot
       contain secrets", detected as "GitHub Personal Access Token" at `fake-token.txt:1`. The commit was dropped
       locally and never reached GitHub
-- [ ] 2.5 Add a manifest pinning a dependency version that has a published advisory, for example `requirements.txt`
-      with `requests==2.19.0`. Wait for Dependabot's security-update pull request. Record its branch name, commit
-      message, author and whether it has `Signed-off-by`. If none opens within an hour, record that and use
-      Dependabot's documented branch shape (`dependabot/<ecosystem>/<package>-<version>`) for 3.1
-- [ ] 2.6 Delete the probe repository, then the probe's state, `README.probe.md` and `terraform.tfvars`. Verify
-      `gh api repos/troupe-run/infra-probe-security` returns 404 and `git status --short --ignored tofu/probe` shows
-      nothing but caches
+- [ ] 2.5 The owner creates the "troupe-run baseline" configuration (design D4) and attaches it to the probe only,
+      with the commands given at the time (`gh api -X POST orgs/troupe-run/code-security/configurations ...`, then
+      `.../{id}/attach` with `scope: selected` and the probe's ID, 1421864669). Verify `gh api
+      orgs/troupe-run/code-security/configurations` lists it with exactly D4's settings, `gh api
+      repos/troupe-run/infra-probe-security/code-security-configuration` names it, and the probe's
+      `dependency-graph/sbom` returns 200
+      The vulnerable pin (`requirements.txt`, `requests==2.19.0`, 5e43181) was pushed at 08:37 UTC, before the
+      configuration: no alert and no pull request after an hour, and the SBOM returned 404 (design, Context)
+- [ ] 2.6 Wait for Dependabot's alert and its security-update pull request on the probe. Verify `gh api
+      repos/troupe-run/infra-probe-security/dependabot/alerts` lists the `requests` alert. Record the pull request's
+      branch name, commit message, author and whether it has `Signed-off-by`. If none opens within an hour of the
+      alert, record that and use Dependabot's documented branch shape (`dependabot/<ecosystem>/<package>-<version>`)
+      for 4.1
+- [ ] 2.7 Delete the probe repository, then the probe's scratch copy. Verify `gh api
+      repos/troupe-run/infra-probe-security` returns 404 and `git status --short --ignored tofu/probe` shows nothing
+      but caches
 
-## 3. A Dependabot pull request has a tested path (design D5)
+## 3. The configuration on the live repositories (design D4, D6, D7)
 
-- [ ] 3.1 Add a test to `scripts/tests/test_guard_push_and_ci.py` that runs `run_ci` for a branch named like 2.5's
+- [ ] 3.1 The owner attaches the configuration to troupe (1413896926), .github (1413955208), infrastructure
+      (1414209818) and website (1408722166), and sets it as the default for new public repositories (`PUT
+      .../{id}/defaults`, `default_for_new_repos: public`). Verify, for each of the four, that
+      `code-security-configuration` names it and `dependency-graph/sbom` returns 200, that `gh api
+      orgs/troupe-run/code-security/configurations/defaults` lists it for `public`, and that each repository's
+      `vulnerability-alerts`, `automated-security-fixes` and `security_and_analysis` read on. Record what `gh api
+      orgs/troupe-run` reads for the five `*_enabled_for_new_repositories` settings
+- [ ] 3.2 The owner creates a new public repository, `troupe-run/infra-probe-defaults`. Verify, with nothing applied to
+      it, that its SBOM returns 200 and that alerts, security updates, secret scanning and push protection read on,
+      and that `code-security-configuration` names the configuration. Record the result. Then the owner deletes it,
+      and `gh api repos/troupe-run/infra-probe-defaults` returns 404. If any feature is off, stop and report to the
+      owner before going on
+- [ ] 3.3 List the open secret-scanning alerts in all four repositories (design D6). Record each by type and location,
+      never content, and report them to the owner. Verify the list is complete: `gh api
+      repos/troupe-run/<repo>/secret-scanning/alerts --paginate` for each
+- [ ] 3.4 Write `oob/code-security.json` (design D7): the configuration by name with D4's settings, its default, and the
+      four repositories it's attached to. Add the checks to `scripts/oob.py`: the configuration (including any
+      undeclared one), the default, each managed repository's attachment, and each managed repository's dependency
+      graph, where 200 is on, 404 is reported as off, and any other status is an error naming the repository and the
+      status. Add tests to `scripts/tests/test_oob.py`, one per behaviour, each named for what it checks, including
+      that a non-404 error is never read as "off". Add the row to `oob/README.md`. Verify `uv run scripts/check.py`
+      passes, and that `uv run scripts/oob.py` reports none of these checks as different
+- [ ] 3.5 In `tofu/org.tf`, set the five `*_enabled_for_new_repositories` attributes to 3.1's recorded values, and
+      rewrite their comment: the configuration in `oob/code-security.json` decides new repositories' defaults, and
+      these closing-down parameters are only kept in step with what GitHub reads (D4). Verify `uv run
+      scripts/check.py` passes
+
+## 4. A Dependabot pull request has a tested path (design D5)
+
+- [ ] 4.1 Add a test to `scripts/tests/test_guard_push_and_ci.py` that runs `run_ci` for a branch named like 2.6's
       Dependabot branch, with a conventional commit, in `troupe-run/troupe` and in `troupe-run/infrastructure`
       (parametrised). It checks that the branch-change rule refuses it. Name it for what it checks. Verify it passes,
       and that it fails when `reserved_release_branch` is made to return `True` for that branch (revert afterwards)
       Test added 2026-10-16 with Dependabot's documented branch shape: 2 passed; with `reserved_release_branch`
-      returning `True` for `dependabot/` branches, both failed (reverted). Waiting on 2.5 for the observed branch
-- [x] 3.2 Add a "Dependabot pull requests" section to `docs/development-workflow.md`. In troupe and infrastructure,
+      returning `True` for `dependabot/` branches, both failed (reverted). Waiting on 2.6 for the observed branch
+- [x] 4.2 Add a "Dependabot pull requests" section to `docs/development-workflow.md`. In troupe and infrastructure,
       such a pull request is an alert with a fix: take the bump into an issue and an OpenSpec change, and close
       Dependabot's pull request with a link. On the website it merges once `test` passes. Add a Known gaps entry: a
       security fix waits for a person. Verify `uv run scripts/check.py` passes, the docs tests included
 
-## 4. Local plan
+## 5. Local plan
 
-- [x] 4.1 Fast-forward onto `origin/main` (`git log HEAD..origin/main` shows only state commits, or nothing), then
-      `uv run scripts/tofu.py plan`. Verify the plan has:
-      - 8 imports (two per repository), and each `vulnerability_alerts` import with no change;
-      - four in-place updates of `dependabot_security_updates` (`enabled` `false` to `true`);
-      - four in-place updates of `github_repository.this`, each changing only `secret_scanning` and
-        `secret_scanning_push_protection` in `security_and_analysis`;
-      - one in-place update of `github_organization_settings.org`, changing only the five attributes from 1.3;
-      - nothing else. Grep every `~`, `+` and `-` line.
-      Record the summary line
-      Done 2026-10-16 on 4268fb7's state (nothing ahead on `origin/main`): `Plan: 8 to import, 0 to add, 9 to
+- [ ] 5.1 Fast-forward onto `origin/main` (`git log HEAD..origin/main` shows only state commits, or nothing), then
+      `uv run scripts/tofu.py plan`, after group 3. Verify the plan has 8 imports (two per repository), each one
+      changing nothing, because the configuration has already turned the features on. Any remaining change must be
+      one this change declares: list each, and grep every `~`, `+` and `-` line. Record the summary line
+      First run, before the configuration (2026-10-16), on 4268fb7's state (nothing ahead on `origin/main`): `Plan: 8 to import, 0 to add, 9 to
       change, 0 to destroy.` Exactly the list above: the four alerts imports change nothing; each repository's
       `github_repository.this` changes only the two `status` values; the org changes only the five attributes.
       No `+` or `-` lines
-- [ ] 4.2 Run `uv run scripts/oob.py`. Verify it reports no differences, and record its output for the pull request
+- [ ] 5.2 Run `uv run scripts/oob.py`. Verify it reports none of the code-security checks as different, and record its
+      output for the pull request
       2026-10-16: 5 differences, none from this change: the infrastructure App holds `pages: write`, which isn't
       declared (likely website-pages, #51/#57); troupe specs `flake-hunt`, `python-support` and `quality-check` have
       no `cap:` label; `cap:releases`'s Purpose isn't recorded. Left open for the owner
 
-## 5. Evidence on GitHub
 
-- [ ] 5.1 Push the branch and open the pull request (`Closes #53`), with 4.1's plan summary, 4.2's output and the
-      probe's findings from group 2. Tell the owner the run link while `plan (pull request)` waits for approval.
-      Verify every required check passes, and that the posted plan matches 4.1's
+## 6. Evidence on GitHub
+
+- [ ] 6.1 Push the branch and open the pull request (`Closes #53`), with 5.1's plan summary, 5.2's output, the probe's
+      findings from group 2, and 3.2's and 3.3's results. Tell the owner the run link while `plan (pull request)`
+      waits for approval. Verify every required check passes, and that the posted plan matches 5.1's
 
 ## Workflow follow-up
 
 - Run `/opsx:archive` on the branch before merging. The owner merges by rebase and approves `main`'s `apply` job.
-- After the apply, check each repository: `vulnerability-alerts` returns 204, `automated-security-fixes` reads
-  `enabled: true`, `security_and_analysis` has secret scanning and push protection `enabled`, and the next daily plan
-  is clean. Check that the App's state commit after the apply landed (push protection didn't refuse it).
-- After the apply, list secret-scanning alerts in all four repositories (design D6). Report each one to the owner by
-  type and location, never by content.
-- After the apply, ask the owner to create a new public `infra-probe-*` repository. Read its `security_and_analysis`,
-  `vulnerability-alerts` and `automated-security-fixes`, then have it deleted (design D4). If any of the four
-  features is off, open a follow-up issue (on the roadmap board) for D4's fallback: a code security configuration
-  declared in `oob/`. Record the result on #53.
+- After the apply, check each repository: the SBOM returns 200, `vulnerability-alerts` returns 204,
+  `automated-security-fixes` reads `enabled: true`, `security_and_analysis` has secret scanning and push protection
+  `enabled`, and the next daily plan is clean. Check that the App's state commit after the apply landed (push
+  protection didn't refuse it), and that `uv run scripts/oob.py` reports none of the code-security checks.
 - Comment on #53 with the pull request and the archived change, check it's closed, and set its card to Done.

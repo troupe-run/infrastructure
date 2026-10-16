@@ -1,18 +1,23 @@
 ## ADDED Requirements
 
 ### Requirement: Repositories have their security features on
-Every managed repository SHALL have Dependabot alerts, Dependabot security updates, secret scanning and secret
-scanning push protection turned on, and each SHALL be declared, so that one turned off on GitHub appears in the plan.
-Turning them on SHALL change no other setting of the repository.
+Every managed repository SHALL have the dependency graph, Dependabot alerts, Dependabot security updates, secret
+scanning and secret scanning push protection turned on. Each SHALL be declared, so that one turned off on GitHub
+appears in the plan, or in the drift check for what OpenTofu can't manage. Turning them on SHALL change no other
+setting of the repository.
 
 #### Scenario: Every repository reads as protected
 - **WHEN** each managed repository's security settings are read from GitHub after an apply
-- **THEN** Dependabot alerts, Dependabot security updates, secret scanning and push protection are all on, and the
-  plan shows no difference
+- **THEN** the dependency graph, Dependabot alerts, Dependabot security updates, secret scanning and push protection
+  are all on, and neither the plan nor the drift check shows a difference
 
 #### Scenario: A feature turned off by hand shows as drift
-- **WHEN** an owner turns off any of the four features on a managed repository on GitHub
-- **THEN** the next plan shows it turning back on
+- **WHEN** an owner turns off any of the five features on a managed repository on GitHub
+- **THEN** the next plan shows it turning back on, or the drift check reports it and exits non-zero
+
+#### Scenario: Dependabot can see the dependencies
+- **WHEN** a managed repository's dependency graph is read from GitHub
+- **THEN** it lists the repository's packages, so Dependabot can raise an alert for a vulnerable one
 
 #### Scenario: Turning them on leaves the other settings alone
 - **WHEN** the features are turned on for a repository whose other settings already match the declaration
