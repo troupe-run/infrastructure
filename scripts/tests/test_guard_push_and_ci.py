@@ -553,3 +553,22 @@ def test_guard_ci_refuses_a_release_branch_in_another_repository(
             "--repository", "troupe-run/infrastructure"]  # fmt: skip
     assert guard_ci(repo, monkeypatch, *args) == 1
     assert "guard: commit-branch-change:" in capsys.readouterr().err
+
+
+# security-scanning: a Dependabot pull request in a governed repository is an alert that comes with
+# a fix, not something to merge. No exemption covers its branch, so its fix arrives through an
+# OpenSpec change (security-scanning design D5; owner, 2026-10-16).
+
+DEPENDABOT_BRANCH = "dependabot/uv/requests-2.32.4"
+DEPENDABOT_BOT = "dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>"
+
+
+@pytest.mark.parametrize("repository", [TROUPE, "troupe-run/infrastructure"])
+def test_a_dependabot_branch_in_a_governed_repository_fails_the_branch_rule(
+    make_repo: Callable[[], Repo], tmp_path: Path, repository: str
+) -> None:
+    repo, base = release_repo(make_repo, tmp_path)
+    repo.switch(DEPENDABOT_BRANCH)
+    commit_as(repo, DEPENDABOT_BOT, "chore(deps): bump requests from 2.19.0 to 2.32.4", "uv.lock")
+    [refusal] = guard.run_ci(repo.path, base, repo.head(), DEPENDABOT_BRANCH, repository=repository)
+    assert refusal.rule == "commit-branch-change"
