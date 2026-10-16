@@ -332,6 +332,11 @@ hooks is still caught.
 - **WHEN** a pull request's branch has no matching OpenSpec change
 - **THEN** the GitHub check fails and names the rule
 
+#### Scenario: A Dependabot pull request in a governed repository
+- **WHEN** a pull request in `troupe-run/troupe` or `troupe-run/infrastructure` comes from a branch named
+  `dependabot/<ecosystem>/<package>-<version>`, which has no matching OpenSpec change
+- **THEN** the GitHub check fails on the branch-change rule: no exemption covers a Dependabot branch
+
 ### Requirement: Pull request titles are Conventional Commits
 For a pull request, the GitHub check SHALL apply the commit-message rule to the pull request's title, and SHALL
 re-run when the title changes. A failing title is refused under `commit-message`, naming the title, with a fix that
