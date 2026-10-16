@@ -142,6 +142,26 @@ def test_a_changed_field_is_reported_with_both_values(oob_dir: Path) -> None:
     assert found == ["projects: 1 public is False on GitHub, declared True"]
 
 
+def test_a_project_unlinked_from_a_declared_repository_is_reported(oob_dir: Path) -> None:
+    """govern-website design D4: OpenTofu can't link a project, so the links are declared."""
+    linked = [{**PROJECTS[0], "repositories": ["troupe", "website"]}]
+    (oob_dir / "projects.json").write_text(json.dumps(linked))
+    unlinked = [{**PROJECTS[0], "repositories": ["troupe"]}]
+    found = RUN(fake_github(TYPES, unlinked, []), oob_dir)
+    assert found == [
+        "projects: 1 repositories is ['troupe'] on GitHub, declared ['troupe', 'website']"
+    ]
+
+
+def test_the_projects_query_reads_each_project_s_linked_repositories_sorted_by_name() -> None:
+    """Checks the query's text only: the fake above stands in for what gh returns."""
+    (projects,) = [c for c in oob.CHECKS if c.name == "projects"]
+    query = next(a for a in projects.gh_args if a.startswith("query="))
+    jq = projects.gh_args[projects.gh_args.index("--jq") + 1]
+    assert "repositories(first:100){nodes{name}}" in query
+    assert ".repositories = ([.repositories.nodes[].name] | sort)" in jq
+
+
 def test_two_factor_turned_on_by_hand_is_reported(oob_dir: Path) -> None:
     on = [{"name": "two_factor_requirement_enabled", "value": True}]
     found = RUN(fake_github(TYPES, PROJECTS, [], settings=on), oob_dir)

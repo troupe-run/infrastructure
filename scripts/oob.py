@@ -99,9 +99,13 @@ CHECKS = [
             "graphql",
             "-f",
             f'query={{organization(login:"{ORG}"){{projectsV2(first:100)'
-            "{nodes{number title public closed shortDescription}}}}",
+            "{nodes{number title public closed shortDescription"
+            " repositories(first:100){nodes{name}}}}}}",
             "--jq",
-            ".data.organization.projectsV2.nodes",
+            # The repositories each project is linked to, by name: OpenTofu can't link a project
+            # (govern-website design D4).
+            "[.data.organization.projectsV2.nodes[]"
+            " | .repositories = ([.repositories.nodes[].name] | sort)]",
         ],
     ),
 ]

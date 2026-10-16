@@ -47,13 +47,19 @@
 
 ## 3. The roadmap is linked and checked
 
-- [ ] 3.1 In `scripts/tests/test_oob.py`, add a test for the projects check: a declaration listing
+- [x] 3.1 In `scripts/tests/test_oob.py`, add a test for the projects check: a declaration listing
       `["troupe", "website"]` against a GitHub answer linked only to `troupe` reports the difference and exits
       non-zero. Verify it fails before 3.2
-- [ ] 3.2 Extend the `projects` check in `scripts/oob.py` to read each project's linked repositories in the same
+      Done 2026-10-16: two tests. The drift report itself already worked, since the comparison handles any
+      field, so that test passed before 3.2. The one that failed before 3.2 checks the query asks for and sorts the
+      linked repositories; its name and docstring say it checks the query's text only
+- [x] 3.2 Extend the `projects` check in `scripts/oob.py` to read each project's linked repositories in the same
       GraphQL query, sorted by name, and add `"repositories": ["troupe", "website"]` to `oob/projects.json` (design
       D4). Update `oob/README.md` to say the links are checked and how the owner makes one. Verify 3.1 passes and
       `uv run scripts/check.py` passes
+      Done 2026-10-16: 23 passed in `test_oob.py`; `check.py` all gates passed (805 tests). Against GitHub,
+      `oob.py` reports `projects: 1 repositories is ['troupe'] on GitHub, declared ['troupe', 'website']`, which
+      3.3 resolves. Its other four lines are troupe label drift that predates this change
 - [ ] 3.3 Owner: run `gh project link 1 --owner troupe-run --repo troupe-run/website`. Verify `uv run scripts/oob.py`
       reports no difference, and record its output here
 
