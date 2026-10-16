@@ -182,9 +182,12 @@
 
 ## 6. Evidence on GitHub
 
-- [ ] 6.1 Push the branch and open the pull request (`Closes #53`), with 5.1's plan summary, 5.2's output, the probe's
+- [x] 6.1 Push the branch and open the pull request (`Closes #53`), with 5.1's plan summary, 5.2's output, the probe's
       findings from group 2, and 3.2's and 3.3's results. Tell the owner the run link while `plan (pull request)`
       waits for approval. Verify every required check passes, and that the posted plan matches 5.1's
+      Done 2026-10-16, PR #65 at b6c4f7d: every check passed on the push and pull_request runs (`check`, all eleven
+      `guard tests` legs, `guard (workflow rules)`, DCO). After the owner approved it, `plan (pull request)` passed,
+      and its comment matches 5.1: `Plan: 8 to import, 0 to add, 0 to change, 0 to destroy.`, the same eight imports
 
 ## Workflow follow-up
 
