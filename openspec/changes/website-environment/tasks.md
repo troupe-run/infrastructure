@@ -38,12 +38,17 @@
       `can_admins_bypass` from `true` to `false` on the environment and nothing else. Record the summary here
       Done 2026-10-16, on 4268fb7's state: all gates passed. `Plan: 2 to import, 0 to add, 1 to change, 0 to destroy.`
       The one change is `can_admins_bypass = true -> false` on `github_repository_environment.github_pages`, imported
-      and updated in place
+      and updated in place. The same update also shows `+ prevent_self_review = false`: GitHub returns that field
+      only for an environment with reviewers, so the import leaves it empty in state, and the update writes GitHub's
+      own default. Nothing changes on GitHub for it, and `plan-main` (no reviewers, `false`) shows no drift daily
 
 ## 3. Evidence on GitHub
 
-- [ ] 3.1 Push the branch and open the pull request (`Closes #52`). Verify every check passes, and that after the
+- [x] 3.1 Push the branch and open the pull request (`Closes #52`). Verify every check passes, and that after the
       owner approves the plan run, its posted plan matches 2.1's
+      Done 2026-10-16, PR #56 at 9ef6168: `check`, DCO, `does it need a plan?`, both `guard (workflow rules)` runs
+      and all eleven `guard tests` legs passed. After the owner approved it, `plan (pull request)` passed, and its
+      comment matches 2.1 line for line: `Plan: 2 to import, 0 to add, 1 to change, 0 to destroy.`
 
 ## Workflow follow-up
 
