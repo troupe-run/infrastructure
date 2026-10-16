@@ -27,6 +27,13 @@
 # commit to that branch; unsetting them makes it delete the file and the branch.
 # drop-forgery-resistance (design D3) reruns it without the deletion rule, merging a pull request
 # from the branch to show that delete-on-merge removes it.
+#
+# The website-pages probe (design D6) sets probe_pages, which imports the probe's Pages site,
+# turned on beforehand with `gh api -X POST repos/troupe-run/<name>/pages -f build_type=workflow`,
+# into a github_repository_pages deployed from Actions. Switching the site to a branch with
+# `gh api -X PUT repos/troupe-run/<name>/pages -f build_type=legacy -f "source[branch]=main"` then
+# shows as drift. It has no domain, so the module's `pages`, which needs one, isn't used: what's
+# tested is the provider's drift detection.
 
 terraform {
   required_version = ">= 1.8"
@@ -104,6 +111,12 @@ variable "probe_required_checks" {
 
 variable "probe_environments" {
   description = "Add the plan and apply environments of ci-apply design D2 to the probe."
+  type        = bool
+  default     = false
+}
+
+variable "probe_pages" {
+  description = "Import and declare the probe's Pages site, deployed from Actions (website-pages design D6)."
   type        = bool
   default     = false
 }
@@ -331,4 +344,18 @@ resource "github_repository_file" "release" {
   content             = "written by the App\n"
   commit_message      = "chore: probe a commit by the App to a release branch"
   overwrite_on_create = false
+}
+
+# The website-pages probe (design D6): a Pages site deployed from Actions, with no domain.
+resource "github_repository_pages" "probe" {
+  count = var.probe_pages ? 1 : 0
+
+  repository = var.probe_repo
+  build_type = "workflow"
+}
+
+import {
+  for_each = var.probe_pages ? toset([var.probe_repo]) : toset([])
+  to       = github_repository_pages.probe[0]
+  id       = each.key
 }
