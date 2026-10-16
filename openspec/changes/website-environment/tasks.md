@@ -31,10 +31,13 @@
 
 ## 2. No admin can bypass it (D2 step 2, D3)
 
-- [ ] 2.1 Set `can_admins_bypass = false`, with a comment giving D3's reason (an admin, which agents share the
+- [x] 2.1 Set `can_admins_bypass = false`, with a comment giving D3's reason (an admin, which agents share the
       login of, could otherwise deploy past the branch rule), and commit it. Verify `uv run scripts/check.py` passes,
       and a local plan's summary is `Plan: 2 to import, 0 to add, 1 to change, 0 to destroy.`, where the one change is
       `can_admins_bypass` from `true` to `false` on the environment and nothing else. Record the summary here
+      Done 2026-10-16, on 4268fb7's state: all gates passed. `Plan: 2 to import, 0 to add, 1 to change, 0 to destroy.`
+      The one change is `can_admins_bypass = true -> false` on `github_repository_environment.github_pages`, imported
+      and updated in place
 
 ## 3. Evidence on GitHub
 
