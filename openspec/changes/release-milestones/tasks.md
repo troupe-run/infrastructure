@@ -34,7 +34,7 @@
       destroy.` The import of `troupe-run/troupe/1` worked, which also proves 1.2 (a)'s ID format. The one change is
       `title = "alpha-0" -> "0.1.0"` on `release["troupe/0.1.0"]`, in place, with `number = 1` and every other
       attribute unchanged
-- [ ] 2.4 Commit (`feat(tofu): declare the release milestones in every managed repository`)
+- [x] 2.4 Commit (`feat(tofu): declare the release milestones in every managed repository`)
 
 ## 3. check.py keeps the declaration honest (D4)
 
@@ -47,7 +47,7 @@
       duplicate title and on state `done`, each naming the milestone and the problem, then passes on the real file
       Done 2026-10-17: with a state of `done` in the real file the test failed with "0.2.0: state is 'done'; valid
       states are open, closed"; the duplicate-title and duplicate-key tests name the title or key. Restored, all pass
-- [ ] 3.3 Commit (`test: keep the milestone declaration in step with the managed repositories`). Verify
+- [x] 3.3 Commit (`test: keep the milestone declaration in step with the managed repositories`). Verify
       `uv run scripts/check.py` passes before the commit
 
 ## 4. oob.py reports a milestone made by hand (D5)
