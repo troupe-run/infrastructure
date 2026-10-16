@@ -80,8 +80,10 @@
 
 ## 5. Pull request
 
-- [ ] 5.1 Open the pull request with `Closes #68`, the D3 plan summary, and a note that the apply renames alpha-0.
+- [x] 5.1 Open the pull request with `Closes #68`, the D3 plan summary, and a note that the apply renames alpha-0.
       Verify CI is green on every job and its plan (once the owner approves that run) shows the summary from 2.3
+      Done 2026-10-17: #70. CI 17 passed, 2 skipped (plan and apply of main). The owner approved the plan run, and
+      its plan reads `Plan: 1 to import, 11 to add, 1 to change, 0 to destroy.`, the one change `alpha-0 -> 0.1.0`
 
 ## Workflow follow-up
 
