@@ -187,6 +187,115 @@ def stale_descriptions(fetch: Fetch, specs: list[str], oob_dir: Path, root: Path
     return found
 
 
+# The code security configuration that turns on each managed repository's dependency graph,
+# Dependabot and secret scanning, its default for new repositories, and where it's attached
+# (spec: repositories, org-settings; security-scanning design D4, D7). The provider can't manage
+# configurations. GitHub's own built-in configurations (target_type "global") aren't declared.
+CODE_SECURITY = "code-security.json"
+CONFIGURATION_FIELDS = [
+    "name",
+    "enforcement",
+    "advanced_security",
+    "dependency_graph",
+    "dependency_graph_autosubmit_action",
+    "dependabot_alerts",
+    "dependabot_security_updates",
+    "dependabot_delegated_alert_dismissal",
+    "code_scanning_default_setup",
+    "code_scanning_delegated_alert_dismissal",
+    "secret_scanning",
+    "secret_scanning_push_protection",
+    "secret_scanning_delegated_bypass",
+    "secret_scanning_validity_checks",
+    "secret_scanning_non_provider_patterns",
+    "secret_scanning_generic_secrets",
+    "secret_scanning_delegated_alert_dismissal",
+    "secret_scanning_extended_metadata",
+    "private_vulnerability_reporting",
+]
+CONFIGURATIONS_GH_ARGS = [
+    "api",
+    f"orgs/{ORG}/code-security/configurations",
+    "--jq",
+    f'[.[] | select(.target_type == "organization") | {{{", ".join(CONFIGURATION_FIELDS)}}}]',
+]
+DEFAULTS_GH_ARGS = [
+    "api",
+    f"orgs/{ORG}/code-security/configurations/defaults",
+    "--jq",
+    "[.[] | {name: .configuration.name, default_for_new_repos}]",
+]
+
+
+def attachment_gh_args(repository: str) -> list[str]:
+    """A repository's configuration. GitHub answers 204 with no body when none is attached."""
+    return [
+        "api",
+        f"repos/{ORG}/{repository}/code-security-configuration",
+        "--jq",
+        "{status, configuration: .configuration.name}",
+    ]
+
+
+def sbom_gh_args(repository: str) -> list[str]:
+    return [
+        "api",
+        f"repos/{ORG}/{repository}/dependency-graph/sbom",
+        "--jq",
+        ".sbom.packages | length",
+    ]
+
+
+class NotFoundError(Exception):
+    """GitHub answered 404."""
+
+
+class UnreadableError(Exception):
+    """Something couldn't be read, so its state is unknown: an error, never "off" or "on"."""
+
+
+def dependency_graph(fetch: Fetch, repository: str) -> str:
+    """ "on" when the repository's dependency graph can be read, "off" when GitHub says it doesn't
+    exist (404). Any other failure is an error naming the repository: never read as either."""
+    try:
+        fetch(sbom_gh_args(repository))
+    except NotFoundError:
+        return "off"
+    except Exception as error:
+        raise UnreadableError(
+            f"code security repositories: couldn't read {repository!r}'s dependency graph ({error})"
+        ) from error
+    return "on"
+
+
+def code_security(fetch: Fetch, oob_dir: Path) -> list[str]:
+    """The configurations, the defaults, and each declared repository's attachment and graph."""
+    declared = json.loads((oob_dir / CODE_SECURITY).read_text())
+    found = differences(
+        "code security configurations", "name", declared["configurations"],
+        fetch(CONFIGURATIONS_GH_ARGS),
+    )  # fmt: skip
+    found += differences(
+        "code security defaults", "name", declared["defaults"], fetch(DEFAULTS_GH_ARGS)
+    )
+    actual: list[Record] = []
+    for repo in declared["repositories"]:
+        name = repo["repository"]
+        attached = fetch(attachment_gh_args(name)) or {}
+        actual.append(
+            {
+                "repository": name,
+                "configuration": attached.get("configuration"),
+                "status": attached.get("status", "none"),
+                "dependency_graph": dependency_graph(fetch, name),
+            }
+        )
+    found += differences(
+        "code security repositories", "repository", declared["repositories"], actual
+    )
+    return found
+
+
 def differences(name: str, key: str, declared: list[Record], actual: list[Record]) -> list[str]:
     """Every item missing, extra or changed, in a stable order."""
     want = {item[key]: item for item in declared}
@@ -207,8 +316,16 @@ def differences(name: str, key: str, declared: list[Record], actual: list[Record
 
 
 def gh(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
-    result = subprocess.run(["gh", *args], capture_output=True, text=True, check=True)
-    return json.loads(result.stdout)
+    """The JSON gh prints; None when GitHub sent no body (204). A 404 is NotFoundError, so a
+    caller can tell "doesn't exist" from any other failure."""
+    result = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        if "(HTTP 404)" in result.stderr:
+            raise NotFoundError(" ".join(args[:2]))
+        raise subprocess.CalledProcessError(
+            result.returncode, ["gh", *args], result.stdout, result.stderr
+        )
+    return json.loads(result.stdout) if result.stdout.strip() else None
 
 
 def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT) -> list[str]:
@@ -222,11 +339,16 @@ def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT) -> list[str]:
     specs = fetch(SPECS_GH_ARGS)
     found += unlabelled_specs(specs, root)
     found += stale_descriptions(fetch, specs, oob_dir, root)
+    found += code_security(fetch, oob_dir)
     return found
 
 
 def main() -> int:
-    found = run(gh, OOB, ROOT)
+    try:
+        found = run(gh, OOB, ROOT)
+    except UnreadableError as error:
+        print(f"oob: {error}. Nothing is known about it until it can be read; run again.")
+        return 1
     for line in found:
         print(line)
     if found:
@@ -234,7 +356,7 @@ def main() -> int:
         return 1
     print(
         f"oob: no differences ({', '.join(c.name for c in CHECKS)}, "
-        "troupe specs, troupe label descriptions)"
+        "troupe specs, troupe label descriptions, code security)"
     )
     return 0
 

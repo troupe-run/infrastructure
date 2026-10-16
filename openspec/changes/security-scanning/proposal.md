@@ -31,7 +31,7 @@ attribute, `security_and_analysis` field or org setting turns the graph on for a
   closing down. They're set to whatever GitHub reads once the configuration is the default, with a comment pointing
   to `oob/`. Advanced Security stays `false`.
 - A Dependabot pull request in a governed repository (`troupe`, `infrastructure`) is treated as an alert that comes
-  with a fix (owner, 2026-10-16). It can't merge as it is, because the guard's branch rule and DCO refuse it. Its fix
+  with a fix (owner, 2026-10-16). It can't merge as it is, because the guard's branch rule refuses it. Its fix
   goes through an issue and an OpenSpec change like any other change, and the Dependabot pull request is closed with
   a link to that change. `docs/development-workflow.md` says so. The guard doesn't change. A test pins the refusal,
   so an exemption can't arrive by accident.

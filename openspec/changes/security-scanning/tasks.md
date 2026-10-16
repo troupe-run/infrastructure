@@ -73,11 +73,17 @@
       `enforcement: unenforced`. Attached to the probe (`scope: selected`, 1421864669):
       `code-security-configuration` reads `attached`, "troupe-run baseline"; the SBOM returns 200 and lists
       `requests`; `security_and_analysis` still reads on
-- [ ] 2.6 Wait for Dependabot's alert and its security-update pull request on the probe. Verify `gh api
+- [x] 2.6 Wait for Dependabot's alert and its security-update pull request on the probe. Verify `gh api
       repos/troupe-run/infra-probe-security/dependabot/alerts` lists the `requests` alert. Record the pull request's
       branch name, commit message, author and whether it has `Signed-off-by`. If none opens within an hour of the
       alert, record that and use Dependabot's documented branch shape (`dependabot/<ecosystem>/<package>-<version>`)
       for 4.1
+      Done 2026-10-16. 5 alerts on `requests` (1 high, 4 medium) after the configuration was attached. Pull request
+      #1 by `app/dependabot`, found at 11:20 UTC: branch `dependabot/pip/requests-2.33.0`, commit 23dea8c
+      `build(deps): Bump requests from 2.19.0 to 2.33.0` (a Conventional Commit, following the repository's
+      `build:` history), author `49699333+dependabot[bot]@users.noreply.github.com`, and signed off as
+      `dependabot[bot] <support@github.com>`. It does have a sign-off, so the design's "no sign-off, DCO fails" was
+      corrected in the docs, design and proposal: the branch rule is what stops it
 - [ ] 2.7 Delete the probe repository, then the probe's scratch copy. Verify `gh api
       repos/troupe-run/infra-probe-security` returns 404 and `git status --short --ignored tofu/probe` shows nothing
       but caches
@@ -113,12 +119,15 @@
 
 ## 4. A Dependabot pull request has a tested path (design D5)
 
-- [ ] 4.1 Add a test to `scripts/tests/test_guard_push_and_ci.py` that runs `run_ci` for a branch named like 2.6's
+- [x] 4.1 Add a test to `scripts/tests/test_guard_push_and_ci.py` that runs `run_ci` for a branch named like 2.6's
       Dependabot branch, with a conventional commit, in `troupe-run/troupe` and in `troupe-run/infrastructure`
       (parametrised). It checks that the branch-change rule refuses it. Name it for what it checks. Verify it passes,
       and that it fails when `reserved_release_branch` is made to return `True` for that branch (revert afterwards)
       Test added 2026-10-16 with Dependabot's documented branch shape: 2 passed; with `reserved_release_branch`
       returning `True` for `dependabot/` branches, both failed (reverted). Waiting on 2.6 for the observed branch
+      Done 2026-10-16 with 2.6's observed branch, author, message and sign-off: 2 passed, each refused by the branch
+      rule only (the guard accepts the message); with `dependabot/` exempted in `reserved_release_branch`, both
+      failed (reverted, `git diff` clean)
 - [x] 4.2 Add a "Dependabot pull requests" section to `docs/development-workflow.md`. In troupe and infrastructure,
       such a pull request is an alert with a fix: take the bump into an issue and an OpenSpec change, and close
       Dependabot's pull request with a link. On the website it merges once `test` passes. Add a Known gaps entry: a
