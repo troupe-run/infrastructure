@@ -59,9 +59,11 @@
 
 ## 3. Drift in the Pages settings shows in a plan (probe)
 
-- [ ] 3.1 Add a `probe_pages` option to `tofu/probe/main.tf` that declares a `github_repository_pages` with
+- [x] 3.1 Add a `probe_pages` option to `tofu/probe/main.tf` that declares a `github_repository_pages` with
       `build_type = "workflow"` on the probe repository, and describe it in the file's header with the other probes
       (design D6). Verify `tofu validate` is clean in `tofu/probe`
+      Done 2026-10-16: `probe_pages` declares `github_repository_pages.probe` (workflow, no domain) and imports it.
+      `tofu fmt -check` clean and `tofu validate` passed in `tofu/probe`
 - [ ] 3.2 Run the probe: create a throwaway public repository, ask the owner to add it to the App's installation,
       turn on Pages deployed from Actions with `gh api`, import and plan with `probe_pages = true` and verify no change.
       Then switch its source to a branch with `gh api`, plan again, and verify the plan shows `build_type` changing
