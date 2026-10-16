@@ -117,7 +117,7 @@
 
 ## 5. Activation reports a hook git skips
 
-- [ ] 5.1 Extend `activate_hooks` in `scripts/guard.py` (design D6). Keep its `str | None` signature. Name each
+- [x] 5.1 Extend `activate_hooks` in `scripts/guard.py` (design D6). Keep its `str | None` signature. Name each
       `.githooks/` file that isn't executable, with the wording for a delivered or a source file, and skip it where
       `os.name == "nt"`. Verify with tests in `test_guard_session.py` and `test_check_activation.py`:
       - a non-executable hook is reported at session start and by the check;
@@ -128,6 +128,10 @@
       - Windows reports nothing (simulated with a patched `os.name`).
 
       All of these pass on the three-OS CI matrix
+      Done 2026-10-17: the tests are in both files, and the check's case asserts that its exit code is the gates'
+      alone (0 and 1). On PR #71, CI run 38981432771 passed `check` and all 12 `guard tests` jobs (macOS, Windows and
+      Ubuntu; Python 3.12 to 3.15). On Windows, the non-executable cases are skipped, since there is no executable
+      bit, and the `os.name == "nt"` case runs
 
 ## Workflow follow-up
 
