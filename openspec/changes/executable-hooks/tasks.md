@@ -2,7 +2,7 @@
 
 ## 1. What GitHub does with a mode commit
 
-- [ ] 1.1 On a throwaway repository in troupe-run, set up a `main` ruleset that the App bypasses, as on `website`.
+- [x] 1.1 On a throwaway repository in troupe-run, set up a `main` ruleset that the App bypasses, as on `website`.
       The App's installation is for selected repositories, so ask the owner to add the throwaway to it. Then:
       - create a `100644` file through the Contents API, as `github_repository_file` does;
       - as the App, make a Git Data API commit that sets it to `100755` (tree on the head's tree with the same blob,
@@ -12,9 +12,29 @@
       Verify and record here: the ref update is accepted, the commit's author is the App's bot, the mode is still
       `100755` after the content update, and a ref update on a stale head gets a 422 (design D4, Risks). Then delete
       the throwaway, and ask the owner to remove it from the installation
-- [ ] 1.2 In the same throwaway, point a scratch `github_repository_file` at the file (a local, throwaway state,
+      Done 2026-10-17 on `troupe-run/throwaway-hook-modes`. The owner created it, added it to the App's installation,
+      and added a "protect main" ruleset with the App bypassing `always`. GitHub refuses that bypass until the App is
+      installed on the repository (422 "Actor ... must be part of the ruleset source or owner organization"). A
+      probe ran as the App (a token minted for that repository only, with contents write) and used the real
+      `hook_modes.apply_modes`:
+      1. the Contents API created `.githooks/pre-push` as `100644`;
+      2. `apply_modes` exited 0, and the file became `100755` (commit ae87bf8);
+      3. the commit's author is `340938853+troupe-run-infrastructure[bot]@users.noreply.github.com` (the guard's
+         `DELIVERY_AUTHOR_EMAIL`), login `troupe-run-infrastructure[bot]`, `verified: true`, message
+         `chore(guard): set the mode of .githooks/pre-push from troupe-run/infrastructure`;
+      4. a Contents API content update returned 200, and the mode stayed `100755`;
+      5. a non-forced ref update from a stale head got 422 "Update is not a fast forward".
+
+      Deleting the repository is left to the owner, since the guard reserves it (`owner-only`); deleting it also
+      removes it from the installation
+- [x] 1.2 In the same throwaway, point a scratch `github_repository_file` at the file (a local, throwaway state,
       never this repository's). Verify a plan after the mode commit shows no change, and record whether `commit_sha`
       moved (design, Risks)
+      Done 2026-10-17, with a scratch configuration and plain local state outside this repository. Importing the file
+      (ID `throwaway-hook-modes:.githooks/pre-push:main`) planned `no-op` with importing, and was applied to the
+      scratch state only. `commit_sha` was 50cce88. Two mode commits followed through `apply_modes`, to `100644`
+      (cdeb287) and back to `100755` (1623c9e). The next plan exited 0 ("No changes"), and after a refresh-only apply
+      `commit_sha` was still 50cce88: the provider doesn't see a mode commit
 
 ## 2. The mode check reads the plan
 
@@ -108,14 +128,14 @@
       - Windows reports nothing (simulated with a patched `os.name`).
 
       All of these pass on the three-OS CI matrix
-- [ ] 5.2 After the change's first apply on `main`, check `git ls-tree origin/main .githooks/` in `website` shows
-      `100755` for all three, the App's commit is on `main` with green guard CI, and the next plan shows no change
-      in OpenTofu or in modes. Record the commit and the run here (spec: "The approved apply sets the mode")
-
 ## Workflow follow-up
 
 - Open the pull request with `Closes #69`, and post the plan as evidence once the owner approves its run.
 - Run `/opsx:archive` on the branch before merging. The owner merges by rebase.
-- After the merge and 5.2, comment on #69 with the PR and the archived change, check that it's closed, and set its
+- After the change's first apply on `main` (moved here from task 5.2, because the change is archived before it
+  merges): check that `git ls-tree origin/main .githooks/` in `website` shows `100755` for all three hooks. Check
+  that the App's commit is on `main` with a green `guard` run, and that the next plan shows no change in OpenTofu or
+  in modes. Record the commit and the run on #69 (spec: "The approved apply sets the mode").
+- After the merge and that check, comment on #69 with the PR and the archived change, check that it's closed, and set its
   card to Done.
 - In a `website` clone, check that `git push` no longer prints the "hook was ignored" hint.
