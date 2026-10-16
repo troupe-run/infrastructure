@@ -54,13 +54,16 @@
       Done 2026-10-17: each case is a test in `test_hook_modes.py`, plus a listed file missing at apply time
       refusing before any write, and exit codes 1 (refusal) and 2 (no token). Every check runs before any write, in
       every repository
-- [ ] 3.2 Document the command and its recovery in the script's docstring and in the README's apply section, and say
+- [x] 3.2 Document the command and its recovery in the script's docstring and in the README's apply section, and say
       in the break-glass section that a local apply doesn't set modes and the next CI plan does. Verify the guard's
       docs test (`test_guard_docs.py`) passes
+      Done 2026-10-17: the docstring gives usage, design references and recovery. The README's "Changing the org"
+      steps 2 and 3, "Break-glass", and "Delivering the guard" say how modes are planned and set, and that a local
+      apply leaves them to the next CI plan. `test_guard_docs.py`: 2 passed
 
 ## 4. CI plans and applies modes
 
-- [ ] 4.1 In `.github/workflows/tofu.yml`, after the main plan:
+- [x] 4.1 In `.github/workflows/tofu.yml`, after the main plan:
       - run `hook_modes.py plan` with `GITHUB_TOKEN`;
       - set `changes` to true when OpenTofu has changes or the list isn't empty;
       - add the list to the run summary under the plan;
@@ -69,13 +72,28 @@
 
       Do the same in the pull-request plan, posting the list in its comment. Verify `actionlint` (or the repo's
       workflow test, if one exists) and `uv run scripts/check.py` pass
-- [ ] 4.2 In the apply job, add a step that runs only when `tofu apply` succeeded and the list isn't empty. It mints a
+      Done 2026-10-17: `actionlint` 1.7.12 (`uvx --from actionlint-py`) reports nothing, exit 0; `uv run
+      scripts/check.py` passes, `test_required_checks.py`'s workflow checks included. Whether `GITHUB_TOKEN` can read
+      the other repositories' trees is first shown by this pull request's own plan run
+- [x] 4.2 In the apply job, add a step that runs only when `tofu apply` succeeded and the list isn't empty. It mints a
       token scoped to the plan's repositories with contents write, then runs `hook_modes.py apply`. Comment it with
       the design reference. Verify by reading the job's `if:` conditions against the ci-apply spec's scenarios, and
       quote them here
-- [ ] 4.3 Update `docs/development-workflow.md` and the guard-delivery section of the README to say that a delivered
+      Done 2026-10-17. The conditions:
+      - job: `if: needs.plan.outputs.changes == 'true'`, where `changes` is
+        `steps.plan.outputs.changes == 'true' || steps.modes.outputs.changes == 'true'`. A plan with neither still
+        ends without asking for approval, and a mode-only plan waits in the `apply` environment, which only the owner
+        approves.
+      - both mode steps: `if: steps.apply.outcome == 'success' && needs.plan.outputs.mode_repositories != ''`. They
+        run only after a successful apply. They're placed before the state steps, which keep
+        `always() && steps.apply.outcome != 'skipped'`, so the state is still committed after a failed apply or a
+        failed mode step.
+      - the token has `repositories: ${{ needs.plan.outputs.mode_repositories }}` and `permission-contents: write`.
+- [x] 4.3 Update `docs/development-workflow.md` and the guard-delivery section of the README to say that a delivered
       file keeps its source's mode, how the plan shows a difference, and that the App sets it after the apply. Verify
       `uv run scripts/check.py` passes
+      Done 2026-10-17: `docs/development-workflow.md`'s guard-delivery section and the README's "Delivering the
+      guard"; check passes (at the commit)
 
 ## 5. Activation reports a hook git skips
 
