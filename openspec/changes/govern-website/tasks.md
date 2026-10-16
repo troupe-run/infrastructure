@@ -1,0 +1,76 @@
+# Tasks
+
+## 1. Before anything is planned
+
+- [ ] 1.1 Ask the owner whether the website's existing history is rewritten (design D7). Record the answer and its
+      date here, and on #54. If it's yes, the owner's break-glass rewrite is done and verified (`git log --format=%s`
+      on the website's `main` shows only Conventional Commits, its "Last updated" dates are unchanged on a docs
+      page, and a plan shows no ruleset drift once `protect main` is restored) before 1.2 starts
+- [ ] 1.2 Open the website's bootstrap issue in `troupe-run/website` with `--project "troupe roadmap"`, describing
+      design D1's contents and linking #54. Verify it's on the board with
+      `gh issue view <n> -R troupe-run/website --json projectItems`
+- [ ] 1.3 Check that the website's bootstrap pull request (D1) is merged. Its `main` holds `openspec/`,
+      `scripts/check.py`, `scripts/check-paths.toml` (skipping at least `openspec/**`), CONTRIBUTING.md and
+      CLAUDE.md, and none of the delivered paths. The CI job is still named `test` and runs `uv run scripts/check.py`.
+      Verify with `gh api repos/troupe-run/website/contents/<path>` for each, a 404 for each delivered path, and the
+      full check's macOS time recorded in that pull request, under the guard's 10-minute limit
+- [ ] 1.4 Owner: confirm that the infrastructure App's installation lists `website` in the App's settings
+      (teams-and-access), and record that here
+
+## 2. The website receives the guard
+
+- [ ] 2.1 In `scripts/tests/test_required_checks.py`, add a test that reads `guard_targets` from
+      `tofu/guard_delivery.tf` and checks that each repository it names requires `guard (workflow rules)` from
+      `github-actions` in `tofu/required-checks.json` (design D3). Verify it passes on `main`'s data (troupe only).
+      Then add `module.repo_website.name` to `guard_targets` on its own and verify the test fails, naming `website`
+- [ ] 2.2 Add `{"context": "guard (workflow rules)", "app": "github-actions"}` to the `website` entry of
+      `tofu/required-checks.json`, and leave DCO out (design D3). Update the module's comment if it names the
+      checks. Verify the 2.1 test passes
+- [ ] 2.3 In `tofu/guard_delivery.tf`, make `guard_targets` name both repositories, and make `depends_on` list
+      `module.repo_troupe` and `module.repo_website` (design D2). Update the comments that assume troupe alone. In
+      `tofu/repositories.tf`, give `repo_website` `app_bypass_id = local.infrastructure_app_id` and
+      `has_projects = true`, each with a comment giving the reason, as `repo_troupe`'s do. Verify `tofu fmt -check` and
+      `tofu validate` are clean
+- [ ] 2.4 Edit the `development-workflow` spec's Purpose in `openspec/specs/development-workflow/spec.md` so it names
+      this repository, `troupe` and `website` (design D5). Verify `openspec validate --specs --strict` passes
+- [ ] 2.5 Update README.md "Delivering the guard" and "To stop delivering" so they speak of each repository that
+      receives the guard, and so the stop steps name that repository's `app_bypass_id` (design D5). Verify
+      `uv run pytest scripts/tests/test_guard_docs.py` passes, and
+      `grep -n "troupe" README.md` shows no remaining line that means "every governed repository"
+
+## 3. The roadmap is linked and checked
+
+- [ ] 3.1 In `scripts/tests/test_oob.py`, add a test for the projects check: a declaration listing
+      `["troupe", "website"]` against a GitHub answer linked only to `troupe` reports the difference and exits
+      non-zero. Verify it fails before 3.2
+- [ ] 3.2 Extend the `projects` check in `scripts/oob.py` to read each project's linked repositories in the same
+      GraphQL query, sorted by name, and add `"repositories": ["troupe", "website"]` to `oob/projects.json` (design
+      D4). Update `oob/README.md` to say the links are checked and how the owner makes one. Verify 3.1 passes and
+      `uv run scripts/check.py` passes
+- [ ] 3.3 Owner: run `gh project link 1 --owner troupe-run --repo troupe-run/website`. Verify `uv run scripts/oob.py`
+      reports no difference, and record its output here
+
+## 4. Plan and evidence
+
+- [ ] 4.1 Fast-forward onto `origin/main` once its latest state commit has landed, then run a local plan. Verify
+      it shows exactly design D2's changes: the website's ruleset updated in place (bypass actor and one required
+      check), `repo_website`'s `has_projects` turned on, and eight `github_repository_file.guard["website:…"]`
+      creations, with nothing for troupe, infrastructure or `.github`. Record the summary line
+- [ ] 4.2 Push the branch and open the pull request (`Closes #54`). Verify `check`, every `guard tests` leg,
+      `guard (workflow rules)` and DCO pass. Verify that the posted plan, once the owner has approved its run,
+      matches 4.1, and attach `scripts/oob.py`'s output
+- [ ] 4.3 Before the owner approves the plan, list open pull requests in `troupe-run/website`. Verify that none is
+      open, or note each one that will need its `guard` check to run again after the apply (design, Risks)
+
+## Workflow follow-up
+
+- Run `/opsx:archive` on the branch before merging. The owner merges by rebase and approves `main`'s `apply` job.
+- After the apply, verify:
+  - the website's `main` has eight `chore(guard): deliver …` commits by the App, each with green `guard` and CI runs;
+  - `gh api repos/troupe-run/website/rulesets/<id>` lists the App as a bypass actor, and `test` and
+    `guard (workflow rules)` as required checks;
+  - a fresh plan shows no changes;
+  - the website's next pull request reports `guard (workflow rules)` as required, and merges with no sign-off.
+- Comment on #54 with the pull request and the archived change, check that it's closed, and set its card to Done.
+  Do the same for the website's bootstrap issue, if its own pull request didn't close it.
+- Remove this change's worktree and branch once it's merged and verified.
