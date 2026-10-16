@@ -18,7 +18,7 @@
 
 ## 2. The mode check reads the plan
 
-- [ ] 2.1 Add `scripts/hook_modes.py` with a `plan` command (design D1, D2). It reads `tofu show -json` of a saved
+- [x] 2.1 Add `scripts/hook_modes.py` with a `plan` command (design D1, D2). It reads `tofu show -json` of a saved
       plan for the `github_repository_file.guard` instances, gets each source's mode from `git ls-files -s`, reads
       each target's tree once with an injectable fetch, and writes `mode-plan.json` plus a Markdown summary. A
       truncated tree or an unknown mode is an error naming the repository. Standard library only, `mypy --strict`
@@ -29,12 +29,19 @@
       - a `100644` source is never listed;
       - the blob is git's hash of the content (checked against `git hash-object`);
       - a truncated tree refuses.
-- [ ] 2.2 Tag the new tests and script in `scripts/check-paths.toml` as its rules require. Verify
+
+      Done 2026-10-17: `test_hook_modes.py` covers each case, plus a regular source never listed, an executable
+      target with a regular source listed back to `100644`, a symlink mode refusing, one tree read per target, a
+      delivery with unknown content refusing, and this repository's hooks being `100755`. 24 passed; ruff and
+      `mypy --strict` clean. The plan JSON's shape is checked against a real saved plan in 5.2's first live plan
+- [x] 2.2 Tag the new tests and script in `scripts/check-paths.toml` as its rules require. Verify
       `uv run scripts/check.py` passes, with the `guard_pytest` tag check included
+      Done 2026-10-17: nothing to tag. `check-paths.toml` lists only `openspec/**` as skipped, so the new script and
+      tests need the full check, which is the default. `uv run scripts/check.py`: 845 passed, all gates passed
 
 ## 3. The fix sets modes as the App
 
-- [ ] 3.1 Add an `apply` command to `scripts/hook_modes.py` (design D4). It reads `mode-plan.json` and, per repository,
+- [x] 3.1 Add an `apply` command to `scripts/hook_modes.py` (design D4). It reads `mode-plan.json` and, per repository,
       reads `main`'s head, refuses a listed file whose blob differs, creates the tree and commit with the message
       `chore(guard): set the mode of <paths> from troupe-run/infrastructure`, and updates the ref without force. It
       makes no request for an empty plan. Verify with offline tests using an injected HTTP layer:
@@ -43,6 +50,10 @@
       - a 422 on the ref update fails the run;
       - an empty plan makes no request;
       - the message is a Conventional Commit that the guard's own commit-message check accepts.
+
+      Done 2026-10-17: each case is a test in `test_hook_modes.py`, plus a listed file missing at apply time
+      refusing before any write, and exit codes 1 (refusal) and 2 (no token). Every check runs before any write, in
+      every repository
 - [ ] 3.2 Document the command and its recovery in the script's docstring and in the README's apply section, and say
       in the break-glass section that a local apply doesn't set modes and the next CI plan does. Verify the guard's
       docs test (`test_guard_docs.py`) passes
