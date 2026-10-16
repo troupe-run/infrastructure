@@ -4,6 +4,10 @@
     "number": 1,
     "public": true,
     "shortDescription": null,
-    "title": "troupe roadmap"
+    "title": "troupe roadmap",
+    "repositories": [
+      "troupe",
+      "website"
+    ]
   }
 ]
