@@ -31,8 +31,12 @@ See proposal.md for why. What was found on 2026-10-16, before anything was writt
   and the org's settings.
 - **The guard and Dependabot.** `run_ci` in `scripts/guard.py` applies the branch rule to every branch other than
   `main`, except a `release-please--` branch in `RELEASE_REPOSITORIES`. A Dependabot branch (`dependabot/...`) has no
-  OpenSpec change, so `guard (workflow rules)`, which troupe and infrastructure both require, fails. Dependabot's
-  commits carry no `Signed-off-by`, so `DCO` fails too. `delivered_changes_by_others` would also refuse a Dependabot
+  OpenSpec change, so `guard (workflow rules)`, which troupe and infrastructure both require, fails. The probe
+  (D3) showed that Dependabot's commit is otherwise in shape: a Conventional Commit following the repository's
+  history (`build(deps): Bump requests from 2.19.0 to 2.33.0`), signed off as `dependabot[bot] <support@github.com>`,
+  which isn't the author's email (`49699333+dependabot[bot]@users.noreply.github.com`). Whether DCO accepts that is
+  untested: the probe has no DCO check, and the branch rule refuses the pull request either way.
+  `delivered_changes_by_others` would also refuse a Dependabot
   change to a delivered file in troupe (for example, an action version in `guard.yml`). The website requires only
   `test`, and has no guard or DCO.
 - **The dependency graph is off** (found during the probe, 2026-10-16). `GET

@@ -166,7 +166,9 @@ removed {
 **Adding a repository:** add it to the `troupe-run-infrastructure` App's installation first, and update the list in
 `oob/README.md`. Without the App, OpenTofu sees only the repository's public view. A new repository gets the "protect
 main" ruleset unless its `module` block sets `main_ruleset` to `app-only` or `none`. It gets Dependabot alerts and
-security updates, secret scanning and push protection from the module too.
+security updates, secret scanning and push protection from the module too. Its dependency graph, which Dependabot
+needs, is turned on by the org's code security configuration: add the repository to `oob/code-security.json` and
+have the owner attach the configuration to it (`oob/README.md`).
 
 ## How main is protected
 

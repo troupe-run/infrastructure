@@ -2,6 +2,7 @@
 
 import base64
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,22 @@ CLI_SPEC = (
     "## Requirements\n"
 )
 PURPOSES = {"cap:cli": "The command line, a thin client over the core."}
+BASELINE = {"name": "baseline", "enforcement": "unenforced", "dependency_graph": "enabled"}
+DEFAULTS = [{"name": "baseline", "default_for_new_repos": "public"}]
+ATTACHED = {"status": "attached", "configuration": "baseline"}
+CODE_SECURITY = {
+    "configurations": [BASELINE],
+    "defaults": DEFAULTS,
+    "repositories": [
+        {
+            "repository": r,
+            "configuration": "baseline",
+            "status": "attached",
+            "dependency_graph": "on",
+        }
+        for r in ("troupe", "website")
+    ],
+}
 
 
 @pytest.fixture
@@ -45,6 +62,7 @@ def oob_dir(tmp_path: Path) -> Path:
     labels.parent.mkdir(parents=True)
     labels.write_text(json.dumps(CAP_LABELS))
     (tmp_path / "troupe-spec-purposes.json").write_text(json.dumps(PURPOSES))
+    (tmp_path / "code-security.json").write_text(json.dumps(CODE_SECURITY))
     return tmp_path
 
 
@@ -57,11 +75,31 @@ def fake_github(
     apps: list[Any] = APPS,
     specs: list[str] = SPECS,
     spec_docs: dict[str, str] | None = None,
+    configurations: list[Any] | None = None,
+    defaults: list[Any] = DEFAULTS,
+    attachments: dict[str, Any] | None = None,
+    graphs: dict[str, BaseException] | None = None,
 ) -> oob.Fetch:
+    """GitHub as declared. attachments maps a repository to its attachment (None: 204, nothing
+    attached); graphs maps a repository to what reading its dependency graph raises."""
     docs = {"cli": CLI_SPEC} if spec_docs is None else spec_docs
+    configs = [BASELINE] if configurations is None else configurations
+    attached = attachments or {}
+    graph_errors = graphs or {}
 
     def fetch(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
         calls.append(args)
+        if args[1].endswith("/code-security/configurations"):
+            return configs
+        if args[1].endswith("/code-security/configurations/defaults"):
+            return defaults
+        if args[1].endswith("/code-security-configuration"):
+            return attached.get(args[1].split("/")[2], ATTACHED)
+        if args[1].endswith("/dependency-graph/sbom"):
+            error = graph_errors.get(args[1].split("/")[2])
+            if error is not None:
+                raise error
+            return 3
         if args[1].endswith("/spec.md"):
             name = args[1].split("/")[-2]
             return {"content": base64.b64encode(docs[name].encode()).decode()}
@@ -239,6 +277,10 @@ def test_every_github_call_is_a_read() -> None:
         *((c.name, c.gh_args) for c in oob.CHECKS),
         ("specs", oob.SPECS_GH_ARGS),
         ("purpose", oob.purpose_gh_args("runs")),
+        ("configurations", oob.CONFIGURATIONS_GH_ARGS),
+        ("defaults", oob.DEFAULTS_GH_ARGS),
+        ("attachment", oob.attachment_gh_args("troupe")),
+        ("sbom", oob.sbom_gh_args("troupe")),
     ]:
         assert args[0] == "api"
         assert not write_flags & set(args), name
@@ -247,3 +289,80 @@ def test_every_github_call_is_a_read() -> None:
             assert all(f.startswith("query={") for f in fields), name
         else:
             assert fields == [], name
+
+
+# security-scanning design D7: the code security configuration, its default, and each declared
+# repository's attachment and dependency graph.
+
+
+def test_a_configuration_setting_changed_on_github_is_reported(oob_dir: Path) -> None:
+    changed = {**BASELINE, "dependency_graph": "not_set"}
+    found = RUN(fake_github(TYPES, PROJECTS, [], configurations=[changed]), oob_dir)
+    assert found == [
+        "code security configurations: 'baseline' dependency_graph is 'not_set' on GitHub, "
+        "declared 'enabled'"
+    ]
+
+
+def test_an_undeclared_configuration_on_github_is_reported(oob_dir: Path) -> None:
+    extra = {"name": "by hand", "enforcement": "enforced"}
+    found = RUN(fake_github(TYPES, PROJECTS, [], configurations=[BASELINE, extra]), oob_dir)
+    assert found == ["code security configurations: 'by hand' is on GitHub but not declared"]
+
+
+def test_the_configuration_no_longer_the_default_is_reported(oob_dir: Path) -> None:
+    found = RUN(fake_github(TYPES, PROJECTS, [], defaults=[]), oob_dir)
+    assert found == ["code security defaults: 'baseline' is declared but missing on GitHub"]
+
+
+def test_a_repository_with_no_configuration_attached_is_reported(oob_dir: Path) -> None:
+    found = RUN(fake_github(TYPES, PROJECTS, [], attachments={"website": None}), oob_dir)
+    assert found == [
+        "code security repositories: 'website' configuration is None on GitHub, "
+        "declared 'baseline'",
+        "code security repositories: 'website' status is 'none' on GitHub, declared 'attached'",
+    ]
+
+
+def test_a_dependency_graph_github_says_is_missing_is_reported_as_off(oob_dir: Path) -> None:
+    graphs: dict[str, BaseException] = {"troupe": oob.NotFoundError("sbom")}
+    found = RUN(fake_github(TYPES, PROJECTS, [], graphs=graphs), oob_dir)
+    assert found == [
+        "code security repositories: 'troupe' dependency_graph is 'off' on GitHub, declared 'on'"
+    ]
+
+
+def test_a_dependency_graph_that_can_t_be_read_is_an_error_never_off(oob_dir: Path) -> None:
+    graphs: dict[str, BaseException] = {"troupe": RuntimeError("HTTP 502")}
+    with pytest.raises(oob.UnreadableError, match=r"'troupe'.*dependency graph.*HTTP 502"):
+        RUN(fake_github(TYPES, PROJECTS, [], graphs=graphs), oob_dir)
+
+
+def test_main_exits_non_zero_naming_the_repository_when_a_graph_can_t_be_read(
+    oob_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    graphs: dict[str, BaseException] = {"website": RuntimeError("HTTP 403")}
+    monkeypatch.setattr(oob, "OOB", oob_dir)
+    monkeypatch.setattr(oob, "ROOT", oob_dir)
+    monkeypatch.setattr(oob, "gh", fake_github(TYPES, PROJECTS, [], graphs=graphs))
+    assert oob.main() == 1
+    out = capsys.readouterr().out
+    assert "'website'" in out
+    assert "HTTP 403" in out
+    assert "no differences" not in out
+
+
+def test_gh_reports_a_404_as_not_found_and_other_failures_as_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_run(stderr: str, returncode: int, stdout: str = "") -> Any:  # noqa: ANN401
+        return lambda *_a, **_k: subprocess.CompletedProcess([], returncode, stdout, stderr)
+
+    monkeypatch.setattr(subprocess, "run", fake_run("gh: Not Found (HTTP 404)", 1))
+    with pytest.raises(oob.NotFoundError):
+        oob.gh(["api", "repos/x/y/dependency-graph/sbom"])
+    monkeypatch.setattr(subprocess, "run", fake_run("gh: Server Error (HTTP 502)", 1))
+    with pytest.raises(subprocess.CalledProcessError):
+        oob.gh(["api", "repos/x/y/dependency-graph/sbom"])
+    monkeypatch.setattr(subprocess, "run", fake_run("", 0))
+    assert oob.gh(["api", "repos/x/y/code-security-configuration"]) is None
