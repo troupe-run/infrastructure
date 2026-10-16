@@ -92,13 +92,20 @@
 
 ## 3. The configuration on the live repositories (design D4, D6, D7)
 
-- [ ] 3.1 The owner attaches the configuration to troupe (1413896926), .github (1413955208), infrastructure
+- [x] 3.1 The owner attaches the configuration to troupe (1413896926), .github (1413955208), infrastructure
       (1414209818) and website (1408722166), and sets it as the default for new public repositories (`PUT
       .../{id}/defaults`, `default_for_new_repos: public`). Verify, for each of the four, that
       `code-security-configuration` names it and `dependency-graph/sbom` returns 200, that `gh api
       orgs/troupe-run/code-security/configurations/defaults` lists it for `public`, and that each repository's
       `vulnerability-alerts`, `automated-security-fixes` and `security_and_analysis` read on. Record what `gh api
       orgs/troupe-run` reads for the five `*_enabled_for_new_repositories` settings
+      Done 2026-10-16. Owner attached 284304 to the four and set it as the default. Each repository:
+      `code-security-configuration` `attached`, "troupe-run baseline"; SBOM 200 (troupe 36 packages, `.github` 1,
+      infrastructure 24, website 604); `vulnerability-alerts` 204; `automated-security-fixes` `true`; secret
+      scanning and push protection `enabled`. `.../defaults`: "troupe-run baseline" for `public`. `oob.py`: no
+      code-security differences. `gh api orgs/troupe-run` still reads all six `*_enabled_for_new_repositories`
+      as `false`. Newly visible: one open Dependabot alert on the website (`postcss-selector-parser`, medium,
+      GHSA-rj75-hqrm-r3gf, fixed in 7.1.6), reported to the owner; none in the other three
 - [ ] 3.2 The owner creates a new public repository, `troupe-run/infra-probe-defaults`. Verify, with nothing applied to
       it, that its SBOM returns 200 and that alerts, security updates, secret scanning and push protection read on,
       and that `code-security-configuration` names the configuration. Record the result. Then the owner deletes it,
@@ -114,10 +121,11 @@
       status. Add tests to `scripts/tests/test_oob.py`, one per behaviour, each named for what it checks, including
       that a non-404 error is never read as "off". Add the row to `oob/README.md`. Verify `uv run scripts/check.py`
       passes, and that `uv run scripts/oob.py` reports none of these checks as different
-- [ ] 3.5 In `tofu/org.tf`, set the five `*_enabled_for_new_repositories` attributes to 3.1's recorded values, and
+- [x] 3.5 In `tofu/org.tf`, set the five `*_enabled_for_new_repositories` attributes to 3.1's recorded values, and
       rewrite their comment: the configuration in `oob/code-security.json` decides new repositories' defaults, and
       these closing-down parameters are only kept in step with what GitHub reads (D4). Verify `uv run
       scripts/check.py` passes
+      Done 2026-10-16: all five back to `false`, as on `main`, so the org shows no change in the plan
 
 ## 4. A Dependabot pull request has a tested path (design D5)
 
