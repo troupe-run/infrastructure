@@ -84,10 +84,14 @@
 
 ## 4. Plan and evidence
 
-- [ ] 4.1 Fast-forward onto `origin/main` once its latest state commit has landed, then run a local plan. Verify
+- [x] 4.1 Fast-forward onto `origin/main` once its latest state commit has landed, then run a local plan. Verify
       it shows exactly design D2's changes: the website's ruleset updated in place (bypass actor and one required
       check), `repo_website`'s `has_projects` turned on, and eight `github_repository_file.guard["website:…"]`
       creations, with nothing for troupe, infrastructure or `.github`. Record the summary line
+      Done 2026-10-16 on b8e2ee3's state (after website-environment and website-pages were applied): `Plan: 8 to
+      add, 2 to change, 0 to destroy.` The eight `guard["website:…"]` files; `repo_website`'s `has_projects`
+      false -> true and nothing else; its ruleset gains only the App (5272634, `always`) as a bypass actor and
+      `guard (workflow rules)` (15368). `check.py` all gates passed. `oob.py`: only the four troupe label lines
 - [ ] 4.2 Push the branch and open the pull request (`Closes #54`). Verify `check`, every `guard tests` leg,
       `guard (workflow rules)` and DCO pass. Verify that the posted plan, once the owner has approved its run,
       matches 4.1, and attach `scripts/oob.py`'s output
