@@ -107,6 +107,10 @@
       owner had attached the "troupe-run baseline" configuration to those four repositories in the meantime
       (security-scanning task 3.1). That change declares them, and it hasn't merged yet. This PR waits for it:
       rebase onto `main` after its apply, then plan again and check for `8 to add, 2 to change`
+      Re-planned 2026-10-16 after security-scanning merged and applied (state commit 2e9f521), with the branch
+      rebased onto it: `Plan: 8 to add, 2 to change, 0 to destroy.`, the same resources and attributes as 4.1, and no
+      `security_and_analysis` change. `oob.py`: only the four troupe label lines (#63). The PR's own plan is
+      checked against this once the owner approves its run
 - [ ] 4.3 Before the owner approves the plan, list open pull requests in `troupe-run/website`. Verify that none is
       open, or note each one that will need its `guard` check to run again after the apply (design, Risks)
 
