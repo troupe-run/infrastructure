@@ -21,6 +21,7 @@
       "members": "write",
       "metadata": "read",
       "organization_administration": "write",
+      "pages": "write",
       "workflows": "write"
     },
     "repository_selection": "selected"

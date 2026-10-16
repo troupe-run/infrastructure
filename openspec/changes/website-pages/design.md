@@ -107,9 +107,11 @@ here). The App has no Pages permission. The first local plan is the test: it rea
   so `oob.py` agrees with the installation.
 - If it reads, no permission is added, and the design records that `administration: write` was enough.
 
-**Result (2026-10-16, task 1.3):** the App read the site with no Pages permission, although GitHub's permissions table
-lists Pages read for the GET. No permission was added. The PUT is listed under Administration write too, which the App
-has, so a corrective apply is expected to work. If one is ever refused, the step above applies then.
+**Result (2026-10-16):** the App read the site with no Pages permission (task 1.3), although GitHub's permissions table
+lists Pages read for the GET. But it can't update one: on the probe, the apply correcting a hand change failed with
+`403 Resource not accessible by integration` (task 3.2), though the table also lists the PUT under Administration
+write. So drift would show and its correction would fail. The owner chose to add Pages read and write to the App
+(2026-10-16), and `oob/app-installations.json` records it.
 
 Write is asked for, not read only: correcting drift (the point of declaring it) needs it. The App already holds
 `administration: write` on every repository it's installed on, so Pages write adds no trust it didn't have.
