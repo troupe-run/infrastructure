@@ -12,11 +12,15 @@
       design D1's contents, including D8's CONTRIBUTING text for outside fixes, and linking #54. Verify it's on the board with
       `gh issue view <n> -R troupe-run/website --json projectItems`
       Done 2026-10-16: troupe-run/website#7, on "troupe roadmap" (Todo)
-- [ ] 1.3 Check that the website's bootstrap pull request (D1) is merged. Its `main` holds `openspec/`,
+- [x] 1.3 Check that the website's bootstrap pull request (D1) is merged. Its `main` holds `openspec/`,
       `scripts/check.py`, `scripts/check-paths.toml` (skipping at least `openspec/**`), CONTRIBUTING.md (with D8's
       text on outside fixes) and CLAUDE.md, and none of the delivered paths. The CI job is still named `test` and runs `uv run scripts/check.py`.
       Verify with `gh api repos/troupe-run/website/contents/<path>` for each, a 404 for each delivered path, and the
       full check's macOS time recorded in that pull request, under the guard's 10-minute limit
+      Done 2026-10-16: website#7 closed by website#14 (merged 11:14 UTC, change `adopt-org-workflow` archived on its
+      branch). On `main`: `openspec/config.yaml`, `scripts/check.py`, `scripts/check-paths.toml` (skips `openspec/**`,
+      `.claude/**`, `docs/**` and the contributor docs), CONTRIBUTING.md with D8's text, and CLAUDE.md. All eight
+      delivered paths 404. CI's job is still `test` and runs `uv run scripts/check.py`. Full check on macOS: 38.3 s
 - [ ] 1.4 Owner: confirm that the infrastructure App's installation lists `website` in the App's settings
       (teams-and-access), and record that here
 
