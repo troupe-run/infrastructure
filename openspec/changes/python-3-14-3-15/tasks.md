@@ -26,9 +26,13 @@
       If either version fails, fix the guard or its tests here, with a test named for the behaviour, before going on
       Done 2026-10-16 (macOS arm64): 3.14.8, 700 passed in 80.41s; 3.15.0, 700 passed in 79.97s. `check.py`: all
       gates passed. Nothing needed fixing
-- [ ] 1.5 Run `tofu fmt -check` and `tofu validate`, then a local plan after fast-forwarding onto `origin/main`.
+- [x] 1.5 Run `tofu fmt -check` and `tofu validate`, then a local plan after fast-forwarding onto `origin/main`.
       Verify the plan changes only the two "protect main" rulesets (`troupe`, `infrastructure`), each by the six new
       required contexts, and record its summary line
+      Done 2026-10-16, on 0e332af's state: `tofu fmt -check` clean, `tofu validate` passed (in `check.py`). `Plan: 0 to
+      add, 2 to change, 0 to destroy.` `module.repo_infrastructure` and `module.repo_troupe`'s `github_repository_
+      ruleset.main[0]` each add six `required_check` blocks (the six new names, `integration_id = 15368`), and nothing
+      else changes
 
 ## 2. Evidence on GitHub
 
