@@ -2,8 +2,9 @@
 # guard-delivery, design D2). The App commits them straight to main.
 
 locals {
-  # Each governed repository other than this one, which is the source.
-  guard_targets = toset([module.repo_troupe.name])
+  # Each governed repository other than this one, which is the source. A repository joins only
+  # once its main holds openspec/ and scripts/check.py (spec: guard-delivery; govern-website D1).
+  guard_targets = toset([module.repo_troupe.name, module.repo_website.name])
 
   guard_files = toset([
     "scripts/guard.py",
@@ -44,9 +45,9 @@ resource "github_repository_file" "guard" {
   content             = local.guard_contents[each.value.file]
   overwrite_on_create = false
 
-  # After the repository's ruleset, which lets the App push (design D5). Without this the
-  # deliveries race the bypass, and one that lands first is refused with a 409.
-  depends_on = [module.repo_troupe]
+  # After each receiving repository's ruleset, which lets the App push (design D5). Without
+  # this the deliveries race the bypass, and one that lands first is refused with a 409.
+  depends_on = [module.repo_troupe, module.repo_website]
 
   # Changes exactly when the content does, so a delivery never reuses an earlier message
   # (design D3).

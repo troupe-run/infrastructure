@@ -11,7 +11,9 @@ locals {
   # The checks each repository's pull requests need before they merge (spec: rulesets), named
   # as GitHub reports them. infrastructure's are tested against its workflows
   # (scripts/tests/test_required_checks.py); troupe's and website's were read from their latest
-  # merged pull requests on 2026-10-12 (required-checks design D1).
+  # merged pull requests on 2026-10-12 (required-checks design D1). Each repository receiving the
+  # guard requires its `guard` check, which is tested too. website requires no DCO: it takes no
+  # sign-off (owner, 2026-10-16; govern-website D3).
   required_checks = jsondecode(file("${path.module}/required-checks.json"))
 
   # The App that posts each check, so a status of the same name from anything else doesn't count.
@@ -77,8 +79,13 @@ module "repo_website" {
   name        = "website"
   description = "troupe.run \u2014 website and landing page"
   # Set by the owner on GitHub after rename-website, and declared here (required-checks).
-  homepage_url    = "https://troupe.run/"
-  labels          = concat(local.github_default_labels, local.workflow_labels)
+  homepage_url = "https://troupe.run/"
+  labels       = concat(local.github_default_labels, local.workflow_labels)
+  # The org's roadmap (project 1) is linked here too, and turning projects off would hide it from
+  # the repository (govern-website D4).
+  has_projects = true
+  # website receives the guard from this repository (guard_delivery.tf; govern-website).
+  app_bypass_id   = local.infrastructure_app_id
   required_checks = local.checks_for["website"]
   # https://troupe.run, deployed from Actions (spec: repositories; website-pages). If the domain is
   # removed by hand, GitHub drops HTTPS and the certificate with it: the first apply restores the
