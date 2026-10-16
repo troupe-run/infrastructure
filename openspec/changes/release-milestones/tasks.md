@@ -8,12 +8,24 @@
       stop and update the design first
       Done 2026-10-17: troupe has only milestone 1, `alpha-0`, open, 0 open and 3 closed issues; infrastructure,
       website and `.github` have none. Matches the design
-- [ ] 1.2 On a throwaway repository with one milestone holding one issue, verify with a scratch OpenTofu config (not
+- [x] 1.2 On a throwaway repository with one milestone holding one issue, verify with a scratch OpenTofu config (not
       this repository's state): (a) the milestone imports with ID `<owner>/<repository>/<number>`; (b) changing its
       declared title plans as an in-place update, and after the apply the milestone keeps its number and its issue;
       (c) renaming it by hand on GitHub shows as a title change in the next plan; (d) removing it from a
       `for_each` with `prevent_destroy = true` fails the plan. Record each result here. If (b) is a replacement, stop
       and take it back to the owner (design D3). Delete the throwaway repository afterwards and verify it's gone
+      Done 2026-10-17 on `troupe-run/infra-probe-milestones-1017` (milestone 1 `probe-old` holding issue 1), as the
+      infrastructure App, with a scratch config and its own encrypted state:
+      (a) `Preparing import... [id=troupe-run/infra-probe-milestones-1017/1]` worked.
+      (b) `Plan: 1 to import, 0 to add, 1 to change, 0 to destroy.`, `title = "probe-old" -> "probe-new"`; after the
+      apply the milestone was still `number=1`, holding 1 open issue, and issue 1's milestone read `probe-new`.
+      (c) Renamed by hand to `probe-hand`; the next plan showed `title = "probe-hand" -> "probe-new"`, 1 to change.
+      (d) With the milestone removed from the `for_each`: `Plan: 0 to add, 0 to change, 1 to destroy.` then
+      `Error: Resource instance cannot be destroyed ... has prevent_destroy set`, exit 1, and the milestone was still
+      on GitHub with its issue. While its `import` block was still there, the same removal failed earlier instead,
+      with `Configuration for import target does not exist`: also exit 1, nothing deleted. So removing troupe's 0.1.0
+      fails for that reason while imports.tf keeps its block, and either way nothing is deleted.
+      The repository was deleted afterwards: `gh repo view` reports `Could not resolve to a Repository`
 
 ## 2. Declare the milestones and adopt alpha-0 (D1, D2, D3)
 
