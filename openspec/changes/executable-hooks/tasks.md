@@ -128,6 +128,7 @@
       - Windows reports nothing (simulated with a patched `os.name`).
 
       All of these pass on the three-OS CI matrix
+
 ## Workflow follow-up
 
 - Open the pull request with `Closes #69`, and post the plan as evidence once the owner approves its run.
@@ -136,6 +137,6 @@
   merges): check that `git ls-tree origin/main .githooks/` in `website` shows `100755` for all three hooks. Check
   that the App's commit is on `main` with a green `guard` run, and that the next plan shows no change in OpenTofu or
   in modes. Record the commit and the run on #69 (spec: "The approved apply sets the mode").
-- After the merge and that check, comment on #69 with the PR and the archived change, check that it's closed, and set its
-  card to Done.
+- After the merge and that check, comment on #69 with the PR and the archived change, check that it's closed, and set
+  its card to Done.
 - In a `website` clone, check that `git push` no longer prints the "hook was ignored" hint.
