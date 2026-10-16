@@ -199,8 +199,11 @@ and whether it's a real secret that needs rotating (the owner's job) or a false 
   run fails and keeps the state as its `state-after-apply` artifact, and the README's recovery for that case applies.
 - [Attaching the configuration turns the features on outside a plan] → it's the owner's own write, made for this
   change. The next plan shows what OpenTofu still needs to adopt, and the pull request carries that plan.
-- [The configuration and OpenTofu disagree later] → each declares the same five features. A difference shows in the
-  daily plan or in `oob.py`.
+- [The configuration and OpenTofu disagree later] → each declares the same five features. A difference in what
+  OpenTofu manages shows in the daily plan. A difference in the configuration, its attachments, its default or a
+  dependency graph shows only when someone runs `oob.py`, with every plan as `oob/README.md` says: nothing checks
+  those daily yet. If the graph is turned off by hand, Dependabot goes quiet until the next run. Running `oob.py`
+  daily in CI is #62 (owner, 2026-10-16).
 - [Deleting one of the new resources from the module turns its feature off everywhere] → D1: the module's comment
   says so, and the plan would show four destroys of that resource for the owner to refuse.
 - [The live PATCH changes a setting nobody meant to change] → D3's first probe, then the live plan must show only the
