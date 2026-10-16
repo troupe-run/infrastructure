@@ -89,9 +89,10 @@ is two approvals:
    `scripts/tests/`, `README.md`, `CLAUDE.md`; the list is in `scripts/plan_needed.py`) skips the plan, which counts
    as passed and asks you for nothing. Anything else is planned, including a file the list doesn't know about.
 2. **Merge.** Once CI and `guard` pass on `main`, the `plan (main)` job plans unattended and shows the plan in the
-   run's summary. A plan with no changes ends there.
+   run's summary, with any delivered file's mode to set below it ("Delivering the guard"). A plan with neither ends
+   there.
 3. **Read that plan, then approve the `apply` job** (`apply` environment). It applies exactly the saved plan you
-   read, then commits the new encrypted state to `main` as the App:
+   read, sets the modes it listed, then commits the new encrypted state to `main` as the App:
    `chore(tofu): commit the state after applying <sha>`. That commit starts no further plan.
 
 Rejecting the approval applies nothing. To plan `main` again later, for example after drift or a rejection, run
@@ -129,6 +130,10 @@ run is in progress: nothing locks the state between CI and your machine.
    owner.
 2. **After the owner approves it,** `uv run scripts/tofu.py apply change.tfplan`.
 3. Commit the updated `tofu/terraform.tfstate` on that branch, and merge it through a pull request.
+
+A local apply doesn't set delivered files' modes: only CI's apply job does. If your apply delivers a file whose mode
+differs from its source's (a hook to a new repository, say), the next CI plan of `main` lists it, and its apply sets
+it.
 
 **If CI applied but couldn't commit the state,** the run fails and keeps the state as its `state-after-apply`
 artifact. Download it (`gh run download <run> -n state-after-apply`), copy it over `tofu/terraform.tfstate` on a
@@ -228,6 +233,16 @@ change to the guard reaches them like any other change to the org, with one extr
 3. Read the plan, and approve the apply. Each changed file becomes one commit on each receiving repository's `main`,
    by the App, named `chore(guard): deliver <path> <content hash> from troupe-run/infrastructure`.
 4. Check each receiving repository's `guard` and CI runs on those commits.
+
+**A delivered file keeps its source's mode.** `github_repository_file` can't set one, so a file it creates is
+`100644`, and git skips a hook that isn't executable. So each plan of `main`, and each pull request's plan, runs
+`scripts/hook_modes.py plan`. It reads what is delivered from the saved plan, and lists each file in a receiving
+repository whose mode isn't its source's here (`git ls-files -s`), including a hook this apply creates. A listed mode
+is a change: the run waits for your approval even when OpenTofu has nothing to do. After the apply succeeds, the
+apply job sets each mode as the App with `hook_modes.py apply`: one commit per repository, named
+`chore(guard): set the mode of <paths> from troupe-run/infrastructure`, which keeps each file's content. It refuses,
+writing nothing, if a listed file's content isn't what the plan read, and it never forces `main`. If it fails, the
+run fails, and the next plan (daily at the latest) lists the modes again. The script's docstring has the details.
 
 The probe showed how this behaves (design D3 and D8 of the `development-workflow` change):
 - a receiving repository's ruleset lets only the App push to `main`; the owner's own push is still refused;

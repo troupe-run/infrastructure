@@ -199,6 +199,10 @@ day, so that is within a day of the edit landing. The `delivered-file` rule refu
 far: change the file in `troupe-run/infrastructure` instead. The scripts'
 own checks (`scripts/check.py`), and any other files, stay each repository's own.
 
+A delivered file also keeps its source's mode, so the hooks are executable wherever they're delivered. The plan lists
+any file whose mode differs, as a change for the owner to approve, and after the apply the App sets the mode in one
+commit per repository (README, "Delivering the guard").
+
 ## Where the templates come from
 
 The pull request template and the Bug, Feature and Decision issue forms are the org's defaults. Their source is

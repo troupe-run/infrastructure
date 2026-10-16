@@ -112,6 +112,16 @@ jobs:
           uv run --no-project scripts/tofu.py init -input=false -no-color
           uv run --no-project scripts/tofu.py plan -input=false -no-color -lock=false -out=pr.tfplan
           uv run --no-project scripts/tofu.py show -no-color pr.tfplan > "$RUNNER_TEMP/plan.txt"
+      # The delivered files' modes this plan would leave to set (spec: guard-delivery;
+      # executable-hooks design D3). Evidence only: it reads the targets, and writes nothing.
+      - name: Modes to set after the apply
+        if: steps.secrets.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run --no-project scripts/tofu.py show -json pr.tfplan > "$RUNNER_TEMP/plan.json"
+          uv run --no-project scripts/hook_modes.py plan --plan-json "$RUNNER_TEMP/plan.json" \
+            --out "$RUNNER_TEMP/mode-plan.json" --summary "$RUNNER_TEMP/modes.md"
       - name: Post the plan on the pull request
         if: steps.secrets.outputs.available == 'true'
         env:
@@ -127,6 +137,8 @@ jobs:
             echo "$(grep -E '^(Plan:|No changes)' "$RUNNER_TEMP/plan.txt" | head -1)"
             echo
             echo "Made in CI on this pull request merged onto \`main\` ([run]($RUN_URL)). The apply happens after the merge, once the owner approves the plan made then."
+            echo
+            cat "$RUNNER_TEMP/modes.md"
             echo
             echo '<details><summary>Full plan</summary>'
             echo
@@ -151,7 +163,10 @@ jobs:
       name: plan-main
       deployment: false
     outputs:
-      changes: ${{ steps.plan.outputs.changes }}
+      # OpenTofu's changes, or a delivered file's mode to set: either waits for approval
+      # (executable-hooks design D3).
+      changes: ${{ steps.plan.outputs.changes == 'true' || steps.modes.outputs.changes == 'true' }}
+      mode_repositories: ${{ steps.modes.outputs.repositories }}
       sha: ${{ steps.sha.outputs.sha }}
     env:
       TF_VAR_github_app_pem: ${{ secrets.TF_VAR_github_app_pem }}
@@ -225,10 +240,29 @@ jobs:
             *) exit "$code" ;;
           esac
           uv run --no-project scripts/tofu.py show -no-color main.tfplan > "$RUNNER_TEMP/plan.txt"
+      # Each delivered file whose mode the apply would leave unlike its source's (spec:
+      # guard-delivery; executable-hooks design D1-D3). It only reads; the apply job sets them.
+      - name: Modes to set after the apply
+        id: modes
+        if: steps.skip.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run --no-project scripts/tofu.py show -json main.tfplan > "$RUNNER_TEMP/plan.json"
+          uv run --no-project scripts/hook_modes.py plan --plan-json "$RUNNER_TEMP/plan.json" \
+            --out tofu/mode-plan.json --summary "$RUNNER_TEMP/modes.md"
+          repositories=$(jq -r '[.entries[].repository] | unique | join(",")' tofu/mode-plan.json)
+          echo "repositories=$repositories" >> "$GITHUB_OUTPUT"
+          if [ -n "$repositories" ]; then
+            echo "changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changes=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Show the plan for approval
         if: steps.skip.outputs.skip == 'false'
         env:
           CHANGES: ${{ steps.plan.outputs.changes }}
+          MODE_CHANGES: ${{ steps.modes.outputs.changes }}
           SHA: ${{ steps.sha.outputs.sha }}
         run: |
           {
@@ -236,21 +270,28 @@ jobs:
             echo
             if [ "$CHANGES" = "true" ]; then
               echo "**$(grep -E '^Plan:' "$RUNNER_TEMP/plan.txt" | head -1)** The apply job waits for the owner's approval (Review deployments)."
+            elif [ "$MODE_CHANGES" = "true" ]; then
+              echo "**No OpenTofu changes, but modes to set (below).** The apply job waits for the owner's approval (Review deployments)."
             else
               echo "No changes. Nothing to approve."
             fi
+            echo
+            cat "$RUNNER_TEMP/modes.md"
             echo
             echo '```'
             head -c 900000 "$RUNNER_TEMP/plan.txt"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Keep the saved plan for the apply job
-        if: steps.plan.outputs.changes == 'true'
-        # Encrypted with the state passphrase, and it holds no key (design D3).
+        if: steps.plan.outputs.changes == 'true' || steps.modes.outputs.changes == 'true'
+        # Encrypted with the state passphrase, and it holds no key (design D3). The mode plan holds
+        # only paths, modes and blob ids.
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: main-tfplan
-          path: tofu/main.tfplan
+          path: |
+            tofu/main.tfplan
+            tofu/mode-plan.json
           retention-days: 1
           if-no-files-found: error
 
@@ -288,6 +329,23 @@ jobs:
         run: |
           uv run --no-project scripts/tofu.py init -input=false -no-color
           uv run --no-project scripts/tofu.py apply -input=false -no-color main.tfplan
+      # Only after an apply that succeeded: a failed one's modes stay for the next plan
+      # (executable-hooks design D4). The token reaches only the repositories the plan named.
+      - name: Token for setting modes
+        id: mode-token
+        if: steps.apply.outcome == 'success' && needs.plan.outputs.mode_repositories != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: 5272634
+          private-key: ${{ secrets.TF_VAR_github_app_pem }}
+          owner: troupe-run
+          repositories: ${{ needs.plan.outputs.mode_repositories }}
+          permission-contents: write
+      - name: Set delivered files' modes as the App
+        if: steps.apply.outcome == 'success' && needs.plan.outputs.mode_repositories != ''
+        env:
+          GH_TOKEN: ${{ steps.mode-token.outputs.token }}
+        run: uv run --no-project scripts/hook_modes.py apply --mode-plan tofu/mode-plan.json
       # From here on, run even when the apply failed part way: its state is still the truth.
       - name: Keep the state
         if: always() && steps.apply.outcome != 'skipped'
