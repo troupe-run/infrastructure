@@ -53,6 +53,23 @@ resource "github_repository" "this" {
   }
 }
 
+# The Pages site, when var.pages is set (spec: repositories; website-pages design D1 to D3). Built
+# from Actions, so it has no source: the provider refuses one with "workflow", and ignores the
+# branch the API still reports. Destroying it disables Pages and takes the site down, so, like the
+# repository, it can't be destroyed: to stop managing it, use a `removed` block (README.md).
+resource "github_repository_pages" "this" {
+  count = var.pages == null ? 0 : 1
+
+  repository     = github_repository.this.name
+  build_type     = "workflow"
+  cname          = var.pages.cname
+  https_enforced = var.pages.https_enforced
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 resource "github_issue_labels" "this" {
   repository = github_repository.this.name
 

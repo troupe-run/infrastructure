@@ -72,8 +72,6 @@ module "repo_infrastructure" {
   required_checks = local.checks_for["infrastructure"]
 }
 
-# GitHub Pages (deployed from Actions) isn't declared yet: the provider treats `pages` as
-# computed, so leaving it out shows no drift. See the Findings in design.md.
 module "repo_website" {
   source      = "./modules/repository"
   name        = "website"
@@ -82,4 +80,9 @@ module "repo_website" {
   homepage_url    = "https://troupe.run/"
   labels          = concat(local.github_default_labels, local.workflow_labels)
   required_checks = local.checks_for["website"]
+  # https://troupe.run, deployed from Actions (spec: repositories; website-pages). If the domain is
+  # removed by hand, GitHub drops HTTPS and the certificate with it: the first apply restores the
+  # domain and fails on HTTPS ("The certificate does not exist yet"), and a second, once GitHub has
+  # approved the new certificate, enforces it.
+  pages = { cname = "troupe.run" }
 }

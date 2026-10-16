@@ -54,6 +54,12 @@ import {
   id = "website"
 }
 
+# The website's Pages site, set by hand before website-pages declared it (design D4).
+import {
+  to = module.repo_website.github_repository_pages.this[0]
+  id = "website"
+}
+
 # The files troupe already had when it was adopted. The generated list, and any file delivered since
 # (scripts/guard_pytest.py, commit-check-paths), is created, not imported: importing a file troupe
 # doesn't have fails the plan with a 404.

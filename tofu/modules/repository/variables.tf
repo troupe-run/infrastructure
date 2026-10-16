@@ -92,3 +92,14 @@ variable "app_bypass_id" {
   type        = number
   default     = null
 }
+
+# The repository's GitHub Pages site, deployed from Actions (spec: repositories; website-pages
+# design D2). Null: Pages isn't managed here. Only the website sets it.
+variable "pages" {
+  description = "The repository's GitHub Pages site, deployed from Actions. Null: Pages isn't managed here."
+  type = object({
+    cname          = string
+    https_enforced = optional(bool, true)
+  })
+  default = null
+}
