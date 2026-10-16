@@ -30,7 +30,12 @@
       Administration write, which the App has. If one is ever refused, D5's step applies then
 - [x] 1.4 Only if 1.3 needed the permission: add `"pages": "write"` to `troupe-run-infrastructure` in
       `oob/app-installations.json`. Verify `uv run scripts/oob.py` reports no drift, and quote its output
-      Not needed, 2026-10-16: 1.3 read the site without the permission, so the App and its declaration are unchanged
+      Reopened 2026-10-16: 1.3 read the site without the permission, but 3.2 showed the App can't update one (403).
+      The owner chose to add Pages read and write, and `oob/app-installations.json` now records `"pages": "write"`.
+      Done 2026-10-16, after the owner's change: the installation reports `pages: write`, and `uv run scripts/oob.py`
+      reports no difference in App installations. Its four other differences are troupe's `cap:*` labels
+      (`flake-hunt`, `python-support` and `quality-check` have no label, and `cap:releases` has no recorded Purpose),
+      which are on `main` too and outside this change
 
 ## 2. Adopting the site changes nothing, and nothing can disable it
 
@@ -64,16 +69,35 @@
       (design D6). Verify `tofu validate` is clean in `tofu/probe`
       Done 2026-10-16: `probe_pages` declares `github_repository_pages.probe` (workflow, no domain) and imports it.
       `tofu fmt -check` clean and `tofu validate` passed in `tofu/probe`
-- [ ] 3.2 Run the probe: create a throwaway public repository, ask the owner to add it to the App's installation,
+- [x] 3.2 Run the probe: create a throwaway public repository, ask the owner to add it to the App's installation,
       turn on Pages deployed from Actions with `gh api`, import and plan with `probe_pages = true` and verify no change.
       Then switch its source to a branch with `gh api`, plan again, and verify the plan shows `build_type` changing
       back to `workflow`. Record both plans' summary lines here
-- [ ] 3.3 Delete the throwaway repository, the probe's state, and its `terraform.tfvars`, and ask the owner to confirm
+      2026-10-16, on `troupe-run/infra-probe-pages-20261016` (added to the App's installation by the owner), with
+      `declared = false` so only the Pages site is touched: the import plans `1 to import, 0 to add, 0 to change, 0
+      to destroy`, and was applied into the probe's state. After `gh api -X PUT ... -f build_type=legacy -f
+      "source[branch]=main"`, the plan shows `~ build_type = "legacy" -> "workflow"` and the `source` block removed:
+      `Plan: 0 to add, 1 to change, 0 to destroy.` Applying that correction failed: `PUT .../pages: 403 Resource not
+      accessible by integration`. The App can read a Pages site but not update one, so drift shows but can't be
+      corrected without the Pages permission (design D5). After the owner added Pages read and write, the same
+      correction applied (`Apply complete! Resources: 0 added, 1 changed, 0 destroyed.`), the API reads
+      `build_type: workflow` again, and the next plan says `No changes.`
+- [x] 3.3 Delete the throwaway repository, the probe's state, and its `terraform.tfvars`, and ask the owner to confirm
       it's gone from the App's installation. Verify `gh repo view troupe-run/<name>` fails and `git status` in
       `tofu/probe` is clean
-- [ ] 3.4 Record here how the custom-domain and HTTPS scenarios are shown (design D6): cite the lines of
+      Done 2026-10-16: `gh repo delete` succeeded and `gh repo view` now fails ("Could not resolve to a Repository");
+      `terraform.tfstate`, its backup and `terraform.tfvars` are deleted, and `git status` in `tofu/probe` shows only
+      the ignored `.terraform/` and lock file. GitHub drops a deleted repository from an App's installation; the owner
+      was asked to confirm it's gone from the list
+- [x] 3.4 Record here how the custom-domain and HTTPS scenarios are shown (design D6): cite the lines of
       `resource_github_repository_pages.go` at `v6.13.0` where Read sets `cname` and `https_enforced` from the API,
       and say that this is reasoning from the provider's source, not a run against a live domain
+      Done 2026-10-16. In `github/resource_github_repository_pages.go` at `v6.13.0`,
+      `resourceGithubRepositoryPagesRead` (line 239) sets `cname` from `pages.GetCNAME()` on every refresh (lines
+      258 to 266: the API's value, or null when it has none) and `https_enforced` from `pages.GetHTTPSEnforced()`
+      (line 285). Both are compared with the declaration, so a domain or HTTPS changed by hand is a planned change.
+      This is reasoning from the provider's source, not a run: `troupe.run` can't be lent to a probe. 3.2 shows the
+      same refresh-and-compare path working for `build_type`
 
 ## 4. Evidence on GitHub
 

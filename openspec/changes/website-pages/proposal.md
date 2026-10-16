@@ -18,10 +18,9 @@ either. adopt-org left this for "a later change, if Pages settings are to be man
   destroying it disables Pages. Stopping management uses a `removed` block, as the README already says for
   repositories.
 - The comment above `module "repo_website"` saying Pages isn't declared goes.
-- The `troupe-run-infrastructure` App gains the **Pages** repository permission (read and write), if it needs it.
-  Today it has none, and Pages info can't be read without authentication (an unauthenticated read gets a 404). The
-  first local plan shows whether `administration: write` is enough. If it isn't, the owner adds the permission on
-  GitHub and accepts it on the installation, and `oob/app-installations.json` records it.
+- The `troupe-run-infrastructure` App gains the **Pages** repository permission (read and write), and
+  `oob/app-installations.json` records it. The App can read a Pages site without it, but an update is refused with a
+  403, so drift would show and its correction would fail (design D5). Only the owner can change the App's permissions.
 
 Out of scope: the `github-pages` environment and its main-only deploy rule (#52); troupe.run's DNS (#55); whether
 the Pages site is public (`public` is left unset, so the provider reads it and never sends it: a public repository on
@@ -46,7 +45,6 @@ change to the declaration's data.
 - `tofu/modules/repository/`: a new `pages` variable and a `github_repository_pages` resource counted on it.
 - `tofu/repositories.tf`: `repo_website` sets `pages`, and the stale comment goes.
 - `tofu/imports.tf`: one `import` block for the website's Pages site.
-- `oob/app-installations.json`, only if the App needs the Pages permission. That's a change to the App on GitHub,
-  which only the owner can make.
+- `oob/app-installations.json`: the App's Pages permission, which the owner adds on GitHub.
 - The live site: the first apply imports the site with no change. A wrong attribute would change the live domain or
   HTTPS, so the plan is read for `0 to change` on the Pages resource before it's approved.
