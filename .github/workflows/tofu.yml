@@ -113,6 +113,13 @@ jobs:
           uv run --no-project scripts/tofu.py init -input=false -no-color
           uv run --no-project scripts/tofu.py plan -input=false -no-color -lock=false -out=pr.tfplan
           uv run --no-project scripts/tofu.py show -no-color pr.tfplan > "$RUNNER_TEMP/plan.txt"
+      # No rendering of the plan holds a key: the App's, the DNS token or the state passphrase
+      # (spec: state-and-apply; ephemeral-state-passphrase D2). Before anything else reads plan.json.
+      - name: The plan holds no key
+        if: steps.secrets.outputs.available == 'true'
+        run: |
+          uv run --no-project scripts/tofu.py show -json pr.tfplan > "$RUNNER_TEMP/plan.json"
+          uv run --no-project scripts/plan_secrets.py "$RUNNER_TEMP/plan.txt" "$RUNNER_TEMP/plan.json"
       # The delivered files' modes this plan would leave to set (spec: guard-delivery;
       # executable-hooks design D3). Evidence only: it reads the targets, and writes nothing.
       - name: Modes to set after the apply
@@ -120,7 +127,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          uv run --no-project scripts/tofu.py show -json pr.tfplan > "$RUNNER_TEMP/plan.json"
           uv run --no-project scripts/hook_modes.py plan --plan-json "$RUNNER_TEMP/plan.json" \
             --out "$RUNNER_TEMP/mode-plan.json" --summary "$RUNNER_TEMP/modes.md"
       # A failed check block is only a warning, and `tofu show` leaves it out of plan.txt (spec: dns;
@@ -251,6 +257,13 @@ jobs:
             *) exit "$code" ;;
           esac
           uv run --no-project scripts/tofu.py show -no-color main.tfplan > "$RUNNER_TEMP/plan.txt"
+      # No rendering of the plan holds a key: the App's, the DNS token or the state passphrase
+      # (spec: state-and-apply; ephemeral-state-passphrase D2). Before anything else reads plan.json.
+      - name: The plan holds no key
+        if: steps.skip.outputs.skip == 'false'
+        run: |
+          uv run --no-project scripts/tofu.py show -json main.tfplan > "$RUNNER_TEMP/plan.json"
+          uv run --no-project scripts/plan_secrets.py "$RUNNER_TEMP/plan.txt" "$RUNNER_TEMP/plan.json"
       # Each delivered file whose mode the apply would leave unlike its source's (spec:
       # guard-delivery; executable-hooks design D1-D3). It only reads; the apply job sets them.
       - name: Modes to set after the apply
@@ -259,7 +272,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          uv run --no-project scripts/tofu.py show -json main.tfplan > "$RUNNER_TEMP/plan.json"
           uv run --no-project scripts/hook_modes.py plan --plan-json "$RUNNER_TEMP/plan.json" \
             --out tofu/mode-plan.json --summary "$RUNNER_TEMP/modes.md"
           repositories=$(jq -r '[.entries[].repository] | unique | join(",")' tofu/mode-plan.json)
