@@ -9,7 +9,10 @@ pull request.
 import json
 from typing import Any
 
+import pytest
 from conftest import REPO
+
+pytestmark = pytest.mark.dns
 
 DNS = REPO / "tofu" / "dns.json"
 

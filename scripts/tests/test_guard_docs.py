@@ -2,9 +2,12 @@
 
 import re
 
+import pytest
 from conftest import REPO
 
 import guard
+
+pytestmark = pytest.mark.docs
 
 DOC = REPO / "docs" / "development-workflow.md"
 ROW = re.compile(r"^\| `([a-z-]+)` \| (git|Claude) \|", re.MULTILINE)

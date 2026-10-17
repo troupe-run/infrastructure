@@ -37,6 +37,7 @@ def paths_opentofu_reads() -> set[str]:
     return read
 
 
+@pytest.mark.tofu
 def test_every_path_opentofu_reads_is_planned() -> None:
     read = paths_opentofu_reads()
     assert "scripts/guard.py" in read

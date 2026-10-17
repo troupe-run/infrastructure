@@ -2,7 +2,7 @@
 
 ## 1. Prove GitHub's behaviour first
 
-- [ ] 1.1 On a throwaway repository `troupe-run/infra-probe-skipped-matrix` (created from a public template-free
+- [x] 1.1 On a throwaway repository `troupe-run/infra-probe-skipped-matrix` (created from a public template-free
   repo, deleted afterwards), push a workflow with a `changes` job, a matrix job skipped by a job-level `if`, and a
   `guard tests` result job with `if: always()`; open one pull request that skips the matrix and one that runs it.
   Verify with `gh api repos/.../commits/<sha>/check-runs`: the skipped matrix reports one check run under its
@@ -10,14 +10,21 @@
   Add a ruleset requiring `guard tests` and verify `gh pr merge --rebase` is accepted on the skipping pull request.
   Record the run URLs and outputs here, then delete the repository and verify `gh repo view` returns not found. If
   the naming differs from D6, stop and revise the design before going on.
+  - Done 2026-10-17 on `troupe-run/infra-probe-skipped-matrix` (2 OSes × 2 Pythons, ruleset requiring `guard tests`
+    from GitHub Actions). PR 1 (README only, run 39033316264): check runs `guard tests (${{ matrix.os }}, Python ${{
+    matrix.python }}) | skipped`, `guard tests | success`, `changes | success`; merge state `CLEAN`, and `gh pr merge
+    --rebase` merged it. PR 2 (`guard/` changed, run 39033322541): the four legs under their expanded names and
+    `guard tests`, all success. With one leg failing: `guard tests | failure`, merge state `BLOCKED`. On the push to
+    `main` (run 39033281766), `changes` was skipped, every leg ran and `guard tests` passed. D6 holds. The
+    repository was deleted; `gh repo view` answers "Could not resolve to a Repository".
 
 ## 2. Scopes and tags
 
-- [ ] 2.1 Declare `dns`, `milestones`, `labels`, `tofu` and `docs` in `scripts/check-paths.toml` (design D1, D2),
+- [x] 2.1 Declare `dns`, `milestones`, `labels`, `tofu` and `docs` in `scripts/check-paths.toml` (design D1, D2),
   with the file's comment saying why `tofu` lists files by name, why `scripts/` has no scope (D3), and that tags are
   enforced for in-process reads only. Verify `uv run scripts/guard.py check-scope <<< tofu/dns.json` prints
   `scope=dns` and `check-args=--scope dns`, and that `scripts/tofu.py` prints `scope=full`.
-- [ ] 2.2 Tag the tests that read each scope's files (`pytestmark` where a module reads at collection or in a shared
+- [x] 2.2 Tag the tests that read each scope's files (`pytestmark` where a module reads at collection or in a shared
   fixture, the test itself otherwise), starting from design's table and finishing from `guard_pytest`'s failures.
   Verify `uv run pytest` passes with no tag violation, and that removing the `dns` marker from `test_dns.py` makes it
   fail naming `tofu/dns.json` and the tag (then restore it).

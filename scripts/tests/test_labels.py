@@ -7,7 +7,10 @@ the merge. So the declared descriptions are checked here, offline, on every pull
 import json
 from typing import Any
 
+import pytest
 from conftest import REPO
+
+pytestmark = pytest.mark.labels
 
 TROUPE_LABELS = REPO / "tofu" / "labels" / "troupe.json"
 GITHUB_LIMIT = 100

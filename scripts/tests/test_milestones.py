@@ -9,7 +9,10 @@ import json
 import re
 from typing import Any
 
+import pytest
 from conftest import REPO
+
+pytestmark = [pytest.mark.milestones, pytest.mark.tofu]
 
 TOFU = REPO / "tofu"
 MILESTONES = TOFU / "milestones.json"
