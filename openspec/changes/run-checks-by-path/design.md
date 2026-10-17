@@ -227,6 +227,16 @@ until it's fixed. The table goes in the pull request as evidence. Reads through 
 the task also greps the tests for subprocesses that read a scoped file, and none were found while drafting this
 design (`test_tofu_wrapper.py` runs a fake `tofu`).
 
+### D9. ruff stops reading `openspec/`
+
+Found while applying: ruff formats the Python blocks in Markdown files, so `ruff format --check .` read every
+`design.md` under `openspec/`, against the skip list's comment that no gate does. A commit that touched only
+`openspec/` skipped the check, so a badly formatted block there reached the branch unchecked, and only CI's full check
+noticed. Once `scope=none` skips CI's `check` too (D4), nothing would notice until `main`'s full run failed. `pyproject.toml`
+now sets `extend-exclude = ["openspec"]` for ruff, which makes the skip list's claim true again. Formatting the code
+in a design is worth nothing to anyone. The alternative, taking `openspec/**` out of skip, would run the full check on
+every planning commit, the cost the skip list was made to remove.
+
 ## Risks / Trade-offs
 
 - [Between the merge and the apply, the ruleset still requires the 11 leg names] → A pull request that skips the

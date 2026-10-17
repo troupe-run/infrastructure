@@ -340,6 +340,7 @@ def release_ruleset_repositories(release_tf: str, repositories_tf: str) -> set[s
     return covered
 
 
+@pytest.mark.tofu
 def test_every_repository_the_guard_exempts_has_the_release_ruleset_declared() -> None:
     covered = release_ruleset_repositories(
         (TOFU / "release.tf").read_text(encoding="utf-8"),
@@ -348,6 +349,7 @@ def test_every_repository_the_guard_exempts_has_the_release_ruleset_declared() -
     assert guard.RELEASE_REPOSITORIES.issubset(covered)
 
 
+@pytest.mark.tofu
 def test_removing_the_release_ruleset_leaves_its_repository_uncovered() -> None:
     release_tf = (TOFU / "release.tf").read_text(encoding="utf-8")
     [ruleset] = [
@@ -361,6 +363,7 @@ def test_removing_the_release_ruleset_leaves_its_repository_uncovered() -> None:
     assert not guard.RELEASE_REPOSITORIES.issubset(covered)
 
 
+@pytest.mark.tofu
 @pytest.mark.parametrize("rule", ["creation", "update"])
 def test_a_release_ruleset_that_stops_reserving_the_name_leaves_its_repository_uncovered(
     rule: str,

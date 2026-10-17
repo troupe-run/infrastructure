@@ -2,9 +2,47 @@
 # CI (`guard.py check-scope`), and by the guard_pytest plugin on every test run (spec: development-workflow;
 # docs/development-workflow.md). A path in no group needs the full check. This file is this repository's own; it
 # isn't delivered.
+#
+# A scope still runs every gate but the tests, which narrow to those tagged with it (pytest: @pytest.mark.<scope>).
+# guard_pytest fails a test that reads a scope's file without its tag, but it sees only reads made in the test's own
+# process: a test that reads one through a subprocess must be tagged by hand. Python sources have no scope: a test
+# reads a module by importing it, once per process, so the tag check couldn't see who depends on it
+# (run-checks-by-path design D3).
 version = 1
 
 # No gate reads these. ruff and mypy read Python, tofu reads tofu/, and the tests build their OpenSpec trees in
 # temporary directories. guard_pytest fails any test that reads a file here, so this stays true.
 [skip]
 paths = ["openspec/**"]
+
+# The declarations OpenTofu reads, one scope each (spec: dns, milestones, labels).
+[scopes.dns]
+paths = ["tofu/dns.json"]
+
+[scopes.milestones]
+paths = ["tofu/milestones.json"]
+
+[scopes.labels]
+paths = ["tofu/labels/**"]
+
+# The OpenTofu configuration, each top-level file by name: `tofu/**` would overlap the scopes above, so a DNS change
+# would run these tests too. A new .tf file is in no group, and runs the full check, until it's listed here.
+[scopes.tofu]
+paths = [
+  "tofu/dns.tf",
+  "tofu/environments.tf",
+  "tofu/guard_delivery.tf",
+  "tofu/imports.tf",
+  "tofu/milestones.tf",
+  "tofu/org.tf",
+  "tofu/org_profile.tf",
+  "tofu/providers.tf",
+  "tofu/release.tf",
+  "tofu/repositories.tf",
+  "tofu/versions.tf",
+  "tofu/modules/**",
+  "tofu/required-checks.json",
+]
+
+[scopes.docs]
+paths = ["docs/**", "README.md", "CLAUDE.md"]

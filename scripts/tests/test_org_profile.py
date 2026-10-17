@@ -78,6 +78,7 @@ def test_the_org_profile_has_the_bug_feature_and_decision_forms() -> None:
     assert [p.name for p in real_forms()] == ["bug.yml", "decision.yml", "feature.yml"]
 
 
+@pytest.mark.labels
 @pytest.mark.parametrize("form", real_forms(), ids=lambda p: p.name)
 def test_each_forms_type_and_labels_are_declared_by_the_org(form: Path) -> None:
     assert form_problems(form, enabled_types(ISSUE_TYPES), label_names(WORKFLOW_LABELS)) == []

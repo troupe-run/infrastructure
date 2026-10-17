@@ -17,6 +17,8 @@ import pytest
 import yaml
 from conftest import REPO
 
+pytestmark = pytest.mark.tofu
+
 CHECKS = REPO / "tofu" / "required-checks.json"
 REPOSITORIES_TF = REPO / "tofu" / "repositories.tf"
 GUARD_DELIVERY_TF = REPO / "tofu" / "guard_delivery.tf"
