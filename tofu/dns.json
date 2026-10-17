@@ -15,7 +15,7 @@
     "pages-verify": {
       "name": "_github-pages-challenge-troupe-run.troupe.run",
       "type": "TXT",
-      "content": "\"f20f50ae5c14b2efb4e971b5c99318\""
+      "content": "\"5f257f97c64f4931616bb34e817511\""
     },
     "mx-null": { "name": "troupe.run", "type": "MX", "content": ".", "priority": 0 },
     "spf": { "name": "troupe.run", "type": "TXT", "content": "\"v=spf1 -all\"" },
