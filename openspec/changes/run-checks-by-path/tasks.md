@@ -78,13 +78,60 @@
 - [x] 4.4 Update `docs/development-workflow.md`'s CI section and `ci.yml`'s header comment to say what this
   repository's CI runs on a pull request and on `main`. Commit the docs edit on its own (with `tasks.md`), and verify
   the commit hook announces `running scripts/check.py --scope docs` and passes.
+  - 4.4: the docs commit (513dfb3 before the rebase onto main, 43c5155 after) printed `guard: only README.md, docs/**
+    and openspec/** are staged; running scripts/check.py --scope docs instead of the full check` and `passed in 2s`.
 
 ## 5. Evidence
 
-- [ ] 5.1 Run the differential over the last 40 merged pull requests (design D8): for each, the old selection (full
+- [x] 5.1 Run the differential over the last 40 merged pull requests (design D8): for each, the old selection (full
   check, 11 legs), the new one (scope, selected tests, legs or not), and the check that every test reading a changed
   path is selected or the answer is `full`. Verify zero misses, grep the tests for subprocesses reading scoped files
   (none expected), and record the table, with the time saved, here and in the pull request.
+  - 2026-10-17. Only 34 pull requests have ever merged here (#3 to #82), so all 34 are in it, not 40. Each test's
+    reads and tags were recorded over the full suite (934 tests, before the rebase onto main added one, which
+    `test_dns.py`'s module tag covers). For each pull request: the scope `check-scope` gives its paths, the tests that
+    scope selects, the tests that read any changed path, and those not selected. **Misses: 0.** 31 pull requests
+    still run the full check (each changed a script, a workflow or another path in no scope); 3 are scoped, none
+    skipped. The legs are skipped on 19 of 34. The tests that use subprocesses read scoped files only in temporary
+    repositories, never this one's.
+
+    | PR | Paths | Scope | Tests run (of 934) | Tests reading a changed path | Missed | Legs (of 11) | Title |
+    |---|---|---|---|---|---|---|---|
+    | #3 | 52 | full | 934 | 38 | 0 | 11 | feat: adopt the troupe-run org into OpenTofu, with a clean p |
+    | #7 | 12 | full | 934 | 10 | 0 | 0 | feat: protect main on every managed repository with a rulese |
+    | #9 | 48 | full | 934 | 65 | 0 | 11 | feat: the development workflow and its guard live here, and  |
+    | #10 | 22 | full | 934 | 21 | 0 | 0 | ci-apply: plan and apply the org from GitHub Actions |
+    | #12 | 10 | full | 934 | 11 | 0 | 0 | fix-state-commit: commit CI's state with a tested script, an |
+    | #13 | 13 | full | 934 | 12 | 0 | 11 | rename-website: troupe-run.github.io becomes website |
+    | #17 | 34 | full | 934 | 29 | 0 | 11 | required-checks: required CI, guard, DCO and plan checks; an |
+    | #18 | 10 | full | 934 | 32 | 0 | 11 | refuse-admin-merge: allow-list agents' gh commands, and refu |
+    | #20 | 22 | full | 934 | 23 | 0 | 0 | feat: org-default PR template and issue forms in .github |
+    | #23 | 7 | full | 934 | 2 | 0 | 0 | fix: drop the duplicate security link from the org's issue c |
+    | #24 | 15 | full | 934 | 16 | 0 | 0 | feat: declare troupe's capability labels here, changed by pu |
+    | #27 | 5 | labels | 9 | 1 | 0 | 0 | feat(tofu): add cap:client-protocol and cap:runs to troupe's |
+    | #28 | 12 | full | 934 | 1 | 0 | 0 | feat: say what each of troupe's cap: labels covers, and repo |
+    | #32 | 9 | full | 934 | 31 | 0 | 11 | feat(guard)!: one way per write — refuse GraphQL mutations a |
+    | #36 | 6 | full | 934 | 1 | 0 | 0 | chore(labels): refresh cap:platform and cap:protocol, add ca |
+    | #37 | 11 | full | 934 | 44 | 0 | 11 | feat(guard): pass release-please's PR narrowly, and check PR |
+    | #38 | 10 | full | 934 | 32 | 0 | 11 | feat(guard): grant the plain gh commands the guard allows, s |
+    | #40 | 11 | full | 934 | 13 | 0 | 0 | ci(tofu): plan main every day, so a forged delivery shows wi |
+    | #41 | 18 | full | 934 | 11 | 0 | 0 | feat(tofu): declare troupe's release App, its environment, v |
+    | #44 | 10 | full | 934 | 31 | 0 | 11 | feat(guard): open the release-please exemption on troupe onl |
+    | #48 | 19 | full | 934 | 38 | 0 | 11 | feat(guard): run only what a commit's paths need |
+    | #49 | 18 | full | 934 | 47 | 0 | 11 | fix(guard): trust a release branch's name only where troupe  |
+    | #50 | 8 | full | 934 | 22 | 0 | 11 | ci: test the guard on Python 3.14 and 3.15, and require thos |
+    | #56 | 9 | docs,tofu | 35 | 1 | 0 | 0 | feat(tofu): declare the website's github-pages environment a |
+    | #57 | 13 | full | 934 | 10 | 0 | 0 | feat(tofu): declare the website's GitHub Pages settings |
+    | #64 | 25 | full | 934 | 17 | 0 | 0 | feat(tofu): govern the website with the guard, without DCO |
+    | #65 | 20 | full | 934 | 3 | 0 | 11 | feat: turn on Dependabot and secret scanning in every reposi |
+    | #67 | 8 | full | 934 | 19 | 0 | 11 | ci: test a pull request once, and main except its state comm |
+    | #70 | 14 | full | 934 | 3 | 0 | 0 | feat: declare the release milestones in every managed reposi |
+    | #71 | 16 | full | 934 | 42 | 0 | 11 | feat(guard): delivered files keep their source's mode |
+    | #74 | 26 | full | 934 | 18 | 0 | 0 | feat: manage troupe.run's DNS in Cloudflare as code |
+    | #77 | 4 | dns | 17 | 5 | 0 | 0 | fix(dns): publish troupe.run's new Pages verification record |
+    | #79 | 12 | full | 934 | 6 | 0 | 0 | feat(dns): declare troupe.run's Universal SSL setting with i |
+    | #82 | 11 | full | 934 | 6 | 0 | 0 | fix(dns): turn troupe.run's Universal SSL off |
+
 - [ ] 5.2 Open the pull request (`Closes #78`), and verify on its own run: `changes` answers `full` and `guard=true`
   (it changes `ci.yml`), every leg runs, `guard tests` passes, and the plan shows the ruleset change. Record the run
   and plan here.
