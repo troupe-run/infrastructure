@@ -72,9 +72,14 @@
     `test_required_checks.py` leaves the legs out (`NOT_REQUIRED`) and checks `guard tests` is required and no leg is.
     actionlint (`uvx --from actionlint-py actionlint`) reports nothing. On this branch's own paths the `changes` step
     answers `scope=full`, `check-args=` and `guard=true`.
-- [ ] 4.3 Replace the 11 leg contexts with `guard tests` in `tofu/required-checks.json`, and update the `rulesets`
+- [x] 4.3 Replace the 11 leg contexts with `guard tests` in `tofu/required-checks.json`, and update the `rulesets`
   wording in `README.md` (the example check name). Verify `test_infrastructure_requires_exactly_its_pull_request_jobs`
   passes, and `uv run scripts/tofu.py plan` locally shows only the `infrastructure` ruleset's required checks changing.
+  - 4.3: `test_infrastructure_requires_exactly_its_pull_request_jobs` passes. The local plan couldn't run (1Password
+    timed out waiting for the owner's Touch ID: `authorization timeout`), so the plan is #83's, approved by the owner
+    (run 39034742492): `Plan: 0 to add, 1 to change, 0 to destroy`, only
+    `module.repo_infrastructure.github_repository_ruleset.main[0]` updated in place, its 11 `guard tests (<os>,
+    Python <v>)` contexts removed and `guard tests` added.
 - [x] 4.4 Update `docs/development-workflow.md`'s CI section and `ci.yml`'s header comment to say what this
   repository's CI runs on a pull request and on `main`. Commit the docs edit on its own (with `tasks.md`), and verify
   the commit hook announces `running scripts/check.py --scope docs` and passes.
@@ -132,9 +137,12 @@
     | #79 | 12 | full | 934 | 6 | 0 | 0 | feat(dns): declare troupe.run's Universal SSL setting with i |
     | #82 | 11 | full | 934 | 6 | 0 | 0 | fix(dns): turn troupe.run's Universal SSL off |
 
-- [ ] 5.2 Open the pull request (`Closes #78`), and verify on its own run: `changes` answers `full` and `guard=true`
+- [x] 5.2 Open the pull request (`Closes #78`), and verify on its own run: `changes` answers `full` and `guard=true`
   (it changes `ci.yml`), every leg runs, `guard tests` passes, and the plan shows the ruleset change. Record the run
   and plan here.
+  - #83, CI run 39034742545: `what does it need?` answered `scope=full`, `check-args=` and `guard=true` (the pull
+    request changes `ci.yml`). `check` passed, all 11 legs passed under their expanded names, and `guard tests`
+    passed. `plan (pull request)`, `guard (workflow rules)` and DCO passed. The plan is as in 4.3.
 
 ## Workflow follow-up
 
