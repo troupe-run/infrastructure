@@ -57,11 +57,11 @@ uv run scripts/oob.py            # drift in what OpenTofu can't manage
 ```
 
 `scripts/tofu.py` runs `tofu` in `tofu/` as the `troupe-run-infrastructure` GitHub App:
-- **When the secrets are already in the environment** (`TF_VAR_github_app_pem`, `TF_VAR_state_passphrase` and
-  `TF_VAR_billing_email`), as they are in CI, it uses them.
+- **When the secrets are already in the environment** (`TF_VAR_github_app_pem`, `TF_VAR_state_passphrase`,
+  `TF_VAR_billing_email` and `TF_VAR_cloudflare_api_token`), as they are in CI, it uses them.
 - **Otherwise** it runs `tofu` under `op run`, which takes the secrets from the 1Password references in
   `tofu/secrets.env` for that one run. Expect a 1Password prompt.
-- **Without either,** it stops before contacting GitHub and names what's missing.
+- **Without either,** it stops before contacting GitHub or Cloudflare and names what's missing.
 
 No secret is ever written to the repo. The state is encrypted, and is unreadable without the passphrase. The App's
 key is ephemeral input, so a saved plan doesn't hold it either: applying a saved plan asks for the key again.
@@ -104,7 +104,7 @@ Rejecting the approval applies nothing. To plan `main` again later, for example 
 | `plan-main` | `main` only | none | the plan after a merge, and manual runs |
 | `apply` | `main` only | the owner | the apply |
 
-Each holds the same three secrets. OpenTofu declares the environments (`tofu/environments.tf`) but never their
+Each holds the same four secrets. OpenTofu declares the environments (`tofu/environments.tf`) but never their
 values: the owner sets them from 1Password, so no value is printed or passes through a session:
 
 ```sh
@@ -116,6 +116,8 @@ for env in plan-pr plan-main apply; do
     | gh secret set TF_VAR_state_passphrase --env "$env" -R troupe-run/infrastructure
   op read -n "op://troupe.run/troupe-run-infrastructure tofu state/billing email" \
     | gh secret set TF_VAR_billing_email --env "$env" -R troupe-run/infrastructure
+  op read -n "op://troupe.run/troupe-run cloudflare dns/credential" \
+    | gh secret set TF_VAR_cloudflare_api_token --env "$env" -R troupe-run/infrastructure
 done
 ```
 

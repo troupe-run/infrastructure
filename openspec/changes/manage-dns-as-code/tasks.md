@@ -43,12 +43,16 @@
 
 ## 3. Supply the token (D4; specs: state-and-apply, ci-apply)
 
-- [ ] 3.1 Add `TF_VAR_cloudflare_api_token` to `SECRETS` in `scripts/tofu.py` and its 1Password reference to
+- [x] 3.1 Add `TF_VAR_cloudflare_api_token` to `SECRETS` in `scripts/tofu.py` and its 1Password reference to
       `tofu/secrets.env`, and update `scripts/tofu.py`'s tests for the new secret. Verify the test that a missing
       secret is named before anything runs passes for the token, and `uv run scripts/check.py` passes
-- [ ] 3.2 Add `TF_VAR_cloudflare_api_token` to the `env` of every job in `.github/workflows/tofu.yml` that sets the
+      Done 2026-10-17: two new tests failed first (the token wasn't required; secrets.env didn't name it), then
+      `test_tofu_wrapper.py` 8 passed, including one that `secrets.env` names exactly the wrapper's secrets
+- [x] 3.2 Add `TF_VAR_cloudflare_api_token` to the `env` of every job in `.github/workflows/tofu.yml` that sets the
       other secrets. Update the README's environments paragraph and its `gh secret set` loop. Verify
       `uv run scripts/check.py` passes and a `grep` finds the variable in each job that has `TF_VAR_state_passphrase`
+      Done 2026-10-17: 3 jobs have `TF_VAR_state_passphrase:` and 3 have `TF_VAR_cloudflare_api_token:`;
+      `check.py`: all gates passed
 - [ ] 3.3 Ask the owner to run the README's updated loop, so all three environments get the token. Verify with
       `gh secret list --env <env> -R troupe-run/infrastructure` for each (names only)
 

@@ -22,8 +22,14 @@ TOFU_DIR = ROOT / "tofu"
 SECRETS_ENV = TOFU_DIR / "secrets.env"
 
 # Supplied at run time, never committed. The billing email isn't secret, but it is personal
-# data in a public repo, so it travels the same way (design D4).
-SECRETS = ("TF_VAR_github_app_pem", "TF_VAR_state_passphrase", "TF_VAR_billing_email")
+# data in a public repo, so it travels the same way (design D4). The Cloudflare token edits only
+# troupe.run's DNS records (manage-dns-as-code design D4).
+SECRETS = (
+    "TF_VAR_github_app_pem",
+    "TF_VAR_state_passphrase",
+    "TF_VAR_billing_email",
+    "TF_VAR_cloudflare_api_token",
+)
 
 # The 1Password account holding the items in tofu/secrets.env. An OP_ACCOUNT already in the
 # environment wins.
