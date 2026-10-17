@@ -92,7 +92,8 @@ both names. Then:
 | any path in no group, none at all, or `scripts/check-paths.toml` itself | the full check |
 
 With no `scripts/check-paths.toml`, every commit runs the full check. A commit that changes the declaration always
-runs the full check, so it can't widen itself and benefit in the same commit. This repository skips `openspec/**`.
+runs the full check, so it can't widen itself and benefit in the same commit. This repository skips `openspec/**`,
+and scopes its declarations (`dns`, `milestones`, `labels`), its OpenTofu configuration (`tofu`) and its docs (`docs`).
 
 **CI gets the same answer from the same code.** A workflow pipes the changed paths into `check-scope`:
 
@@ -114,6 +115,12 @@ fails the step, prints the same message as the commit hook, and prints no answer
 itself: the base to compare against, and what to do when it can't work one out (a new branch, a force push, a shallow
 history). Then it passes no paths, and the answer is `full`.
 
+This repository's `ci.yml` asks in a `changes` job on each pull request. `check` is skipped (which counts as passed)
+on `none`, runs `check.py` with the scopes it's given, and runs the full check when `changes` failed. The same job asks
+`scripts/guard_tests_needed.py` whether the guard's tests must run on every OS and Python: only when a pull request
+changes what they depend on (the guard's files, its tests, the declaration, the Python project or `ci.yml`). One
+`guard tests` job reports for those legs, run or skipped. `main` runs everything after every merge.
+
 ### A scope is a test tag
 
 The guard passes scope names and doesn't know what they run. A repository that declares a scope makes its `check.py`
@@ -129,7 +136,7 @@ keep this contract, whatever language it's in:
 
 With pytest, the tag is a marker named for the scope: `@pytest.mark.docs` on a test, or `pytestmark = pytest.mark.docs`
 on a module. `check.py` runs `pytest -m "api or docs"`, built by `guard.marker_expression`. This repository's
-`check.py` takes `--scope` too. It declares no scope, so it refuses every name.
+`check.py` takes `--scope` too, for the scopes above.
 
 **Every test run checks the tags.** A test fails if it reads a file under a scope's paths without that scope's tag,
 or reads a skipped path at all. The message names the test, the file and the tag to add. So a new test that reads

@@ -75,7 +75,7 @@
 - [ ] 4.3 Replace the 11 leg contexts with `guard tests` in `tofu/required-checks.json`, and update the `rulesets`
   wording in `README.md` (the example check name). Verify `test_infrastructure_requires_exactly_its_pull_request_jobs`
   passes, and `uv run scripts/tofu.py plan` locally shows only the `infrastructure` ruleset's required checks changing.
-- [ ] 4.4 Update `docs/development-workflow.md`'s CI section and `ci.yml`'s header comment to say what this
+- [x] 4.4 Update `docs/development-workflow.md`'s CI section and `ci.yml`'s header comment to say what this
   repository's CI runs on a pull request and on `main`. Commit the docs edit on its own (with `tasks.md`), and verify
   the commit hook announces `running scripts/check.py --scope docs` and passes.
 
