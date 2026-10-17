@@ -15,8 +15,10 @@
 
 ## 2. Pull request
 
-- [ ] 2.1 Open the pull request with `Closes #76`. Verify CI is green and its plan (once the owner approves that run)
+- [x] 2.1 Open the pull request with `Closes #76`. Verify CI is green and its plan (once the owner approves that run)
       matches 1.2
+      Done 2026-10-17: #77. CI 17 passed, 2 skipped (main's plan and apply). The owner approved the plan run; it reads
+      `Plan: 0 to add, 1 to change, 0 to destroy.`, the same in-place `content` change as 1.2
 
 ## Workflow follow-up
 
