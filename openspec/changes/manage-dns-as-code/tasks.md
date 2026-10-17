@@ -17,7 +17,9 @@
 - [ ] 1.2 Ask the owner to create the D4 token (Zone → DNS → Edit, Zone → Zone → Read, troupe.run only, no IP
       filter) and save it in 1Password as `troupe-run cloudflare dns`, field `credential`, vault `troupe.run`. Using
       it through `op run`, without printing it, verify the zone's status is `active` and it has exactly eleven records:
-      the ones in 1.1, each with `proxied: false`. Record the account (not its credentials) here
+      the ones in 1.1, each with `proxied: false`. Ask the owner to confirm two-factor login is on for the
+      Cloudflare account and for the Gandi account: either login can repoint troupe.run without a plan (design D1).
+      Record the account (not its credentials) and both confirmations here
 - [ ] 1.3 With the token, list the zone's ID and each record's ID, content, TTL, comment, tags and `settings`. Record
       them here: IDs, not secrets. Note any attribute the scan set that D3's declaration doesn't have
 - [ ] 1.4 The owner started Pages domain verification on 2026-10-17 and added its record in the dashboard:

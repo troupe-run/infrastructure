@@ -50,6 +50,10 @@ built (see Context for the evidence). Gandi's provider would be the only way to 
 dormant dependency this change avoids. A one-off change by hand, recorded in `oob/README.md` with its rollback, is
 the smaller risk. The plan reports when it's changed back (D5).
 
+Both logins can change troupe.run outside this repository: Cloudflare's can edit any record, and Gandi's can change
+the nameservers. A changed record shows in the next plan (daily at the latest), but serves whatever it points at until
+then. So two-factor login on both accounts is part of this change (task 1.2), and `oob/README.md` records it.
+
 ### D2. The zone was created by hand; OpenTofu reads it and adopts its records
 
 `dns.tf` finds the zone with `data "cloudflare_zone"` by name, so its ID isn't copied anywhere. The ten records
