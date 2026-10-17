@@ -9,6 +9,10 @@ terraform {
       source  = "integrations/github"
       version = "~> 6.13"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.28"
+    }
   }
 
   encryption {

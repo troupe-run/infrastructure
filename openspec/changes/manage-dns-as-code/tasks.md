@@ -20,8 +20,24 @@
       the ones in 1.1, each with `proxied: false`. Ask the owner to confirm two-factor login is on for the
       Cloudflare account and for the Gandi account: either login can repoint troupe.run without a plan (design D1).
       Record the account (not its credentials) and both confirmations here
-- [ ] 1.3 With the token, list the zone's ID and each record's ID, content, TTL, comment, tags and `settings`. Record
+      Progress 2026-10-17: the owner created the token and saved it in 1Password. Read through `op run`: an
+      account-owned token, `active`, no expiry. It sees one zone, `troupe.run`, in account `troupe.run`
+      (`32b1f418aad2938f5d7dc5a8ad51226c`), status `active`, nameservers `audrey` and `sterling.ns.cloudflare.com`.
+      Eleven records, all `proxied: false`. Scope: SSL settings, Universal SSL and account members are refused
+      (403); DNSSEC status reads (200, Zone Read). The account is troupe-run's; hps.gd's zones will go in a
+      separate account (owner, 2026-10-17). Waiting on: the item's title has a leading space
+      (`" troupe-run cloudflare dns"`), which the owner is asked to remove; two-factor confirmations
+- [x] 1.3 With the token, list the zone's ID and each record's ID, content, TTL, comment, tags and `settings`. Record
       them here: IDs, not secrets. Note any attribute the scan set that D3's declaration doesn't have
+      Done 2026-10-17. Zone `f716f063a26f15bcfcecd62791cdd202`. Every record: TTL 1, `proxied: false`, no comment,
+      no tags. The CNAME has `settings.flatten_cname: false` (Cloudflare's default); the others have empty
+      `settings`. The probe (2.2) shows whether the declaration needs it. Record IDs:
+      A 108 `be277d7b076adb4e5ce20835d1c51898`, 109 `358fa37e927b4887ad5c893d6652a872`,
+      110 `dea0be14dc4d244cd40f5e877f3bb8cd`, 111 `660e903470158fa5dbf5a77c6f04b6db`;
+      AAAA 8000 `d445ef5e762426d8f78b4a0eed0f2c23`, 8001 `5a337b22a47d23fc5f4cc1d4f94fcb93`,
+      8002 `bff4ac11cb1977de99fc16069bbe20b2`, 8003 `4a0260edaa4b749fa6b3329d14c4be3b`;
+      CNAME www `1c76375044e1296ce02454c0c922b560`; TXT `_gh-troupe-run-o` `05b01811966bd3ed028215c1382805f4`;
+      TXT `_github-pages-challenge-troupe-run` `25be6a5ec9d1532102f26ba9aea140eb`
 - [ ] 1.4 The owner started Pages domain verification on 2026-10-17 and added its record in the dashboard:
       `_github-pages-challenge-troupe-run`, `f20f50ae5c14b2efb4e971b5c99318` (D9). Ask the owner whether troupe.run
       shows as verified or pending in the org's Pages settings, and record it here
@@ -76,9 +92,12 @@
       `check` blocks, with a header citing spec: dns and #55. Lock the provider for every platform the existing lock
       file covers. Verify `uv run scripts/check.py` passes (`tofu fmt`, `tofu validate`) and the lock file lists the
       new provider's hashes for each platform
-- [ ] 4.4 Add eleven `import` blocks to `tofu/imports.tf`, one per kept record, with the IDs from 1.3. Verify a local plan
+- [x] 4.4 Add eleven `import` blocks to `tofu/imports.tf`, one per kept record, with the IDs from 1.3. Verify a local plan
       (fast-forward onto `origin/main` first) imports exactly those eleven with no change, and its other actions are
       creates for the new records only, with no change to any GitHub resource
+      Done 2026-10-17 on the branch at `origin/main`'s head: `Plan: 11 to import, 5 to add, 0 to change, 0 to
+      destroy.` The eleven imports plan no change (the CNAME's `flatten_cname: false` included); the five creates are
+      `mx-null`, `spf`, `dmarc`, `caa-issue` and `caa-issuewild`. Nothing else in the plan
 - [x] 4.5 In each plan step of `.github/workflows/tofu.yml`, turn every `Check block assertion failed` in the plan's
       output into a `::warning::` annotation naming the check. Verify with a local run of the step's script against
       a saved plan output holding one failed check: exactly one annotation, naming it

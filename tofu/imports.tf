@@ -142,3 +142,63 @@ import {
   to = github_repository_milestone.release["troupe/0.1.0"]
   id = "troupe-run/troupe/1"
 }
+
+# troupe.run's records as Cloudflare served them when it took over from Gandi: ten copied by its
+# scan, and the Pages challenge the owner added. Imported, not recreated, because they're live
+# (manage-dns-as-code design D2). The IDs are `<zone>/<record>`, read with the DNS token; they
+# identify objects and aren't secret.
+
+import {
+  to = cloudflare_dns_record.troupe_run["apex-a-108"]
+  id = "f716f063a26f15bcfcecd62791cdd202/be277d7b076adb4e5ce20835d1c51898"
+}
+
+import {
+  to = cloudflare_dns_record.troupe_run["apex-a-109"]
+  id = "f716f063a26f15bcfcecd62791cdd202/358fa37e927b4887ad5c893d6652a872"
+}
+
+import {
+  to = cloudflare_dns_record.troupe_run["apex-a-110"]
+  id = "f716f063a26f15bcfcecd62791cdd202/dea0be14dc4d244cd40f5e877f3bb8cd"
+}
+
+import {
+  to = cloudflare_dns_record.troupe_run["apex-a-111"]
+  id = "f716f063a26f15bcfcecd62791cdd202/660e903470158fa5dbf5a77c6f04b6db"
+}
+
+import {
+  to = cloudflare_dns_record.troupe_run["apex-aaaa-8000"]
+  id = "f716f063a26f15bcfcecd62791cdd202/d445ef5e762426d8f78b4a0eed0f2c23"
+}
+
+import {
+  to = cloudflare_dns_record.troupe_run["apex-aaaa-8001"]
+  id = "f716f063a26f15bcfcecd62791cdd202/5a337b22a47d23fc5f4cc1d4f94fcb93"
+}
+
+import {
+  to = cloudflare_dns_record.troupe_run["apex-aaaa-8002"]
+  id = "f716f063a26f15bcfcecd62791cdd202/bff4ac11cb1977de99fc16069bbe20b2"
+}
+
+import {
+  to = cloudflare_dns_record.troupe_run["apex-aaaa-8003"]
+  id = "f716f063a26f15bcfcecd62791cdd202/4a0260edaa4b749fa6b3329d14c4be3b"
+}
+
+import {
+  to = cloudflare_dns_record.troupe_run["www"]
+  id = "f716f063a26f15bcfcecd62791cdd202/1c76375044e1296ce02454c0c922b560"
+}
+
+import {
+  to = cloudflare_dns_record.troupe_run["org-verify"]
+  id = "f716f063a26f15bcfcecd62791cdd202/05b01811966bd3ed028215c1382805f4"
+}
+
+import {
+  to = cloudflare_dns_record.troupe_run["pages-verify"]
+  id = "f716f063a26f15bcfcecd62791cdd202/25be6a5ec9d1532102f26ba9aea140eb"
+}
