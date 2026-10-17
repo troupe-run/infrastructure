@@ -87,3 +87,39 @@ because both keys are valid until the old one is deleted.
 
 **The infrastructure App's "Variables: write"** was granted for this (2026-10-13), so OpenTofu can write
 `RELEASE_APP_CLIENT_ID`. It's declared in `app-installations.json`.
+
+## troupe.run's DNS (set up by hand)
+
+troupe.run is registered at Gandi and served by Cloudflare. `tofu/dns.tf` manages its records (spec: dns). The zone,
+the token and the nameservers are set up by hand, because managing them would need an account-wide token, or Gandi's
+dormant provider (manage-dns-as-code design D1, D2). Done 2026-10-17.
+
+**The account.** Cloudflare account `troupe.run` (`32b1f418aad2938f5d7dc5a8ad51226c`), on the free plan, holds only
+troupe-run's zones. hps.gd's zones go in a separate account, so no token or member made for them can reach troupe.run.
+Two-factor login is required on it, and on the Gandi account that holds the registration: either login can repoint
+troupe.run without a plan.
+
+**The zone.** `troupe.run` (`f716f063a26f15bcfcecd62791cdd202`). Cloudflare's scan copied Gandi's ten records when it
+was added, and the owner added the Pages verification record; all eleven were imported, not recreated. Its settings
+are Cloudflare's defaults: nothing is proxied, so they don't touch the site. If a CAA answer at the apex ever shows CAs
+that `dns.json` doesn't declare, Cloudflare is adding its own for Universal SSL: turn that off for the zone.
+
+**The token.** A custom account API token with Zone → DNS → Edit and Zone → Zone → Read, on troupe.run only, no IP
+filter and no expiry. It's in 1Password as `troupe-run-cloudflare-dns`, field `credential`, in vault `troupe.run`, and
+in CI's three environments as `TF_VAR_cloudflare_api_token` (README). Check its scope without printing it:
+
+```sh
+export OP_ACCOUNT=l-a-u.1password.com
+op run --env-file=tofu/secrets.env -- sh -c 'curl -s -H "Authorization: Bearer $TF_VAR_cloudflare_api_token" \
+  https://api.cloudflare.com/client/v4/zones | python3 -c "import json,sys; print([z[\"name\"] for z in json.load(sys.stdin)[\"result\"]])"'
+```
+
+It should list `troupe.run` and nothing else. To rotate it, create the new token with the same permissions, replace the
+1Password item's credential, run the README's environment-secret loop, then delete the old token in Cloudflare.
+
+**The nameservers.** At Gandi, troupe.run's nameservers are `audrey.ns.cloudflare.com` and
+`sterling.ns.cloudflare.com`. A plan warns when Cloudflare doesn't report the zone active, which is what changing them
+causes. **Rollback:** set Gandi's three back (`ns-25-c.gandi.net`, `ns-61-b.gandi.net`, `ns-150-a.gandi.net`). Gandi's
+LiveDNS zone still holds the original records, without the mail lockdown, the CAA policy or the Pages verification
+record, so add those there first if the rollback is to keep them. No DS record is published, so there's no DNSSEC to
+undo (#72).

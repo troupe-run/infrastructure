@@ -25,11 +25,12 @@ that closes the issue. Specs live in `openspec/specs/`.
 | `tofu/environments.tf` | CI's three environments on infrastructure (`plan-pr`, `plan-main`, `apply`), and the website's `github-pages`, which only `main` may deploy through |
 | `tofu/release.tf` | What troupe's release workflow needs: the `release` environment, limited to `main`, the release App's client ID, and the ruleset that lets only the App create or update `release-please--*` branches. The App and its key are set up by hand ([oob/README.md](oob/README.md#troupes-release-app-set-up-by-hand)) |
 | `tofu/milestones.json`, `tofu/milestones.tf` | The release milestones (0.1.0, 0.2.0, 1.0.0), the same in every managed repository so the roadmap board groups them by title. A finished release is closed by setting its state, never removed, and a milestone's key never changes, so a rename happens in place |
+| `tofu/dns.json`, `tofu/dns.tf` | troupe.run's DNS records in Cloudflare: the site's, the org's and Pages' domain verification, the mail lockdown and the CAA policy. No record is proxied, TTLs are automatic, and a record's key never changes, so an edit happens in place. The zone, the token and the nameservers at Gandi are set up by hand ([oob/README.md](oob/README.md#trouperuns-dns-set-up-by-hand)) |
 | `org-profile/` | The source of `troupe-run/.github`'s files, byte for byte |
 | `scripts/guard.py`, `scripts/guard_pytest.py`, `.githooks/`, `.claude/settings.json`, `.github/workflows/guard.yml` | The guard: this repo's own, and the source of every delivered copy |
 | `docs/development-workflow.md` | Every rule the guard enforces, and how an override works |
 | `oob/` | What OpenTofu can't manage, and `scripts/oob.py`'s declarations |
-| `scripts/` | `tofu.py` (the only way to run `tofu`), `oob.py` (drift checks), `check.py` (the repo's check), `check-paths.toml` (what a change to each path needs from the check), `guard.py` |
+| `scripts/` | `tofu.py` (the only way to run `tofu`), `oob.py` (drift checks), `plan_checks.py` (a plan's failed check blocks as warnings on the run), `check.py` (the repo's check), `check-paths.toml` (what a change to each path needs from the check), `guard.py` |
 
 ## Setup
 
