@@ -15,7 +15,7 @@
       so it's adopted like the others (11 records, not 10). Certificate: Let's Encrypt `YR1`, notBefore 2026-10-07,
       notAfter 2027-01-05
 - [ ] 1.2 Ask the owner to create the D4 token (Zone → DNS → Edit, Zone → Zone → Read, troupe.run only, no IP
-      filter) and save it in 1Password as `troupe-run cloudflare dns`, field `credential`, vault `troupe.run`. Using
+      filter) and save it in 1Password as `troupe-run-cloudflare-dns`, field `credential`, vault `troupe.run`. Using
       it through `op run`, without printing it, verify the zone's status is `active` and it has exactly eleven records:
       the ones in 1.1, each with `proxied: false`. Ask the owner to confirm two-factor login is on for the
       Cloudflare account and for the Gandi account: either login can repoint troupe.run without a plan (design D1).
@@ -25,8 +25,8 @@
       (`32b1f418aad2938f5d7dc5a8ad51226c`), status `active`, nameservers `audrey` and `sterling.ns.cloudflare.com`.
       Eleven records, all `proxied: false`. Scope: SSL settings, Universal SSL and account members are refused
       (403); DNSSEC status reads (200, Zone Read). The account is troupe-run's; hps.gd's zones will go in a
-      separate account (owner, 2026-10-17). Waiting on: the item's title has a leading space
-      (`" troupe-run cloudflare dns"`), which the owner is asked to remove; two-factor confirmations
+      separate account (owner, 2026-10-17). The owner renamed the item `troupe-run-cloudflare-dns`, and
+      `tofu/secrets.env`'s reference resolves through `op run`. Waiting on: two-factor confirmations
 - [x] 1.3 With the token, list the zone's ID and each record's ID, content, TTL, comment, tags and `settings`. Record
       them here: IDs, not secrets. Note any attribute the scan set that D3's declaration doesn't have
       Done 2026-10-17. Zone `f716f063a26f15bcfcecd62791cdd202`. Every record: TTL 1, `proxied: false`, no comment,
