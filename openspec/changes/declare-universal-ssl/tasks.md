@@ -53,8 +53,11 @@
       shows only the added `"universal_ssl": true,` line
 - [x] 2.5 Update README.md's row for `tofu/dns.json`, `tofu/dns.tf`: it also declares the zone's Universal SSL setting,
       which decides which CAs the CAA policy admits. Verify `uv run scripts/check.py` passes
-- [ ] 2.6 Commit group 1's docs and group 2 as Conventional Commits, signed off, saying why. Verify the guard accepts
+- [x] 2.6 Commit group 1's docs and group 2 as Conventional Commits, signed off, saying why. Verify the guard accepts
       each commit and `check.py` passes before each
+      Done 2026-10-17: `c5f0a9a` (the change's artifacts; the check is skipped for openspec-only commits), `cce0dae`
+      (the declaration, test, resource, import and README row) and `5acb606` (`oob/README.md`). Each signed off; the
+      guard ran `check.py` on the last two, 892 tests passed
 
 ## 3. Pull request
 
