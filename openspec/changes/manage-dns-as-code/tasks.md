@@ -140,7 +140,9 @@
       Done 2026-10-17. Universal SSL wasn't needed (2.2(c)); the section says what to do if the apex shows other
       CAs. The section's token-scope command was run as written and printed `['troupe.run']`. The README's anchor
       to it is `#trouperuns-dns-set-up-by-hand`. `plan_checks.py` joins the README's scripts row
-- [ ] 4.8 Commit each of groups 2, 3 and 4 as its own Conventional Commit, signed off. Verify the guard accepts each
+- [x] 4.8 Commit each of groups 2, 3 and 4 as its own Conventional Commit, signed off. Verify the guard accepts each
+      Done 2026-10-17: group 3 `99bd5e2`; group 4 `9e25dfe`, `15a8671`, `82b869d`, `b0e020a`, `71d570c`, `31033c1`;
+      group 2 `678da81`. Each signed off; the guard ran `check.py` on each that touched more than openspec/
 
 ## 5. Pull request
 
