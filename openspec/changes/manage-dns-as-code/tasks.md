@@ -44,20 +44,36 @@
 
 ## 2. Probe the provider under infra-probe.troupe.run (D7)
 
-- [ ] 2.1 In `tofu/probe/`, add a Cloudflare section behind a `probe_dns` variable. It holds one record of each new
+- [x] 2.1 In `tofu/probe/`, add a Cloudflare section behind a `probe_dns` variable. It holds one record of each new
       shape (quoted TXT, null MX, CAA `issue` and `issuewild`) under `infra-probe.troupe.run`, an `import` block for
       one A record the owner creates by hand in the dashboard under that name, and the two D5 `check` blocks. Its
       header comment says how to run and clean it up, as the earlier probes do. Verify `tofu fmt -check` and
       `tofu validate` pass in `tofu/probe/`
-- [ ] 2.2 Apply the probe locally, then plan again. Verify, and record here: (a) the second plan is clean for every
+      Done 2026-10-17, without the hand-made import: 4.4's plan already imported eleven records made outside
+      OpenTofu with no change. The undeclared check reads one type at a time, behind `probe_dns_read`, after a
+      whole-zone read panicked (2.2). `probe_dns_read_all` keeps the whole-zone read, to reproduce the panic.
+      `tofu fmt -check` and `tofu validate` pass
+- [x] 2.2 Apply the probe locally, then plan again. Verify, and record here: (a) the second plan is clean for every
       type (TXT quoting, CAA `flags`, null MX `.` with `priority = 0`, fully qualified names, `ttl = 1`); (b) the
       hand-made record imports with no change; (c) whether CAA for `infra-probe.troupe.run` or `troupe.run` shows
       entries that weren't declared; (d) the undeclared-records check warns on a second record added by hand and is
       quiet once it's deleted; (e) the zone-active check passes. If (a) or (b) fails for a type, change D3's shape for
       it and record why. If (c) shows Cloudflare's CAs, ask the owner to turn off Universal SSL for the zone, and
       check again
-- [ ] 2.3 Destroy the probe's records, delete its local state, and unset `probe_dns`. Verify with the token that the
+      Done 2026-10-17 (design D7, Results). First run: one whole-zone read in the check block. The apply created
+      the five records, then panicked saving state (`inconsistent list element types`, CAA's `data.flags`); the
+      owner was told, and the records were deleted through the API. Second run, approved by the owner, reads
+      behind a variable: (a) apply saved state; replan `No changes` for TXT, null MX, both CAA, a CNAME without a
+      trailing dot, TTL 1. (b) see 2.1. (c) `dig CAA infra-probe.troupe.run` at both Cloudflare nameservers:
+      exactly `0 issue "letsencrypt.org"` and `0 issuewild ";"`, nothing added. (d) one read per type: a TXT and a
+      CAA under `hand.infra-probe.troupe.run`, made through the API, both named in the warning
+      (`plan_checks.py`: one annotation); quiet once deleted. (e) the zone-active check passed in every plan.
+      Third run, at the owner's request: with state present, a whole-zone read panicked 3 times out of 3, and one
+      read per type over the same records planned `No changes`
+- [x] 2.3 Destroy the probe's records, delete its local state, and unset `probe_dns`. Verify with the token that the
       zone holds exactly the eleven records from 1.2, and that `git status` shows no probe state or tfvars
+      Done 2026-10-17: `Destroy complete! Resources: 5 destroyed.`; the API lists 11 records, none under
+      `infra-probe`; `git status --ignored tofu/probe` shows only `main.tf` changed and the ignored provider files
 
 ## 3. Supply the token (D4; specs: state-and-apply, ci-apply)
 
@@ -107,8 +123,12 @@
       `::warning title=check.undeclared_records::Records in the zone ...`, exit 0. Both plan jobs run it after
       the JSON plan exists, and add its summary to the posted plan and the step summary.
       `test_plan_checks.py`: 8 passed; an unknown status is an error naming the known ones
-- [ ] 4.6 Verify the 4.4 plan shows no check warning, and that the saved plan holds no token: `tofu show -json` on it
+- [x] 4.6 Verify the 4.4 plan shows no check warning, and that the saved plan holds no token: `tofu show -json` on it
       contains neither the token nor the App key. Record the plan's summary line here
+      Done 2026-10-17, with the per-type reads: `Plan: 11 to import, 5 to add, 0 to change, 0 to destroy.`, 21
+      reads, `check.undeclared_records` and `check.zone_active` pass, `plan_checks.py` prints nothing. The saved
+      plan's JSON has neither the token nor the App key. It does hold the state passphrase, under
+      `variables.state_passphrase.value`, as every saved plan has since before this change (reported to the owner)
 - [ ] 4.7 Add the Layout row for `tofu/dns.json` / `dns.tf` to README.md (a key never changes; nothing is proxied; TTL
       automatic). Add a "troupe.run's DNS (set up by hand)" section to `oob/README.md`: the account, the zone and its
       scan-imported records, the token's scope and 1Password item, Universal SSL if 2.2(c) needed it, the Pages

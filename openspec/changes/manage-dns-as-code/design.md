@@ -123,8 +123,19 @@ zone's records, and Zone Read.
 
 Two `check` blocks in `dns.tf`:
 
-- **Undeclared records:** `data "cloudflare_dns_records"` for the zone, compared by name, type and content with the
-  declaration. Each one that's left over is named in the assertion's message.
+- **Undeclared records:** the zone's records, compared by ID with the declared ones. Each one that's left over is
+  named in the assertion's message, by name, type and content. The zone is read with one `cloudflare_dns_records`
+  per record type, for all 21 types the API has, not only the declared ones: a stray NS record would hand a
+  subdomain to someone else's servers. One read of the whole zone **panics OpenTofu** once the zone holds a CAA
+  record, because the list's CAA elements type `data.flags` differently from the rest (provider 5.28.0, OpenTofu
+  1.13.1). It panics at plan, and while an apply saves its state, which would leave records live but unrecorded.
+  The probe reproduced it 3 times out of 3, and one read per type planned cleanly over the same records (D7).
+  It's the provider's open bug
+  [cloudflare/terraform-provider-cloudflare#7004](https://github.com/cloudflare/terraform-provider-cloudflare/issues/7004),
+  reported on 5.18.0 in April 2026 and not reproduced by Cloudflare; we don't comment on it (owner, 2026-10-17).
+  Once it's fixed, the probe's `probe_dns_read_all` retests one read.
+  These reads are top-level data sources, so an API failure fails the plan, as a failed read of the zone already
+  does.
 - **Zone active:** `data "cloudflare_zone"`'s `status == "active"`, naming the status and the nameservers Cloudflare
   expects.
 
@@ -166,6 +177,14 @@ open:
 
 The probe's records are on names nothing reads, and they're destroyed afterwards. The zone is then checked to hold
 only the eleven adopted records.
+
+**Results (2026-10-17).** The first run used one whole-zone read inside the check block. Its apply created the five
+records and then panicked while saving state; the records were deleted through the API. With reads moved behind a
+variable, the apply saved state and the replan was clean for every shape (point 1). Point 2 was already answered by
+the live root's plan: eleven records made outside OpenTofu import with no change. Cloudflare served exactly the two
+declared CAA records, with none of its own added (point 3), on a subdomain; the apex is checked after the apply.
+One read per type found a TXT and a CAA record added through the API, and was quiet once they were deleted
+(point 4). A whole-zone read over the same records still panicked.
 
 ### D8. The CAA test forces a new certificate
 

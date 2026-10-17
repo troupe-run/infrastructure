@@ -28,6 +28,18 @@
 # drop-forgery-resistance (design D3) reruns it without the deletion rule, merging a pull request
 # from the branch to show that delete-on-merge removes it.
 #
+# The manage-dns-as-code probe (design D7) sets probe_dns, with declared = false and any
+# probe_repo, so it needs no throwaway repository. It creates one record of each new shape under
+# infra-probe.troupe.run, a name nothing reads, in the live troupe.run zone, plus the live root's two
+# check blocks, the undeclared one narrowed to that name and read one type at a time. Apply with no
+# types read, so the apply never reads the list:
+#   op run --env-file=../secrets.env -- tofu apply -var probe_dns=true -var declared=false \
+#     -var probe_repo=none
+# then plan again, which must be clean, and plan with -var 'probe_dns_read=["CAA"]' and the other
+# types. To test the undeclared check, add a record under infra-probe.troupe.run outside OpenTofu
+# (the API, with the same token), plan, and delete it. Clean up with `tofu destroy` and the same
+# variables, then delete this directory's state.
+#
 # The website-pages probe (design D6) sets probe_pages, which imports the probe's Pages site,
 # turned on beforehand with `gh api -X POST repos/troupe-run/<name>/pages -f build_type=workflow`,
 # into a github_repository_pages deployed from Actions. Switching the site to a branch with
@@ -42,6 +54,10 @@ terraform {
     github = {
       source  = "integrations/github"
       version = "~> 6.13"
+    }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.28"
     }
   }
 
@@ -358,4 +374,121 @@ import {
   for_each = var.probe_pages ? toset([var.probe_repo]) : toset([])
   to       = github_repository_pages.probe[0]
   id       = each.key
+}
+
+# The manage-dns-as-code probe (design D7): the live dns.tf's record shapes and checks, under a name
+# nothing reads.
+variable "probe_dns" {
+  description = "Create the DNS probe's records under infra-probe.troupe.run (manage-dns-as-code D7)."
+  type        = bool
+  default     = false
+}
+
+variable "cloudflare_api_token" {
+  description = "The DNS token, as in ../providers.tf. Never committed, never saved in a plan."
+  type        = string
+  sensitive   = true
+  ephemeral   = true
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+
+locals {
+  probe_dns_name = "infra-probe.troupe.run"
+  probe_dns_records = var.probe_dns ? {
+    "txt"           = { name = local.probe_dns_name, type = "TXT", content = "\"v=spf1 -all\"" }
+    "mx-null"       = { name = local.probe_dns_name, type = "MX", content = ".", priority = 0 }
+    "caa-issue"     = { name = local.probe_dns_name, type = "CAA", flags = 0, tag = "issue", value = "letsencrypt.org" }
+    "caa-issuewild" = { name = local.probe_dns_name, type = "CAA", flags = 0, tag = "issuewild", value = ";" }
+    "cname"         = { name = "www.${local.probe_dns_name}", type = "CNAME", content = "troupe-run.github.io" }
+  } : {}
+}
+
+data "cloudflare_zone" "probe" {
+  count = var.probe_dns ? 1 : 0
+
+  filter = {
+    name = "troupe.run"
+  }
+}
+
+resource "cloudflare_dns_record" "probe" {
+  for_each = local.probe_dns_records
+
+  zone_id  = data.cloudflare_zone.probe[0].id
+  name     = each.value.name
+  type     = each.value.type
+  ttl      = 1
+  proxied  = false
+  content  = each.value.type == "CAA" ? null : each.value.content
+  priority = try(each.value.priority, null)
+  data = each.value.type == "CAA" ? {
+    flags = each.value.flags
+    tag   = each.value.tag
+    value = each.value.value
+  } : null
+}
+
+# One read per record type: a single cloudflare_dns_records list holding CAA and other types
+# panics OpenTofu (the first probe run, 2026-10-17). probe_dns_read names the types to read, so an
+# apply with none read can't reach the panic.
+variable "probe_dns_read" {
+  description = "Record types to read under infra-probe.troupe.run, one data source each."
+  type        = list(string)
+  default     = []
+}
+
+data "cloudflare_dns_records" "probe" {
+  for_each = var.probe_dns ? toset(var.probe_dns_read) : toset([])
+
+  zone_id   = data.cloudflare_zone.probe[0].id
+  type      = each.key
+  max_items = 1000
+  name = {
+    endswith = local.probe_dns_name
+  }
+}
+
+check "probe_undeclared_records" {
+  assert {
+    condition = length([
+      for record in flatten([for read in data.cloudflare_dns_records.probe : read.result]) : record
+      if !contains([for declared in cloudflare_dns_record.probe : declared.id], record.id)
+    ]) == 0
+    error_message = "Records under ${local.probe_dns_name} that the probe doesn't declare: ${join(", ", [
+      for record in flatten([for read in data.cloudflare_dns_records.probe : read.result]) : "${record.name} ${record.type} ${record.content}"
+      if !contains([for declared in cloudflare_dns_record.probe : declared.id], record.id)
+    ])}."
+  }
+}
+
+check "probe_zone_active" {
+  assert {
+    condition     = !var.probe_dns || try(data.cloudflare_zone.probe[0].status, "") == "active"
+    error_message = "The troupe.run zone is ${try(data.cloudflare_zone.probe[0].status, "unread")}, not active."
+  }
+}
+
+# The first probe's shape: one read of the whole zone, every type in one list. Set to test whether
+# it still panics with CAA records in the zone (cloudflare/terraform-provider-cloudflare#7004).
+variable "probe_dns_read_all" {
+  description = "Read every record under infra-probe.troupe.run in one data source."
+  type        = bool
+  default     = false
+}
+
+data "cloudflare_dns_records" "probe_all" {
+  count = var.probe_dns && var.probe_dns_read_all ? 1 : 0
+
+  zone_id   = data.cloudflare_zone.probe[0].id
+  max_items = 1000
+  name = {
+    endswith = local.probe_dns_name
+  }
+}
+
+output "probe_all_count" {
+  value = length(try(data.cloudflare_dns_records.probe_all[0].result, []))
 }
