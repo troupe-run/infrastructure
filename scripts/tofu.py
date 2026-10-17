@@ -31,6 +31,16 @@ SECRETS = (
     "TF_VAR_cloudflare_api_token",
 )
 
+# The secrets that grant something: acting as the App, editing DNS, decrypting the state. A saved
+# plan, and every rendering of it, holds none of them, so each is an ephemeral variable in both
+# roots and CI checks each plan for them (scripts/plan_secrets.py; ephemeral-state-passphrase D2).
+# The billing email isn't one: the org resource stores it, so it can't be ephemeral.
+KEYS = (
+    "TF_VAR_github_app_pem",
+    "TF_VAR_state_passphrase",
+    "TF_VAR_cloudflare_api_token",
+)
+
 # The 1Password account holding the items in tofu/secrets.env. An OP_ACCOUNT already in the
 # environment wins.
 OP_ACCOUNT = "l-a-u.1password.com"

@@ -79,9 +79,11 @@ terraform {
   }
 }
 
+# Ephemeral, as in ../versions.tf: a saved plan records no ephemeral variable.
 variable "state_passphrase" {
   type      = string
   sensitive = true
+  ephemeral = true
 }
 
 # Ephemeral, so a saved plan stores neither the key nor the identity it was made with, and the
