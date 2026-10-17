@@ -123,6 +123,13 @@ jobs:
           uv run --no-project scripts/tofu.py show -json pr.tfplan > "$RUNNER_TEMP/plan.json"
           uv run --no-project scripts/hook_modes.py plan --plan-json "$RUNNER_TEMP/plan.json" \
             --out "$RUNNER_TEMP/mode-plan.json" --summary "$RUNNER_TEMP/modes.md"
+      # A failed check block is only a warning, and `tofu show` leaves it out of plan.txt (spec: dns;
+      # manage-dns-as-code design D5). Annotate the run with each one, and summarise them below.
+      - name: Check warnings
+        if: steps.secrets.outputs.available == 'true'
+        run: |
+          uv run --no-project scripts/plan_checks.py --plan-json "$RUNNER_TEMP/plan.json" \
+            --summary "$RUNNER_TEMP/checks.md"
       - name: Post the plan on the pull request
         if: steps.secrets.outputs.available == 'true'
         env:
@@ -138,6 +145,8 @@ jobs:
             echo "$(grep -E '^(Plan:|No changes)' "$RUNNER_TEMP/plan.txt" | head -1)"
             echo
             echo "Made in CI on this pull request merged onto \`main\` ([run]($RUN_URL)). The apply happens after the merge, once the owner approves the plan made then."
+            echo
+            cat "$RUNNER_TEMP/checks.md"
             echo
             cat "$RUNNER_TEMP/modes.md"
             echo
@@ -260,6 +269,12 @@ jobs:
           else
             echo "changes=false" >> "$GITHUB_OUTPUT"
           fi
+      # As in pr-plan: a failed check block becomes an annotation and a line in the summary.
+      - name: Check warnings
+        if: steps.skip.outputs.skip == 'false'
+        run: |
+          uv run --no-project scripts/plan_checks.py --plan-json "$RUNNER_TEMP/plan.json" \
+            --summary "$RUNNER_TEMP/checks.md"
       - name: Show the plan for approval
         if: steps.skip.outputs.skip == 'false'
         env:
@@ -277,6 +292,8 @@ jobs:
             else
               echo "No changes. Nothing to approve."
             fi
+            echo
+            cat "$RUNNER_TEMP/checks.md"
             echo
             cat "$RUNNER_TEMP/modes.md"
             echo
