@@ -36,8 +36,12 @@ terraform {
   }
 }
 
+# Ephemeral, so a saved plan doesn't record it: `sensitive` alone hides it only from the readable
+# plan, and `tofu show -json` would write it out in plain text (ephemeral-state-passphrase D1).
+# The apply decrypts the plan with the passphrase supplied again.
 variable "state_passphrase" {
   description = "Encrypts state and plans. Supplied at run time by scripts/tofu.py, never committed."
   type        = string
   sensitive   = true
+  ephemeral   = true
 }
