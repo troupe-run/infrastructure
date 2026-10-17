@@ -1,6 +1,7 @@
 {
   "zone": "troupe.run",
   "ttl": 1,
+  "universal_ssl": true,
   "records": {
     "apex-a-108": { "name": "troupe.run", "type": "A", "content": "185.199.108.153" },
     "apex-a-109": { "name": "troupe.run", "type": "A", "content": "185.199.109.153" },

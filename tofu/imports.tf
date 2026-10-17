@@ -202,3 +202,10 @@ import {
   to = cloudflare_dns_record.troupe_run["pages-verify"]
   id = "f716f063a26f15bcfcecd62791cdd202/25be6a5ec9d1532102f26ba9aea140eb"
 }
+
+# troupe.run's Universal SSL setting, adopted as it is (on), so the first plan imports it and changes
+# nothing. The ID is the zone's (declare-universal-ssl design D2).
+import {
+  to = cloudflare_universal_ssl_setting.troupe_run
+  id = "f716f063a26f15bcfcecd62791cdd202"
+}

@@ -25,7 +25,9 @@ TYPES: dict[str, frozenset[str]] = {
 }
 COMMON = frozenset({"name", "type"})
 OPTIONAL = frozenset({"ttl"})
-TOP_LEVEL = frozenset({"zone", "ttl", "records"})
+# universal_ssl decides which CAs the CAA records admit, so it's declared beside them (spec dns:
+# "troupe.run's Universal SSL setting is declared once"; declare-universal-ssl design D1).
+TOP_LEVEL = frozenset({"zone", "ttl", "universal_ssl", "records"})
 
 # (name, type, content) of the records troupe.run had at Gandi (spec dns: "The records from
 # before the move are kept").
@@ -84,6 +86,9 @@ def declaration_problems(text: str) -> list[str]:
         for field in sorted(set(declared) - TOP_LEVEL)
     ]
     found += [f"{field}: tofu/dns.json needs it" for field in sorted(TOP_LEVEL - set(declared))]
+    universal_ssl = declared.get("universal_ssl", False)
+    if not isinstance(universal_ssl, bool):
+        found.append(f"universal_ssl: is {universal_ssl!r}; it takes true or false")
     for key, record in declared.get("records", {}).items():
         found += record_problems(key, record, declared.get("zone", ""))
     return found
@@ -96,7 +101,9 @@ def declared_records() -> list[dict[str, Any]]:
 
 
 def text(records: dict[str, Any], **top: object) -> str:
-    return json.dumps({"zone": "troupe.run", "ttl": 1, "records": records, **top})
+    return json.dumps(
+        {"zone": "troupe.run", "ttl": 1, "universal_ssl": True, "records": records, **top}
+    )
 
 
 def a_record(**fields: object) -> dict[str, Any]:
@@ -122,7 +129,7 @@ def test_the_mail_lockdown_is_declared() -> None:
     assert {"p=reject", "sp=reject"} <= {part.strip() for part in dmarc[0].strip('"').split(";")}
 
 
-def test_only_lets_encrypt_may_issue() -> None:
+def test_the_declared_caa_records_name_only_lets_encrypt() -> None:
     caa = {(r["tag"], r["value"], r["flags"]) for r in declared_records() if r["type"] == "CAA"}
     assert caa == {("issue", "letsencrypt.org", 0), ("issuewild", ";", 0)}
 
@@ -140,7 +147,10 @@ def test_an_unknown_type_names_the_key_and_the_supported_types() -> None:
 
 def test_a_duplicate_key_is_named() -> None:
     record = json.dumps(a_record())
-    raw = f'{{"zone": "troupe.run", "ttl": 1, "records": {{"x": {record}, "x": {record}}}}}'
+    raw = (
+        f'{{"zone": "troupe.run", "ttl": 1, "universal_ssl": true, '
+        f'"records": {{"x": {record}, "x": {record}}}}}'
+    )
     assert declaration_problems(raw) == ["x: declared twice in tofu/dns.json"]
 
 
@@ -183,3 +193,20 @@ def test_an_unknown_top_level_field_is_named() -> None:
 def test_a_well_formed_caa_record_is_valid() -> None:
     record = {"name": "troupe.run", "type": "CAA", "flags": 0, "tag": "issue", "value": "x"}
     assert declaration_problems(text({"caa": record})) == []
+
+
+def test_a_missing_universal_ssl_is_named() -> None:
+    declared = json.loads(text({"x": a_record()}))
+    del declared["universal_ssl"]
+    assert declaration_problems(json.dumps(declared)) == ["universal_ssl: tofu/dns.json needs it"]
+
+
+def test_a_universal_ssl_that_is_not_a_boolean_is_named() -> None:
+    assert declaration_problems(text({"x": a_record()}, universal_ssl="false")) == [
+        "universal_ssl: is 'false'; it takes true or false"
+    ]
+
+
+def test_universal_ssl_takes_true_and_false() -> None:
+    for value in (True, False):
+        assert declaration_problems(text({"x": a_record()}, universal_ssl=value)) == []
