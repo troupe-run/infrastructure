@@ -18,7 +18,7 @@ bringing those records under management, and adding the new ones.
 
 ## What Changes
 
-- **Cloudflare's records are adopted as they are.** The ten records Cloudflare serves are imported, and the first plan
+- **Cloudflare's records are adopted as they are.** The records Cloudflare serves are imported, and the first plan
   shows them imported with no change: A 185.199.108–111.153, AAAA 2606:50c0:8000–8003::153, `www` CNAME
   `troupe-run.github.io.`, and `_gh-troupe-run-o` TXT (the org's domain verification). TTL stays at Cloudflare's
   automatic value. They match Gandi's zone export record for record (owner, 2026-10-17).
@@ -30,9 +30,10 @@ bringing those records under management, and adding the new ones.
   - A CAA record lets only Let's Encrypt issue certificates, since GitHub Pages issues with it today (the live
     certificate is from Let's Encrypt `YR1`). It's tested live, because troupe.run has no traffic yet: Pages is made
     to issue a new certificate after the record is published.
-  - GitHub's Pages domain verification for the org (`_github-pages-challenge-troupe-run`). troupe.run isn't a Pages
-    verified domain yet. It's verified for the org, which is a different check. Verifying it for Pages stops another
-    account's Pages site from claiming the domain.
+  - GitHub's Pages domain verification for the org (`_github-pages-challenge-troupe-run`). troupe.run wasn't a Pages
+    verified domain. It's verified for the org, which is a different check. Verifying it for Pages stops another
+    account's Pages site from claiming the domain. The owner started it and added its record in Cloudflare by hand on
+    2026-10-17, so the record is adopted with the others rather than created.
 - The Cloudflare API token is a new secret. It can only edit DNS in the troupe.run zone. It comes from 1Password at
   run time like the others, is an ephemeral variable so no saved plan holds it, and is set in all three CI
   environments by the owner.
@@ -71,7 +72,7 @@ Out of scope:
 
 ## Impact
 
-- New: `tofu/dns.json` and `tofu/dns.tf`, and ten `import` blocks in `tofu/imports.tf`. `tofu/versions.tf` adds the
+- New: `tofu/dns.json` and `tofu/dns.tf`, and eleven `import` blocks in `tofu/imports.tf`. `tofu/versions.tf` adds the
   `cloudflare/cloudflare` provider, `tofu/providers.tf` its configuration and the ephemeral token variable, and
   `tofu/.terraform.lock.hcl` its hashes for every platform the lock file already covers.
 - `tofu/secrets.env`, `scripts/tofu.py` (`SECRETS`), `.github/workflows/tofu.yml` (each job's `env`) and the README's
