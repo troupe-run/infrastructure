@@ -2,20 +2,27 @@
 
 ## 1. Record the switch and get the token (D1, D2, D4, D6, D9)
 
-- [ ] 1.1 Query every record in Gandi's export (A, AAAA, `www` CNAME, `_gh-troupe-run-o` TXT) at
+- [x] 1.1 Query every record in Gandi's export (A, AAAA, `www` CNAME, `_gh-troupe-run-o` TXT) at
       `audrey.ns.cloudflare.com` and at `ns-25-c.gandi.net`, and the delegation at `.run`'s registry. Also query MX,
       apex TXT, CAA, `_dmarc` TXT and DS at Cloudflare, and read the certificate's issuer and dates. Verify the
       content matches name by name, the delegation names Cloudflare's two nameservers, and nothing else is published.
       Record the output here as the switch's evidence (spec dns: "The new nameservers answer as the old ones did")
+      Done 2026-10-17T10:17Z. Same content at both, name by name: A 185.199.108–111.153; AAAA
+      2606:50c0:8000–8003::153; `www` CNAME `troupe-run.github.io.`; `_gh-troupe-run-o` TXT `"ab7788e488"`.
+      `v0n0.nic.run` delegates to `audrey` and `sterling.ns.cloudflare.com`, with no DS. Cloudflare serves no MX,
+      apex TXT, CAA or `_dmarc` TXT. It does serve `_github-pages-challenge-troupe-run` TXT
+      `"f20f50ae5c14b2efb4e971b5c99318"`, which the owner added in the dashboard after starting Pages verification,
+      so it's adopted like the others (11 records, not 10). Certificate: Let's Encrypt `YR1`, notBefore 2026-10-07,
+      notAfter 2027-01-05
 - [ ] 1.2 Ask the owner to create the D4 token (Zone → DNS → Edit, Zone → Zone → Read, troupe.run only, no IP
       filter) and save it in 1Password as `troupe-run cloudflare dns`, field `credential`, vault `troupe.run`. Using
-      it through `op run`, without printing it, verify the zone's status is `active` and it has exactly ten records:
+      it through `op run`, without printing it, verify the zone's status is `active` and it has exactly eleven records:
       the ones in 1.1, each with `proxied: false`. Record the account (not its credentials) here
 - [ ] 1.3 With the token, list the zone's ID and each record's ID, content, TTL, comment, tags and `settings`. Record
       them here: IDs, not secrets. Note any attribute the scan set that D3's declaration doesn't have
-- [ ] 1.4 The owner started Pages domain verification on 2026-10-17: `_github-pages-challenge-troupe-run`,
-      `f20f50ae5c14b2efb4e971b5c99318` (D9). Verify the org's Pages settings list troupe.run as pending verification
-      with that record, and that it isn't served yet (`dig TXT` at Cloudflare returns nothing). Record both here
+- [ ] 1.4 The owner started Pages domain verification on 2026-10-17 and added its record in the dashboard:
+      `_github-pages-challenge-troupe-run`, `f20f50ae5c14b2efb4e971b5c99318` (D9). Ask the owner whether troupe.run
+      shows as verified or pending in the org's Pages settings, and record it here
 
 ## 2. Probe the provider under infra-probe.troupe.run (D7)
 
@@ -32,7 +39,7 @@
       it and record why. If (c) shows Cloudflare's CAs, ask the owner to turn off Universal SSL for the zone, and
       check again
 - [ ] 2.3 Destroy the probe's records, delete its local state, and unset `probe_dns`. Verify with the token that the
-      zone holds exactly the ten records from 1.2, and that `git status` shows no probe state or tfvars
+      zone holds exactly the eleven records from 1.2, and that `git status` shows no probe state or tfvars
 
 ## 3. Supply the token (D4; specs: state-and-apply, ci-apply)
 
@@ -51,8 +58,8 @@
       supported types; each type's exact fields; unknown fields; duplicate keys (read with `object_pairs_hook`);
       names inside the zone; quoted TXT content; and that the kept records are exactly the ones in spec dns. Each
       failure names the record's key and the problem. Verify the tests fail for the right reason before 4.2
-- [ ] 4.2 Add `tofu/dns.json` with every record from D3: the ten kept records as 1.3 found them, the mail and CAA
-      records, the Pages verification value from 1.4, and any shape changes from 2.2. Verify
+- [ ] 4.2 Add `tofu/dns.json` with every record from D3: the eleven kept records as 1.3 found them (the Pages
+      verification record among them), the mail and CAA records, and any shape changes from 2.2. Verify
       `scripts/tests/test_dns.py` passes, and that one deliberately broken copy per refusal fails naming the key
 - [ ] 4.3 Add the `cloudflare/cloudflare` provider to `tofu/versions.tf` (`~> 5.28`). Add its configuration and the
       `sensitive`, `ephemeral` `cloudflare_api_token` variable to `tofu/providers.tf`. Add `tofu/dns.tf`:
@@ -60,8 +67,8 @@
       `check` blocks, with a header citing spec: dns and #55. Lock the provider for every platform the existing lock
       file covers. Verify `uv run scripts/check.py` passes (`tofu fmt`, `tofu validate`) and the lock file lists the
       new provider's hashes for each platform
-- [ ] 4.4 Add ten `import` blocks to `tofu/imports.tf`, one per kept record, with the IDs from 1.3. Verify a local plan
-      (fast-forward onto `origin/main` first) imports exactly those ten with no change, and its other actions are
+- [ ] 4.4 Add eleven `import` blocks to `tofu/imports.tf`, one per kept record, with the IDs from 1.3. Verify a local plan
+      (fast-forward onto `origin/main` first) imports exactly those eleven with no change, and its other actions are
       creates for the new records only, with no change to any GitHub resource
 - [ ] 4.5 In each plan step of `.github/workflows/tofu.yml`, turn every `Check block assertion failed` in the plan's
       output into a `::warning::` annotation naming the check. Verify with a local run of the step's script against

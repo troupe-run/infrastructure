@@ -53,9 +53,10 @@ the smaller risk. The plan reports when it's changed back (D5).
 ### D2. The zone was created by hand; OpenTofu reads it and adopts its records
 
 `dns.tf` finds the zone with `data "cloudflare_zone"` by name, so its ID isn't copied anywhere. The ten records
-Cloudflare's scan copied from Gandi are what troupe.run serves now, so they're **imported, not recreated**: one
+Cloudflare's scan copied from Gandi, and the Pages challenge record the owner added (D9), are what troupe.run
+serves now, so they're **imported, not recreated**: one
 `import` block each in `tofu/imports.tf`, ID `<zone_id>/<record_id>`. The zone and record IDs are read with the token
-(task 1.3). They identify objects, and aren't secret. The first plan must show the ten imported with no change before
+(task 1.3). They identify objects, and aren't secret. The first plan must show the eleven imported with no change before
 anything else is approved.
 
 Alternatives:
@@ -160,7 +161,7 @@ open:
    check is expected to pass, since the zone is serving.
 
 The probe's records are on names nothing reads, and they're destroyed afterwards. The zone is then checked to hold
-only the ten adopted records.
+only the eleven adopted records.
 
 ### D8. The CAA test forces a new certificate
 
@@ -170,17 +171,19 @@ declaration doesn't change, so the next plan shows no drift once it's back. The 
 without HTTPS cost nothing. If no certificate is issued within an hour, the CAA record is removed by a pull request,
 and the cause is recorded on #55.
 
-### D9. Pages domain verification is started before the pull request and finished after the apply
+### D9. Pages domain verification: started and served by hand, then declared
 
-The owner started it on 2026-10-17 in the org's Settings → Pages → Add a domain, which gave `_github-pages-challenge-troupe-run` with the value `f20f50ae5c14b2efb4e971b5c99318`. The
-value isn't secret: it's published in DNS. It's declared in `dns.json` like any other record. Once main's apply
-serves it, the owner presses Verify. GitHub asks for the record to stay, so it stays declared.
+The owner started it on 2026-10-17 in the org's Settings → Pages → Add a domain, which gave
+`_github-pages-challenge-troupe-run` with the value `f20f50ae5c14b2efb4e971b5c99318`. The value isn't secret: it's
+published in DNS. The owner added the record in Cloudflare's dashboard the same day, so it's imported like the scanned
+records (task 1.1), and pressing Verify doesn't wait for this change. GitHub asks for the record to stay, so it stays
+declared.
 
 ## Risks / Trade-offs
 
 - [The scan set attributes the declaration doesn't have, such as a comment, tags or `settings`] → The probe (D7,
   point 2) and the pull request's plan show them. Each is declared, or reset with the owner's agreement, before
-  merging. The ten imports must read "0 to change".
+  merging. The eleven imports must read "0 to change".
 - [Cloudflare adds CAA records for its own CAs] → The probe checks for them (D7). If they appear, the owner turns off
   Universal SSL for the zone, which a DNS-only zone doesn't use, and records that in `oob/README.md`.
 - [A record is changed in the dashboard before this change merges] → The import's plan shows the difference, and the
@@ -198,7 +201,7 @@ serves it, the owner presses Verify. GitHub asks for the record to stay, so it s
 1. Done by the owner on 2026-10-17: the zone created, Gandi's records copied by the scan, and the nameservers switched.
 2. The owner creates the token and starts Pages domain verification.
 3. The probe runs under `infra-probe.troupe.run`, then destroys what it created.
-4. The pull request's plan shows the ten records imported with no change, and creates for the new records only. The
+4. The pull request's plan shows the eleven records imported with no change, and creates for the new records only. The
    owner merges and approves the apply.
 5. The owner verifies the Pages domain. The CAA test (D8) runs, and the new records are checked from public resolvers.
 
