@@ -10,11 +10,16 @@
       root and the variable
       Done 2026-10-17: `2 failed, 5 passed`. The two failures are `tofu: variable 'state_passphrase' isn't
       ephemeral, so a saved plan would record it` and the same for `tofu/probe`
-- [ ] 1.2 Make `state_passphrase` ephemeral in `tofu/probe/main.tf` and prove it there (D1). Make a saved plan from
+- [x] 1.2 Make `state_passphrase` ephemeral in `tofu/probe/main.tf` and prove it there (D1). Make a saved plan from
       `tofu/probe` with `-var declared=false -var probe_repo=none -out=probe.tfplan`, check that `tofu show -json` of
       it contains no `state_passphrase` variable and not the value (counted with the value from the environment, never
       printed), then apply the saved plan with the passphrase supplied. Record the counts and the apply's result here,
       then delete the probe's plan and state files
+      2026-10-17: not run on the probe root. The owner was on remote control, and 1Password's prompt timed out
+      (`authorization timeout`) before `tofu init`. The owner chose to let the scratch proof in design.md stand in
+      for it, with CI's pull-request plan as the run against the real providers (3.1). Not proven before merge: an
+      apply of a saved plan with the real providers and the passphrase supplied again. It first happens at `main`'s
+      next apply that has changes. The probe's `tofu validate` passed (1.3), and nothing was left in `tofu/probe`
 - [x] 1.3 Make `state_passphrase` ephemeral in `tofu/versions.tf`, with a comment on why (D1, D4). Verify
       `tofu fmt -check` and `tofu validate` pass, and 1.1's tests pass
       Done 2026-10-17: `tofu fmt -check -recursive tofu` is clean, and `tofu validate` reports `Success! The
@@ -22,6 +27,9 @@
 - [ ] 1.4 Fast-forward onto `origin/main`, then run a local plan of the live root with `-out`. Verify it reads
       `No changes.` (the state still decrypts), and that `tofu show -json` of the saved plan contains none of the three
       keys' values. Record the summary line and the counts here
+      2026-10-17: no local plan: 1Password can't prompt over remote control. The owner chose CI's pull-request plan
+      as the stand-in. It runs the same root with the real secrets, and its new step checks `plan.txt` and
+      `plan.json` for all three keys. Recorded under 3.1 once the owner approves that run
 
 ## 2. CI refuses a plan that holds a key (D2; spec: state-and-apply)
 
@@ -38,7 +46,10 @@
       warnings", the only readers of `plan.json`. The same holds in `main`'s plan job. `check.py`: all gates passed
 - [x] 2.3 Add `plan_secrets.py` to README.md's `scripts/` row (D4). Verify `uv run scripts/check.py` passes
       Done 2026-10-17: all gates passed
-- [ ] 2.4 Commit groups 1 and 2 as Conventional Commits, signed off, saying why. Verify the guard accepts each commit
+- [x] 2.4 Commit groups 1 and 2 as Conventional Commits, signed off, saying why. Verify the guard accepts each commit
+      Done 2026-10-17, after rebasing onto `origin/main` (run-checks-by-path had landed): group 1 `42cf8af`, group 2
+      `f808777`, and `c233a99`, which tags the declaration tests `tofu`, since `guard_pytest` refused them untagged
+      once `tofu/*.tf` became that scope's. Each signed off; the guard ran `check.py` on each, and all gates passed
 
 ## 3. Pull request
 
