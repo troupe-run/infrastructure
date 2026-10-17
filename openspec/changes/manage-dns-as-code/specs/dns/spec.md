@@ -62,7 +62,8 @@ on `troupe.run`, and a DMARC record on `_dmarc.troupe.run` with policy `reject` 
 
 ### Requirement: Only Let's Encrypt may issue certificates
 troupe.run SHALL publish a CAA record that lets only Let's Encrypt issue certificates for it, and forbids wildcard
-certificates. The site SHALL still get its certificates from GitHub Pages with the record in place.
+certificates. The site SHALL still get its certificates from GitHub Pages with the record in place. A name that is a
+CNAME to another domain, such as `www`, takes that domain's CAA policy instead (GitHub's, for `www`).
 
 #### Scenario: The CAA record is published
 - **WHEN** CAA for `troupe.run` is queried after the move
