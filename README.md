@@ -116,7 +116,7 @@ for env in plan-pr plan-main apply; do
     | gh secret set TF_VAR_state_passphrase --env "$env" -R troupe-run/infrastructure
   op read -n "op://troupe.run/troupe-run-infrastructure tofu state/billing email" \
     | gh secret set TF_VAR_billing_email --env "$env" -R troupe-run/infrastructure
-  op read -n "op://troupe.run/troupe-run cloudflare dns/credential" \
+  op read -n "op://troupe.run/troupe-run-cloudflare-dns/credential" \
     | gh secret set TF_VAR_cloudflare_api_token --env "$env" -R troupe-run/infrastructure
 done
 ```

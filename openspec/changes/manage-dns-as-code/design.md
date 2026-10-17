@@ -110,7 +110,7 @@ Alternative: HCL locals. They're readable, but the duplicate-key check and the p
 ### D4. The token: DNS edit on one zone, ephemeral, from 1Password
 
 The owner creates a custom API token with **Zone → DNS → Edit** and **Zone → Zone → Read**, for the troupe.run zone
-only, saved in 1Password as item `troupe-run cloudflare dns`, field `credential`, in vault `troupe.run`. It reaches
+only, saved in 1Password as item `troupe-run-cloudflare-dns`, field `credential`, in vault `troupe.run`. It reaches
 OpenTofu as `TF_VAR_cloudflare_api_token`, which joins `SECRETS` in `scripts/tofu.py` and `tofu/secrets.env`. Each
 job's `env` in `tofu.yml` gets it, and the README's loop sets it in all three environments. The variable is
 `sensitive` and `ephemeral`, like `github_app_pem`, and feeds only the provider's `api_token`. So a saved plan holds
