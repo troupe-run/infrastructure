@@ -84,6 +84,7 @@ jobs:
       TF_VAR_github_app_pem: ${{ secrets.TF_VAR_github_app_pem }}
       TF_VAR_state_passphrase: ${{ secrets.TF_VAR_state_passphrase }}
       TF_VAR_billing_email: ${{ secrets.TF_VAR_billing_email }}
+      TF_VAR_cloudflare_api_token: ${{ secrets.TF_VAR_cloudflare_api_token }}
     steps:
       - name: Secrets available?
         id: secrets
@@ -172,6 +173,7 @@ jobs:
       TF_VAR_github_app_pem: ${{ secrets.TF_VAR_github_app_pem }}
       TF_VAR_state_passphrase: ${{ secrets.TF_VAR_state_passphrase }}
       TF_VAR_billing_email: ${{ secrets.TF_VAR_billing_email }}
+      TF_VAR_cloudflare_api_token: ${{ secrets.TF_VAR_cloudflare_api_token }}
     steps:
       - name: The commit to plan
         id: sha
@@ -307,6 +309,7 @@ jobs:
       TF_VAR_github_app_pem: ${{ secrets.TF_VAR_github_app_pem }}
       TF_VAR_state_passphrase: ${{ secrets.TF_VAR_state_passphrase }}
       TF_VAR_billing_email: ${{ secrets.TF_VAR_billing_email }}
+      TF_VAR_cloudflare_api_token: ${{ secrets.TF_VAR_cloudflare_api_token }}
       SHA: ${{ needs.plan.outputs.sha }}
     steps:
       # The same commit as the plan: applying a saved plan refuses inputs that differ (design D3).

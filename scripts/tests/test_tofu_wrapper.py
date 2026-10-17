@@ -20,6 +20,7 @@ SECRETS = {
     "TF_VAR_github_app_pem": "pem",
     "TF_VAR_state_passphrase": "pass",
     "TF_VAR_billing_email": "a@b.c",
+    "TF_VAR_cloudflare_api_token": "cf",
 }
 
 # A fake tool: records its name, arguments and the App/secret environment to $CALLS, then
@@ -27,7 +28,8 @@ SECRETS = {
 FAKE = """#!{python}
 import json, os, subprocess, sys
 name = os.path.basename(sys.argv[0])
-keys = ["OP_ACCOUNT", "TF_VAR_github_app_pem", "TF_VAR_state_passphrase", "TF_VAR_billing_email"]
+keys = ["OP_ACCOUNT", "TF_VAR_github_app_pem", "TF_VAR_state_passphrase", "TF_VAR_billing_email",
+        "TF_VAR_cloudflare_api_token"]
 with open(os.environ["CALLS"], "a") as f:
     f.write(json.dumps({{"tool": name, "args": sys.argv[1:],
                         "env": {{k: os.environ.get(k) for k in keys}}}}) + "\\n")
@@ -107,3 +109,20 @@ def test_no_tofu_on_the_path_is_refused(tmp_path: Path) -> None:
     assert code != 0
     assert calls == []
     assert "tofu is not on the PATH" in stderr
+
+
+def test_missing_cloudflare_token_without_op_stops_before_tofu_and_names_it(tmp_path: Path) -> None:
+    partial = {k: v for k, v in SECRETS.items() if k != "TF_VAR_cloudflare_api_token"}
+    code, stderr, calls = run(tmp_path, ["tofu"], partial)
+    assert code != 0
+    assert calls == []
+    assert "TF_VAR_cloudflare_api_token" in stderr
+
+
+def test_the_references_file_names_every_secret_the_wrapper_needs() -> None:
+    names = {
+        line.split("=", 1)[0]
+        for line in (ROOT / "tofu" / "secrets.env").read_text().splitlines()
+        if line and not line.startswith("#")
+    }
+    assert names == set(SECRETS)
