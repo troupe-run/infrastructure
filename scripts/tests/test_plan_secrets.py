@@ -36,6 +36,8 @@ def test_every_key_is_a_secret_the_wrapper_supplies() -> None:
     assert set(KEYS) <= set(SECRETS)
 
 
+# Reads the `tofu` scope's files (scripts/check-paths.toml); the probe root is in no scope.
+@pytest.mark.tofu
 @pytest.mark.parametrize("root", sorted(ROOTS))
 @pytest.mark.parametrize("key", KEYS)
 def test_every_key_is_an_ephemeral_sensitive_variable_in_each_root(root: str, key: str) -> None:
