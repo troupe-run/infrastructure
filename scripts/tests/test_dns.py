@@ -26,7 +26,8 @@ TYPES: dict[str, frozenset[str]] = {
 COMMON = frozenset({"name", "type"})
 OPTIONAL = frozenset({"ttl"})
 # universal_ssl decides which CAs the CAA records admit, so it's declared beside them (spec dns:
-# "troupe.run's Universal SSL setting is declared once"; declare-universal-ssl design D1).
+# "troupe.run's Universal SSL setting is declared once"; declare-universal-ssl design D1), and it
+# must be off (spec dns: "Only Let's Encrypt may issue certificates"; turn-off-universal-ssl D2).
 TOP_LEVEL = frozenset({"zone", "ttl", "universal_ssl", "records"})
 
 # (name, type, content) of the records troupe.run had at Gandi (spec dns: "The records from
@@ -89,6 +90,12 @@ def declaration_problems(text: str) -> list[str]:
     universal_ssl = declared.get("universal_ssl", False)
     if not isinstance(universal_ssl, bool):
         found.append(f"universal_ssl: is {universal_ssl!r}; it takes true or false")
+    elif universal_ssl:
+        found.append(
+            "universal_ssl: is true; it must be false, because while it's on Cloudflare adds CAA"
+            " records for its own CAs beside the declared ones (spec dns: Only Let's Encrypt may"
+            " issue certificates)"
+        )
     for key, record in declared.get("records", {}).items():
         found += record_problems(key, record, declared.get("zone", ""))
     return found
@@ -102,7 +109,7 @@ def declared_records() -> list[dict[str, Any]]:
 
 def text(records: dict[str, Any], **top: object) -> str:
     return json.dumps(
-        {"zone": "troupe.run", "ttl": 1, "universal_ssl": True, "records": records, **top}
+        {"zone": "troupe.run", "ttl": 1, "universal_ssl": False, "records": records, **top}
     )
 
 
@@ -148,7 +155,7 @@ def test_an_unknown_type_names_the_key_and_the_supported_types() -> None:
 def test_a_duplicate_key_is_named() -> None:
     record = json.dumps(a_record())
     raw = (
-        f'{{"zone": "troupe.run", "ttl": 1, "universal_ssl": true, '
+        f'{{"zone": "troupe.run", "ttl": 1, "universal_ssl": false, '
         f'"records": {{"x": {record}, "x": {record}}}}}'
     )
     assert declaration_problems(raw) == ["x: declared twice in tofu/dns.json"]
@@ -207,6 +214,13 @@ def test_a_universal_ssl_that_is_not_a_boolean_is_named() -> None:
     ]
 
 
-def test_universal_ssl_takes_true_and_false() -> None:
-    for value in (True, False):
-        assert declaration_problems(text({"x": a_record()}, universal_ssl=value)) == []
+def test_universal_ssl_off_is_accepted() -> None:
+    assert declaration_problems(text({"x": a_record()}, universal_ssl=False)) == []
+
+
+def test_universal_ssl_on_is_refused_with_why() -> None:
+    assert declaration_problems(text({"x": a_record()}, universal_ssl=True)) == [
+        "universal_ssl: is true; it must be false, because while it's on Cloudflare adds CAA"
+        " records for its own CAs beside the declared ones (spec dns: Only Let's Encrypt may"
+        " issue certificates)"
+    ]

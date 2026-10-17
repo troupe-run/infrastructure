@@ -101,17 +101,17 @@ troupe.run without a plan.
 
 **The zone.** `troupe.run` (`f716f063a26f15bcfcecd62791cdd202`). Cloudflare's scan copied Gandi's ten records when it
 was added, and the owner added the Pages verification record; all eleven were imported, not recreated. Its settings
-are Cloudflare's defaults, except Universal SSL, which `tofu/dns.json` declares (on): nothing is proxied, so they don't
-touch the site. With Universal SSL on, Cloudflare adds CAA records for its own CAs beside the declared ones. They're in
-the apex's CAA answer but not in the dashboard or the API, so the plan can't report them; check them with
-`dig CAA troupe.run @audrey.ns.cloudflare.com` (spec: dns). Whether turning Universal SSL off removes them is untested:
-try it on the probe first.
+are Cloudflare's defaults, except Universal SSL, which `tofu/dns.json` declares off: nothing is proxied, so they don't
+touch the site. With Universal SSL on, Cloudflare adds CAA records for its own CAs beside the declared ones, which
+aren't in the dashboard or the API, so the plan can't report them. Off, the declared records are the whole policy;
+check with `dig CAA troupe.run @audrey.ns.cloudflare.com` (spec: dns).
 
 **The token.** A custom account API token with Zone → DNS → Edit, Zone → SSL and Certificates → Edit and Zone → Zone →
 Read, on troupe.run only, no IP filter and no expiry. SSL and Certificates is there so a plan can read the Universal
 SSL setting and an apply can change it; it also lets the token manage this zone's edge certificates, but not its SSL
-mode or TLS versions (Zone Settings), and nothing beyond the zone (declare-universal-ssl design D3). It's in 1Password as `troupe-run-cloudflare-dns`, field `credential`, in vault `troupe.run`, and
-in CI's three environments as `TF_VAR_cloudflare_api_token` (README). Check its scope without printing it:
+mode or TLS versions (Zone Settings), and nothing beyond the zone (declare-universal-ssl design D3). It's in
+1Password as `troupe-run-cloudflare-dns`, field `credential`, in vault `troupe.run`, and in CI's three environments as
+`TF_VAR_cloudflare_api_token` (README). Check its scope without printing it:
 
 ```sh
 export OP_ACCOUNT=l-a-u.1password.com
