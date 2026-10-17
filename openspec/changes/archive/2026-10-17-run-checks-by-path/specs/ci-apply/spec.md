@@ -71,9 +71,8 @@ report their result either way.
 ### Requirement: CI tests each pull request once, and main after every push
 This repository's tests (the `check` and `guard tests` jobs) SHALL run once for each update to a pull request, on the
 pull request merged onto `main`, and once for every push to `main` that changes more than the state file. A push to
-any other branch, and the App's state commit after an apply, SHALL NOT run them again. On a pull request they run what
-its paths need; on `main` they SHALL run the full check and every guard-tests leg. The `guard` check's triggers are
-set by "The rules are re-checked on GitHub" (development-workflow).
+any other branch, and the App's state commit after an apply, SHALL NOT run them again. On `main` they SHALL run in
+full. The `guard` check's triggers are set by "The rules are re-checked on GitHub" (development-workflow).
 
 #### Scenario: A pull request is tested once
 - **WHEN** a commit is pushed to a branch that has an open pull request into `main`
