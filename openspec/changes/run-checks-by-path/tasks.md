@@ -28,18 +28,34 @@
   fixture, the test itself otherwise), starting from design's table and finishing from `guard_pytest`'s failures.
   Verify `uv run pytest` passes with no tag violation, and that removing the `dns` marker from `test_dns.py` makes it
   fail naming `tofu/dns.json` and the tag (then restore it).
-- [ ] 2.3 Verify each scope runs its tests: `uv run scripts/check.py --scope <name>` for each of the five passes, runs
+- [x] 2.3 Verify each scope runs its tests: `uv run scripts/check.py --scope <name>` for each of the five passes, runs
   every non-test gate, and selects only tagged tests (`pytest --collect-only -q -m <name>` count recorded here, with
   the elapsed time of each scoped run against the full run's).
+  - 2026-10-17, local (warm mypy and tofu caches), every run exit 0 with all 7 gates:
+
+    | Scope | Tests selected | Whole check |
+    |---|---|---|
+    | `dns` | 17 | 2 s |
+    | `milestones` | 8 | 2 s |
+    | `labels` | 9 | 2 s |
+    | `tofu` | 31 | 2 s |
+    | `docs` | 2 | 1 s |
+    | full | 892 | 69 s |
+
 
 ## 3. What the guard's matrix depends on
 
-- [ ] 3.1 Write `scripts/guard_tests_needed.py` (design D5) and `scripts/tests/test_guard_tests_needed.py`: `true` for
+- [x] 3.1 Write `scripts/guard_tests_needed.py` (design D5) and `scripts/tests/test_guard_tests_needed.py`: `true` for
   each guard path, a `test_guard_*.py`, `conftest.py`, `pyproject.toml`, `uv.lock`, `ci.yml` and an empty list;
   `false` for `tofu/dns.json`, `scripts/tofu.py` and `openspec/` paths together; the stdout contract
   (`guard=true\n`). Verify the tests pass, and that they fail when an entry is removed from `DEPENDS_ON`.
-- [ ] 3.2 Add the test that every file in `tofu/guard_delivery.tf`'s `guard_files` is covered by `DEPENDS_ON`. Verify
+- [x] 3.2 Add the test that every file in `tofu/guard_delivery.tf`'s `guard_files` is covered by `DEPENDS_ON`. Verify
   it fails, naming the file, against a copy of `guard_delivery.tf` with an extra delivered file.
+  - The tests are in `scripts/tests/test_needs_guard_tests.py`, not `test_guard_tests_needed.py`: a `test_guard_*`
+    name would make them one of the guard's own tests, which the matrix runs. 21 pass. Removing `.githooks/`,
+    `uv.lock` or `conftest.py` from `DEPENDS_ON` fails 2, 1 and 2 of them. The delivered-file test runs on the real
+    `guard_delivery.tf`; a second one shows a `guard_files` list with an extra file is named
+    (`["scripts/guard_hooks.toml"]`).
 
 ## 4. CI
 
