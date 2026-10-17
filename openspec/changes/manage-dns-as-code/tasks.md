@@ -106,12 +106,16 @@
       ones in the shapes 2.2 proved. `test_dns.py` 14 passed; six broken copies each refused naming the key
       (`caa-issue` type SRV, `mx-null` with `proxied`, `spf` unquoted, `www` not fully qualified, a duplicate
       `spf`, `mx-null` without `priority`)
-- [ ] 4.3 Add the `cloudflare/cloudflare` provider to `tofu/versions.tf` (`~> 5.28`). Add its configuration and the
+- [x] 4.3 Add the `cloudflare/cloudflare` provider to `tofu/versions.tf` (`~> 5.28`). Add its configuration and the
       `sensitive`, `ephemeral` `cloudflare_api_token` variable to `tofu/providers.tf`. Add `tofu/dns.tf`:
       `data "cloudflare_zone"` by name, one `cloudflare_dns_record` per key with `proxied = false`, and the two D5
       `check` blocks, with a header citing spec: dns and #55. Lock the provider for every platform the existing lock
       file covers. Verify `uv run scripts/check.py` passes (`tofu fmt`, `tofu validate`) and the lock file lists the
       new provider's hashes for each platform
+      Done 2026-10-17: `check.py` passed on `82b869d` and every commit since. `tofu providers lock` for linux_amd64,
+      linux_arm64, darwin_amd64, darwin_arm64 and windows_amd64 found every checksum already tracked and changed
+      nothing (cloudflare 5.28.0: 8 h1, 9 zh, the same pattern as the github provider's 13 and 14). `dns.tf`
+      reads the zone one type at a time (D5; #73)
 - [x] 4.4 Add eleven `import` blocks to `tofu/imports.tf`, one per kept record, with the IDs from 1.3. Verify a local plan
       (fast-forward onto `origin/main` first) imports exactly those eleven with no change, and its other actions are
       creates for the new records only, with no change to any GitHub resource
