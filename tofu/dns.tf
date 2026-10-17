@@ -38,21 +38,38 @@ resource "cloudflare_dns_record" "troupe_run" {
 
 # What an apply can't see is reported, not fixed: a failed check is a warning, so a stray record
 # can't block an unrelated plan, and scripts/plan_checks.py puts it on the run (design D5).
-check "undeclared_records" {
-  data "cloudflare_dns_records" "all" {
-    zone_id   = data.cloudflare_zone.troupe_run.id
-    max_items = 1000
-  }
+#
+# The zone is read one record type at a time. One cloudflare_dns_records list holding CAA records
+# and others panics OpenTofu (5.28.0 with 1.13.1), at plan and while an apply saves state; one list
+# per type doesn't (design D5, the probe of 2026-10-17). It's the provider's open bug
+# https://github.com/cloudflare/terraform-provider-cloudflare/issues/7004: once that's fixed, retest
+# with the probe's probe_dns_read_all before going back to one read. Every type the API has is read,
+# not only the declared ones, so a stray record of any type is reported.
+locals {
+  dns_record_types = toset([
+    "A", "AAAA", "CAA", "CERT", "CNAME", "DNSKEY", "DS", "HTTPS", "LOC", "MX", "NAPTR", "NS",
+    "OPENPGPKEY", "PTR", "SMIMEA", "SRV", "SSHFP", "SVCB", "TLSA", "TXT", "URI",
+  ])
 
+  dns_undeclared = [
+    for record in flatten([for read in data.cloudflare_dns_records.troupe_run : read.result]) :
+    "${record.name} ${record.type} ${record.content}"
+    if !contains([for declared in cloudflare_dns_record.troupe_run : declared.id], record.id)
+  ]
+}
+
+data "cloudflare_dns_records" "troupe_run" {
+  for_each = local.dns_record_types
+
+  zone_id   = data.cloudflare_zone.troupe_run.id
+  type      = each.key
+  max_items = 1000
+}
+
+check "undeclared_records" {
   assert {
-    condition = length([
-      for record in data.cloudflare_dns_records.all.result : record
-      if !contains([for declared in cloudflare_dns_record.troupe_run : declared.id], record.id)
-    ]) == 0
-    error_message = "Records in the troupe.run zone that tofu/dns.json doesn't declare: ${join(", ", [
-      for record in data.cloudflare_dns_records.all.result : "${record.name} ${record.type} ${record.content}"
-      if !contains([for declared in cloudflare_dns_record.troupe_run : declared.id], record.id)
-    ])}. Declare each one in tofu/dns.json, or delete it in Cloudflare."
+    condition     = length(local.dns_undeclared) == 0
+    error_message = "Records in the troupe.run zone that tofu/dns.json doesn't declare: ${join(", ", local.dns_undeclared)}. Declare each one in tofu/dns.json, or delete it in Cloudflare."
   }
 }
 
