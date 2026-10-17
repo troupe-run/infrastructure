@@ -31,9 +31,9 @@ changes only files OpenTofu never reads SHALL NOT be planned, and SHALL NOT ask 
 - **THEN** it is planned like any other, and its plan shows the delivery
 
 ### Requirement: A pull request's run holds no credential without the owner's approval
-A workflow run for a pull request SHALL NOT get any credential (the App's key or the state passphrase) until the
-owner has approved that run. A run that isn't approved SHALL NOT plan. A pull request's run SHALL NOT be able to
-reach the credential for planning `main`, which needs no approval.
+A workflow run for a pull request SHALL NOT get any credential (the App's key, the state passphrase or the DNS host's
+API token) until the owner has approved that run. A run that isn't approved SHALL NOT plan. A pull request's run
+SHALL NOT be able to reach the credential for planning `main`, which needs no approval.
 
 #### Scenario: An unapproved pull request run gets nothing
 - **WHEN** a pull request is pushed and the owner hasn't approved its plan run

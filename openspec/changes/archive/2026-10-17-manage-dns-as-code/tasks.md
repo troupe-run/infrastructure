@@ -169,8 +169,8 @@
 - After the owner approves the apply, verify the MX, SPF, DMARC, CAA and Pages verification answers match spec dns at
   Cloudflare's nameservers and from two public resolvers. Verify https://troupe.run and https://www.troupe.run still
   serve the site.
-- The owner presses Verify for troupe.run in the org's Pages settings (D9). Verify it's listed as verified, and the
-  org's domain verification still reads `isVerified: true`.
+- Verify troupe.run is still listed as verified in the org's Pages settings (the owner verified it on 2026-10-17,
+  D9), and the org's domain verification still reads `isVerified: true`.
 - The CAA test (D8): the owner removes troupe.run as the website's custom domain and adds it again. Verify a new
   Let's Encrypt certificate is served (its `notBefore` is after the apply), and the next plan shows no Pages drift.
 - Comment on #55 with the PR, the archived change and the results above. Then check that #55 is closed and its card
