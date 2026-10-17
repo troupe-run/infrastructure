@@ -108,3 +108,54 @@ def test_the_script_prints_a_github_output_line() -> None:
     assert run("tofu/dns.json\nopenspec/x.md\n") == "guard=false\n"
     assert run("tofu/dns.json\nscripts/guard.py\n") == "guard=true\n"
     assert run("") == "guard=true\n"
+
+
+@pytest.mark.parametrize(
+    ("legs", "changes", "guard"),
+    [
+        ("success", "success", "true"),
+        ("success", "skipped", ""),  # a push to main: no `changes` job, every leg runs
+        ("success", "failure", ""),  # the decision failed, so the legs ran
+        ("skipped", "success", "false"),
+    ],
+)
+def test_the_result_passes_when_the_legs_passed_or_weren_t_needed(
+    legs: str, changes: str, guard: str
+) -> None:
+    assert guard_tests_needed.result_problem(legs, changes, guard) is None
+
+
+@pytest.mark.parametrize(
+    ("legs", "changes", "guard", "named"),
+    [
+        ("failure", "success", "true", "is failure"),
+        ("cancelled", "success", "true", "is cancelled"),
+        ("skipped", "success", "true", "guard=true"),
+        ("skipped", "failure", "", "was failure"),
+        ("skipped", "skipped", "", "was skipped"),
+        ("skipped", "success", "", "guard=(nothing)"),
+        ("", "success", "false", "is (none)"),
+    ],
+)
+def test_the_result_fails_and_says_why_otherwise(
+    legs: str, changes: str, guard: str, named: str
+) -> None:
+    problem = guard_tests_needed.result_problem(legs, changes, guard)
+    assert problem is not None
+    assert named in problem
+
+
+def test_the_result_mode_exits_with_the_verdict() -> None:
+    def run(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, str(SCRIPTS / "guard_tests_needed.py"), "--result", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert run("skipped", "success", "false").returncode == 0
+    failed = run("failure", "success", "true")
+    assert failed.returncode == 1
+    assert "guard tests: the legs' result is failure" in failed.stderr
+    assert run("success", "success").returncode == 2

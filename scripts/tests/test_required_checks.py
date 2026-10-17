@@ -27,9 +27,11 @@ WORKFLOWS = REPO / ".github" / "workflows"
 STATE_FILE = "tofu/terraform.tfstate"
 
 # The workflows whose pull-request jobs infrastructure requires, and the jobs deliberately left
-# out: `changes` only decides whether to plan, and a failure there makes the plan run (design D2).
+# out: each `changes` only decides what runs, and a failure there runs everything (design D2); the
+# guard's legs report through `guard tests`, because a skipped matrix job reports under its
+# unexpanded name (run-checks-by-path design D6).
 REQUIRED_WORKFLOWS = ("ci.yml", "guard.yml", "tofu.yml")
-NOT_REQUIRED = {"changes"}
+NOT_REQUIRED = {"changes", "guard-tests"}
 
 MATRIX_REF = re.compile(r"\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}")
 EXPRESSION = re.compile(r"\$\{\{.*?\}\}")
@@ -202,10 +204,16 @@ def test_every_required_check_names_an_app_opentofu_maps_to_an_id() -> None:
     assert {check["app"] for repo in checks.values() for check in repo} <= mapped
 
 
-def test_a_renamed_matrix_leg_no_longer_matches_the_required_names() -> None:
+def test_a_renamed_job_no_longer_matches_the_required_names() -> None:
     workflows = real_workflows()
-    workflows["ci.yml"]["jobs"]["guard-tests"]["strategy"]["matrix"]["os"][0] = "ubuntu-24.04"
+    workflows["ci.yml"]["jobs"]["guard-tests-result"]["name"] = "guard tests (all)"
     assert required("infrastructure", "github-actions") != pull_request_checks(workflows)
+
+
+def test_the_guard_s_legs_aren_t_required_but_their_result_is() -> None:
+    names = pull_request_checks(real_workflows())
+    assert "guard tests" in names
+    assert not [name for name in names if name.startswith("guard tests (")]
 
 
 def test_a_required_name_dropped_from_the_list_no_longer_matches() -> None:

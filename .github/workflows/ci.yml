@@ -8,6 +8,19 @@ name: CI
 # - main after every merge. tofu.yml's plan of main follows this run.
 # - not the App's state commit after an apply: it changes only the state file, and tofu.yml's
 #   plan skips it too.
+#
+# A pull request runs what its paths need (#78, run-checks-by-path; spec: ci-apply):
+#
+#   changes      what the changed paths need: guard.py check-scope reads scripts/check-paths.toml,
+#                and scripts/guard_tests_needed.py says whether the guard's legs must run
+#   check        skipped when only skipped paths changed, scoped when only scoped ones did, and
+#                otherwise the full check
+#   guard tests  the required check for the legs: it passes when they passed, or were skipped
+#                because nothing they test changed. A skipped matrix job reports under its
+#                unexpanded name, so the legs themselves can't be required (design D6).
+#
+# A failed `changes` runs everything. main runs everything after every merge (design D7): its
+# merged tree may be one no pull request tested, and a guard delivery needs every OS green.
 on:
   pull_request:
   push:
@@ -22,8 +35,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: what does it need?
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      scope: ${{ steps.paths.outputs.scope }}
+      check-args: ${{ steps.paths.outputs['check-args'] }}
+      guard: ${{ steps.paths.outputs.guard }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: The pull request's changed paths
+        id: paths
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only --no-renames "$BASE...$HEAD" > "$RUNNER_TEMP/paths"
+          uv run --no-project scripts/guard.py check-scope < "$RUNNER_TEMP/paths" >> "$GITHUB_OUTPUT"
+          python3 scripts/guard_tests_needed.py < "$RUNNER_TEMP/paths" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
   check:
     name: check
+    # A required check. Skipped, which counts as passed, only when `changes` succeeded and found
+    # only skipped paths. With no answer (a push to main, or a failed `changes`) it runs in full.
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.scope != 'none' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -39,13 +82,22 @@ jobs:
       - name: Install
         run: uv sync --locked
       - name: Check (the same script as local runs)
-        run: uv run scripts/check.py
+        env:
+          # `--scope <name>` words, or nothing for the full check. Scope names are [a-z][a-z0-9_]*,
+          # so they split on spaces safely.
+          CHECK_ARGS: ${{ needs.changes.outputs['check-args'] }}
+        run: uv run scripts/check.py $CHECK_ARGS
 
   guard-tests:
     # The guard's hooks run on contributors' machines, so its tests run on every OS and Python
     # version troupe supports: 3.12 to 3.15 since troupe-run/troupe#110 (development-workflow
-    # design D10, python-3-14-3-15). The check job above covers Linux on 3.12.
+    # design D10, python-3-14-3-15). The check job above covers Linux on 3.12. Not required
+    # themselves: `guard tests` below reports for them.
     name: guard tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    needs: changes
+    if: >-
+      !cancelled() &&
+      (needs.changes.result != 'success' || needs.changes.outputs.guard == 'true')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -67,3 +119,19 @@ jobs:
       - name: The guard's tests
         # Every test_guard_*.py file, selected by pytest rather than listed here.
         run: uv run pytest scripts/tests -o python_files=test_guard_*.py
+
+  guard-tests-result:
+    name: guard tests
+    # The required check for the legs (design D6). always(): it must report whatever they did.
+    needs: [changes, guard-tests]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: The legs' result
+        env:
+          LEGS: ${{ needs.guard-tests.result }}
+          CHANGES: ${{ needs.changes.result }}
+          GUARD: ${{ needs.changes.outputs.guard }}
+        run: python3 scripts/guard_tests_needed.py --result "$LEGS" "$CHANGES" "$GUARD"

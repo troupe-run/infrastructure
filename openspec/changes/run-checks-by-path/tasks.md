@@ -59,14 +59,19 @@
 
 ## 4. CI
 
-- [ ] 4.1 Add the `changes` job to `.github/workflows/ci.yml`, with `scope`, `check-args` and `guard` outputs, and
+- [x] 4.1 Add the `changes` job to `.github/workflows/ci.yml`, with `scope`, `check-args` and `guard` outputs, and
   make `check` depend on it (design D4): skipped on `scope=none`, scoped by `check-args`, full when `changes` failed
   or didn't run. Extend `test_required_checks.py` (or a new `test_ci_workflow.py`) to pin these conditions: `check`
   is skipped only on `none`, runs on a failed `changes`, and `changes` is limited to pull requests. Verify the tests
   pass and fail when a condition is changed.
-- [ ] 4.2 Make `guard-tests` run when `changes` failed, didn't run, or said `guard=true`, and add the `guard tests`
+- [x] 4.2 Make `guard-tests` run when `changes` failed, didn't run, or said `guard=true`, and add the `guard tests`
   result job (design D6), its logic in one step whose cases are tested from Python (success, skipped with
   `guard=false`, skipped otherwise, failure, cancelled). Verify those tests pass.
+  - 4.1 and 4.2: the conditions are pinned in `scripts/tests/test_ci_workflow.py` (7 mutations, each named), the
+    legs' verdict is `guard_tests_needed.py --result`, tested in `test_needs_guard_tests.py` (12 cases).
+    `test_required_checks.py` leaves the legs out (`NOT_REQUIRED`) and checks `guard tests` is required and no leg is.
+    actionlint (`uvx --from actionlint-py actionlint`) reports nothing. On this branch's own paths the `changes` step
+    answers `scope=full`, `check-args=` and `guard=true`.
 - [ ] 4.3 Replace the 11 leg contexts with `guard tests` in `tofu/required-checks.json`, and update the `rulesets`
   wording in `README.md` (the example check name). Verify `test_infrastructure_requires_exactly_its_pull_request_jobs`
   passes, and `uv run scripts/tofu.py plan` locally shows only the `infrastructure` ruleset's required checks changing.
