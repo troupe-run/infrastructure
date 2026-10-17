@@ -2,8 +2,7 @@
 
 ### Requirement: Each repository requires its own checks
 Each repository with a `main` ruleset SHALL require the checks that run on its pull requests:
-- `infrastructure`: its CI check, its `guard tests` check (which reports for every guard-tests job, run or skipped),
-  the `guard` check, DCO, and its pull request's plan;
+- `infrastructure`: its CI check, its `guard tests` check, the `guard` check, DCO, and its pull request's plan;
 - `troupe`: each of its CI check jobs, the `guard` check and DCO;
 - `website`: its CI test and the `guard` check. It SHALL NOT require DCO: its contributions are accepted under its
   own licences, with no sign-off (owner, 2026-10-16).

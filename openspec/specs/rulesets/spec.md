@@ -107,7 +107,7 @@ of the same name posted by anything else doesn't count. A check that is skipped 
 
 ### Requirement: Each repository requires its own checks
 Each repository with a `main` ruleset SHALL require the checks that run on its pull requests:
-- `infrastructure`: its CI check, each guard-tests job, the `guard` check, DCO, and its pull request's plan;
+- `infrastructure`: its CI check, its `guard tests` check, the `guard` check, DCO, and its pull request's plan;
 - `troupe`: each of its CI check jobs, the `guard` check and DCO;
 - `website`: its CI test and the `guard` check. It SHALL NOT require DCO: its contributions are accepted under its
   own licences, with no sign-off (owner, 2026-10-16).
@@ -133,6 +133,11 @@ The required names SHALL be declared in one place.
 - **WHEN** a pull request into the website's `main` has unsigned-off commits and its CI test and `guard` check have
   passed
 - **THEN** the merge succeeds
+
+#### Scenario: A skipped guard-tests matrix doesn't block a merge
+- **WHEN** a pull request into `infrastructure` changes nothing the guard's tests depend on, so every guard-tests leg
+  is skipped
+- **THEN** its required checks can all pass, and it can be merged once they do
 
 ### Requirement: Only the App changes .github's main
 In `troupe-run/.github`, every change to `main` SHALL be refused unless the infrastructure App makes it. That
