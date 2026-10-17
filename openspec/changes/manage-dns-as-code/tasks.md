@@ -58,10 +58,13 @@
 
 ## 4. Declare and adopt the records (D2, D3, D5, D9; spec: dns)
 
-- [ ] 4.1 Add `scripts/tests/test_dns.py`, failing first against a missing or empty declaration. It covers: the
+- [x] 4.1 Add `scripts/tests/test_dns.py`, failing first against a missing or empty declaration. It covers: the
       supported types; each type's exact fields; unknown fields; duplicate keys (read with `object_pairs_hook`);
       names inside the zone; quoted TXT content; and that the kept records are exactly the ones in spec dns. Each
       failure names the record's key and the problem. Verify the tests fail for the right reason before 4.2
+      Done 2026-10-17: before `tofu/dns.json` existed, the 5 declaration tests failed with `FileNotFoundError` and
+      the 9 refusal tests passed. Also covers the mail lockdown, CAA set and Pages record being declared, an
+      unknown top-level field, and `proxied` being refused as a field no type takes
 - [ ] 4.2 Add `tofu/dns.json` with every record from D3: the eleven kept records as 1.3 found them (the Pages
       verification record among them), the mail and CAA records, and any shape changes from 2.2. Verify
       `scripts/tests/test_dns.py` passes, and that one deliberately broken copy per refusal fails naming the key
@@ -74,9 +77,15 @@
 - [ ] 4.4 Add eleven `import` blocks to `tofu/imports.tf`, one per kept record, with the IDs from 1.3. Verify a local plan
       (fast-forward onto `origin/main` first) imports exactly those eleven with no change, and its other actions are
       creates for the new records only, with no change to any GitHub resource
-- [ ] 4.5 In each plan step of `.github/workflows/tofu.yml`, turn every `Check block assertion failed` in the plan's
+- [x] 4.5 In each plan step of `.github/workflows/tofu.yml`, turn every `Check block assertion failed` in the plan's
       output into a `::warning::` annotation naming the check. Verify with a local run of the step's script against
       a saved plan output holding one failed check: exactly one annotation, naming it
+      Done 2026-10-17 as `scripts/plan_checks.py`, reading `tofu show -json`'s `checks`, not the text. A real plan
+      showed `tofu show` drops the warning and the text output wraps it at 80 columns. Run against that real saved
+      plan (one failing, one passing check): exactly one line,
+      `::warning title=check.undeclared_records::Records in the zone ...`, exit 0. Both plan jobs run it after
+      the JSON plan exists, and add its summary to the posted plan and the step summary.
+      `test_plan_checks.py`: 8 passed; an unknown status is an error naming the known ones
 - [ ] 4.6 Verify the 4.4 plan shows no check warning, and that the saved plan holds no token: `tofu show -json` on it
       contains neither the token nor the App key. Record the plan's summary line here
 - [ ] 4.7 Add the Layout row for `tofu/dns.json` / `dns.tf` to README.md (a key never changes; nothing is proxied; TTL

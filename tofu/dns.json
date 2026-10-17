@@ -1,0 +1,30 @@
+{
+  "zone": "troupe.run",
+  "ttl": 1,
+  "records": {
+    "apex-a-108": { "name": "troupe.run", "type": "A", "content": "185.199.108.153" },
+    "apex-a-109": { "name": "troupe.run", "type": "A", "content": "185.199.109.153" },
+    "apex-a-110": { "name": "troupe.run", "type": "A", "content": "185.199.110.153" },
+    "apex-a-111": { "name": "troupe.run", "type": "A", "content": "185.199.111.153" },
+    "apex-aaaa-8000": { "name": "troupe.run", "type": "AAAA", "content": "2606:50c0:8000::153" },
+    "apex-aaaa-8001": { "name": "troupe.run", "type": "AAAA", "content": "2606:50c0:8001::153" },
+    "apex-aaaa-8002": { "name": "troupe.run", "type": "AAAA", "content": "2606:50c0:8002::153" },
+    "apex-aaaa-8003": { "name": "troupe.run", "type": "AAAA", "content": "2606:50c0:8003::153" },
+    "www": { "name": "www.troupe.run", "type": "CNAME", "content": "troupe-run.github.io" },
+    "org-verify": { "name": "_gh-troupe-run-o.troupe.run", "type": "TXT", "content": "\"ab7788e488\"" },
+    "pages-verify": {
+      "name": "_github-pages-challenge-troupe-run.troupe.run",
+      "type": "TXT",
+      "content": "\"f20f50ae5c14b2efb4e971b5c99318\""
+    },
+    "mx-null": { "name": "troupe.run", "type": "MX", "content": ".", "priority": 0 },
+    "spf": { "name": "troupe.run", "type": "TXT", "content": "\"v=spf1 -all\"" },
+    "dmarc": {
+      "name": "_dmarc.troupe.run",
+      "type": "TXT",
+      "content": "\"v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s\""
+    },
+    "caa-issue": { "name": "troupe.run", "type": "CAA", "flags": 0, "tag": "issue", "value": "letsencrypt.org" },
+    "caa-issuewild": { "name": "troupe.run", "type": "CAA", "flags": 0, "tag": "issuewild", "value": ";" }
+  }
+}
