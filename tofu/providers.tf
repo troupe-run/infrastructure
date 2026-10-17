@@ -25,3 +25,17 @@ variable "github_app_pem" {
   sensitive   = true
   ephemeral   = true
 }
+
+# troupe.run's DNS (dns.tf; manage-dns-as-code design D4). The token can edit DNS records in the
+# troupe.run zone and read the zone, nothing else. It's ephemeral for the same reason as the App's
+# key: a saved plan keeps only its name.
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token: DNS edit and zone read on troupe.run only. Never committed, never saved in a plan."
+  type        = string
+  sensitive   = true
+  ephemeral   = true
+}
