@@ -12,7 +12,12 @@
 - [ ] 1.3 Fast-forward onto `origin/main`, then run a local plan. Verify it reads
       `0 to add, 1 to change, 0 to destroy`, the one change is `cloudflare_universal_ssl_setting.troupe_run`
       `enabled = true -> false`, and no check warns. Record the summary here
-- [ ] 1.4 Commit as Conventional Commits, signed off, saying why. Verify the guard accepts each commit
+      2026-10-17: the local plan couldn't run; the owner was on remote control without 1Password (the prompt timed
+      out). CI's pull-request plan, which runs the same plan with the same token once the owner approves it, stands in
+      for it (owner, 2026-10-17); its result is recorded under 2.1
+- [x] 1.4 Commit as Conventional Commits, signed off, saying why. Verify the guard accepts each commit
+      Done 2026-10-17: `db8396b` (the change's artifacts) and `f04c7a4` (the declaration, check and docs; the guard
+      ran `check.py`, which passed). Both signed off
 
 ## 2. Pull request
 
