@@ -191,9 +191,11 @@ Every other managed repository has a ruleset named "protect main" on its default
   a force-push, a merge commit and a squash are all refused, for the owner too. GitHub refuses to delete a default
   branch anyway.
 - **A pull request merges only when its required checks pass.** Each repository's checks are listed in
-  `tofu/required-checks.json`, as GitHub names them (`guard tests (macos-latest, Python 3.13)`, not the workflow's job
-  id), each pinned to the App that posts it, so a status of the same name posted by anything else doesn't count. A
-  skipped job counts as passed. A test checks this repository's list against its workflows; when you rename a job or
+  `tofu/required-checks.json`, as GitHub names them (`check (macos-latest, Python 3.13)` in troupe, not the workflow's
+  job id), each pinned to the App that posts it, so a status of the same name posted by anything else doesn't count. A
+  skipped job counts as passed. Here, the guard's eleven OS and Python legs report through one `guard tests` job: they
+  run only when a pull request changes what they test, and a skipped matrix job reports under its unexpanded name,
+  which no required check could match. A test checks this repository's list against its workflows; when you rename a job or
   change a matrix in troupe or the website, change the list here too, or their pull requests wait for a check that
   never reports.
 - **The owner's bypass works only on pull requests.** An org admin can merge a PR past a rule that blocks it with
