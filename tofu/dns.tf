@@ -36,6 +36,17 @@ resource "cloudflare_dns_record" "troupe_run" {
   } : null
 }
 
+# Universal SSL decides which CAA policy is real: while it's on, Cloudflare adds `issue` and
+# `issuewild` records for its own CAs beside the declared ones, so issuance is limited to Let's
+# Encrypt and those CAs, wildcards included. Cloudflare's records aren't in the API, so the
+# undeclared check below can't see them; `dig` checks them (spec dns; declare-universal-ssl design
+# D1, D5). The provider's delete does nothing, so removing this block stops managing the setting
+# without changing it, and there's no prevent_destroy to add (design D2).
+resource "cloudflare_universal_ssl_setting" "troupe_run" {
+  zone_id = data.cloudflare_zone.troupe_run.id
+  enabled = local.dns.universal_ssl
+}
+
 # What an apply can't see is reported, not fixed: a failed check is a warning, so a stray record
 # can't block an unrelated plan, and scripts/plan_checks.py puts it on the run (design D5).
 #
