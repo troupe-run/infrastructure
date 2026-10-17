@@ -156,9 +156,12 @@
 
 ## 5. Pull request
 
-- [ ] 5.1 Open the pull request with `Closes #55`, the plan summary from 4.6, and a note that the import changes
+- [x] 5.1 Open the pull request with `Closes #55`, the plan summary from 4.6, and a note that the import changes
       nothing served and the apply adds only the new records. Verify CI is green on every job, and that its plan (once
       the owner approves that run) matches 4.6's summary with no check warning
+      Done 2026-10-17: #74. CI 17 passed, 2 skipped (main's plan and apply). The owner approved the plan run; its
+      plan reads `Plan: 11 to import, 5 to add, 0 to change, 0 to destroy.`, the same eleven imports and five
+      creates as 4.6, with no check warning (the job's one annotation is GitHub's notice about `ubuntu-latest`)
 
 ## Workflow follow-up
 
