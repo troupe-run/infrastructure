@@ -44,7 +44,7 @@ resource "cloudflare_dns_record" "troupe_run" {
 # per type doesn't (design D5, the probe of 2026-10-17). It's the provider's open bug
 # https://github.com/cloudflare/terraform-provider-cloudflare/issues/7004: once that's fixed, retest
 # with the probe's probe_dns_read_all before going back to one read. Every type the API has is read,
-# not only the declared ones, so a stray record of any type is reported.
+# not only the declared ones, so a stray record of any type is reported. Going back to one read is #73.
 locals {
   dns_record_types = toset([
     "A", "AAAA", "CAA", "CERT", "CNAME", "DNSKEY", "DS", "HTTPS", "LOC", "MX", "NAPTR", "NS",

@@ -99,9 +99,13 @@
       Done 2026-10-17: before `tofu/dns.json` existed, the 5 declaration tests failed with `FileNotFoundError` and
       the 9 refusal tests passed. Also covers the mail lockdown, CAA set and Pages record being declared, an
       unknown top-level field, and `proxied` being refused as a field no type takes
-- [ ] 4.2 Add `tofu/dns.json` with every record from D3: the eleven kept records as 1.3 found them (the Pages
+- [x] 4.2 Add `tofu/dns.json` with every record from D3: the eleven kept records as 1.3 found them (the Pages
       verification record among them), the mail and CAA records, and any shape changes from 2.2. Verify
       `scripts/tests/test_dns.py` passes, and that one deliberately broken copy per refusal fails naming the key
+      Done 2026-10-17: 16 records, the eleven matching 1.3 (TTL 1, the CNAME without a trailing dot), the five new
+      ones in the shapes 2.2 proved. `test_dns.py` 14 passed; six broken copies each refused naming the key
+      (`caa-issue` type SRV, `mx-null` with `proxied`, `spf` unquoted, `www` not fully qualified, a duplicate
+      `spf`, `mx-null` without `priority`)
 - [ ] 4.3 Add the `cloudflare/cloudflare` provider to `tofu/versions.tf` (`~> 5.28`). Add its configuration and the
       `sensitive`, `ephemeral` `cloudflare_api_token` variable to `tofu/providers.tf`. Add `tofu/dns.tf`:
       `data "cloudflare_zone"` by name, one `cloudflare_dns_record` per key with `proxied = false`, and the two D5
@@ -129,10 +133,13 @@
       reads, `check.undeclared_records` and `check.zone_active` pass, `plan_checks.py` prints nothing. The saved
       plan's JSON has neither the token nor the App key. It does hold the state passphrase, under
       `variables.state_passphrase.value`, as every saved plan has since before this change (reported to the owner)
-- [ ] 4.7 Add the Layout row for `tofu/dns.json` / `dns.tf` to README.md (a key never changes; nothing is proxied; TTL
+- [x] 4.7 Add the Layout row for `tofu/dns.json` / `dns.tf` to README.md (a key never changes; nothing is proxied; TTL
       automatic). Add a "troupe.run's DNS (set up by hand)" section to `oob/README.md`: the account, the zone and its
       scan-imported records, the token's scope and 1Password item, Universal SSL if 2.2(c) needed it, the Pages
       domain verification, Gandi's nameserver setting and the rollback (D6). Verify `uv run scripts/check.py` passes
+      Done 2026-10-17. Universal SSL wasn't needed (2.2(c)); the section says what to do if the apex shows other
+      CAs. The section's token-scope command was run as written and printed `['troupe.run']`. The README's anchor
+      to it is `#trouperuns-dns-set-up-by-hand`. `plan_checks.py` joins the README's scripts row
 - [ ] 4.8 Commit each of groups 2, 3 and 4 as its own Conventional Commit, signed off. Verify the guard accepts each
 
 ## 5. Pull request
