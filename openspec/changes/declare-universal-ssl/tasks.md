@@ -61,9 +61,12 @@
 
 ## 3. Pull request
 
-- [ ] 3.1 Open the pull request with `Closes #75`, the plan summary from 2.3, and a note that the import changes nothing
+- [x] 3.1 Open the pull request with `Closes #75`, the plan summary from 2.3, and a note that the import changes nothing
       served and the token was widened in place. Verify CI is green on every job, and that its plan (once the owner
       approves that run) matches 2.3's summary with no check warning
+      Done 2026-10-17: #79. Every check passed except main's plan and apply, which were skipped. The owner approved
+      the plan run (39031085144); it reads `Plan: 1 to import, 0 to add, 0 to change, 0 to destroy.`, importing
+      `cloudflare_universal_ssl_setting.troupe_run` with `enabled = true`, as in 2.3, with no check warning
 
 ## Workflow follow-up
 
