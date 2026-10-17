@@ -14,7 +14,7 @@
       `"f20f50ae5c14b2efb4e971b5c99318"`, which the owner added in the dashboard after starting Pages verification,
       so it's adopted like the others (11 records, not 10). Certificate: Let's Encrypt `YR1`, notBefore 2026-10-07,
       notAfter 2027-01-05
-- [ ] 1.2 Ask the owner to create the D4 token (Zone → DNS → Edit, Zone → Zone → Read, troupe.run only, no IP
+- [x] 1.2 Ask the owner to create the D4 token (Zone → DNS → Edit, Zone → Zone → Read, troupe.run only, no IP
       filter) and save it in 1Password as `troupe-run-cloudflare-dns`, field `credential`, vault `troupe.run`. Using
       it through `op run`, without printing it, verify the zone's status is `active` and it has exactly eleven records:
       the ones in 1.1, each with `proxied: false`. Ask the owner to confirm two-factor login is on for the
@@ -27,7 +27,8 @@
       (403); DNSSEC status reads (200, Zone Read). The account is troupe-run's; hps.gd's zones will go in a
       separate account (owner, 2026-10-17). The owner renamed the item `troupe-run-cloudflare-dns`, and
       `tofu/secrets.env`'s reference resolves through `op run`. The account was made with GitHub sign-in; the
-      owner set a Cloudflare password and turned on two-factor login (2026-10-17). Waiting on: Gandi's confirmation
+      owner set a Cloudflare password and turned on two-factor login (2026-10-17). The owner confirmed two-factor
+      login on Gandi too (2026-10-17)
 - [x] 1.3 With the token, list the zone's ID and each record's ID, content, TTL, comment, tags and `settings`. Record
       them here: IDs, not secrets. Note any attribute the scan set that D3's declaration doesn't have
       Done 2026-10-17. Zone `f716f063a26f15bcfcecd62791cdd202`. Every record: TTL 1, `proxied: false`, no comment,
@@ -39,9 +40,11 @@
       8002 `bff4ac11cb1977de99fc16069bbe20b2`, 8003 `4a0260edaa4b749fa6b3329d14c4be3b`;
       CNAME www `1c76375044e1296ce02454c0c922b560`; TXT `_gh-troupe-run-o` `05b01811966bd3ed028215c1382805f4`;
       TXT `_github-pages-challenge-troupe-run` `25be6a5ec9d1532102f26ba9aea140eb`
-- [ ] 1.4 The owner started Pages domain verification on 2026-10-17 and added its record in the dashboard:
+- [x] 1.4 The owner started Pages domain verification on 2026-10-17 and added its record in the dashboard:
       `_github-pages-challenge-troupe-run`, `f20f50ae5c14b2efb4e971b5c99318` (D9). Ask the owner whether troupe.run
       shows as verified or pending in the org's Pages settings, and record it here
+      Done 2026-10-17: the owner reports troupe.run verified in the org's Pages settings. The org's own domain
+      verification still reads `isVerified: true` (GraphQL `organization.domains`)
 
 ## 2. Probe the provider under infra-probe.troupe.run (D7)
 
@@ -88,8 +91,10 @@
       `uv run scripts/check.py` passes and a `grep` finds the variable in each job that has `TF_VAR_state_passphrase`
       Done 2026-10-17: 3 jobs have `TF_VAR_state_passphrase:` and 3 have `TF_VAR_cloudflare_api_token:`;
       `check.py`: all gates passed
-- [ ] 3.3 Ask the owner to run the README's updated loop, so all three environments get the token. Verify with
+- [x] 3.3 Ask the owner to run the README's updated loop, so all three environments get the token. Verify with
       `gh secret list --env <env> -R troupe-run/infrastructure` for each (names only)
+      Done 2026-10-17: `plan-pr`, `plan-main` and `apply` each list `TF_VAR_CLOUDFLARE_API_TOKEN`, updated at
+      11:16:35Z, 11:16:37Z and 11:16:39Z, beside the three earlier secrets
 
 ## 4. Declare and adopt the records (D2, D3, D5, D9; spec: dns)
 
