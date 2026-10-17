@@ -2,12 +2,16 @@
 
 ## 1. Change the record
 
-- [ ] 1.1 Change `pages-verify`'s content in `tofu/dns.json` to `"5f257f97c64f4931616bb34e817511"`. Verify
+- [x] 1.1 Change `pages-verify`'s content in `tofu/dns.json` to `"5f257f97c64f4931616bb34e817511"`. Verify
       `scripts/tests/test_dns.py` passes and `uv run scripts/check.py` passes
-- [ ] 1.2 Run a local plan (fast-forward onto `origin/main` first). Verify it reads
+      Done 2026-10-17: `test_dns.py` 14 passed; `check.py` passed on the commit (1.3)
+- [x] 1.2 Run a local plan (fast-forward onto `origin/main` first). Verify it reads
       `Plan: 0 to add, 1 to change, 0 to destroy.`, the one change being `cloudflare_dns_record.troupe_run["pages-verify"]`'s
       `content`, in place, with both check blocks passing. Record the summary here
-- [ ] 1.3 Commit (`fix(dns): publish troupe.run's new Pages verification record`), signed off
+      Done 2026-10-17 at `origin/main`'s head (`4a29625`): `Plan: 0 to add, 1 to change, 0 to destroy.`, the one
+      change `content = "\"f20f50ae5c14b2efb4e971b5c99318\"" -> "\"5f257f97c64f4931616bb34e817511\""`, in place;
+      `plan_checks.py` printed nothing
+- [x] 1.3 Commit (`fix(dns): publish troupe.run's new Pages verification record`), signed off
 
 ## 2. Pull request
 
