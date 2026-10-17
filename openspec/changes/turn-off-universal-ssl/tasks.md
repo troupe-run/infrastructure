@@ -9,7 +9,7 @@
       `"universal_ssl": true`, then set `tofu/dns.json` to `false` and verify every test in the module passes
 - [x] 1.2 Update `tofu/dns.tf`'s comment on `cloudflare_universal_ssl_setting` (off, and why it stays declared),
       README.md's row, and `oob/README.md`'s zone and token paragraphs (D4). Verify `uv run scripts/check.py` passes
-- [ ] 1.3 Fast-forward onto `origin/main`, then run a local plan. Verify it reads
+- [x] 1.3 Fast-forward onto `origin/main`, then run a local plan. Verify it reads
       `0 to add, 1 to change, 0 to destroy`, the one change is `cloudflare_universal_ssl_setting.troupe_run`
       `enabled = true -> false`, and no check warns. Record the summary here
       2026-10-17: the local plan couldn't run; the owner was on remote control without 1Password (the prompt timed
@@ -21,8 +21,13 @@
 
 ## 2. Pull request
 
-- [ ] 2.1 Open the pull request with `Closes #81` and 1.3's plan summary. Verify CI is green on every job, and that its
+- [x] 2.1 Open the pull request with `Closes #81` and 1.3's plan summary. Verify CI is green on every job, and that its
       plan (once the owner approves that run) matches 1.3
+      Done 2026-10-17: #82. Every check passed except main's plan and apply, which were skipped. The owner approved
+      the plan run (39033838782): `Plan: 0 to add, 1 to change, 0 to destroy.`, the one change being
+      `cloudflare_universal_ssl_setting.troupe_run` `~ enabled = true -> false`. No check warning (the job's one
+      annotation is GitHub's notice about `ubuntu-latest`). It's the first plan since #79's apply, so that apply left
+      no drift. This is 1.3's evidence too
 
 ## Workflow follow-up
 
