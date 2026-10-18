@@ -42,9 +42,13 @@
 
 ## 3. Pull request
 
-- [ ] 3.1 Fast-forward onto `origin/main`, then open the pull request with `Closes #61`, 1.1's failing count, 1.3's
+- [x] 3.1 Fast-forward onto `origin/main`, then open the pull request with `Closes #61`, 1.1's failing count, 1.3's
       output and 1.4's check result. Verify CI is green on every job and that the posted plan reads `No changes.` (or
       only drift already on `main`, named in the PR) once the owner approves that run
+      Done 2026-10-18: #88, already up to date with `origin/main`. Every check passed: `check`, `guard tests`, both
+      `guard (workflow rules)`, `DCO`, and `plan (pull request)` once the owner approved it (run 39116706067). `plan
+      (main)` and `apply (main)` were skipped, as on every pull request, and the guard's OS matrix was skipped because
+      the paths didn't need it. The posted plan reads `No changes. Your infrastructure matches the configuration.`
 
 ## Workflow follow-up
 
