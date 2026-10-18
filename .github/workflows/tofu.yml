@@ -121,6 +121,16 @@ jobs:
         run: |
           uv run --no-project scripts/tofu.py show -json pr.tfplan > "$RUNNER_TEMP/plan.json"
           uv run --no-project scripts/plan_secrets.py "$RUNNER_TEMP/plan.txt" "$RUNNER_TEMP/plan.json"
+      # The whole plan, which the comment links to when it's too long to show (spec: ci-apply;
+      # truncate-long-plans D5). Unzipped, so the artifact is plan.txt itself. Only after the check above.
+      - name: Keep the full plan
+        id: full-plan
+        if: steps.secrets.outputs.available == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: ${{ runner.temp }}/plan.txt
+          archive: false
+          if-no-files-found: error
       # The delivered files' modes this plan would leave to set (spec: guard-delivery;
       # executable-hooks design D3). Evidence only: it reads the targets, and writes nothing.
       - name: Modes to set after the apply
@@ -144,7 +154,9 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PLAN_URL: ${{ steps.full-plan.outputs.artifact-url }}
         run: |
+          head="$RUNNER_TEMP/head.md"
           body="$RUNNER_TEMP/comment.md"
           {
             echo "### OpenTofu plan for ${HEAD_SHA:0:7}"
@@ -157,14 +169,11 @@ jobs:
             echo
             cat "$RUNNER_TEMP/modes.md"
             echo
-            echo '<details><summary>Full plan</summary>'
-            echo
-            echo '```'
-            # A comment holds at most 65536 characters; the run keeps the whole plan.
-            head -c 60000 "$RUNNER_TEMP/plan.txt"
-            echo '```'
-            echo '</details>'
-          } > "$body"
+          } > "$head"
+          # Whole if it fits in a comment, otherwise cut at a line with a note and a link to the full
+          # plan, every resource change kept (spec: ci-apply; truncate-long-plans D1-D4).
+          uv run --no-project scripts/plan_comment.py --target comment --head "$head" \
+            --plan "$RUNNER_TEMP/plan.txt" --plan-url "$PLAN_URL" --out "$body"
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body-file "$body"
 
   plan:
@@ -265,6 +274,15 @@ jobs:
         run: |
           uv run --no-project scripts/tofu.py show -json main.tfplan > "$RUNNER_TEMP/plan.json"
           uv run --no-project scripts/plan_secrets.py "$RUNNER_TEMP/plan.txt" "$RUNNER_TEMP/plan.json"
+      # As in pr-plan: the whole plan, linked from the summary when it's too long to show.
+      - name: Keep the full plan
+        id: full-plan
+        if: steps.skip.outputs.skip == 'false'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: ${{ runner.temp }}/plan.txt
+          archive: false
+          if-no-files-found: error
       # Each delivered file whose mode the apply would leave unlike its source's (spec:
       # guard-delivery; executable-hooks design D1-D3). It only reads; the apply job sets them.
       - name: Modes to set after the apply
@@ -294,7 +312,9 @@ jobs:
           CHANGES: ${{ steps.plan.outputs.changes }}
           MODE_CHANGES: ${{ steps.modes.outputs.changes }}
           SHA: ${{ steps.sha.outputs.sha }}
+          PLAN_URL: ${{ steps.full-plan.outputs.artifact-url }}
         run: |
+          head="$RUNNER_TEMP/head.md"
           {
             echo "### OpenTofu plan for ${SHA:0:7}"
             echo
@@ -310,10 +330,11 @@ jobs:
             echo
             cat "$RUNNER_TEMP/modes.md"
             echo
-            echo '```'
-            head -c 900000 "$RUNNER_TEMP/plan.txt"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } > "$head"
+          # Whole if it fits in a step summary, otherwise cut as on a pull request (truncate-long-plans D1-D4).
+          uv run --no-project scripts/plan_comment.py --target summary --head "$head" \
+            --plan "$RUNNER_TEMP/plan.txt" --plan-url "$PLAN_URL" --out "$RUNNER_TEMP/summary.md"
+          cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Keep the saved plan for the apply job
         if: steps.plan.outputs.changes == 'true' || steps.modes.outputs.changes == 'true'
         # Encrypted with the state passphrase, and it holds no key (design D3). The mode plan holds

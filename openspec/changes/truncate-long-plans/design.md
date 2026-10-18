@@ -84,7 +84,8 @@ flaw too; fixing it costs one line, and an early close would hide the note.
 ### D5. The full plan is an artifact of the run
 
 A new step after "The plan holds no key" uploads `plan.txt` with `actions/upload-artifact` (the version this workflow
-already pins), as `pr-plan` in `pr-plan` and `main-plan` in `plan`, and its `artifact-url` output becomes the link.
+already pins) with `archive: false`, so it is stored as the file itself, not a zip. In that mode the artifact takes
+the file's name, so each run has one `plan.txt`. The step's `artifact-url` output becomes the link.
 It's uploaded on every run, not only when the plan is long, because the URL is needed before the body is built and
 the upload is small. Retention is the repository default, as for the run's log.
 
@@ -172,6 +173,7 @@ the commit.
 
 ## Open Questions
 
-- Whether `actions/upload-artifact`'s pinned version can upload `plan.txt` unzipped, so the link opens in the browser
-  rather than downloading a zip. Either way the link reaches the full plan; the task checks the action's
-  documentation and uses it if it's there.
+None left. Whether the pinned `actions/upload-artifact` (v7.0.1, `043fb46`) can upload unzipped: yes. Its
+`action.yml` documents `archive: false` ("uploaded as-is without archiving… only a single file… the name of the
+file will be used as the artifact name") and `artifact-url` ("only works for requests authenticated with GitHub").
+Checked 2026-10-18 (task 3.1).
