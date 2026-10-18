@@ -1,10 +1,10 @@
 ## MODIFIED Requirements
 
 ### Requirement: Each App's installation is declared and checked
-For each GitHub App installed in the org (today DCO, `troupe-run-infrastructure` and `troupe-run-release`), its
-permissions and its repository selection (all repositories, or selected ones) SHALL be declared here. A difference
-from GitHub SHALL be reported by a drift check that only reads. The check SHALL run in CI whenever `main` is planned,
-daily included (spec: ci-apply), as well as by hand.
+For each GitHub App installed in the org (today DCO, `troupe-run-infrastructure`, `troupe-run-release` and
+`troupe-run-board`), its permissions and its repository selection (all repositories, or selected ones) SHALL be
+declared here. A difference from GitHub SHALL be reported by a drift check that only reads. The check SHALL run in CI
+whenever `main` is planned, daily included (spec: ci-apply), as well as by hand.
 
 #### Scenario: An App given a new permission is reported
 - **WHEN** an App's installation gains a permission on GitHub without the declaration changing

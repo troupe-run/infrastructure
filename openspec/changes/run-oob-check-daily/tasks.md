@@ -41,11 +41,12 @@
   design.md's table, replacing "documented, not yet probed". Any check that's still unreadable goes in `BY_HAND`
   (D4), recorded in design.md. Done when `--ci` with that token reports no unreadable check and no
   difference.
-- [ ] 3.3 Show a difference failing with that token. After 3.5, run `--ci` with the job's token. The org has a real
-  difference today, #59's `troupe-run-board` App installed but not yet declared, so check the run exits 1 with an
-  `::error::` line naming it. (The plan was a temporary edit to a copy of `oob/`; a real difference shows the same
-  thing without one.) Then ask the owner to confirm their GitHub notification setting for Actions sends email for
-  failed workflows (D5), and record the answer in design.md.
+- [ ] 3.3 Show a difference failing with that token. After 3.5, run `--ci` with the job's token on a scratchpad copy
+  of what `oob.py` reads, with one issue type's description changed, so the worktree isn't touched. Check that it
+  exits 1 with an `::error::` line naming the difference, and a summary listing every check. (The plan was a
+  test-only path; then #59's `troupe-run-board`, until #59's change declared it on `main`.) Then ask the owner to
+  confirm their GitHub notification setting for Actions sends email for failed workflows (D5), and record the answer
+  in design.md.
 - [ ] 3.4 Add the `oob` job to `.github/workflows/tofu.yml`. It gets the `plan` job's `if`, the `plan-main` environment
   (`deployment: false`), `permissions: contents: read`, and the read-only token from `actions/create-github-app-token`
   (D2) as `GH_TOKEN`. It runs `uv run --no-project scripts/oob.py --ci`, with no `needs:` on `plan` and not needed by
