@@ -30,12 +30,12 @@
 
 ## 4. Verify
 
-- [ ] 4.1 Run `uv run scripts/oob.py` on the branch and verify it reports nothing for troupe's specs or labels; keep
+- [x] 4.1 Run `uv run scripts/oob.py` on the branch and verify it reports nothing for troupe's specs or labels; keep
       its output for the pull request
-- [ ] 4.2 Run `uv run scripts/tofu.py plan` and verify it shows the three `cap:` labels created on troupe-run/troupe,
+- [x] 4.2 Run `uv run scripts/tofu.py plan` and verify it shows the three `cap:` labels created on troupe-run/troupe,
       `speed` created on troupe, `.github`, infrastructure and website, and nothing else created, changed or deleted;
       keep its output for the pull request
-- [ ] 4.3 Run `openspec validate label-troupe-specs --strict` and verify it passes
+- [x] 4.3 Run `openspec validate label-troupe-specs --strict` and verify it passes
 
 ## Workflow follow-up
 
