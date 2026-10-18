@@ -2,18 +2,30 @@
 
 ## 1. The check (D1 to D3; specs: ci-apply, release-credentials, repositories)
 
-- [ ] 1.1 Write `scripts/tests/test_main_only_environments.py`, marked `tofu` (`pytestmark`), with the D1 table and
+- [x] 1.1 Write `scripts/tests/test_main_only_environments.py`, marked `tofu` (`pytestmark`), with the D1 table and
       the mutation tests listed in D3 first, against a problems function that returns nothing yet. Verify each
       mutation test fails, and record the count
-- [ ] 1.2 Write the reader (D2): strip comments, find resource blocks by matching braces, read `local.ci_environments`,
+      Done 2026-10-18: `18 failed, 1 passed`. Every failure is the stub's `[]` against the named problem, or `DID NOT
+      RAISE ValueError` for the two unknown shapes; none came from the text edits. The pass is the real files
+- [x] 1.2 Write the reader (D2): strip comments, find resource blocks by matching braces, read `local.ci_environments`,
       resolve the `ci` resource's `dynamic` conditions and the policy's `for_each` filter, and refuse any other shape
       with "update this test". Write the problems function (D1, D3) on top of it. Verify every test in the module
       passes, including the real files giving no problems
-- [ ] 1.3 Delete the `github_pages` resource block in a scratch copy of `tofu/environments.tf` (in the scratchpad,
+      Done 2026-10-18: `19 passed`. The reader finds all five environments (`plan-pr` too, which isn't checked), each
+      with `can_admins_bypass` false, the four main-only ones with `protected_branches = false` and
+      `custom_branch_policies = true`, `apply` and `plan-pr` with `local.owner_user_id` as reviewer, and exactly
+      `['main']` as the branch policies of each main-only one. ruff and mypy are clean
+- [x] 1.3 Delete the `github_pages` resource block in a scratch copy of `tofu/environments.tf` (in the scratchpad,
       read by the problems function, not the real file) and run the real-files check against it. Verify it names
       `github-pages: not declared`. This is #61's failing case, the one `prevent_destroy` missed
-- [ ] 1.4 Verify `uv run scripts/check.py` passes, and that `uv run scripts/check.py --scope tofu` runs the new tests
+      Done 2026-10-18, on copies of both files in the scratchpad. With only the environment's block deleted, its policy
+      still names it, and the check refuses with `github_repository_environment.github_pages isn't declared` (as
+      `tofu validate` would). With the block and its policy deleted, which is the `2 to destroy` from #61, it gives
+      `['github-pages: not declared']`
+- [x] 1.4 Verify `uv run scripts/check.py` passes, and that `uv run scripts/check.py --scope tofu` runs the new tests
       (`guard_pytest` accepts their marker)
+      Done 2026-10-18: `check: all gates passed` both ways. `--scope tofu` selected 58 of 971 tests, including all 19 in
+      `test_main_only_environments.py`
 
 ## 2. The comments (D4)
 
