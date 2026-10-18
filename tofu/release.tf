@@ -12,7 +12,8 @@ locals {
 
 # Holds RELEASE_APP_PRIVATE_KEY, which the owner sets from 1Password (oob/README.md). Only a run on
 # main may use it, and no admin may bypass that. No reviewers: it runs on every push to main, and
-# the release pull request is reviewed before it merges (design D2).
+# the release pull request is reviewed before it merges (design D2). Removing or weakening it fails
+# scripts/tests/test_main_only_environments.py.
 resource "github_repository_environment" "release" {
   repository          = module.repo_troupe.name
   environment         = "release"
