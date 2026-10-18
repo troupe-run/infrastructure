@@ -27,7 +27,7 @@ one place that says which suites a scope runs.
 - The workflow doc describes the key. This repository's declaration doesn't use it: all its tests are in one
   directory, and its scopes stay markers.
 - `pytest-xdist` joins this repository's dev dependencies, so the guard's tests can prove the key under `-n`.
-- `scripts/guard.py` and `scripts/guard_pytest.py` are delivered to troupe.
+- `scripts/guard.py` and `scripts/guard_pytest.py` are delivered to troupe and website.
 
 ## Capabilities
 
@@ -49,5 +49,6 @@ None.
   `-n 2`), and the unmatched-entry failure.
 - `pyproject.toml`, `uv.lock`: `pytest-xdist` in the dev group.
 - `docs/development-workflow.md`, the comment at the top of `scripts/check-paths.toml`.
-- troupe: the two delivered files change by delivery. Nothing there uses the key until its `package-check-scopes`
-  change adds `tests` to its scopes.
+- troupe and website: the two delivered files change by delivery. Nothing there uses the key until troupe's
+  `package-check-scopes` change adds `tests` to its scopes. website's declaration has only `[skip]`, and it runs no
+  pytest.

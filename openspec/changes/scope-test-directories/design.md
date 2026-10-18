@@ -182,7 +182,7 @@ missing: a skip would pass without proving anything, so a missing package fails 
 
 1. Merge here. This repository's declaration doesn't change apart from its comment, so its behaviour doesn't either.
 2. CI is green on all three OSes. The owner approves the `apply` job, which delivers `scripts/guard.py` and
-   `scripts/guard_pytest.py` to troupe. troupe's declaration has no `tests` keys, so nothing changes there.
+   `scripts/guard_pytest.py` to troupe and website. Neither declaration has `tests` keys, so nothing changes there.
 3. troupe's `package-check-scopes` adds its package scopes with `tests`, in one commit, which runs the full check.
 
 Rollback: before troupe uses the key, revert here and deliver again. Once it does, take its `tests` keys out first
