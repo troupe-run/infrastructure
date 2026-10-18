@@ -39,7 +39,7 @@
 
 ## 3. The plugin applies it
 
-- [ ] 3.1 Extend `scripts/tests/test_guard_pytest.py`'s throwaway project so a test can declare `tests` and lay out
+- [x] 3.1 Extend `scripts/tests/test_guard_pytest.py`'s throwaway project so a test can declare `tests` and lay out
   several test directories, and its `run_pytest` takes extra arguments (`-m`, `-n 2`, paths). Write the tests (spec:
   both new requirements): `-m <scope>` selects exactly the tests under the scope's `tests` plus any test marked by
   hand, serially and with `-n 2`, comparing the sets of passed node ids; an untagged test under a `tests` directory
@@ -47,14 +47,26 @@
   matching no test fails the full run and the `-m <scope>` run, serially and with `-n 2`, with exit 1, the message
   in the output and no `INTERNALERROR`; running one file outside the broken entry passes; `pytest --markers` lists the
   scope's `tests`. Verify they fail on the current plugin.
-- [ ] 3.2 Implement D5 in `scripts/guard_pytest.py`: the `tryfirst` `pytest_collection_modifyitems` adding markers
+  - 2026-10-18: 15 new tests (18 cases with the testpaths pair added in 3.2), 13 failing on the old plugin. The
+    three that passed must pass either way: a read outside the scope's directories still fails, and runs of
+    `suites/b` and `suites/b/test_b.py` pass.
+- [x] 3.2 Implement D5 in `scripts/guard_pytest.py`: the `tryfirst` `pytest_collection_modifyitems` adding markers
   from `directory_tags`, the run's roots from `config.args` (D6), and the failing item for each unmatched entry,
   placed first and marked with its scope; the marker description lists `tests`; the module docstring says what the
   hook does. Verify 3.1 passes, every existing test in the file still passes, and `uv run scripts/check.py` passes.
-- [ ] 3.3 Measure the hook's cost on this repository's own run: `uv run pytest -q` three times before and after 3.2
+  - 2026-10-18: 28 pass in the file. A test for a run from `testpaths` (`["suites"]` checks the missing entry,
+    `["suites/b"]` doesn't) was added, as design D6's risks promised. `_record` now uses the same `_relative` helper,
+    so the repository-relative rule is written once. With `trylast` in place of `tryfirst`, the four selection cases
+    (both scopes, serial and `-n 2`) fail: `-m` has already deselected, so the scope's other directories look
+    empty. Restored. The full check passes (1012 tests).
+- [x] 3.3 Measure the hook's cost on this repository's own run: `uv run pytest -q` three times before and after 3.2
   (no `tests` keys here, so the hook only walks the items). Record the times here; verify the difference is within
   run-to-run noise.
 
+  - 2026-10-18: the totals before and after can't be compared, because 3.1's tests start pytest subprocesses (and
+    the machine was loaded: 81-131 s). So the same 952 tests (the new ones deselected with `-k`) ran with the old
+    plugin (`904d7a9`) and the new one, alternating: old 96.2, 86.3, 96.2 s; new 84.3, 95.7, 91.6 s. No difference
+    beyond noise. This repository declares no `tests`, so the hook returns at once.
 ## 4. Documentation
 
 - [ ] 4.1 In `docs/development-workflow.md`, describe the `tests` key: the example declaration gains a scope with
