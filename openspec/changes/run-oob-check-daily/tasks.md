@@ -21,13 +21,13 @@
   `--ci`. With `--ci`, a `BY_HAND` check makes no read (the test's fetch records calls), and the report names it with
   its reason. Without `--ci`, it's read as today. Any other argument exits 2 with the usage before any read. A test
   pins App installations in `BY_HAND`. Verify with `uv run pytest scripts/tests/test_oob.py`.
-- [ ] 2.2 Test first, then write the report for CI. `--ci` prints an `::error::` line for each difference and each
+- [x] 2.2 Test first, then write the report for CI. `--ci` prints an `::error::` line for each difference and each
   unreadable check, and, when `GITHUB_STEP_SUMMARY` is set, appends a Markdown summary to it: the differences, the
   unreadable checks, the checks that ran, and the by-hand checks with their reasons. Verify with tests of the
   rendered annotations and summary.
-- [ ] 2.3 Run `uv run scripts/oob.py` with the owner's login, which should show "no differences" with every check run,
+- [x] 2.3 Run `uv run scripts/oob.py` with the owner's login, which should show "no differences" with every check run,
   and `uv run scripts/oob.py --ci`, which should name App installations as by hand. Quote both outputs in the PR.
-- [ ] 2.4 Run `uv run scripts/check.py`, which must pass (mypy --strict, ruff, tests).
+- [x] 2.4 Run `uv run scripts/check.py`, which must pass (mypy --strict, ruff, tests).
 
 ## 3. The App's grants and the job (design D1, D2, D5, D6)
 

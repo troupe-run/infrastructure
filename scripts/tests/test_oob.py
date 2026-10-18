@@ -600,3 +600,76 @@ def test_any_other_argument_exits_2_before_reading_anything(
     assert oob.main(argv) == 2
     assert calls == []
     assert "usage: uv run scripts/oob.py [--ci]" in capsys.readouterr().err
+
+
+# run-oob-check-daily design D5: under --ci, each difference and unreadable check is an error
+# annotation, and the run's summary lists what was found, what ran and what was left to a person.
+
+
+def ci_main(
+    oob_dir: Path, monkeypatch: pytest.MonkeyPatch, fetch: oob.Fetch, argv: list[str] | None = None
+) -> tuple[int, Path]:
+    summary = oob_dir / "summary.md"
+    monkeypatch.setattr(oob, "OOB", oob_dir)
+    monkeypatch.setattr(oob, "ROOT", oob_dir)
+    monkeypatch.setattr(oob, "gh", fetch)
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    return oob.main(["--ci"] if argv is None else argv), summary
+
+
+def test_ci_annotates_each_difference_and_each_unreadable_check(
+    oob_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    failures: dict[str, BaseException] = {"issue-types": refused("gh: Forbidden (HTTP 403)")}
+    fetch = fake_github(TYPES, PROJECTS, [], failures=failures, settings=[
+        {"name": "two_factor_requirement_enabled", "value": True}
+    ])  # fmt: skip
+    code, _ = ci_main(oob_dir, monkeypatch, fetch)
+    assert code == 1
+    errors = [line for line in capsys.readouterr().out.splitlines() if line.startswith("::error")]
+    assert errors == [
+        "::error title=oob difference::org settings: 'two_factor_requirement_enabled' value is "
+        "True on GitHub, declared False",
+        "::error title=oob unreadable::issue types: couldn't read it (gh: Forbidden (HTTP 403))",
+    ]
+
+
+def test_an_annotation_escapes_what_would_end_or_split_it() -> None:
+    assert oob.annotation("difference", "50% done\r\nnext") == (
+        "::error title=oob difference::50%25 done%0D%0Anext"
+    )
+
+
+def test_the_summary_lists_differences_unreadable_checks_what_ran_and_what_was_left(
+    oob_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    failures: dict[str, BaseException] = {"issue-types": refused("gh: Forbidden (HTTP 403)")}
+    made = {"website": [*DECLARED_MILESTONES, "0.3.0"]}
+    fetch = fake_github(TYPES, PROJECTS, [], failures=failures, milestones=made)
+    _, summary = ci_main(oob_dir, monkeypatch, fetch)
+    text = summary.read_text()
+    assert text.startswith("### Out-of-band drift check\n")
+    assert "**1 difference, 1 check couldn't be read.**" in text
+    assert "- milestones: website: '0.3.0' is on GitHub but not declared" in text
+    assert "- issue types: couldn't read it (gh: Forbidden (HTTP 403))" in text
+    ran = [n for n in oob.CHECK_NAMES if n not in {"issue types", "App installations"}]
+    assert f"Checked: {', '.join(ran)}." in text
+    assert f"- App installations: {oob.BY_HAND['App installations']}" in text
+
+
+def test_the_summary_says_no_differences_when_there_are_none(
+    oob_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    code, summary = ci_main(oob_dir, monkeypatch, fake_github(TYPES, PROJECTS, []))
+    assert code == 0
+    assert "**No differences.**" in summary.read_text()
+
+
+def test_a_hand_run_writes_no_annotations_and_no_summary(
+    oob_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fetch = fake_github(TYPES[:1], PROJECTS, [])
+    code, summary = ci_main(oob_dir, monkeypatch, fetch, argv=[])
+    assert code == 1
+    assert "::error" not in capsys.readouterr().out
+    assert not summary.exists()

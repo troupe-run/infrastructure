@@ -11,6 +11,7 @@ leaves out the checks in BY_HAND and names each one.
 import base64
 import dataclasses
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -480,6 +481,40 @@ def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT, *, ci: bool = False) -> 
     return report
 
 
+def annotation(kind: str, message: str) -> str:
+    """A GitHub Actions error annotation, escaped so the message can't end or split it."""
+    escaped = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    return f"::error title=oob {kind}::{escaped}"
+
+
+def plural(count: int, one: str, many: str) -> str:
+    return f"{count} {one if count == 1 else many}"
+
+
+def summary(report: Report) -> str:
+    """The run summary in Markdown: what was found, what ran, and what was left to a person."""
+    found = []
+    if report.differences:
+        found.append(plural(len(report.differences), "difference", "differences"))
+    if report.unreadable:
+        found.append(
+            plural(len(report.unreadable), "check couldn't be read", "checks couldn't be read")
+        )
+    lines = ["### Out-of-band drift check", ""]
+    lines.append(f"**{', '.join(found)}.**" if found else "**No differences.**")
+    if report.differences:
+        lines += ["", "Fix GitHub, or update the declaration in `oob/`:", ""]
+        lines += [f"- {line}" for line in report.differences]
+    if report.unreadable:
+        lines += ["", "Couldn't be read, so nothing is known about them:", ""]
+        lines += [f"- {line}" for line in report.unreadable]
+    lines += ["", f"Checked: {', '.join(report.ran)}."]
+    if report.by_hand:
+        lines += ["", "Left to a hand run (`uv run scripts/oob.py` with the owner's login):", ""]
+        lines += [f"- {name}: {why}" for name, why in report.by_hand]
+    return "\n".join(lines) + "\n"
+
+
 USAGE = "usage: uv run scripts/oob.py [--ci]"
 
 
@@ -491,7 +526,16 @@ def main(argv: list[str]) -> int:
             file=sys.stderr,
         )
         return 2
-    report = run(gh, OOB, ROOT, ci=argv == ["--ci"])
+    ci = argv == ["--ci"]
+    report = run(gh, OOB, ROOT, ci=ci)
+    if ci:
+        for line in report.differences:
+            print(annotation("difference", line))
+        for error in report.unreadable:
+            print(annotation("unreadable", error))
+        if path := os.environ.get("GITHUB_STEP_SUMMARY"):
+            with Path(path).open("a", encoding="utf-8") as out:
+                out.write(summary(report))
     for line in report.differences:
         print(line)
     for error in report.unreadable:
