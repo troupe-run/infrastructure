@@ -162,6 +162,24 @@ from the 1Password key with `op run`, and never print it. gh can't mint one, so 
 -sha256 -sign`, exchanged at `POST /app/installations/{id}/access_tokens`, all inside one `op run` shell that prints
 nothing. The findings go in this section.
 
+Question 3 was asked without a live write: the probe tried a write that can't succeed either way (creating a label
+with no name on website), where 403 means refused for lack of permission and 422 means permitted but invalid. Posting
+a comment on website, as first planned, would have written to a live repository had the App had the permission.
+
+**Findings (2026-10-18, the owner's terminal, throwaway project 3 "infra-probe board" and
+`troupe-run/infra-probe-20261018-board`, since deleted).** The token was minted from the 1Password key and revoked
+afterwards (`DELETE /installation/token`: 204). Nothing secret was printed.
+
+- **The token's permissions:** `{'organization_projects': 'write'}`, `repository_selection: selected`. No
+  `metadata`, and no repository permission.
+- **The installation's repositories:** `GET /installation/repositories` returned `[]`. The installation covers no
+  repository at all.
+- **Q1, yes:** `gh project item-add 3 --owner troupe-run --url <probe issue>` added the issue
+  (`PVTI_lADOE-8w_M4BnlvlzhBml-g`), from a public repository the App isn't installed on, and
+  `gh project item-list 3` showed it. The App needs no repository permission, so "Issues: read" isn't added.
+- **Q2, yes:** gh accepted the installation token (`ghs_…`) for `project item-add`, with no scope warning.
+- **Q3, refused:** the label write on website gave HTTP 403.
+
 **Not probed: the branch policy.** The ci-apply probe showed that an environment declared like this refuses a run from
 another branch, and `release` and `github-pages` are declared the same way. After the apply, `gh api` shows `board`'s
 `can_admins_bypass: false`, and its custom branch policies list exactly `main`.
