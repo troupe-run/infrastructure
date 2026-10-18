@@ -138,6 +138,64 @@ def test_a_body_file_is_read_relative_to_the_working_directory(tmp_path: Path) -
     assert "pr-closes-issue" in {d.rule for d in bad}
 
 
+# What refuse-substituted-pr-body must not change (its design D5): which bodies are refused
+
+LITERAL = st.text(alphabet=st.sampled_from("abc XYZ019.,:#-"), max_size=20)
+EXPANSION = st.sampled_from(["$(cat notes)", "`cat notes`", "$BODY", "${BODY}", "$((1+2))"])
+BODY_PART = st.one_of(LITERAL, EXPANSION, st.just("Closes #16"), st.just("Mentions #16"))
+
+
+@st.composite
+def pr_create_with_a_body(draw: st.DrawFn) -> str:
+    text = "".join(draw(st.lists(BODY_PART, max_size=4)))
+    if draw(st.booleans()):  # the issue's form: the body is a heredoc read by cat
+        value = f"\"$(cat <<'EOF'\n{text}\nEOF\n)\""
+    elif draw(st.booleans()) and not any(c in text for c in "$`"):
+        value = f"'{text}'"
+    else:
+        value = f'"{text}"'
+    form = draw(st.sampled_from(["--body {}", "--body={}", "-b {}"]))
+    return "gh pr create --title t " + form.format(value)
+
+
+def _body_word(words: list[str]) -> str:
+    for index, word in enumerate(words):
+        if word.startswith("--body="):
+            return word.removeprefix("--body=")
+        if word in ("--body", "-b"):
+            return words[index + 1]
+    raise AssertionError(f"no body in {words}")
+
+
+@given(pr_create_with_a_body())
+def test_a_pr_body_is_refused_exactly_when_the_word_the_check_sees_has_no_closing_line(
+    command: str,
+) -> None:
+    [words] = guard.split_command(command)
+    closes = guard.CLOSING.search(_body_word(words)) is not None
+    refused = "pr-closes-issue" in {d.rule for d in guard.shell_decisions(command, Path.cwd())}
+    assert refused is not closes
+
+
+@pytest.mark.parametrize("body", ["'no closing line'", "'costs $5'", '"costs $5 or $"'])
+def test_a_plain_body_with_no_closing_line_keeps_its_message(body: str) -> None:
+    [decision] = [
+        d
+        for d in guard.shell_decisions(f"gh pr create --body {body}", Path.cwd())
+        if d.rule == "pr-closes-issue"
+    ]
+    assert decision.problem == "the pull request's description doesn't close an issue."
+    assert decision.fix == (
+        "Add a line like 'Closes #22' to the description (--body or --body-file)."
+    )
+
+
+def test_a_body_file_that_closes_an_issue_goes_ahead(tmp_path: Path) -> None:
+    (tmp_path / "pr.md").write_text("Does x.\n\nCloses #16\n", encoding="utf-8")
+    decisions = guard.shell_decisions("gh pr create --title t --body-file pr.md", tmp_path)
+    assert not any(d.refused for d in decisions)
+
+
 # pr-closes-issue covers PRs into this repository only (#28)
 
 TROUPE_ORIGIN = "git@github.com:troupe-run/troupe.git"
