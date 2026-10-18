@@ -69,11 +69,15 @@
     beyond noise. This repository declares no `tests`, so the hook returns at once.
 ## 4. Documentation
 
-- [ ] 4.1 In `docs/development-workflow.md`, describe the `tests` key: the example declaration gains a scope with
+- [x] 4.1 In `docs/development-workflow.md`, describe the `tests` key: the example declaration gains a scope with
   `tests`, the entry rules say directories only, "A scope is a test tag" says a test under a scope's `tests` counts
   as tagged, and the unmatched-entry failure and narrower-run rule are stated, with the xdist behaviour. Update the
   top comment in `scripts/check-paths.toml` to mention the key. Verify `uv run scripts/check.py` passes (the docs
   tests read both) and the doc's example declaration parses with `guard.check_paths`.
+  - 2026-10-18: the doc's example gains a `vcs_git` scope with `tests`; the entry rules, the directory tags, the
+    unmatched-entry failure and the narrower-run rule are described. The example is now checked by a lasting test,
+    `test_the_docs_example_declaration_is_one_the_guard_reads` in `test_guard_docs.py` (tagged `docs`), rather than
+    once by hand.
 
 ## 5. Integration
 

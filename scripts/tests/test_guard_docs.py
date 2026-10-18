@@ -25,3 +25,12 @@ def test_the_docs_say_the_tamper_rule_can_t_be_overridden() -> None:
         if f"`{guard.TAMPER_RULE}`" in line
     )
     assert "No override unlocks this rule" in row
+
+
+def test_the_docs_example_declaration_is_one_the_guard_reads() -> None:
+    text = DOC.read_text(encoding="utf-8")
+    example = text.split("```toml\nversion = 1\n", 1)[1].split("```", 1)[0]
+    declaration = guard.check_paths("version = 1\n" + example)
+    assert ("vcs_git", ("packages/troupe-vcs-git/tests/**", "packages/troupe/tests/**")) in (
+        declaration.tests
+    )

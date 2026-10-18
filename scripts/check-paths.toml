@@ -3,7 +3,9 @@
 # docs/development-workflow.md). A path in no group needs the full check. This file is this repository's own; it
 # isn't delivered.
 #
-# A scope still runs every gate but the tests, which narrow to those tagged with it (pytest: @pytest.mark.<scope>).
+# A scope still runs every gate but the tests, which narrow to those tagged with it (pytest: @pytest.mark.<scope>),
+# or under one of the directories in its optional `tests` list (`dir/**`), which guard_pytest tags for it. All of this
+# repository's tests are in scripts/tests, so its scopes are tagged in the tests.
 # guard_pytest fails a test that reads a scope's file without its tag, but it sees only reads made in the test's own
 # process: a test that reads one through a subprocess must be tagged by hand. Python sources have no scope: a test
 # reads a module by importing it, once per process, so the tag check couldn't see who depends on it
