@@ -2,24 +2,25 @@
 
 ## 1. Unreadable is an error, for every check (design D3)
 
-- [ ] 1.1 In `scripts/tests/test_oob.py`, add failing tests first: a 403 from the issue types read, a GraphQL answer
-  carrying `errors`, and an org-settings answer with `value: null` each make `run` report an `UnreadableError` naming
-  the check (and the field, for `null`), with no difference reported for any of them. Run `uv run pytest
-  scripts/tests/test_oob.py` and see them fail.
-- [ ] 1.2 Route every read in `run` through one wrapper that turns a fetch failure into `UnreadableError`, make the
-  GraphQL read fail on `errors`, and make a declared field that reads back as `null` unreadable. Verify that 1.1's
-  tests pass and every existing test in `test_oob.py` still passes.
-- [ ] 1.3 Add a test that no declaration in `oob/` holds a `null` value, so D3 can't hide a real difference. Verify it
-  passes on the current files and fails on a copy with a `null` added.
-- [ ] 1.4 Make `run` go on after a check fails to read, and `main` report every unreadable check and every
+- [x] 1.1 In `scripts/tests/test_oob.py`, add failing tests first: a 403 from the issue types read, a projects read
+  that `gh` fails because the GraphQL answer carried `errors`, and an org-settings answer with `value: null` each make
+  `run` report the check as unreadable (naming the field, for `null`), with no difference reported for any of them.
+  Run `uv run pytest scripts/tests/test_oob.py` and see them fail.
+- [x] 1.2 Route every read in `run` through one wrapper that turns a fetch failure into `UnreadableError` naming the
+  check, and mark org settings `null_is_unreadable` (D3). Verify that 1.1's tests pass and every existing test in
+  `test_oob.py` still passes.
+- [x] 1.3 Add tests that `null` stays an ordinary value everywhere else. A project whose `shortDescription` is
+  declared `null` and reads `null` matches, and one declared with text that reads `null` is a difference, not
+  unreadable. Verify both pass, and that the second fails if `null_is_unreadable` is set on projects.
+- [x] 1.4 Make `run` go on after a check fails to read, and `main` report every unreadable check and every
   difference. Test that two refused reads and one difference produce two named errors and the difference, and exit 1.
 
 ## 2. Checks run only by hand, and `--ci` (design D4, D5)
 
-- [ ] 2.1 Test first, then add the `by_hand` reason to the check declarations, set only on App installations, and
-  `--ci`. With `--ci`, a `by_hand` check makes no read (the test's fetch records calls), and the report names it with
+- [x] 2.1 Test first, then add `BY_HAND` (check name to reason, design D4), holding only App installations, and
+  `--ci`. With `--ci`, a `BY_HAND` check makes no read (the test's fetch records calls), and the report names it with
   its reason. Without `--ci`, it's read as today. Any other argument exits 2 with the usage before any read. A test
-  pins App installations as `by_hand`. Verify with `uv run pytest scripts/tests/test_oob.py`.
+  pins App installations in `BY_HAND`. Verify with `uv run pytest scripts/tests/test_oob.py`.
 - [ ] 2.2 Test first, then write the report for CI. `--ci` prints an `::error::` line for each difference and each
   unreadable check, and, when `GITHUB_STEP_SUMMARY` is set, appends a Markdown summary to it: the differences, the
   unreadable checks, the checks that ran, and the by-hand checks with their reasons. Verify with tests of the
@@ -37,8 +38,8 @@
   prompt, mint an installation token locally from the App's key, with exactly D2's repositories and read permissions.
   Check the action's `permission-*` input names for issue types and projects against its documentation. Never print
   the key or the token. Run `GH_TOKEN=<that token> uv run scripts/oob.py --ci`. Record each read's result in
-  design.md's table, replacing "documented, not yet probed". Any check that's still unreadable gets a `by_hand`
-  reason (D4), recorded in design.md. Done when `--ci` with that token reports no unreadable check and no
+  design.md's table, replacing "documented, not yet probed". Any check that's still unreadable goes in `BY_HAND`
+  (D4), recorded in design.md. Done when `--ci` with that token reports no unreadable check and no
   difference.
 - [ ] 3.3 Show a difference failing with that token. Run `--ci` against a temporary copy of `oob/` with one field
   changed (pointed at by a test-only path, never committed), and check it exits 1 with the `::error::` line naming
@@ -55,7 +56,7 @@
 ## 4. Documentation
 
 - [ ] 4.1 Update `oob/README.md` ("It isn't run by CI…"): where and when the job runs, that App installations is left
-  to the hand run (pointing at its `by_hand` reason in `oob.py`), that the manual run still goes in a PR that changes
+  to the hand run (pointing at `BY_HAND` in `oob.py`), that the manual run still goes in a PR that changes
   `oob/`, and D5's notification note (who GitHub emails, and that changing the `cron` line moves it). Update README.md's
   `oob.py` lines to match. Verify with `uv run scripts/check.py`, and check that no "isn't run by CI" wording is left:
   `grep -rn "run by CI" README.md oob/README.md`.
