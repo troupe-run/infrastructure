@@ -142,7 +142,15 @@ it.
 artifact. Download it (`gh run download <run> -n state-after-apply`), copy it over `tofu/terraform.tfstate` on a
 branch, and merge that through a pull request.
 
-**An apply can't delete a repository.** Removing a repository's declaration makes the plan fail on `prevent_destroy`.
+**An apply can't delete a repository, but it can archive one and lose its labels.** `prevent_destroy` fails the plan
+only while the repository's `module` block is there, refusing a `count = 0` or a change that would replace the
+repository. Deleting `module "repo_<name>"` deletes that guard with it: the plan lists the repository and its labels,
+ruleset and Dependabot settings as destroyed, and nothing refuses. Only reading the plan stops it. If it's applied,
+`archive_on_destroy` archives the repository rather than deleting it, but the apply first deletes its labels, which
+takes them off every issue and pull request, its ruleset, and its Dependabot alerts and security updates. To get it
+back, unarchive it (`gh repo unarchive troupe-run/<name>`), restore its declaration and `import` blocks, and apply: the
+repository is imported again and everything else is recreated, but issues and pull requests don't get their labels back.
+
 To stop managing a repository but keep it, replace its `module` block with:
 
 ```hcl
