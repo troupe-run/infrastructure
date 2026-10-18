@@ -12,6 +12,13 @@
     "repository_selection": "selected"
   },
   {
+    "app_slug": "troupe-run-board",
+    "permissions": {
+      "organization_projects": "write"
+    },
+    "repository_selection": "selected"
+  },
+  {
     "app_slug": "troupe-run-infrastructure",
     "permissions": {
       "actions_variables": "write",
