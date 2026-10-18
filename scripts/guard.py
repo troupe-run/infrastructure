@@ -1674,8 +1674,10 @@ def shell_decisions(command: str, cwd: Path) -> list[Decision]:
 UNQUOTED_SHELL_SYNTAX = frozenset("$`\\<>|&;(){}*?[]~!#\n")
 # Inside double quotes, these still expand.
 DOUBLE_QUOTED_SHELL_SYNTAX = frozenset("$`")
-# The flags of granted commands that read a local file and send its contents to GitHub.
-GH_FILE_FLAGS = ("--body-file", "-F", "--input")
+# The flags of granted commands that read a local file and send its contents to GitHub. When gh
+# is updated, look for new ones: a StringVarP whose help names a `file`, or attachments.AddFlag
+# (refuse-substituted-pr-body design D6).
+GH_FILE_FLAGS = ("--body-file", "-F", "--input", "--attach")
 
 
 def _plain_shell_text(command: str) -> bool:
@@ -1707,8 +1709,14 @@ def _files_read(words: Sequence[str]) -> list[str] | None:
         value = inline if equals else (words[index + 1] if index + 1 < len(words) else "")
         if value in ("", "-"):
             return None
-        files.append(value)
+        files.extend(_attachment_readings(value) if name == "--attach" else [value])
     return files
+
+
+def _attachment_readings(value: str) -> list[str]:
+    """Every file gh might read for `--attach <value>`: the whole value, or the part before any
+    '#' but a leading one, whichever exists when gh runs (gh 2.102.0, internal/attachments)."""
+    return [value, *(value[:index] for index, char in enumerate(value) if char == "#" and index)]
 
 
 def _within(path: Path, *roots: Path) -> bool:
