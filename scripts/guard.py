@@ -86,6 +86,8 @@ CLOSING = re.compile(
     r"(?:#\d+|[\w.-]+/[\w.-]+#\d+|https://github\.com/[\w.-]+/[\w.-]+/issues/\d+)",
     re.IGNORECASE,
 )
+SHELL_EXPANSION = re.compile(r"\$[A-Za-z_{(]|`")
+"""A $NAME, ${...}, $(...) or backtick: text the shell replaces before gh sees it."""
 UNTICKED = re.compile(r"^\s*- \[(?![xX]\])[^\]]*\]\s*(.*)$", re.MULTILINE)
 EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 SHELL_TOOLS = ("Bash", "PowerShell")
@@ -1073,6 +1075,17 @@ def pr_closes_issue(words: Sequence[str], cwd: Path) -> Decision:
         problem = "the pull request has no description, so it closes no issue."
     if body is not None and CLOSING.search(body):
         return ALLOW
+    if body is not None and SHELL_EXPANSION.search(body):
+        # Quoting is gone by now, so literal '$HOME' gets this message too: the fix still works
+        # (refuse-substituted-pr-body design D1, D2).
+        problem = (
+            "a description built by the shell ($VAR, $(...) or backticks) can't be checked "
+            "before it's sent."
+        )
+        fix = (
+            "Write the description to a file in an earlier, separate command, and pass it with "
+            "--body-file and a literal path, including 'Closes #<issue>'."
+        )
     return Decision("pr-closes-issue", problem, fix)
 
 

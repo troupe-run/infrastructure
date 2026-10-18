@@ -265,6 +265,63 @@ def test_an_attached_body_that_closes_no_issue_says_so() -> None:
     assert decision.problem == "the pull request's description doesn't close an issue."
 
 
+# A body built by the shell can't be checked (#90; refuse-substituted-pr-body design D1, D2)
+
+ISSUE_90_COMMAND = """gh pr create --title t --body "$(cat <<'EOF'
+Closes #16
+
+Does the thing.
+EOF
+)\""""
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ISSUE_90_COMMAND,
+        'gh pr create --title t --body "$(cat notes)"',
+        'gh pr create --title t --body "`cat notes`"',
+        'gh pr create --title t --body="$(x)"',
+        'gh pr create --title t --body "$BODY"',
+        'gh pr create --title t --body "${BODY}"',
+        'gh pr create --title t -b"$BODY"',
+    ],
+)
+def test_a_body_built_by_the_shell_is_refused_as_one_that_can_t_be_checked(command: str) -> None:
+    [decision] = [
+        d for d in guard.shell_decisions(command, Path.cwd()) if d.rule == "pr-closes-issue"
+    ]
+    assert "built by the shell" in decision.problem
+    assert "can't be checked before it's sent" in decision.problem
+    assert "doesn't close" not in decision.problem
+    assert "--body-file" in decision.fix
+    assert "literal path" in decision.fix
+
+
+def test_the_issue_s_command_is_denied_with_the_new_message(make_repo: Callable[[], Repo]) -> None:
+    output = pre_tool_use(make_repo().path, "Bash", {"command": ISSUE_90_COMMAND})
+    reason = denial_reason(output)
+    assert reason.startswith("guard: pr-closes-issue:")
+    assert "built by the shell" in reason
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'gh pr create --title t --body "Closes #16 $(cat notes)"',
+        'gh pr create --title t --body "$BODY Closes #16"',
+    ],
+)
+def test_an_expanded_body_whose_own_text_closes_an_issue_goes_ahead(command: str) -> None:
+    assert not any(d.refused for d in guard.shell_decisions(command, Path.cwd()))
+
+
+def test_a_body_file_after_an_expanded_body_is_what_s_read(tmp_path: Path) -> None:
+    (tmp_path / "good.md").write_text("Closes #16\n", encoding="utf-8")
+    command = 'gh pr create --title t --body "$(cat notes)" --body-file good.md'
+    assert not any(d.refused for d in guard.shell_decisions(command, tmp_path))
+
+
 def test_a_target_after_grouped_flags_is_read(troupe_clone: Repo) -> None:
     command = "gh pr create -dR troupe-run/.github --title t --body 'Updates a link.'"
     assert "pr-closes-issue" not in pr_rules(command, troupe_clone.path)

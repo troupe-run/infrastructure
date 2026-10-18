@@ -46,7 +46,7 @@
 
 ## 3. Say what's wrong with a body built by the shell
 
-- [ ] 3.1 Write the regression tests (spec: "A description built by the shell", "An expanded description whose own
+- [x] 3.1 Write the regression tests (spec: "A description built by the shell", "An expanded description whose own
   text closes an issue"): the issue's command verbatim, `--body "$(cat notes)"`, `` --body "`cat notes`" ``,
   `--body="$(x)"`, `--body "$BODY"` and `--body "${BODY}"` are refused with a problem saying a description built by
   the shell can't be checked before it's sent, a fix naming `--body-file`, and a problem that doesn't say the
@@ -54,8 +54,12 @@
   `guard: pr-closes-issue:` with the new problem; `--body "Closes #16 $(cat notes)"` goes ahead; an expanded
   `--body` followed by `--body-file good.md` that closes an issue goes ahead. Verify the refusal tests fail on the
   current code and the go-ahead ones pass.
-- [ ] 3.2 Implement D1 and D2 in `pr_closes_issue`. Verify 1.1, 3.1 and every existing test pass, and `uv run mypy`
+  - 2026-10-18: on `751ab4d` the 8 refusal tests fail (7 commands, plus the issue's command through the hook) and
+    the 3 go-ahead tests pass. `-b"$BODY"` was added, so the attached form gets the message too.
+- [x] 3.2 Implement D1 and D2 in `pr_closes_issue`. Verify 1.1, 3.1 and every existing test pass, and `uv run mypy`
   and `uv run ruff check` are clean.
+  - 2026-10-18: `SHELL_EXPANSION` and the new problem and fix, applied after the flags are read. 1082 tests pass;
+    ruff and mypy clean.
 - [ ] 3.3 Run the one-off comparison (design D5): a scratchpad script runs `main`'s `pr_closes_issue`
   (`git show main:scripts/guard.py`) and this branch's over at least 5,000 generated commands mixing every body,
   body-file, fill, title and repo form above. Verify every difference is one the spec allows: a new message only
