@@ -31,7 +31,11 @@ probed: the job doesn't use it to read.
 | dependency graph, per repository | `GET repos/troupe-run/<repo>/dependency-graph/sbom` | 200 (all four) | 200 (all four) |
 | undeclared milestones, per repository | `GET repos/troupe-run/<repo>/milestones?state=all` | 200 (all four) | 200 (all four) |
 
-`uv run scripts/oob.py --ci` with that token reported no unreadable check and no difference.
+`uv run scripts/oob.py --ci` with that token reported no unreadable check and no difference. Run again after the
+rebase onto #59's merge (task 3.3), on a scratchpad copy declaring the `Task` issue type's description changed, it
+read all nine checks, exited 1, printed `::error title=oob difference::issue types: 'Task' description is 'A specific
+piece of work' on GitHub, declared 'changed by the probe'`, and wrote a summary saying "**1 difference.**" with that
+line and every check under "Checked".
 
 **The installations read.** It returned 200 to the job's token, listing all four installations (`total_count` 4:
 `dco`, `troupe-run-infrastructure`, `troupe-run-release`, `troupe-run-board`), each with its repository selection and
