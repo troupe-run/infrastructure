@@ -73,11 +73,17 @@ paths = ["openspec/**"]
 
 [scopes.docs]   # only the tests tagged `docs` read these
 paths = ["docs/**", "plugins/runner-scripted/README.md"]
+
+[scopes.vcs_git]  # a package; its suite and the core suite reach it
+paths = ["packages/troupe-vcs-git/src/**", "packages/troupe-vcs-git/tests/**"]
+tests = ["packages/troupe-vcs-git/tests/**", "packages/troupe/tests/**"]
 ```
 
 - **Entries** are an exact path (`plugins/runner-scripted/README.md`) or a directory and everything under it
   (`docs/**`). No other wildcard is accepted.
 - **Scopes may overlap.** A path in two scopes runs both. A path can't be both skipped and in a scope.
+- **A scope's `tests`**, if it has one, lists the test directories it runs, each written `dir/**`. Every test under
+  one counts as tagged with the scope (below). The list can't be empty or name a file, and `[skip]` has none.
 - **Scope names** match `[a-z][a-z0-9_]*`, so each is a valid tag in any test runner. `none` and `full` are reserved.
 - **Anything else is malformed**, and refuses the commit, naming the file, the problem and the fix. That includes
   other keys or tables, another `version`, and the bad entries above. A malformed file is never treated as missing.
@@ -137,6 +143,19 @@ keep this contract, whatever language it's in:
 With pytest, the tag is a marker named for the scope: `@pytest.mark.docs` on a test, or `pytestmark = pytest.mark.docs`
 on a module. `check.py` runs `pytest -m "api or docs"`, built by `guard.marker_expression`. This repository's
 `check.py` takes `--scope` too, for the scopes above.
+
+**Or the declaration tags whole directories.** Every test whose file is under one of a scope's `tests` directories
+counts as tagged with it, for `-m` and for the tag check below, as if the marker were written on it. `guard_pytest`
+adds the marker as the tests are collected, before `-m` selects, so a `--scope` run selects the same tests serially
+and under pytest-xdist (`-n`), and no `check.py` changes. That's for selecting whole suites, such as a package's and
+those that reach it, without a `pytestmark` in every module.
+
+A `tests` entry that no collected test is under fails the run, so a renamed directory can't quietly stop a suite
+running: a test named `scripts/check-paths.toml::scopes.<name>.tests[<i>]` fails, naming the scope, the entry and the
+fix. It carries the scope's marker, so the scope's own run fails too, rather than passing with nothing to test. An
+entry is checked only when the run collects from a directory that contains it (its path arguments, or `testpaths`
+without them), so running one file or one suite never fails for another. A run selecting a different scope doesn't
+check it either; the full run does. The rule is `guard.directory_tags` and `guard.unmatched_tests`.
 
 **Every test run checks the tags.** A test fails if it reads a file under a scope's paths without that scope's tag,
 or reads a skipped path at all. The message names the test, the file and the tag to add. So a new test that reads
