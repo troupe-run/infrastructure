@@ -82,25 +82,33 @@
 
 ## 4. Help requests go ahead
 
-- [ ] 4.1 Before changing the guard, add to `scripts/tests/test_guard_gh.py` a hypothesis property test (design D5):
+- [x] 4.1 Before changing the guard, add to `scripts/tests/test_guard_gh.py` a hypothesis property test (design D5):
   for generated gh commands that aren't in D4's help shape (groups from the guard's tables and unknown ones, flags
   and values, `--help`/`-h` as a flag's value or not last), `shell_decisions` gives the same decisions as it does
   with the help test switched off. Name it for that. Verify it and every existing gh test pass on the current code
   (the property holds trivially there, which is the baseline).
-- [ ] 4.2 Write the help tests (spec: "Asking for help", "A help flag that is another flag's value", "Help for an
+  - 2026-10-18: `test_a_command_outside_the_help_shape_is_decided_as_if_there_were_no_help_rule`, with the shape
+    written out in the test rather than imported. 297 gh tests pass on `b56fe3f`.
+- [x] 4.2 Write the help tests (spec: "Asking for help", "A help flag that is another flag's value", "Help for an
   extension or an alias", "Help for an owner-only command", "Help for gh pr create"): `gh pr --help`,
   `gh codespace -h`, `gh repo create myrepo --help`, `gh repo edit --help`, `gh label create -h`,
   `gh auth token --help`, `gh copilot --help`, `GH_REPO=x gh pr create --help` and `gh pr create -h` go ahead;
   refused as today: `gh label create x --description --help` (owner-only), `gh co --help`, `gh myext --help`,
   `gh extension exec myext --help`, `gh ext exec myext --help`, `gh pr create --help x`
   (no closing description), `gh pr create --title --help` (no closing description), and `guard.py override --help`
-  (`guard-tamper`). No help request is granted (`grantable` is false). Verify the go-ahead tests fail on the current
-  code.
-- [ ] 4.3 Implement D4 in `scripts/guard.py`: `GH_BUILTIN_GROUPS` (gh 2.102.0's CORE, GITHUB ACTIONS and ADDITIONAL
+  (`guard-tamper`). A help request is granted only when the command it asks about is: `gh pr --help`,
+  `gh repo edit --help` and `gh codespace -h` aren't, `gh issue view --help` (granted today) and `gh pr create -h`
+  are. Verify the go-ahead tests fail on the current code.
+  - 2026-10-18: on `b56fe3f` the 9 go-ahead tests fail, and `gh pr create -h` isn't granted (pr-closes-issue
+    refuses it); the 8 still-refused cases and the other 4 grant cases pass. Writing the grant test showed help for a
+    granted command is already granted (`gh issue view --help`), so the design's "help requests aren't granted"
+    became "the help rule grants nothing new".
+- [x] 4.3 Implement D4 in `scripts/guard.py`: `GH_BUILTIN_GROUPS` (gh 2.102.0's CORE, GITHUB ACTIONS and ADDITIONAL
   COMMANDS, with a comment naming the version, that ALIAS COMMANDS are left out, and to check new commands for
   `DisableFlagParsing`), `GH_HELP_FORWARDED`, `gh_help_request`, and its use in
   `shell_decisions`. Verify 4.1, 4.2 and every test in `scripts/tests/` pass, and `uv run mypy` and
   `uv run ruff check` are clean.
+  - 2026-10-18: 1106 tests pass; ruff and mypy clean.
 - [ ] 4.4 Check D4 against gh (design D5): repeat the sweep of `--help` and `-h` over every built-in group and every
   command in the guard's tables, and record which decisions changed (expected: exactly the help shapes, refused to
   allowed; `guard-tamper` and `skip-hooks` unchanged). Then run real gh, now that the guard allows it, on
@@ -114,7 +122,7 @@
     the extension (`pkg/cmd/extension/command.go:541-557`), so D4 now excludes it; `gh copilot` handles help itself
     (`pkg/cmd/copilot/copilot.go:83-104`). `-h` is help through pflag v1.0.10's `ErrHelp` (`flag.go:1050-1056`).
 - [ ] 4.5 In `docs/development-workflow.md`, the `gh-allow-list` and `owner-only` rows say a request for a built-in
-  command's help goes ahead, in the narrow shape (D4), and isn't granted; the `pr-closes-issue` row says the same for
+  command's help goes ahead, in the narrow shape (D4), and is granted only when the command it asks about is; the `pr-closes-issue` row says the same for
   `gh pr create --help`. Verify `uv run scripts/check.py` passes.
 
 ## 5. An attachment is a file read

@@ -3,6 +3,7 @@
 
 import io
 import json
+import shlex
 import subprocess
 import sys
 from collections.abc import Callable
@@ -10,6 +11,8 @@ from pathlib import Path
 
 import pytest
 from conftest import SCRIPTS, Repo, clean_env
+from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import strategies as st
 
 import guard
 
@@ -702,3 +705,110 @@ def test_an_allow_list_override_doesn_t_unlock_an_owner_only_refusal(
     grant(repo, "gh-allow-list")
     assert "owner-only" in run_hook(repo, "gh auth token")
     assert run_hook(repo, "gh extension install owner/gh-thing") == ""
+
+
+# Help requests (refuse-substituted-pr-body design D4, D5)
+
+TABLE_KEYS = {
+    *guard.GH_READS,
+    *guard.GH_WORKFLOW_WRITES,
+    *guard.GH_NOT_GRANTED,
+    *guard.GH_OWNER_ONLY,
+}
+TABLE_GROUPS = sorted({group for group, _ in TABLE_KEYS})
+TABLE_SUBCOMMANDS = sorted({sub for _, sub in TABLE_KEYS if sub})
+HELP_FLAGS = ("--help", "-h")
+TAIL_WORDS = (
+    "x", "17", "--title", "--description", "--body", "-R", "troupe-run/.github", "--admin", "--web",
+    *HELP_FLAGS,
+)  # fmt: skip
+
+
+def in_help_shape(words: list[str]) -> bool:
+    """D4's shape, written out here rather than imported: gh, a group, words that aren't flags,
+    then --help or -h as the last word. (The guard also needs the group to be a built-in one, so
+    this is wider; the property below only uses commands outside it.)"""
+    return (
+        len(words) >= 3
+        and words[0] == "gh"
+        and words[-1] in HELP_FLAGS
+        and not any(word.startswith("-") for word in words[1:-1])
+    )
+
+
+@st.composite
+def gh_command_outside_the_help_shape(draw: st.DrawFn) -> list[str]:
+    group = draw(st.sampled_from([*TABLE_GROUPS, "codespace", "myext", "co", "ext", "extension"]))
+    words = ["gh", group]
+    if draw(st.booleans()):
+        words.append(draw(st.sampled_from([*TABLE_SUBCOMMANDS, "exec", "list"])))
+    words += draw(st.lists(st.sampled_from(TAIL_WORDS), max_size=4))
+    assume(not in_help_shape(words))
+    return words
+
+
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+@given(words=gh_command_outside_the_help_shape())
+def test_a_command_outside_the_help_shape_is_decided_as_if_there_were_no_help_rule(
+    words: list[str],
+) -> None:
+    command = shlex.join(words)
+    with_rule = guard.shell_decisions(command, Path.cwd())
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(guard, "gh_help_request", lambda words: False, raising=False)
+        without_rule = guard.shell_decisions(command, Path.cwd())
+    assert with_rule == without_rule
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh pr --help",
+        "gh codespace -h",
+        "gh repo create myrepo --help",
+        "gh repo edit --help",
+        "gh label create -h",
+        "gh auth token --help",
+        "gh copilot --help",
+        "GH_REPO=x gh pr create --help",
+        "gh pr create -h",
+    ],
+)
+def test_a_request_for_a_built_in_command_s_help_goes_ahead(command: str) -> None:
+    assert not any(d.refused for d in guard.shell_decisions(command, Path.cwd()))
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        ("gh label create x --description --help", "owner-only"),
+        ("gh co --help", "gh-allow-list"),
+        ("gh myext --help", "gh-allow-list"),
+        ("gh extension exec myext --help", "gh-allow-list"),
+        ("gh ext exec myext --help", "gh-allow-list"),
+        ("gh pr create --help x", "pr-closes-issue"),
+        ("gh pr create --title --help", "pr-closes-issue"),
+        ("uv run scripts/guard.py override --help", "guard-tamper"),
+    ],
+)
+def test_a_help_flag_gh_wouldn_t_treat_as_help_is_judged_as_the_command(
+    command: str, expected: str
+) -> None:
+    refused = [d.rule for d in guard.shell_decisions(command, Path.cwd()) if d.refused]
+    assert expected in refused
+
+
+@pytest.mark.parametrize(
+    ("command", "granted"),
+    [
+        ("gh pr --help", False),
+        ("gh repo edit --help", False),
+        ("gh codespace -h", False),
+        ("gh issue view --help", True),
+        ("gh pr create -h", True),
+    ],
+)
+def test_a_help_request_is_granted_only_as_the_command_it_asks_about_would_be(
+    command: str, granted: bool
+) -> None:
+    assert guard.grantable(command, Path.cwd(), Path.cwd()) is granted

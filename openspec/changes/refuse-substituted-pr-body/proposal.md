@@ -41,7 +41,8 @@ command" exists to prevent for `--body-file`.
 - A request for a built-in gh command's help goes ahead, whatever the command would be refused for. It's one narrow
   shape: `gh`, a built-in group, words that aren't flags, and `--help` or `-h` last. The shape leaves no room for a
   command that does something: `--help` as another flag's value (`--description --help`), an extension and an alias
-  are judged as today. Help requests aren't granted, and help for `guard.py override` stays refused.
+  are judged as today. The help rule grants nothing new: help is granted only for a command the guard already grants (as
+  `gh issue view --help` is today). Help for `guard.py override` stays refused.
 - A granted command's `--attach` counts as a file read, like `--body-file`: the guard grants it only when every file
   gh could read for it (gh tries the whole value, then each part before a `#`) is inside the repository or the
   system temp directory. `--attach` is also read as a value-taking flag of `gh pr create`.
