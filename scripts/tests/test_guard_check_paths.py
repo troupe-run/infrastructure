@@ -282,6 +282,145 @@ def test_the_decision_is_full_or_exactly_the_scopes_the_paths_are_in(
         assert scope.names == tuple(sorted(set().union(*memberships) - {"skip"}))
 
 
+# A property: a declaration of `paths` alone reads back as written (scope-test-directories 2.1)
+
+ENTRY = st.sampled_from(["a/**", "a/b/**", "a.md", "b/c.md", "docs/**", "x/y/z.json"])
+SCOPE_NAMES = st.sampled_from(["docs", "api", "blah", "b2", "x_y"])
+
+
+def toml_list(entries: tuple[str, ...]) -> str:
+    return "[" + ", ".join(f'"{entry}"' for entry in entries) + "]"
+
+
+@given(
+    skip=st.one_of(st.none(), st.lists(st.sampled_from(["openspec/**", "CHANGELOG.md"]))),
+    scopes=st.dictionaries(SCOPE_NAMES, st.lists(ENTRY), max_size=4),
+)
+def test_a_declaration_of_paths_alone_reads_back_as_written(
+    skip: list[str] | None, scopes: dict[str, list[str]]
+) -> None:
+    text = "version = 1\n"
+    if skip is not None:
+        text += f"[skip]\npaths = {toml_list(tuple(skip))}\n"
+    for name, entries in scopes.items():
+        text += f"[scopes.{name}]\npaths = {toml_list(tuple(entries))}\n"
+
+    read = declared(text)
+
+    assert read.skip == tuple(skip or ())
+    assert read.scopes == tuple((name, tuple(entries)) for name, entries in scopes.items())
+
+
+def test_this_repository_s_declaration_reads() -> None:
+    assert declared((SCRIPTS / "check-paths.toml").read_text(encoding="utf-8")).scopes
+
+
+# A scope's `tests` key (scope-test-directories 2.2, design D1-D3)
+
+WITH_TESTS = """\
+version = 1
+
+[skip]
+paths = ["openspec/**"]
+
+[scopes.vcs_git]
+paths = ["packages/vcs-git/**"]
+tests = ["packages/vcs-git/tests/**", "packages/core/tests/**"]
+
+[scopes.docs]
+paths = ["docs/**"]
+
+[scopes.blah]
+paths = ["path1/**"]
+tests = ["tests/shared/**", "tests/shared/**"]
+
+[scopes.blech]
+paths = ["path1/**"]
+tests = ["tests/shared/**"]
+"""
+
+
+def test_a_scope_s_tests_are_read_in_file_order_and_its_paths_are_unchanged() -> None:
+    read = declared(WITH_TESTS)
+    assert read.scopes == (
+        ("vcs_git", ("packages/vcs-git/**",)),
+        ("docs", ("docs/**",)),
+        ("blah", ("path1/**",)),
+        ("blech", ("path1/**",)),
+    )
+    assert read.tests == (
+        ("vcs_git", ("packages/vcs-git/tests/**", "packages/core/tests/**")),
+        ("blah", ("tests/shared/**", "tests/shared/**")),
+        ("blech", ("tests/shared/**",)),
+    )
+
+
+@given(
+    scopes=st.dictionaries(SCOPE_NAMES, st.lists(ENTRY), max_size=4),
+    tests=st.lists(st.sampled_from(["t/**", "u/v/**"]), min_size=1),
+)
+def test_adding_tests_to_a_scope_changes_nothing_else_it_reads(
+    scopes: dict[str, list[str]], tests: list[str]
+) -> None:
+    plain = "version = 1\n" + "".join(
+        f"[scopes.{name}]\npaths = {toml_list(tuple(entries))}\n"
+        for name, entries in scopes.items()
+    )
+    with_tests = "version = 1\n" + "".join(
+        f"[scopes.{name}]\npaths = {toml_list(tuple(entries))}\ntests = {toml_list(tuple(tests))}\n"
+        for name, entries in scopes.items()
+    )
+    assert declared(with_tests).scopes == declared(plain).scopes
+    assert declared(with_tests).skip == declared(plain).skip
+    assert declared(with_tests).tests == tuple((name, tuple(tests)) for name in scopes)
+    assert declared(plain).tests == ()
+
+
+@pytest.mark.parametrize(
+    ("tests", "names"),
+    [
+        ('"t/**"', "scopes.docs.tests is not a list"),
+        ("[]", "scopes.docs.tests is empty"),
+        ("[1]", "scopes.docs.tests[0]"),
+        ('["t/**", "t/x.py"]', "scopes.docs.tests[1] `t/x.py`"),
+        ('["**"]', "scopes.docs.tests[0] `**`"),
+        ('["t/*/**"]', "scopes.docs.tests[0] `t/*/**`"),
+        ('["t\\\\u/**"]', "scopes.docs.tests[0]"),
+        ('["/t/**"]', "scopes.docs.tests[0] `/t/**`"),
+        ('["t/../u/**"]', "scopes.docs.tests[0] `t/../u/**`"),
+        ('["./t/**"]', "scopes.docs.tests[0] `./t/**`"),
+        ('["t//u/**"]', "scopes.docs.tests[0] `t//u/**`"),
+        ('[""]', "scopes.docs.tests[0]"),
+    ],
+)
+def test_a_malformed_tests_entry_is_refused_naming_the_scope_and_entry(
+    tests: str, names: str
+) -> None:
+    assert names in problem(f'version = 1\n[scopes.docs]\npaths = ["docs/**"]\ntests = {tests}\n')
+
+
+def test_an_exact_file_in_tests_is_told_to_name_a_directory() -> None:
+    found = problem('version = 1\n[scopes.docs]\npaths = ["docs/**"]\ntests = ["t/x.py"]\n')
+    assert "`dir/**`" in found
+
+
+def test_tests_under_skip_is_an_unknown_key() -> None:
+    found = problem('version = 1\n[skip]\npaths = ["openspec/**"]\ntests = ["t/**"]\n')
+    assert "skip has an unknown key `tests`" in found
+
+
+def test_a_scope_s_other_keys_are_still_refused_naming_both_it_reads() -> None:
+    found = problem('version = 1\n[scopes.docs]\npaths = ["docs/**"]\nwhy = "x"\n')
+    assert "unknown key `why`" in found
+    assert "`paths` and `tests`" in found
+
+
+def test_the_fix_for_a_malformed_declaration_names_the_tests_key() -> None:
+    with pytest.raises(guard.CheckPathsError) as error:
+        guard.check_paths('version = 1\n[scopes.docs]\npaths = ["docs/**"]\ntests = []\n')
+    assert "`tests`" in error.value.fix
+
+
 # CI's entry: guard.py check-scope (commit-check-paths tasks 3.1-3.2, design D6)
 
 CI_DECLARATION = """\
