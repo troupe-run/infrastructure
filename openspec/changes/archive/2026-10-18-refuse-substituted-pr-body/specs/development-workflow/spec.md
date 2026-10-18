@@ -112,8 +112,7 @@ In a Claude Code session, a `gh` command SHALL be allowed only if it is on the a
 - a read;
 - an everyday workflow write: pull requests, issues, comments, sub-issues, project items, running workflows;
 - a write to a throwaway repository in `troupe-run`;
-- a request for a built-in command's help: `gh`, a built-in command group, any words that aren't flags, and
-  `--help` or `-h` as the last word.
+- a request for a built-in command's help.
 
 Anything else SHALL be refused, including an unknown subcommand, an extension or an alias. The list SHALL be kept in
 one place.
@@ -157,7 +156,8 @@ one place.
 - **THEN** the command is allowed
 
 #### Scenario: Asking for help
-- **WHEN** an agent runs `gh pr --help`, `gh codespace -h`, `gh repo create myrepo --help` or `gh pr create --help`
+- **WHEN** an agent runs `gh`, one of `gh`'s own command groups, any words that aren't flags, and `--help` or `-h` as
+  the last word, such as `gh pr --help`, `gh codespace -h`, `gh repo create myrepo --help` or `gh pr create --help`
 - **THEN** the command goes ahead, whatever the command it asks about would be refused for
 
 #### Scenario: A help flag that is another flag's value
