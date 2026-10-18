@@ -166,8 +166,13 @@
 
 ## 6. Integration
 
-- [ ] 6.1 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
-  `scripts/guard.py` updated in place in troupe and website, and nothing else. Keep it for the pull request.
+- [ ] 6.1 Verify the delivery plan shows `scripts/guard.py` updated in place in troupe and website, and nothing else,
+  and keep it for the pull request. The evidence is CI's pull-request plan (`tofu.yml`'s `plan (pull request)` job,
+  which plans GitHub's merge ref, so it reads `main`'s latest state), not a local one.
+  - 2026-10-18: a local `uv run scripts/tofu.py plan`, after rebasing onto `59049fa`, stopped twice with 1Password's
+    `authorization timeout`: the owner was away from the machine. The owner agreed CI's PR plan would stand in. The
+    branch's paths need a plan (`scripts/plan_needed.py` gives `plan=true`), and the job waits for the owner to
+    approve the `plan-pr` environment.
 - [x] 6.2 Run `openspec validate refuse-substituted-pr-body --strict` and verify it passes.
   - 2026-10-18: `Change 'refuse-substituted-pr-body' is valid`.
 
