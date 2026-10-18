@@ -47,9 +47,10 @@
   test. Run `uv run scripts/check.py`. (Done: `test_plan_display_workflow.py` fails on the old `tofu.yml` and
   catches 7 mutations in each job. Run locally on #93's inputs, the new post step's shell reproduces #93's posted
   comment byte for byte.)
-- [ ] 3.3 On this change's pull request, once the owner approves the plan run, check the posted comment: its plan is
+- [x] 3.3 On this change's pull request, once the owner approves the plan run, check the posted comment: its plan is
   whole with no note (this change's plan is small), and the `plan.txt` artifact exists on the run and holds the same
-  plan. Quote both in the PR.
+  plan. Quote both in the PR. (Done: run 39131570133 posted a 12,380-byte comment with the plan whole in "Full plan"
+  and no note. Its `plan.txt` artifact, 11,948 bytes, downloads unzipped and equals the comment's plan byte for byte.)
 
 ## 4. A written file's content is sensitive (design D7)
 
