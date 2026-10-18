@@ -70,8 +70,16 @@ the key to rotate for no gain. A separate workflow file would duplicate the trig
 `permission-*: read` input only for what the table needs: contents, issues, administration, organization
 administration, issue types and organization projects. GitHub issues a token with exactly those permissions, so the
 job can't write even though the App can. `oob.py` reads the token through `GH_TOKEN`. The job's `permissions:` is
-`contents: read`. Task 3.2 checks the action's input names for issue types and projects against the action's
-documentation before the job uses them.
+`contents: read`.
+
+The action's inputs (v3.2.0, and v3.3.0 the latest) include `permission-organization-projects` but nothing for issue
+types. GitHub's "permissions required for GitHub Apps" page says `GET /orgs/{org}/issue-types` needs the organization
+"Issue Types" permission (read), and its OpenAPI `app-permissions` schema doesn't list that permission yet. The
+action doesn't limit itself to its declared inputs: `lib/get-permissions-from-inputs.js` turns every
+`INPUT_PERMISSION-*` variable into a key of the token request (`permission-issue-types` → `issue_types`). So the job
+passes `permission-issue-types: read`, and the runner warns "Unexpected input". Task 3.2 confirms that GitHub
+accepts `issue_types` and that the token reads issue types. If it doesn't, issue types goes in `BY_HAND` rather than
+the token being widened.
 
 *Alternative:* `GITHUB_TOKEN` alone. It can read only the public-repository checks, and none of the code security
 ones that motivated #62.
