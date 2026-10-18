@@ -53,13 +53,16 @@
 
 ## 4. A written file's content is sensitive (design D7)
 
-- [ ] 4.1 Write the tests first (design D6). One fails unless `content` on each `github_repository_file` in
+- [x] 4.1 Write the tests first (design D6). One fails unless `content` on each `github_repository_file` in
   `tofu/guard_delivery.tf` and `tofu/org_profile.tf` is wrapped in `sensitive(`. Name it as a check of the
   configuration's text. The other feeds `hook_modes.py` a `plan.json` resource whose `after_sensitive` marks
   `content`, and checks it still reads the content and its blob id. Run them: the first fails, and the second passes
-  already, since the script ignores `after_sensitive`.
-- [ ] 4.2 Wrap both `content` expressions in `sensitive()`. Leave `commit_message` as it is: it hashes the source
-  directly. Verify 4.1's tests pass and `uv run scripts/check.py` passes (`tofu validate` included).
+  already, since the script ignores the marker. (Done: OpenTofu marks it in `planned_values`'s `sensitive_values`,
+  which `hook_modes.py` reads, so the test uses that. `test_file_content_sensitive.py` scans every `.tf` file and
+  found the drift probe's three file resources too; 5 cases fail on the old config.)
+- [x] 4.2 Wrap both `content` expressions in `sensitive()`. Leave `commit_message` as it is: it hashes the source
+  directly. Verify 4.1's tests pass and `uv run scripts/check.py` passes (`tofu validate` included). (Done, with the drift probe's
+  three file resources in `tofu/probe/main.tf` wrapped too, design D7.)
 - [ ] 4.3 On this change's pull request, once the owner approves the plan run, check that the plan shows no change to
   any `github_repository_file` resource and no mode to set (design D7, spec "Hiding the content changes nothing on its
   own"). Quote the plan's `Plan:` / `No changes` line in the PR.

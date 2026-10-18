@@ -67,6 +67,16 @@ def test_a_delivery_with_unknown_content_in_the_plan_refuses() -> None:
         hook_modes.delivered_files(plan)
 
 
+def test_a_delivery_whose_content_is_sensitive_is_still_read() -> None:
+    # `content` is sensitive (truncate-long-plans D7). `tofu show -json` keeps the value and marks
+    # it in sensitive_values, as OpenTofu 1.13.1 does (probe, 2026-10-18).
+    plan = plan_json(("website", HOOK, HOOK_CONTENT))
+    plan["planned_values"]["root_module"]["resources"][1]["sensitive_values"] = {"content": True}
+    [delivered] = hook_modes.delivered_files(plan)
+    assert delivered == Delivered("website", HOOK, HOOK_CONTENT)
+    assert git_blob_sha(delivered.content.encode()) == HOOK_BLOB
+
+
 def test_a_regular_target_with_an_executable_source_is_listed() -> None:
     entries = modes(
         [Delivered("website", HOOK, HOOK_CONTENT)],

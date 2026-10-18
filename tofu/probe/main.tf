@@ -228,7 +228,7 @@ resource "github_repository_file" "probe" {
   repository          = var.probe_repo
   branch              = "main"
   file                = "README.md"
-  content             = try(file("${path.module}/README.probe.md"), "")
+  content             = sensitive(try(file("${path.module}/README.probe.md"), ""))
   commit_message      = "chore: probe file"
   overwrite_on_create = false
 
@@ -263,7 +263,7 @@ resource "github_repository_file" "delivery" {
   repository          = var.probe_repo
   branch              = "main"
   file                = each.key
-  content             = each.value
+  content             = sensitive(each.value)
   commit_message      = "chore(guard): deliver ${each.key} ${substr(sha256(each.value), 0, 12)} from troupe-run/infrastructure"
   overwrite_on_create = false
 }
@@ -365,7 +365,7 @@ resource "github_repository_file" "release" {
   repository          = var.probe_repo
   branch              = github_branch.release[0].branch
   file                = "probe-release.txt"
-  content             = "written by the App\n"
+  content             = sensitive("written by the App\n")
   commit_message      = "chore: probe a commit by the App to a release branch"
   overwrite_on_create = false
 }

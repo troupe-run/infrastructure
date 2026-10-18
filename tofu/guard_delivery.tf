@@ -39,10 +39,12 @@ locals {
 resource "github_repository_file" "guard" {
   for_each = local.guard_deliveries
 
+  # content is sensitive, so a plan shows its hash in commit_message, not the file (spec:
+  # ci-apply; truncate-long-plans D7). It's reviewed in the pull request's diff of its source.
   repository          = each.value.repository
   branch              = "main"
   file                = each.value.file
-  content             = local.guard_contents[each.value.file]
+  content             = sensitive(local.guard_contents[each.value.file])
   overwrite_on_create = false
 
   # After each receiving repository's ruleset, which lets the App push (design D5). Without
