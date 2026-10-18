@@ -45,9 +45,10 @@ resource "github_repository" "this" {
     }
   }
 
-  # An apply never deletes a repository (spec: repositories). prevent_destroy fails the plan;
-  # archive_on_destroy is the backstop if someone lifts it. To stop managing a repo, use a
-  # `removed` block with `destroy = false` (see README.md).
+  # An apply never deletes a repository (spec: repositories). prevent_destroy refuses a destroy
+  # only while this block is declared; deleting the module call deletes it too, and the plan then
+  # destroys the repository. archive_on_destroy, read from state, archives it instead of deleting
+  # it. To stop managing a repo, use a `removed` block with `destroy = false` (see README.md).
   archive_on_destroy = true
 
   lifecycle {
