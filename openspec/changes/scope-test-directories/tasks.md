@@ -51,7 +51,7 @@
     three that passed must pass either way: a read outside the scope's directories still fails, and runs of
     `suites/b` and `suites/b/test_b.py` pass.
 - [x] 3.2 Implement D5 in `scripts/guard_pytest.py`: the `tryfirst` `pytest_collection_modifyitems` adding markers
-  from `directory_tags`, the run's roots from `config.args` (D6), and the failing item for each unmatched entry,
+  from `directory_tags`, the run's roots from its path arguments (D6), and the failing item for each unmatched entry,
   placed first and marked with its scope; the marker description lists `tests`; the module docstring says what the
   hook does. Verify 3.1 passes, every existing test in the file still passes, and `uv run scripts/check.py` passes.
   - 2026-10-18: 28 pass in the file. A test for a run from `testpaths` (`["suites"]` checks the missing entry,
@@ -65,7 +65,7 @@
 
   - 2026-10-18: the totals before and after can't be compared, because 3.1's tests start pytest subprocesses (and
     the machine was loaded: 81-131 s). So the same 952 tests (the new ones deselected with `-k`) ran with the old
-    plugin (`904d7a9`) and the new one, alternating: old 96.2, 86.3, 96.2 s; new 84.3, 95.7, 91.6 s. No difference
+    plugin (`61f7095`) and the new one, alternating: old 96.2, 86.3, 96.2 s; new 84.3, 95.7, 91.6 s. No difference
     beyond noise. This repository declares no `tests`, so the hook returns at once.
 ## 4. Documentation
 
@@ -81,13 +81,34 @@
 
 ## 5. Integration
 
-- [ ] 5.1 In a scratch clone of troupe (not pushed, discarded afterwards), with `main` here's `scripts/guard.py` and
+- [x] 5.1 In a scratch clone of troupe (not pushed, discarded afterwards), with `main` here's `scripts/guard.py` and
   `scripts/guard_pytest.py` copied in and one package scope given `tests` (e.g. `vcs_git` with its suite and the core
   suite): verify `uv run scripts/check.py --scope vcs_git` runs every gate and exactly the tests under those two
   directories (count from `pytest --collect-only -q -m vcs_git`), with and without `-n auto`; that renaming one entry
   to a missing directory fails both, naming the scope and entry; and that troupe's unchanged `check.py` and
   declaration otherwise behave as before (`--scope docs` selects the same count as on troupe's `main`). Record the
   counts and times here.
+  - 2026-10-18, a fresh clone of troupe `main` (`56f288e`) in the scratchpad, never committed in, and deleted
+    afterwards. With this branch's two guard files and `[scopes.vcs_git]` holding `paths` for its src and tests, and
+    `tests = ["packages/troupe-vcs-git/tests/**", "packages/troupe/tests/**"]`:
+    - `pytest --collect-only -m vcs_git` selected 1,435 of 1,799, exactly the two suites' 1,435. `-m docs` selected
+      26, as on troupe's `main`.
+    - `uv run scripts/check.py --scope vcs_git`: every gate ran (ruff, format, mypy, import contracts), then
+      `1430 passed, 5 skipped, 364 deselected in 176.66s`. Exit 0, 183 s in all.
+    - Under xdist (`uv run --with pytest-xdist pytest -n auto -m vcs_git`): the same 1,435, in 41 s. One failed,
+      `test_version_flag_prints_the_installed_version_...`, because `--with` runs in an overlay environment without
+      the `troupe` console script. It fails the same way on `test_cli.py` alone under that overlay, so it isn't
+      the plugin's doing.
+    - **Found:** with the second entry changed to a missing `packages/troupe/testz/**`, both runs passed, exit 0.
+      troupe collects from `testpaths`, which lists the real suites, so the stale entry was outside every root
+      under the first D6. D6 now checks every entry unless the run names paths (`config.args_source`). The test
+      for a `testpaths` run had asserted the old behaviour (`["suites/b"]` passing), and now asserts the failure,
+      with a new one for a directory argument holding the entry (29 pass). Rerun in the clone: `-n auto -m vcs_git`
+      exit 1, `FAILED scripts/check-paths.toml::scopes.vcs_git.tests[1]`, no `INTERNALERROR`; `check.py --scope
+      vcs_git` exit 1 with the message naming the scope, the entry, `scopes.vcs_git.tests[1]` and the fix. pytest's
+      `25/1799 tests collected` line leaves out the failing item, which is added after collection, but it runs (26
+      in all, as the xdist line `1 failed, 25 passed` shows).
+
 - [ ] 5.2 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
   `troupe:scripts/guard.py` and `troupe:scripts/guard_pytest.py` updated in place, and nothing else. Keep it for the
   pull request.
