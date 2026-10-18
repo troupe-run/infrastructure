@@ -68,8 +68,9 @@ group 2.
 
 ## 5. The plan
 
-- [ ] 5.1 Open the pull request (`Closes #59`) and get CI's plan. Verify the plan creates only the `board` environment,
-      its deployment policy and `BOARD_APP_CLIENT_ID` on website, changes no ruleset, and touches no secret
+- [x] 5.1 Open the pull request (`Closes #59`) and get CI's plan. Verify the plan creates only the `board` environment,
+      its deployment policy and `BOARD_APP_CLIENT_ID` on website, changes no ruleset, and touches no secret. Done: #93, CI's plan
+      `Plan: 3 to add, 0 to change, 0 to destroy.`, the three creations only
 
 ## Workflow follow-up
 
