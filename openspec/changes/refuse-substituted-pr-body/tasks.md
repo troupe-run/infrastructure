@@ -27,17 +27,22 @@
     `-b 'Closes #1' --body 'last wins'` → `last wins`; `--body base -- -b x` → error `unknown arguments ["-b" "x"]`;
     `-zb x` → error `unknown shorthand flag: 'z' in -zb`. All as D3 describes. The repository was then deleted, and
     `gh repo view` reports it can't be resolved.
-- [ ] 2.2 Write the reader's table of tests (design D3), one row per case, matching 2.1's results: long `=` and
+- [x] 2.2 Write the reader's table of tests (design D3), one row per case, matching 2.1's results: long `=` and
   space forms, a short flag with its value attached, after `=`, and in the next word, grouped boolean flags before a
   value flag, a dash-leading value of a long and a short flag, an unknown letter, and `--`. Add the spec's
   short-flag scenarios through `shell_decisions`: `-b'Closes #22'`, `-b='Closes #22'`, `-db 'Closes #22'` and
   `-F<file>` holding `Closes #22` go ahead, and `-b'no close'` is refused with "doesn't close an issue";
   `--title --fill --body 'Closes #22'` goes ahead; `-dR troupe-run/.github` with no closing line goes ahead from a
   troupe clone. Verify the decision tests fail on the current code.
-- [ ] 2.3 Implement `pr_create_flags` (D3) in `scripts/guard.py`, with `--attach` added to `GH_PR_CREATE_VALUE_FLAGS`
+  - 2026-10-18: 23 reader rows and 8 decision tests. On `ebbef19`'s guard 30 fail (`pr_create_flags` doesn't
+    exist; the short-flag, grouped-target and `--title --fill` cases are refused) and 1 passes:
+    `-b='Closes #22'`, which the old check already read. It stays, since the spec names it.
+- [x] 2.3 Implement `pr_create_flags` (D3) in `scripts/guard.py`, with `--attach` added to `GH_PR_CREATE_VALUE_FLAGS`
   (design D6), and move `pr_closes_issue` and `pr_target` onto it.
   Verify 1.1, 2.2 and every existing test in `scripts/tests/` pass, and `uv run mypy` and `uv run ruff check` are
   clean.
+  - 2026-10-18: `pr_create_flags` with `GH_PR_CREATE_BOOLEAN_SHORT_FLAGS`; `pr_target` and `pr_closes_issue` read
+    from it. 1071 tests pass; ruff and mypy clean.
 
 ## 3. Say what's wrong with a body built by the shell
 
