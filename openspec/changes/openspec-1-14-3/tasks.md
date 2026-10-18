@@ -28,8 +28,12 @@
 
 ## 3. Pull request
 
-- [ ] 3.1 Open the pull request with `Closes #58`. Verify CI is green, and its plan (once the owner approves that
+- [x] 3.1 Open the pull request with `Closes #58`. Verify CI is green, and its plan (once the owner approves that
       run) reads `No changes.`, since none of these files is delivered. Record both here
+      Done 2026-10-18: #87. CI green: check, guard tests, guard (workflow rules), DCO passed; the guard's OS matrix
+      skipped (no guard file changed), and main's plan and apply skipped. The owner approved the plan run; it reads
+      `No changes. Your infrastructure matches the configuration.` Homebrew's openspec, upgraded to 1.14.3 meanwhile,
+      reports the files up to date and changes nothing
 
 ## Workflow follow-up
 
