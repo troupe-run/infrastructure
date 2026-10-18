@@ -133,19 +133,26 @@ xdist controller (it collects nothing, and the plugin would then depend on xdist
 `pytest_itemcollected` would work for selection, but the unmatched check needs the whole collection, so both are done
 in one hook.
 
-### D6. Only entries inside what the run collects are checked
+### D6. Every entry is checked, unless the run names the paths it collects
 
-A run's roots are its collection arguments: `config.args`, which pytest fills from `testpaths` when no paths are
-given, with any `::` part dropped, resolved against the invocation directory, made relative to the repository root.
-An entry is checked when a root is the repository root, or contains the entry's directory, or is the directory
-itself. Running one test file, or another package's suite, therefore never fails for a scope it didn't collect from.
+When pytest is given no path arguments (`config.args_source` is `TESTPATHS` or `INVOCATION_DIR`), every `tests`
+entry is checked. That's every full run and every `check.py --scope` run. When it's given paths (`ARGS`), those are
+the run's roots: each with any `::` part dropped, resolved against the invocation directory, made relative to the
+repository root. An entry is then checked when a root is the repository root, contains the entry's directory, or is
+that directory. So running one test file, or another package's suite, never fails for a scope it didn't collect from.
+
+The first version took the roots from `config.args` in every case, which pytest fills from `testpaths` when no
+paths are given. The troupe dry run (task 5.1) showed that misses the case this exists for. `testpaths` lists the
+suites that exist, so a stale entry (`packages/troupe/testz/**`) was outside every root, and both the full run and
+`--scope vcs_git` passed without the suite. A renamed directory is renamed in `testpaths` too, and the old entry is
+then outside it in the same way.
 
 An entry whose directory is collected but excluded by `--ignore` or `--ignore-glob` does fail, as its tests aren't
 collected. That's the safe side: the full check and every scoped run pass no such options. The message's fix covers
 it.
 
-*Alternative:* check every entry on every run. That breaks running one file while working, which nobody would
-tolerate. It would then be turned off, and catch nothing.
+*Alternatives:* check every entry on every run (it breaks running one file while working, which nobody would
+tolerate, so it would be turned off and catch nothing); take the roots from `testpaths` too (above).
 
 ### D7. pytest-xdist joins this repository's dev dependencies, for the tests only
 
@@ -160,9 +167,10 @@ missing: a skip would pass without proving anything, so a missing package fails 
 - [A broken scope fails only runs that include its failing item] → A run selecting a different scope (`-m docs`)
   drops it, so a `docs`-only commit doesn't notice a broken `vcs_git` entry. The scope's own run, every full run, and
   every push to `main` fail it, and the commit that renames the directory isn't scoped to `docs`.
-- [`config.args` doesn't match a run's real roots in some invocation] → D6 then checks fewer entries or more. Fewer
-  means a missed warning, which the next full run catches. More means a failure naming the entry, whose fix is clear.
-  The tests cover no arguments (`testpaths`), the root, one file, and one directory.
+- [The path arguments don't match a run's real roots in some invocation] → D6 then checks fewer entries or more.
+  Fewer means a missed warning, which the next full run catches, since it names no paths. More means a failure
+  naming the entry, whose fix is clear. The tests cover `testpaths`, no arguments, a directory holding the entry, one
+  file, and another suite.
 - [A test's `item.path` is the file that defined it, not where it was parametrised or collected] → For Python tests
   these are the same. A plugin item from a non-Python file uses that file, which is the right directory too.
 - [Workers collect differently] → Every worker reads the same declaration and files, so their tags and failing
