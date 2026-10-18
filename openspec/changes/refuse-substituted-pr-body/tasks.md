@@ -15,10 +15,18 @@
 
 ## 2. Read gh pr create's flags as gh does
 
-- [ ] 2.1 Check pflag's rule against real gh (design D5): create `troupe-run/infra-probe-pr-flags` (public, with a
+- [x] 2.1 Check pflag's rule against real gh (design D5): create `troupe-run/infra-probe-pr-flags` (public, with a
   pushed branch), run `gh pr create --dry-run` with `-b'Closes #1'`, `-b='Closes #1'`, `-db 'Closes #1'`,
   `-Fpr.md`, `--title -b --body x`, `--title --fill --body x` and `-- -b x`, and record which description and title
   gh reads for each, here. Delete the repository afterwards and verify it's gone (`gh repo view` fails).
+  - 2026-10-18, gh 2.102.0, `gh pr create --repo troupe-run/infra-probe-pr-flags --head probe --dry-run`, run from
+    this worktree (a PR into another repository isn't checked, so each form reached gh as written). gh read:
+    `-b'Closes #1'` and `-b='Closes #1'` → body `Closes #1`; `-db 'Closes #1'` → draft, body `Closes #1`;
+    `-dbClose` → draft, body `Close`; `-F<path>` and `-F=<path>` → the file's text; `--title -b --body x` → title
+    `-b`; `--title --fill --body x` → title `--fill`; `-b -x` → body `-x`; `--body --fill` → body `--fill`;
+    `-b 'Closes #1' --body 'last wins'` → `last wins`; `--body base -- -b x` → error `unknown arguments ["-b" "x"]`;
+    `-zb x` → error `unknown shorthand flag: 'z' in -zb`. All as D3 describes. The repository was then deleted, and
+    `gh repo view` reports it can't be resolved.
 - [ ] 2.2 Write the reader's table of tests (design D3), one row per case, matching 2.1's results: long `=` and
   space forms, a short flag with its value attached, after `=`, and in the next word, grouped boolean flags before a
   value flag, a dash-leading value of a long and a short flag, an unknown letter, and `--`. Add the spec's
@@ -62,13 +70,15 @@
 - [ ] 4.2 Write the help tests (spec: "Asking for help", "A help flag that is another flag's value", "Help for an
   extension or an alias", "Help for an owner-only command", "Help for gh pr create"): `gh pr --help`,
   `gh codespace -h`, `gh repo create myrepo --help`, `gh repo edit --help`, `gh label create -h`,
-  `gh auth token --help`, `GH_REPO=x gh pr create --help` and `gh pr create -h` go ahead; refused as today:
-  `gh label create x --description --help` (owner-only), `gh co --help`, `gh myext --help`, `gh pr create --help x`
+  `gh auth token --help`, `gh copilot --help`, `GH_REPO=x gh pr create --help` and `gh pr create -h` go ahead;
+  refused as today: `gh label create x --description --help` (owner-only), `gh co --help`, `gh myext --help`,
+  `gh extension exec myext --help`, `gh ext exec myext --help`, `gh pr create --help x`
   (no closing description), `gh pr create --title --help` (no closing description), and `guard.py override --help`
   (`guard-tamper`). No help request is granted (`grantable` is false). Verify the go-ahead tests fail on the current
   code.
 - [ ] 4.3 Implement D4 in `scripts/guard.py`: `GH_BUILTIN_GROUPS` (gh 2.102.0's CORE, GITHUB ACTIONS and ADDITIONAL
-  COMMANDS, with a comment naming the version and that ALIAS COMMANDS are left out), `gh_help_request`, and its use in
+  COMMANDS, with a comment naming the version, that ALIAS COMMANDS are left out, and to check new commands for
+  `DisableFlagParsing`), `GH_HELP_FORWARDED`, `gh_help_request`, and its use in
   `shell_decisions`. Verify 4.1, 4.2 and every test in `scripts/tests/` pass, and `uv run mypy` and
   `uv run ruff check` are clean.
 - [ ] 4.4 Check D4 against gh (design D5): repeat the sweep of `--help` and `-h` over every built-in group and every
@@ -76,8 +86,13 @@
   allowed; `guard-tamper` and `skip-hooks` unchanged). Then run real gh, now that the guard allows it, on
   `gh repo create --help`, `gh auth token --help`, `gh auth token -h`, `gh secret set -h`, `gh config get -h` and
   `gh codespace --help`, and verify each prints help or stops with "flag needs an argument", and changes nothing.
-  Cite the lines of gh 2.102.0's source where `gh alias set` and `gh extension install` refuse a built-in's name.
   Record all of it here.
+  - 2026-10-18, before any code (raised by a side agent): gh 2.102.0's source, read in the scratchpad, gives the
+    facts now in the design's Context. An extension or alias can't take a built-in's name
+    (`pkg/cmd/root/root.go:193-201`, `root.go:205-209`, `pkg/cmd/alias/set/set.go:122-126`; `gh extension install`
+    itself doesn't refuse one, so the design's first wording was wrong). `gh extension exec` forwards `--help` to
+    the extension (`pkg/cmd/extension/command.go:541-557`), so D4 now excludes it; `gh copilot` handles help itself
+    (`pkg/cmd/copilot/copilot.go:83-104`). `-h` is help through pflag v1.0.10's `ErrHelp` (`flag.go:1050-1056`).
 - [ ] 4.5 In `docs/development-workflow.md`, the `gh-allow-list` and `owner-only` rows say a request for a built-in
   command's help goes ahead, in the narrow shape (D4), and isn't granted; the `pr-closes-issue` row says the same for
   `gh pr create --help`. Verify `uv run scripts/check.py` passes.

@@ -39,6 +39,18 @@ See proposal.md for why. The current state of `scripts/guard.py`:
 - gh (cobra) prints a command's help and runs nothing when `--help` or `-h` is a flag, anywhere among the flags. But
   `--help` that follows a value-taking flag is that flag's value (`gh label create x --description --help` creates
   the label), and `gh <extension> --help` runs the extension's program, as `gh <alias> --help` runs the alias.
+- From gh 2.102.0's source (read during apply, in the scratchpad):
+  - gh defines `--help` with no shorthand (`pkg/cmd/root/root.go:102`). `-h` is help because pflag v1.0.10 (gh's
+    `go.mod:53`) returns `ErrHelp` for an undefined `-h` (`flag.go:1050-1056`), and gh passes that to cobra
+    (`pkg/cmd/root/help.go:47-50`). So `-h` is help wherever a command doesn't define it.
+  - An installed extension whose name is a built-in's isn't registered (`pkg/cmd/root/root.go:193-201`), and an
+    alias can't take a built-in's name, when set (`pkg/cmd/alias/set/set.go:122-126`) or when read from config
+    (`root.go:205-209`). So a built-in name always reaches gh's own command.
+  - Two built-ins skip cobra's flag parsing (`DisableFlagParsing`). `gh copilot` prints its own help for `--help`
+    or `-h` before any `--` (`pkg/cmd/copilot/copilot.go:83-104`). **`gh extension exec <name> [args]` forwards
+    every argument after the name, `--help` included, to the extension** (`pkg/cmd/extension/command.go:541-557`).
+    The other `DisableFlagParsing` commands are aliases, installed extensions and the hidden stubs for official
+    extensions (`aw`, `stack`, `webhook`), none of which is a built-in group.
 - 12 commands use `-h` for a value, not help: `--hostname` on the seven `gh auth` commands, `--homepage` on
   `gh repo create` and `gh repo edit`, `--host` on `gh config get`, `list` and `set` (from `gh help` on every
   command, gh 2.102.0). As the last word, that `-h` has no value, and pflag stops with "flag needs an argument"
@@ -135,8 +147,11 @@ leaves grouped flags and value-skipping wrong, and keeps two walks to drift.
     gh <group> [<word> ...] (--help | -h)
 
 - `<group>` is in a new table, `GH_BUILTIN_GROUPS`: gh's own command groups, copied from gh 2.102.0's `gh help`
-  (CORE, GITHUB ACTIONS and ADDITIONAL COMMANDS, not ALIAS COMMANDS). An extension or alias can't take a built-in's
-  name, so a built-in name always means gh's own command, and gh's own commands print help for `--help`.
+  (CORE, GITHUB ACTIONS and ADDITIONAL COMMANDS, not ALIAS COMMANDS). gh doesn't let an extension or alias take a
+  built-in's name (Context), so a built-in name always means gh's own command;
+- the command isn't one that hands its arguments to another program: `gh extension exec` runs an extension with
+  them, `--help` included. These are a second table, `GH_HELP_FORWARDED`, holding `("extension", "exec")`. Only
+  the group's own name is matched, so `gh ext exec` (a cobra alias of `extension`) isn't a help request at all;
 - every word between the group and the help flag doesn't start with `-`, so none can be a flag that takes the help
   flag as its value;
 - the help flag is the last word.
@@ -145,7 +160,9 @@ In `shell_decisions`, a help request skips `pr_closes_issue` and `gh_decision` f
 `guard_tamper` and `skip_hooks` still run, as for every command. Deciding it once, in front of the gh rules,
 keeps the three rules from each growing their own idea of help.
 
-Why it's safe: in this shape gh has no word to take `--help` as a value, so it prints help. For the 12 commands
+Why it's safe: in this shape gh has no word to take `--help` as a value, so a command that parses its own flags
+prints help, and the one built-in that doesn't (`extension exec`) is excluded. `gh copilot` doesn't parse its flags
+either, but prints help itself when it sees them. For the 12 commands
 whose `-h` takes a value, the trailing `-h` has none, so gh stops with an error and runs nothing. A group not in
 the table (an extension, an alias, `co`, or a group a later gh adds) isn't a help request, and is judged as today.
 When gh adds a group, its help is refused until the table gains it: the safe direction.
@@ -187,10 +204,9 @@ shapes) and checking that `guard-tamper` and `skip-hooks` still refuse theirs. R
 newly allowed shapes, the owner-only ones included (`gh repo create --help`, `gh auth token --help`,
 `gh auth token -h`, `gh secret set -h`), to confirm each prints help or stops with "flag needs an argument", and
 does nothing else. That is safe to run once the guard allows it, and it's the guard's claim being checked, so it
-runs after the edit. The claim that an extension or alias can't take a built-in's name is checked in gh's source
-for the installed version (`gh alias set` and `gh extension install` both refuse a name that is already a gh
-command), cited by file and line in tasks.md. It isn't checked by running them: the guard refuses `gh alias set`, and
-both change this machine's gh config.
+runs after the edit. The source facts in Context were read once, during apply, and are cited by file and line; a
+side agent's question about `gh extension exec` led to them. They aren't checked by running gh: the guard refuses
+`gh alias set`, and installing an extension changes this machine's gh config.
 
 ## Risks / Trade-offs
 
@@ -202,7 +218,10 @@ both change this machine's gh config.
 - [A grouped `-R` naming another repository is now allowed through without a closing line] → That's what the
   existing scenario "in any form gh accepts" already requires; the check was wrong before.
 - [A help request lets a command through that does something] → D4's shape leaves gh no word to read `--help` as a
-  value, extensions and aliases are excluded by the table, and the help-flag-as-value and extension cases are tests.
+  value, extensions and aliases are excluded by the table, `gh extension exec` by the second, and the
+  help-flag-as-value, extension and `extension exec` cases are tests. A later gh could add another command that
+  forwards its arguments; the comment on `GH_BUILTIN_GROUPS` says to check for `DisableFlagParsing` when the table
+  is updated.
   The one-off sweep in tasks.md checks real gh: every allowed help shape prints help and changes nothing.
 - [`GH_BUILTIN_GROUPS` falls behind gh] → A new group's help is refused, as today, with the allow-list message.
   Adding it is a one-line pull request.
