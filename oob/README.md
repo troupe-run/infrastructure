@@ -34,6 +34,10 @@ uv run scripts/oob.py
 Run it alongside every plan of a pull request, and quote its output in the pull request: CI doesn't run it on pull
 requests.
 
+**The infrastructure App's "Issue types: read" and "Projects: read"** (organisation permissions, granted by the
+owner on 2026-10-18) are what let CI read the org's issue types and projects. Nothing else uses them. They're
+declared in `app-installations.json`.
+
 **CI runs it too,** in `tofu.yml`'s `drift (out of band)` job, whenever `main` is planned: daily at 06:00 UTC, after
 CI passes on a merge, and on `gh workflow run tofu.yml --ref main`. The job runs `uv run scripts/oob.py --ci` in the
 `plan-main` environment, with an installation token of the infrastructure App that can only read (spec: ci-apply).

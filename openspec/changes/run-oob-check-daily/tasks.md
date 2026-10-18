@@ -31,7 +31,7 @@
 
 ## 3. The App's grants and the job (design D1, D2, D5, D6)
 
-- [ ] 3.1 The owner grants the infrastructure App org "Issue types: read" and "Projects: read" in its settings, and
+- [x] 3.1 The owner grants the infrastructure App org "Issue types: read" and "Projects: read" in its settings, and
   accepts them on the installation. Then declare both in `oob/app-installations.json`, and verify the hand run of
   `uv run scripts/oob.py` shows no App-installations difference.
 - [ ] 3.2 Probe the token the job will use, before the job depends on it. With the owner present for the 1Password
