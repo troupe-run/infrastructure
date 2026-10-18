@@ -74,3 +74,30 @@ def test_the_release_set_is_exactly_release_pleases_two_labels_within_the_limit(
     assert {entry["name"] for entry in labels} == RELEASE_PLEASE_LABELS
     assert len(labels) == len(RELEASE_PLEASE_LABELS)
     assert [entry["name"] for entry in labels if len(entry["description"]) > GITHUB_LIMIT] == []
+
+
+# Kinds of work GitHub's default labels don't cover, such as speed, which every managed
+# repository gets (spec: labels; label-troupe-specs design D4). GitHub refuses a description over
+# the limit only at apply time.
+KIND_LABELS = REPO / "tofu" / "labels" / "kinds.json"
+
+
+def over_the_limit(labels: list[dict[str, Any]]) -> list[str]:
+    """Each label whose description GitHub would refuse, with its length."""
+    return [
+        f"{entry['name']}: description is {length} characters, over {GITHUB_LIMIT}"
+        for entry in labels
+        if (length := len(entry["description"])) > GITHUB_LIMIT
+    ]
+
+
+def test_every_declared_kind_label_is_within_the_limit() -> None:
+    labels = json.loads(KIND_LABELS.read_text(encoding="utf-8"))
+    assert labels, "tofu/labels/kinds.json declares no labels"
+    assert over_the_limit(labels) == []
+
+
+def test_a_kind_label_over_the_limit_is_named_with_its_length() -> None:
+    assert over_the_limit([{"name": "speed", "color": "FBCA04", "description": "x" * 101}]) == [
+        "speed: description is 101 characters, over 100"
+    ]

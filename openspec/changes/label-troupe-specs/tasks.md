@@ -20,11 +20,11 @@
 
 ## 3. Add the speed label
 
-- [ ] 3.1 In `scripts/tests/test_labels.py`, write a test that a kind label in `tofu/labels/kinds.json` over 100
+- [x] 3.1 In `scripts/tests/test_labels.py`, write a test that a kind label in `tofu/labels/kinds.json` over 100
       characters is named with its length, and one that every declared kind label is within the limit. Run them and
       verify they fail because `kinds.json` doesn't exist yet
-- [ ] 3.2 Create `tofu/labels/kinds.json` holding `speed` as in design D4, and verify 3.1's tests pass
-- [ ] 3.3 Add the kind labels to all four repositories' label sets in `tofu/repositories.tf`, after the workflow's
+- [x] 3.2 Create `tofu/labels/kinds.json` holding `speed` as in design D4, and verify 3.1's tests pass
+- [x] 3.3 Add the kind labels to all four repositories' label sets in `tofu/repositories.tf`, after the workflow's
       labels, with a comment saying what the set is for (design D4). Verify `tofu fmt` and `tofu validate` are clean
       and `uv run scripts/check.py` passes
 
