@@ -70,6 +70,12 @@ the environments that `main` uses.
 - **WHEN** a workflow run on a branch other than `main` asks for the apply environment
 - **THEN** GitHub refuses the deployment, and the run gets no secret from that environment
 
+#### Scenario: Removing or weakening main's environments fails the check
+- **WHEN** a change deletes the declaration of the environment that plans `main` or the apply environment, lets
+  either deploy from a branch other than `main`, lets admins bypass either, or removes the owner as the apply
+  environment's required reviewer
+- **THEN** `scripts/check.py` fails, naming the environment and what changed, before any plan is made
+
 ### Requirement: Applies don't overlap
 At most one of CI's plan-and-apply runs on `main` SHALL be in progress at a time. A later run SHALL wait for the
 earlier one to finish. An apply SHALL refuse a saved plan whose state has changed since the plan was made.
