@@ -1,0 +1,78 @@
+# Tasks
+
+## 1. Test dependency
+
+- [ ] 1.1 Add `pytest-xdist` to the `dev` group in `pyproject.toml` and lock it (`uv lock`), for the parallel tests
+  in 3 only (design D7). Verify `uv run python -c "import xdist"` succeeds, `uv run pytest` still passes serially,
+  and `uv run scripts/check.py` passes.
+
+## 2. The declaration reads `tests`
+
+- [ ] 2.1 Before changing the parser, add a differential test in `scripts/tests/test_guard_check_paths.py`: every
+  declaration the existing tests accept, plus the real `scripts/check-paths.toml`, parses to the same `skip` and
+  `scopes`, and to `tests == ()`. Verify it passes on the current code, before 2.2.
+- [ ] 2.2 Write the parsing tests (spec: "A scope can tag whole test directories", malformed and no-`tests`
+  scenarios): a scope with `tests` parses into `CheckPaths.tests` in file order, with `scopes` unchanged; repeated
+  and cross-scope overlapping entries are accepted; refused, each naming the place (`scopes.<name>.tests[i]`) and
+  the entry: `tests` not a list, `tests = []`, a non-string, an exact file, `**`, a wildcard, a backslash, an
+  absolute path, a `.`/`..`/empty segment, and `tests` under `[skip]`. Verify they fail on the current code.
+- [ ] 2.3 Implement D1-D3 in `scripts/guard.py`: the `tests` key on scopes only, the directory-only entry rule built
+  on `_check_paths_entry`, `CheckPaths.tests` with a `()` default, and `CHECK_PATHS_FIX` naming the new key. Verify
+  2.1 and 2.2 pass, and `uv run mypy` and `uv run ruff check` are clean.
+- [ ] 2.4 Add `directory_tags` and `unmatched_tests` (design D4, D6) with tests on plain data: a file under an entry
+  at any depth gets the scope, a sibling with a shared prefix (`tests/a/**` vs `tests/ab/x.py`) doesn't, two scopes
+  listing one directory give both; an entry with no file under it is reported with its scope, and its message names
+  `scripts/check-paths.toml`, the scope, the entry and the fix; an entry outside every root isn't reported, one
+  inside the root or equal to a root is. Verify they pass, and fail when `_matches` is swapped for a plain
+  `startswith` without the `/` boundary (then restore it).
+
+## 3. The plugin applies it
+
+- [ ] 3.1 Extend `scripts/tests/test_guard_pytest.py`'s throwaway project so a test can declare `tests` and lay out
+  several test directories, and its `run_pytest` takes extra arguments (`-m`, `-n 2`, paths). Write the tests (spec:
+  both new requirements): `-m <scope>` selects exactly the tests under the scope's `tests` plus any test marked by
+  hand, serially and with `-n 2`, comparing the sets of passed node ids; an untagged test under a `tests` directory
+  that reads the scope's path passes the tag check; two scopes listing one directory both select it; an entry
+  matching no test fails the full run and the `-m <scope>` run, serially and with `-n 2`, with exit 1, the message
+  in the output and no `INTERNALERROR`; running one file outside the broken entry passes; `pytest --markers` lists the
+  scope's `tests`. Verify they fail on the current plugin.
+- [ ] 3.2 Implement D5 in `scripts/guard_pytest.py`: the `tryfirst` `pytest_collection_modifyitems` adding markers
+  from `directory_tags`, the run's roots from `config.args` (D6), and the failing item for each unmatched entry,
+  placed first and marked with its scope; the marker description lists `tests`; the module docstring says what the
+  hook does. Verify 3.1 passes, every existing test in the file still passes, and `uv run scripts/check.py` passes.
+- [ ] 3.3 Measure the hook's cost on this repository's own run: `uv run pytest -q` three times before and after 3.2
+  (no `tests` keys here, so the hook only walks the items). Record the times here; verify the difference is within
+  run-to-run noise.
+
+## 4. Documentation
+
+- [ ] 4.1 In `docs/development-workflow.md`, describe the `tests` key: the example declaration gains a scope with
+  `tests`, the entry rules say directories only, "A scope is a test tag" says a test under a scope's `tests` counts
+  as tagged, and the unmatched-entry failure and narrower-run rule are stated, with the xdist behaviour. Update the
+  top comment in `scripts/check-paths.toml` to mention the key. Verify `uv run scripts/check.py` passes (the docs
+  tests read both) and the doc's example declaration parses with `guard.check_paths`.
+
+## 5. Integration
+
+- [ ] 5.1 In a scratch clone of troupe (not pushed, discarded afterwards), with `main` here's `scripts/guard.py` and
+  `scripts/guard_pytest.py` copied in and one package scope given `tests` (e.g. `vcs_git` with its suite and the core
+  suite): verify `uv run scripts/check.py --scope vcs_git` runs every gate and exactly the tests under those two
+  directories (count from `pytest --collect-only -q -m vcs_git`), with and without `-n auto`; that renaming one entry
+  to a missing directory fails both, naming the scope and entry; and that troupe's unchanged `check.py` and
+  declaration otherwise behave as before (`--scope docs` selects the same count as on troupe's `main`). Record the
+  counts and times here.
+- [ ] 5.2 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
+  `troupe:scripts/guard.py` and `troupe:scripts/guard_pytest.py` updated in place, and nothing else. Keep it for the
+  pull request.
+- [ ] 5.3 Run `openspec validate scope-test-directories --strict` and verify it passes.
+
+## Workflow follow-up
+
+- Open the pull request with a Conventional title and `Closes #86`, the evidence from 3.3 and 5.1, and the plan from
+  5.2. CI must be green on all three OSes before the delivery is planned.
+- Archive the change on the branch before merging. The owner merges by rebase and approves the `apply` job, which
+  delivers `scripts/guard.py` and `scripts/guard_pytest.py` to troupe.
+- After the apply, confirm troupe's delivered files match `main` here. Comment on troupe-run/troupe#109 that the key
+  is delivered, with its final shape (design D1-D6), so `package-check-scopes` task 2.2 can check it against its D2.
+- Comment on #86 with the pull request and the archived change, check it's closed, and check its roadmap card says
+  Done.
