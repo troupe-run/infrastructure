@@ -35,17 +35,20 @@
 
 ## 3. The workflow (design D5)
 
-- [ ] 3.1 Check whether the pinned `actions/upload-artifact` can upload a single file unzipped (design's open
-  question), from the action's README at that version, and record the answer in design.md.
-- [ ] 3.2 In `.github/workflows/tofu.yml`, add an upload of `plan.txt` after "The plan holds no key" in `pr-plan`
-  (`pr-plan`) and in `plan` (`main-plan`), with an `id` so the next step reads its `artifact-url`. Change "Post the
+- [x] 3.1 Check whether the pinned `actions/upload-artifact` can upload a single file unzipped (design's open
+  question), from the action's README at that version, and record the answer in design.md. (Done: `archive: false`
+  is supported; the artifact is then named after the file, `plan.txt`, so 3.2 uses that, not `pr-plan`/`main-plan`.)
+- [x] 3.2 In `.github/workflows/tofu.yml`, add an upload of `plan.txt` (`archive: false`) after "The plan holds no key" in
+  `pr-plan` and in `plan`, with an `id` so the next step reads its `artifact-url`. Change "Post the
   plan on the pull request" to write the head as today and build `comment.md` with `plan_comment.py --target
   comment`, and "Show the plan for approval" to do the same with `--target summary` into `$GITHUB_STEP_SUMMARY`. Add a
   workflow test that fails if any step runs `head -c` on `plan.txt`, or if either plan step doesn't call
   `plan_comment.py` with the upload's `artifact-url`; verify each by mutating a copy of the loaded workflow in the
-  test. Run `uv run scripts/check.py`.
+  test. Run `uv run scripts/check.py`. (Done: `test_plan_display_workflow.py` fails on the old `tofu.yml` and
+  catches 7 mutations in each job. Run locally on #93's inputs, the new post step's shell reproduces #93's posted
+  comment byte for byte.)
 - [ ] 3.3 On this change's pull request, once the owner approves the plan run, check the posted comment: its plan is
-  whole with no note (this change's plan is small), and the `pr-plan` artifact exists on the run and holds the same
+  whole with no note (this change's plan is small), and the `plan.txt` artifact exists on the run and holds the same
   plan. Quote both in the PR.
 
 ## 4. A written file's content is sensitive (design D7)
@@ -67,5 +70,5 @@
 - The first delivery after the merge that changes a delivered file's source: check its plan shows
   `~ content = (sensitive value)`, the commit message's hash going old → new, and none of the file's content.
 - Archive on the branch before the owner merges by rebase.
-- After the merge, check the next plan of `main` uploads `main-plan` and shows its plan in the run summary. Comment on
+- After the merge, check the next plan of `main` uploads `plan.txt` and shows its plan in the run summary. Comment on
   #98 with the PR and the archived change, check #98 is closed, and set its card to Done.
