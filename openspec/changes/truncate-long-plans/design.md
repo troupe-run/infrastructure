@@ -110,8 +110,9 @@ signed in to GitHub.
 - **Sensitive content (D7).** A test reads `tofu/guard_delivery.tf` and `tofu/org_profile.tf` and fails unless each
   `github_repository_file`'s `content` is wrapped in `sensitive(`. It's a check of the configuration's text, and is
   named as one. What the plan prints is proven by the probe and by this pull request's plan, not by this test.
-- **Modes still read the content.** A `hook_modes.py` test feeds it a `plan.json` resource whose `after_sensitive`
-  marks `content`, shaped like the probe's output, and checks it still reads the content and computes the blob id.
+- **Modes still read the content.** `hook_modes.py` reads `planned_values`, where OpenTofu keeps the value and
+  marks it in `sensitive_values` (probed, as for `after_sensitive`). A test feeds it a resource marked that way and
+  checks it still reads the content and computes the blob id.
 - **Workflow.** A test next to `test_ci_workflow.py` fails if any step in `tofu.yml` runs `head -c` on `plan.txt`,
   or if either plan step doesn't run `plan_comment.py` with the upload step's `artifact-url`.
 
@@ -121,6 +122,8 @@ parameters of the workflow.
 ### D7. A file's content is sensitive, so the plan shows its hash (owner, 2026-10-18)
 
 `content` on `github_repository_file.guard` and `github_repository_file.org_profile` is wrapped in `sensitive()`.
+The drift probe's root (`tofu/probe/main.tf`) wraps its three file resources the same way, since it exists to
+behave like the live root. The test reads every `.tf` file, so a new file resource can't be missed.
 The plan then prints `~ content = (sensitive value)` instead of the file. Each `commit_message` already carries
 `substr(sha256(content), 0, 12)` (guard-delivery D3, org-profile), so a content change still shows as a hash going
 old → new.
@@ -133,6 +136,7 @@ Probed offline on OpenTofu 1.13.1 (2026-10-18), with a `terraform_data` resource
 | Switching an unchanged value to sensitive | `no-op`: no change planned, so no commit and no reused commit message |
 | A sensitive value that changes | `~ input = (sensitive value)`, with no content lines |
 | `tofu show -json` of that plan | `after` still holds the value, and `after_sensitive` marks it `true` |
+| Its `planned_values`, which `hook_modes.py` reads | `values` still holds the value, and `sensitive_values` marks it `true` |
 
 `terraform_data` also printed its `output`, which echoes its input. `github_repository_file` has no attribute that
 echoes `content`. This pull request's own plan checks both points against the real provider: it must show no change

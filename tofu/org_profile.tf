@@ -11,10 +11,12 @@ locals {
 resource "github_repository_file" "org_profile" {
   for_each = local.org_profile_files
 
+  # content is sensitive, so a plan shows its hash in commit_message, not the file (spec:
+  # ci-apply; truncate-long-plans D7). It's reviewed in the pull request's diff of its source.
   repository          = module.repo_github.name
   branch              = "main"
   file                = each.key
-  content             = file("${path.module}/../org-profile/${each.key}")
+  content             = sensitive(file("${path.module}/../org-profile/${each.key}"))
   overwrite_on_create = false
 
   # Changes exactly when the content does, so a sync never reuses an earlier message (spec:
