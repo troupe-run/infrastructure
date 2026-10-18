@@ -9,7 +9,8 @@ name: tofu
 #   or daily at 06:00 UTC                                          the state to main as the App
 #
 # The daily run finds drift in anything OpenTofu manages, a file delivered to troupe included,
-# within a day (spec: ci-apply).
+# within a day (spec: ci-apply). Beside each plan of main, the oob job checks what OpenTofu can't
+# manage (scripts/oob.py, oob/README.md), and fails on any difference.
 #
 # Every job authenticates as the troupe-run-infrastructure App, through scripts/tofu.py, with the
 # secrets of its environment. The owner sets them from 1Password (README); none is in this file.
@@ -325,6 +326,58 @@ jobs:
             tofu/mode-plan.json
           retention-days: 1
           if-no-files-found: error
+
+  # What OpenTofu can't manage, checked with scripts/oob.py whenever main is planned (spec: ci-apply;
+  # run-oob-check-daily design D1-D5). Neither this nor the plan waits for the other. A difference, or
+  # a check it couldn't read, fails this job: that failed run is how drift outside OpenTofu reaches
+  # the owner. The checks only a person can run are named in its summary (BY_HAND in oob.py).
+  oob:
+    name: drift (out of band)
+    if: >-
+      github.ref == 'refs/heads/main' && (
+        github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: plan-main
+      deployment: false
+    permissions:
+      contents: read
+    steps:
+      - name: The commit to check
+        id: sha
+        env:
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: echo "sha=${RUN_SHA:-$GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.sha.outputs.sha }}
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+      # Only reads, whatever the App may do: GitHub grants the token exactly these (design D2). The
+      # action passes every permission-* input to GitHub, so permission-issue-types works though it
+      # isn't one of the action's declared inputs, and the runner warns "Unexpected input".
+      - name: A read-only token
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: 5272634
+          private-key: ${{ secrets.TF_VAR_github_app_pem }}
+          owner: troupe-run
+          repositories: troupe,.github,infrastructure,website
+          permission-contents: read
+          permission-issues: read
+          permission-administration: read
+          permission-organization-administration: read
+          permission-organization-projects: read
+          permission-issue-types: read
+      - name: Check what OpenTofu can't manage
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+        run: uv run --no-project scripts/oob.py --ci
 
   apply:
     name: apply (main)
