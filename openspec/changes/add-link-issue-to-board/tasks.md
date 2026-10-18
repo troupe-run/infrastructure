@@ -5,17 +5,17 @@ group 2.
 
 ## 1. The `board` environment
 
-- [ ] 1.1 Add `"board": Expected("repo_website", owner_reviews=False)` to `MAIN_ONLY` in
+- [x] 1.1 Add `"board": Expected("repo_website", owner_reviews=False)` to `MAIN_ONLY` in
       `scripts/tests/test_main_only_environments.py`, and `tofu/board.tf` to `TF_FILES` (design D3). Verify that
       `uv run pytest scripts/tests/test_main_only_environments.py` fails, naming `board` as not declared, before 1.2
-- [ ] 1.2 Add `tofu/board.tf` (design D2): the `board` environment on `module.repo_website`, with
+- [x] 1.2 Add `tofu/board.tf` (design D2): the `board` environment on `module.repo_website`, with
       `can_admins_bypass = false`, `prevent_self_review = false`, no reviewers and custom branch policies, plus its
       `main`-only deployment policy, each with a comment naming the spec (board-credentials). Verify that the test from
       1.1 passes and that `uv run scripts/check.py` passes (tofu fmt, validate)
-- [ ] 1.3 Check the test catches weakening, not only removal. On a scratch copy, set `can_admins_bypass = true`, and
+- [x] 1.3 Check the test catches weakening, not only removal. On a scratch copy, set `can_admins_bypass = true`, and
       separately change the policy's `branch_pattern` to `*`. Verify the test fails each time, naming `board` and
       what changed, then restore the file
-- [ ] 1.4 Add `tofu/board.tf` to README.md's layout table. Verify `uv run scripts/check.py` passes
+- [x] 1.4 Add `tofu/board.tf` to README.md's layout table. Verify `uv run scripts/check.py` passes
 
 ## 2. The App (owner, on GitHub and in 1Password)
 

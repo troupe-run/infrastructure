@@ -1,5 +1,5 @@
 """The environments only main may use stay declared that way (specs: ci-apply, release-credentials,
-repositories; check-main-only-environments design D1 to D3).
+repositories, board-credentials; check-main-only-environments design D1 to D3).
 
 prevent_destroy goes with its block: deleting an environment's declaration plans a destroy that
 nothing refuses, and the next job that names the environment makes GitHub recreate it with no
@@ -16,7 +16,11 @@ from conftest import REPO
 
 pytestmark = pytest.mark.tofu
 
-TF_FILES = (REPO / "tofu" / "environments.tf", REPO / "tofu" / "release.tf")
+TF_FILES = (
+    REPO / "tofu" / "environments.tf",
+    REPO / "tofu" / "release.tf",
+    REPO / "tofu" / "board.tf",
+)
 
 
 @dataclass(frozen=True)
@@ -32,6 +36,7 @@ MAIN_ONLY = {
     "apply": Expected("repo_infrastructure", owner_reviews=True),
     "release": Expected("repo_troupe", owner_reviews=False),
     "github-pages": Expected("repo_website", owner_reviews=False),
+    "board": Expected("repo_website", owner_reviews=False),
 }
 
 
@@ -360,6 +365,8 @@ PAGES_POLICY = (
 )
 RELEASE = 'resource "github_repository_environment" "release" {'
 RELEASE_POLICY = 'resource "github_repository_environment_deployment_policy" "release_main_only" {'
+BOARD = 'resource "github_repository_environment" "board" {'
+BOARD_POLICY = 'resource "github_repository_environment_deployment_policy" "board_main_only" {'
 CI_BYPASS = "can_admins_bypass   = false\n  prevent_self_review = false\n\n  dynamic"
 PAGES_BYPASS = (
     "can_admins_bypass   = false\n  prevent_self_review = false\n\n  deployment_branch_policy {"
@@ -393,6 +400,12 @@ def test_a_deleted_release_declaration_is_named() -> None:
     texts = real_texts()
     texts["release.tf"] = delete_block(delete_block(texts["release.tf"], RELEASE), RELEASE_POLICY)
     assert problems(texts) == ["release: not declared"]
+
+
+def test_a_deleted_board_declaration_is_named() -> None:
+    texts = real_texts()
+    texts["board.tf"] = delete_block(delete_block(texts["board.tf"], BOARD), BOARD_POLICY)
+    assert problems(texts) == ["board: not declared"]
 
 
 def test_apply_dropped_from_the_ci_environments_is_named() -> None:
