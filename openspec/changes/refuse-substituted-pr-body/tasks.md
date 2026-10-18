@@ -109,7 +109,7 @@
   `shell_decisions`. Verify 4.1, 4.2 and every test in `scripts/tests/` pass, and `uv run mypy` and
   `uv run ruff check` are clean.
   - 2026-10-18: 1106 tests pass; ruff and mypy clean.
-- [ ] 4.4 Check D4 against gh (design D5): repeat the sweep of `--help` and `-h` over every built-in group and every
+- [x] 4.4 Check D4 against gh (design D5): repeat the sweep of `--help` and `-h` over every built-in group and every
   command in the guard's tables, and record which decisions changed (expected: exactly the help shapes, refused to
   allowed; `guard-tamper` and `skip-hooks` unchanged). Then run real gh, now that the guard allows it, on
   `gh repo create --help`, `gh auth token --help`, `gh auth token -h`, `gh secret set -h`, `gh config get -h` and
@@ -121,9 +121,26 @@
     itself doesn't refuse one, so the design's first wording was wrong). `gh extension exec` forwards `--help` to
     the extension (`pkg/cmd/extension/command.go:541-557`), so D4 now excludes it; `gh copilot` handles help itself
     (`pkg/cmd/copilot/copilot.go:83-104`). `-h` is help through pflag v1.0.10's `ErrHelp` (`flag.go:1050-1056`).
-- [ ] 4.5 In `docs/development-workflow.md`, the `gh-allow-list` and `owner-only` rows say a request for a built-in
+  - 2026-10-18, after 4.3: the sweep, with `main`'s guard and this branch's side by side, over 123 commands (every
+    command in the guard's tables, every built-in group, `co`, an extension, `extension exec` and `ext exec`, and the
+    git and override commands) with `--help` and `-h`: 130 forms went from refused to allowed, every one in the help
+    shape; 102 were allowed and stay so; 14 stay refused (`co`, the extension, both `exec` forms, `skip-hooks` and
+    `guard-tamper`). No other decision changed. Real gh 2.102.0 then printed help for `gh repo create --help`,
+    `gh auth token --help`, `gh secret set -h`, `gh codespace --help`, `gh pr create -h` and `gh copilot --help`;
+    `gh auth token -h` and `gh config get -h` stopped with `flag needs an argument: 'h' in -h` and printed usage
+    (stdout went through a token-redacting filter; there was nothing to redact).
+  - Found: a trailing redirection takes a command out of the shape. `gh repo create --help </dev/null 2>&1` was
+    refused as owner-only, because `split_command` makes `2>&1` the words `2>` and `1`. A pipe is fine
+    (`gh repo create --help | head`). Raised with the owner rather than widened here.
+  - Found, outside this change: a gh command inside `$(...)` or backticks reaches no gh rule on `main`.
+    `out=$(gh repo delete troupe-run/x --yes)`, `` x=`gh auth token` `` and `echo $(gh pr merge 1 --admin)` are all
+    allowed, because the words are `out=$(gh` (read as an assignment) or `$(gh` (a program that isn't gh). Seen when
+    a loop here used `out=$(gh $c ...)`. Raised with the owner.
+- [x] 4.5 In `docs/development-workflow.md`, the `gh-allow-list` and `owner-only` rows say a request for a built-in
   command's help goes ahead, in the narrow shape (D4), and is granted only when the command it asks about is; the `pr-closes-issue` row says the same for
   `gh pr create --help`. Verify `uv run scripts/check.py` passes.
+  - 2026-10-18: the three rows updated, the `gh-allow-list` row holding the shape and its limits;
+    `uv run scripts/check.py` passes.
 
 ## 5. An attachment is a file read
 
