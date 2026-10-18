@@ -63,12 +63,16 @@
 
 ## 4. README.md (D3)
 
-- [ ] 4.1 Rewrite "An apply can't delete a repository" in README.md as D3 says, from what 3.2 to 3.5 showed: what
+- [x] 4.1 Rewrite "An apply can't delete a repository" in README.md as D3 says, from what 3.2 to 3.5 showed: what
       `prevent_destroy` refuses, what a deleted block plans, what an approved apply then archives and loses, how to
       recover, and the `removed` block (its example kept). Verify each claim matches the recorded output, and that
       README.md no longer says removing a declaration makes the plan fail
-- [ ] 4.2 Verify `uv run scripts/check.py` passes and a plan of the live root (`uv run scripts/tofu.py plan`) shows
+      Done 2026-10-18: each claim is from 3.2 to 3.5, except that a deleted label leaves pull requests as well as
+      issues, which is GitHub's documented behaviour (the probe had only an issue). The old sentence is gone
+- [x] 4.2 Verify `uv run scripts/check.py` passes and a plan of the live root (`uv run scripts/tofu.py plan`) shows
       `No changes.`
+      Done 2026-10-18: `check: all gates passed`; the live plan: `No changes. Your infrastructure matches the
+      configuration.`
 
 ## Workflow follow-up
 
