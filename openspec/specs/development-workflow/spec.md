@@ -314,6 +314,33 @@ can't be determined, it SHALL be treated as the session's repository.
   worked out (an unrecognisable repository name, or this clone has no remote to compare with)
 - **THEN** the request is refused, as for a PR into the session's repository
 
+#### Scenario: A description built by the shell
+- **WHEN** an agent opens a pull request into the session's repository whose `--body` is built by a shell expansion
+  (command substitution with `$(...)` or backticks, including `$(cat <<'EOF' ... EOF)`, or a variable such as
+  `$BODY` or `${BODY}`), and the text outside the expansion closes no issue
+- **THEN** the request is refused, and the message says a description built by the shell can't be checked before
+  it's sent, and to write it to a file and pass it with `--body-file`
+- **AND** it does not say the description lacks a closing line
+
+#### Scenario: An expanded description whose own text closes an issue
+- **WHEN** an agent opens a pull request whose `--body` holds a shell expansion and, outside it, `Closes #22`
+- **THEN** the request goes ahead, as it did before
+
+#### Scenario: A description given with a short flag
+- **WHEN** an agent opens a pull request whose description is given in any short-flag form `gh` accepts, such as
+  `-b'Closes #22'`, `-b='Closes #22'`, `-Fpr.md`, or after grouped boolean flags (`-db 'Closes #22'`)
+- **THEN** the check reads that description as `gh` does, and the request goes ahead when it closes an issue and is
+  refused when it doesn't
+
+#### Scenario: A flag's value that looks like a flag
+- **WHEN** an agent opens a pull request where another flag's value is a word that looks like a flag, such as
+  `--title --fill` or `--title -b`
+- **THEN** the check reads that word as the value, as `gh` does, not as a flag
+
+#### Scenario: Help for gh pr create
+- **WHEN** an agent runs `gh pr create --help` or `gh pr create -h`
+- **THEN** the request goes ahead, since it prints help and opens no pull request
+
 ### Requirement: Git's checks cannot be skipped from a session
 In a Claude Code session, a git command that would skip or disable the repository's git hooks SHALL be refused.
 That covers `--no-verify`, `-n` on `git commit`, and changing or overriding `core.hooksPath`.
@@ -491,6 +518,10 @@ repository, with a fix naming the owner, or this repository for anything OpenTof
 - **WHEN** an agent runs `gh pr merge --admin` on a repository outside `troupe-run`
 - **THEN** the command is refused, as in `troupe-run`
 
+#### Scenario: Help for an owner-only command
+- **WHEN** an agent asks for the help of an owner-only command, such as `gh repo edit --help` or `gh label create -h`
+- **THEN** the command goes ahead, as a help request (see "Agents' gh commands are allow-listed")
+
 #### Scenario: The owner overrides it
 - **WHEN** the owner grants an `owner-only` override in their own terminal, and the agent then runs the refused
   command
@@ -500,7 +531,8 @@ repository, with a fix naming the owner, or this repository for anything OpenTof
 In a Claude Code session, a `gh` command SHALL be allowed only if it is on the allow-list:
 - a read;
 - an everyday workflow write: pull requests, issues, comments, sub-issues, project items, running workflows;
-- a write to a throwaway repository in `troupe-run`.
+- a write to a throwaway repository in `troupe-run`;
+- a request for a built-in command's help.
 
 Anything else SHALL be refused, including an unknown subcommand, an extension or an alias. The list SHALL be kept in
 one place.
@@ -542,6 +574,22 @@ one place.
 #### Scenario: A mention isn't a command
 - **WHEN** an agent's commit message, or a quoted word, mentions `gh pr merge --admin` or `gh auth token`
 - **THEN** the command is allowed
+
+#### Scenario: Asking for help
+- **WHEN** an agent runs `gh`, one of `gh`'s own command groups, any words that aren't flags, and `--help` or `-h` as
+  the last word, such as `gh pr --help`, `gh codespace -h`, `gh repo create myrepo --help` or `gh pr create --help`
+- **THEN** the command goes ahead, whatever the command it asks about would be refused for
+
+#### Scenario: A help flag that is another flag's value
+- **WHEN** an agent runs a command where `--help` or `-h` follows a flag, such as
+  `gh label create x --description --help`, so `gh` reads it as that flag's value and runs the command
+- **THEN** the command is judged as the command it runs, here refused as owner-only
+
+#### Scenario: Help for an extension or an alias
+- **WHEN** an agent runs `gh <extension> --help`, `gh extension exec <name> --help` or `gh <alias> --help`,
+  including `gh`'s own alias `co`
+- **THEN** the command is refused as before, because `gh` runs the extension or alias, and passes it `--help`,
+  rather than printing help
 
 ### Requirement: Each everyday gh write has one way to do it
 An everyday write SHALL be allowed only through its `gh` command, never as a GraphQL mutation, so that each write has
@@ -609,6 +657,16 @@ temp directory.
 #### Scenario: Through PowerShell
 - **WHEN** an agent runs `gh pr ready 74` through the PowerShell tool
 - **THEN** the guard doesn't grant it
+
+#### Scenario: An attachment from outside the repository
+- **WHEN** an agent runs `gh issue comment 1 --body x --attach /etc/hosts`, or any granted command whose `--attach`
+  could name a file outside the repository and the system temp directory, in any `<file>#<alt text>` reading `gh`
+  might make of it
+- **THEN** the guard doesn't grant it, as for `--body-file`
+
+#### Scenario: An attachment from inside the repository
+- **WHEN** an agent runs `gh pr comment 74 --body x --attach 'docs/shot.png#The new page'`
+- **THEN** the guard may grant it, as for a `--body-file` inside the repository
 
 ### Requirement: The workflow's templates are org defaults
 The pull request template and the issue forms (Bug, Feature and Decision) SHALL have their source in this repository
