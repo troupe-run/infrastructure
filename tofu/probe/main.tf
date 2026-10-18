@@ -46,6 +46,12 @@
 # `gh api -X PUT repos/troupe-run/<name>/pages -f build_type=legacy -f "source[branch]=main"` then
 # shows as drift. It has no domain, so the module's `pages`, which needs one, isn't used: what's
 # tested is the provider's drift detection.
+#
+# The deleted-block probe (correct-prevent-destroy-claim, design D1) shows what declared = false
+# can't: deleting a module call deletes its prevent_destroy too. After the import apply, delete
+# `module "probe"` and the two `import` blocks that target it, in the working tree only, then plan
+# and apply: the repository is archived and its labels, ruleset and Dependabot settings are
+# destroyed. To recover, `gh repo unarchive`, `git checkout` this file and apply again.
 
 terraform {
   required_version = ">= 1.8"

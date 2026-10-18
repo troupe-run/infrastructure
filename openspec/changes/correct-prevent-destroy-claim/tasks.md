@@ -11,35 +11,55 @@
 
 ## 2. The live state (D2)
 
-- [ ] 2.1 Fast-forward onto `origin/main` if only the state commit is ahead, then read
+- [x] 2.1 Fast-forward onto `origin/main` if only the state commit is ahead, then read
       `uv run scripts/tofu.py state show module.repo_<name>.github_repository.this` for troupe, github, infrastructure
       and website. Verify each shows `archive_on_destroy = true`, and record the four lines. If any doesn't, stop and
       ask the owner
+      Done 2026-10-18: already current with `origin/main` (0 behind). `troupe`, `github`, `infrastructure` and
+      `website` each show `archive_on_destroy = true`
 
 ## 3. The probe (D1; needs the owner)
 
-- [ ] 3.1 Create `troupe-run/infra-probe-<date>` with `gh repo create --public --add-readme`, and ask the owner to add
+- [x] 3.1 Create `troupe-run/infra-probe-<date>` with `gh repo create --public --add-readme`, and ask the owner to add
       it to the infrastructure App's installation. Open an issue on it labelled `bug` (ask the owner whether this
       throwaway issue goes on the roadmap board, which the board rule otherwise requires). Set `probe_repo` in
       `tofu/probe/terraform.tfvars`. Apply with `declared = true`. Verify: the repository and its labels are
       imported, and a second plan shows no changes
-- [ ] 3.2 Plan with `-var declared=false`. Verify the plan fails on `prevent_destroy`, naming
+      Done 2026-10-18, on `troupe-run/infra-probe-20261018`, issue #1 labelled `bug` (off the board, owner). Before:
+      10 labels, no rulesets, Dependabot alerts already on (org baseline). Apply: `2 imported, 3 added, 1 changed,
+      0 destroyed`; the next plan: `No changes.`
+- [x] 3.2 Plan with `-var declared=false`. Verify the plan fails on `prevent_destroy`, naming
       `module.probe[0].github_repository.this`, and record the output
-- [ ] 3.3 Delete `module "probe"` and the two `import` blocks that target it, in the working tree only. Plan, then
+      Done 2026-10-18: `Error: Resource instance cannot be destroyed` / `Resource instance
+      module.probe[0].github_repository.this has prevent_destroy`, and nothing applied
+- [x] 3.3 Delete `module "probe"` and the two `import` blocks that target it, in the working tree only. Plan, then
       apply that plan. Verify: the plan lists the repository and the module's other resources as destroyed, with
       nothing refusing. Record the destroy list and the apply's output
-- [ ] 3.4 Record the repository on GitHub: `gh repo view --json isArchived`, its labels, the issue's labels, its
+      Done 2026-10-18: the plan destroys `github_issue_labels.this`, `github_repository.this` (`archive_on_destroy =
+      true -> null`), `github_repository_dependabot_security_updates.this`, `github_repository_ruleset.main[0]` and
+      `github_repository_vulnerability_alerts.this`, each "not in configuration": `5 to destroy`, no error. The apply
+      destroyed the four dependents first, the repository last: `0 added, 0 changed, 5 destroyed`
+- [x] 3.4 Record the repository on GitHub: `gh repo view --json isArchived`, its labels, the issue's labels, its
       rulesets, and whether Dependabot alerts are on. Verify it's archived, not deleted. If it was deleted, or anything
       differs from D3's expectation, stop and take the result to the owner (design, Risks) before 4.1
-- [ ] 3.5 `gh repo unarchive`, `git checkout tofu/probe/main.tf`, and apply with `declared = true`. Verify the apply
+      Done 2026-10-18: `isArchived: true`, so archived, not deleted. Every label is gone from the repository, and
+      issue #1 has none (it had `bug`). No rulesets. Dependabot alerts off (`404`), security updates `false`. This is
+      D3's expectation
+- [x] 3.5 `gh repo unarchive`, `git checkout tofu/probe/main.tf`, and apply with `declared = true`. Verify the apply
       re-imports the repository and recreates what 3.3 destroyed, and a second plan shows no changes. Record what
       didn't come back, such as the issue's label
-- [ ] 3.6 Add the deleted-block probe to the header comment of `tofu/probe/main.tf`: the edit 3.3 makes and the
+      Done 2026-10-18: unarchived, then `2 imported, 3 added, 2 changed, 0 destroyed`; the next plan: `No changes.`
+      Back: the 10 labels, the `protect main` ruleset, alerts on (`204`), security updates `true`. Not back: issue
+      #1's `bug` label, which stays `[]`
+- [x] 3.6 Add the deleted-block probe to the header comment of `tofu/probe/main.tf`: the edit 3.3 makes and the
       recovery 3.5 runs. Verify `tofu fmt -check -recursive tofu` is clean and `git diff tofu/probe/main.tf` touches
       comment lines only
-- [ ] 3.7 Delete the probe repository, then the probe's state and `terraform.tfvars`. Verify `gh repo view
+      Done 2026-10-18: `tofu fmt -check` clean; the diff adds six comment lines
+- [x] 3.7 Delete the probe repository, then the probe's state and `terraform.tfvars`. Verify `gh repo view
       troupe-run/infra-probe-<date>` reports not found, and `git status --short --ignored tofu/probe` shows only the
       provider cache
+      Done 2026-10-18: `gh repo view` says `Could not resolve to a Repository`; only `.terraform/` and
+      `.terraform.lock.hcl` remain
 
 ## 4. README.md (D3)
 
