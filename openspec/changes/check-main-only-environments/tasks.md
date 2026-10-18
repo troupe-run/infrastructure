@@ -35,8 +35,10 @@
       Done 2026-10-18: the `ci` declarations share `environments.tf`'s header, so the line naming the test went there,
       covering `github_pages` too. `tofu fmt -check` is clean, `tofu validate` reports `Success!`, and the module's
       tests: `19 passed`
-- [ ] 2.2 Commit group 1, then group 2, as Conventional Commits, signed off, saying why. Verify the guard accepts
+- [x] 2.2 Commit group 1, then group 2, as Conventional Commits, signed off, saying why. Verify the guard accepts
       each commit
+      Done 2026-10-18: group 1 `1afc3d3` (the guard ran the full check: `971 passed`, all gates passed), group 2
+      `f33b71d` (`check.py --scope tofu`: `58 passed`, all gates passed). Both signed off
 
 ## 3. Pull request
 
