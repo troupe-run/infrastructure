@@ -39,9 +39,10 @@ covered two resources, and nearly all of it was `scripts/guard.py`, printed twic
   `~ content = (sensitive value)`. Each resource's commit message already carries the content's hash, so the plan
   still shows which content each change delivers, old → new. The content is reviewed where it already is: in the
   pull request's diff of its source in this repository.
-  - Probed offline on OpenTofu 1.13.1: making a value sensitive plans no change, so turning this on makes no commit
-    and reuses no commit message. `tofu show -json` keeps the value, marked sensitive, so `hook_modes.py` still reads
-    it.
+  - Turning this on is a one-off update. With the real provider, each file resource plans an in-place update that only
+    marks `content` sensitive ("The value is unchanged"). The apply may write each file again with its unchanged
+    content and existing commit message. The owner accepted this on #100 (2026-10-19). `tofu show -json` keeps the
+    value, marked sensitive, so `hook_modes.py` still reads it.
   - Trade-off: when a delivered file drifts in a target, the plan shows it will be restored, but not what was changed.
     The target's commit history on GitHub still shows that.
 
@@ -67,7 +68,7 @@ None.
 - `.github/workflows/tofu.yml`: in `pr-plan`, a step uploads `plan.txt` as an artifact (after "The plan holds no
   key"), and "Post the plan on the pull request" builds the comment with the new script. In `plan`, "Show the plan
   for approval" does the same for the run summary.
-- `tofu/guard_delivery.tf` and `tofu/org_profile.tf`: `content = sensitive(...)`. The switch plans no change.
+- `tofu/guard_delivery.tf` and `tofu/org_profile.tf`: `content = sensitive(...)`. The switch plans a one-off in-place update of each file resource.
 - New `scripts/plan_comment.py` and `scripts/tests/test_plan_comment.py`; a workflow test pins that no step cuts
   `plan.txt` with `head -c` any more.
 - No OpenTofu resource changes, no new secret or permission (`actions/upload-artifact` needs none beyond the run's).

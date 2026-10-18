@@ -45,6 +45,8 @@ content is reviewed in the pull request's diff of its source.
 - **THEN** the next plan shows that file's resource as an update that restores it, and prints neither the target's
   content nor the source's
 
-#### Scenario: Hiding the content changes nothing on its own
+#### Scenario: Hiding the content is a one-off update that prints no content
 - **WHEN** the plan that first hides file content runs, and no source has changed
-- **THEN** it shows no change to any file resource, and no repository gets a commit
+- **THEN** it shows each file resource as an in-place update whose only change is `content` becoming
+  `(sensitive value)`, with OpenTofu's note that the value is unchanged; it prints no file's content, and no
+  `commit_message` changes

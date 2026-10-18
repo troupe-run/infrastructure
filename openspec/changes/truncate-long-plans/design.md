@@ -133,14 +133,21 @@ Probed offline on OpenTofu 1.13.1 (2026-10-18), with a `terraform_data` resource
 
 | What | Result |
 |---|---|
-| Switching an unchanged value to sensitive | `no-op`: no change planned, so no commit and no reused commit message |
+| Switching an unchanged value to sensitive | `no-op` for `terraform_data`, but **not** for the real provider (below) |
 | A sensitive value that changes | `~ input = (sensitive value)`, with no content lines |
 | `tofu show -json` of that plan | `after` still holds the value, and `after_sensitive` marks it `true` |
 | Its `planned_values`, which `hook_modes.py` reads | `values` still holds the value, and `sensitive_values` marks it `true` |
 
 `terraform_data` also printed its `output`, which echoes its input. `github_repository_file` has no attribute that
-echoes `content`. This pull request's own plan checks both points against the real provider: it must show no change
-to any file resource.
+echoes `content`. This pull request's own plan checked both points against the real provider (run 39131570133):
+
+- No attribute echoes `content`; the plan prints no file's content.
+- The switch is **not** a no-op there. All 25 file resources plan an in-place update, `~ content = (sensitive
+  value)`, under OpenTofu's "this attribute value will be marked as sensitive … The value is unchanged."
+  `resourceGithubRepositoryFileUpdate` (v6.13.0) calls `UpdateFile` unconditionally, so the apply may PUT each file
+  again with its unchanged content and existing `commit_message`. Whether GitHub records a commit for that wasn't
+  probed: the owner chose to accept the one-off update either way (#100, 2026-10-19), since a probe wouldn't change
+  the decision. After it, the state holds the marks and later plans are no-ops again.
 
 *Alternatives:* collapsing heredoc bodies in `plan_comment.py` means parsing text by guesswork, and only hides the
 content in the comment, not the log. Moving delivery out of OpenTofu would redesign delivery to fix how it's
@@ -167,6 +174,8 @@ lists both resources, website's included, and the `Plan:` line. The note shows a
 - [A later OpenTofu changes how a sensitivity-only change plans, or what JSON output holds] → the version is pinned
   (`OPENTOFU_VERSION`); an upgrade's plan shows it, and `hook_modes.py` refuses a resource with no known content
   rather than guessing.
+- [The first apply after the merge rewrites 25 files with unchanged content, maybe as 25 commits reusing their
+  commit messages] → a one-off, accepted by the owner (#100); later plans are no-ops until a source changes.
 - [The plan of `main` could now fail its summary step] → only in D4's case of a resource list over about 1 MB, where
   the owner couldn't review the plan from the summary anyway; the apply waits until it's split or planned locally.
 

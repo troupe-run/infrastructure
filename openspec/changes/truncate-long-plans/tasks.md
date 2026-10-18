@@ -64,9 +64,12 @@
 - [x] 4.2 Wrap both `content` expressions in `sensitive()`. Leave `commit_message` as it is: it hashes the source
   directly. Verify 4.1's tests pass and `uv run scripts/check.py` passes (`tofu validate` included). (Done, with the drift probe's
   three file resources in `tofu/probe/main.tf` wrapped too, design D7.)
-- [ ] 4.3 On this change's pull request, once the owner approves the plan run, check that the plan shows no change to
-  any `github_repository_file` resource and no mode to set (design D7, spec "Hiding the content changes nothing on its
-  own"). Quote the plan's `Plan:` / `No changes` line in the PR.
+- [x] 4.3 On this change's pull request, once the owner approves the plan run, check that each `github_repository_file`
+  resource's only change is `content` becoming `(sensitive value)`, that the plan prints no file's content, and that
+  there's no mode to set (design D7, spec "Hiding the content is a one-off update that prints no content"). Quote the
+  plan's `Plan:` line in the PR. (Done: run 39131570133 plans `0 to add, 25 to change, 0 to destroy`, all 25 file
+  resources, each `~ content = (sensitive value)` with "The value is unchanged" and 9 unchanged attributes hidden;
+  modes: none. Quoted on #100. The plan first expected no change; the owner accepted the one-off update on #100.)
 
 ## Workflow follow-up
 
@@ -74,5 +77,7 @@
 - The first delivery after the merge that changes a delivered file's source: check its plan shows
   `~ content = (sensitive value)`, the commit message's hash going old → new, and none of the file's content.
 - Archive on the branch before the owner merges by rebase.
-- After the merge, check the next plan of `main` uploads `plan.txt` and shows its plan in the run summary. Comment on
+- After the merge, check the next plan of `main` uploads `plan.txt`, shows its plan in the run summary, and plans the
+  same 25 one-off updates. After its apply, record on #98 whether GitHub made a commit in each target, and check the
+  following plan shows no change to any file resource. Comment on
   #98 with the PR and the archived change, check #98 is closed, and set its card to Done.
