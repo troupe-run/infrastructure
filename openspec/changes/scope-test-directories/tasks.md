@@ -109,10 +109,17 @@
       `25/1799 tests collected` line leaves out the failing item, which is added after collection, but it runs (26
       in all, as the xdist line `1 failed, 25 passed` shows).
 
-- [ ] 5.2 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
-  `troupe:scripts/guard.py` and `troupe:scripts/guard_pytest.py` updated in place, and nothing else. Keep it for the
-  pull request.
-- [ ] 5.3 Run `openspec validate scope-test-directories --strict` and verify it passes.
+- [x] 5.2 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
+  `scripts/guard.py` and `scripts/guard_pytest.py` updated in place in each repository the guard is delivered to
+  (troupe and website), and nothing else. Keep it for the pull request.
+  - 2026-10-18, on `origin/main` (nothing ahead after the rebase): `Plan: 0 to add, 4 to change, 0 to destroy.`
+    `github_repository_file.guard` for `troupe:` and `website:` `scripts/guard.py` and `scripts/guard_pytest.py`,
+    updated in place. The task first said troupe only: website has been governed since `govern-website`, so it
+    gets every delivery. Its declaration holds only `[skip]` and it has no `pyproject.toml`, so it loads no pytest
+    plugin; its `scripts/check-paths.toml`, read from GitHub, parses the same with the old and the new guard
+    (same `skip`, no scopes, `tests == ()`).
+- [x] 5.3 Run `openspec validate scope-test-directories --strict` and verify it passes.
+  - 2026-10-18: `Change 'scope-test-directories' is valid`.
 
 ## Workflow follow-up
 
