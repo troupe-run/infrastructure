@@ -8,6 +8,10 @@ locals {
   # repository gets them, so the org's issue forms work in each (spec: labels; pr-templates D3).
   workflow_labels = jsondecode(file("${path.module}/labels/workflow.json"))
 
+  # Kinds of work GitHub's default labels don't cover, such as speed, so a capability label never
+  # stands in for one. Every repository gets them (spec: labels; label-troupe-specs D4).
+  kind_labels = jsondecode(file("${path.module}/labels/kinds.json"))
+
   # The checks each repository's pull requests need before they merge (spec: rulesets), named
   # as GitHub reports them. infrastructure's are tested against its workflows
   # (scripts/tests/test_required_checks.py); troupe's and website's were read from their latest
@@ -40,6 +44,7 @@ module "repo_troupe" {
   labels = concat(
     local.github_default_labels,
     local.workflow_labels,
+    local.kind_labels,
     jsondecode(file("${path.module}/labels/troupe.json")),
     jsondecode(file("${path.module}/labels/release.json")),
   )
@@ -59,7 +64,7 @@ module "repo_github" {
   main_ruleset  = "app-only"
   app_bypass_id = local.infrastructure_app_id
   description   = "Org-wide defaults for troupe-run repositories: DCO config, contributing, security policy, org profile"
-  labels        = concat(local.github_default_labels, local.workflow_labels)
+  labels        = concat(local.github_default_labels, local.workflow_labels, local.kind_labels)
 }
 
 module "repo_infrastructure" {
@@ -68,7 +73,7 @@ module "repo_infrastructure" {
   homepage_url = "https://troupe.run"
   description  = "How the troupe-run org builds software: the org as code (OpenTofu), the development workflow and its guardrails"
   topics       = ["infrastructure-as-code", "openspec", "opentofu"]
-  labels       = concat(local.github_default_labels, local.workflow_labels)
+  labels       = concat(local.github_default_labels, local.workflow_labels, local.kind_labels)
   # CI commits the state here after an apply (spec: ci-apply, design D4).
   app_bypass_id   = local.infrastructure_app_id
   required_checks = local.checks_for["infrastructure"]
@@ -80,7 +85,7 @@ module "repo_website" {
   description = "troupe.run \u2014 website and landing page"
   # Set by the owner on GitHub after rename-website, and declared here (required-checks).
   homepage_url = "https://troupe.run/"
-  labels       = concat(local.github_default_labels, local.workflow_labels)
+  labels       = concat(local.github_default_labels, local.workflow_labels, local.kind_labels)
   # The org's roadmap (project 1) is linked here too, and turning projects off would hide it from
   # the repository (govern-website D4).
   has_projects = true
