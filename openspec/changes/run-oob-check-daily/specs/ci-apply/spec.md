@@ -26,10 +26,11 @@ read GitHub with a token that can only read.
 - **THEN** GitHub refuses it, because the token holds only read permissions and the workflow token only
   `contents: read`
 
-### Requirement: The drift job fails on a difference or an unreadable check, and names what it didn't run
-The drift job SHALL fail when the check finds a difference, and SHALL put each difference in the run's summary and
-annotations. A check that can't be read SHALL fail the job, naming the check, and SHALL never count as "no
-difference". Each check that only a person can run SHALL be named in every run as not run, with the reason.
+### Requirement: The drift job fails on a difference or an unreadable check, and says what it checked
+The drift job SHALL run every check the drift check has, the same checks as a hand run. It SHALL fail when the check
+finds a difference, and SHALL put each difference in the run's summary and annotations. A check that can't be read
+SHALL fail the job, naming the check, and SHALL never count as "no difference". The run's summary SHALL list the
+checks it ran.
 
 #### Scenario: A difference fails the daily run
 - **WHEN** the daily run finds that something in `oob/` differs from GitHub, such as a repository's dependency graph
@@ -37,13 +38,13 @@ difference". Each check that only a person can run SHALL be named in every run a
 - **THEN** the drift job fails, and its summary and an error annotation name the difference
 
 #### Scenario: Nothing differs
-- **WHEN** every check CI can run matches its declaration
-- **THEN** the drift job succeeds, and its summary lists the checks that ran and the checks left to be run by hand
+- **WHEN** every check matches its declaration
+- **THEN** the drift job succeeds, and its summary lists the checks that ran
 
 #### Scenario: A check that can't be read fails the run
 - **WHEN** one check's read fails, for example with a 403 or a network error
 - **THEN** the drift job still runs every other check, then fails, naming the check that couldn't be read
 
-#### Scenario: A check only a person can run is named, not skipped silently
+#### Scenario: CI leaves no check out
 - **WHEN** the drift job runs
-- **THEN** its output names the App-installations check as not run by CI, and says why
+- **THEN** it reads everything a hand run of the drift check reads, the org's App installations included
