@@ -22,14 +22,14 @@ group 2.
 - [x] 2.1 Owner: decide design D1 (new `troupe-run-board` App, or the infrastructure App) and record it in design.md
       as "(owner, <date>)". Verify that design.md's D1 no longer says OPEN QUESTION. Done: option A, a new App
       (owner, 2026-10-18), and D1 says so
-- [ ] 2.2 Owner: create the GitHub App `troupe-run-board` in the troupe-run org, installable only on this account,
+- [x] 2.2 Owner: create the GitHub App `troupe-run-board` in the troupe-run org, installable only on this account,
       with the webhook off. Organisation permission: Projects read and write. No repository permissions beyond the
       metadata GitHub always grants. Install it on `troupe-run/website` only. Verify with
       `gh api orgs/troupe-run/installations --jq '.installations[] | select(.app_slug=="troupe-run-board") | {permissions, repository_selection}'`,
       which should show `organization_projects: write`, `metadata: read` and `selected`. Found (2026-10-18): App ID
       5367918, installation 172676444, `organization_projects: write` and `selected`. GitHub lists no `metadata` for
-      an App with no repository permissions. The repository list is confirmed in 3.2, by the token's own
-      `GET /installation/repositories`
+      an App with no repository permissions. The token's own `GET /installation/repositories` (3.2) returned `[]`:
+      it covers no repository, which works, and the owner chose to keep it that way (design D1, 2026-10-18)
 - [x] 2.3 Owner: generate a private key, store it in 1Password as `troupe-run-board`, field `private key`, in vault
       `troupe.run`, and delete the downloaded file. Verify that
       `op read -n "op://troupe.run/troupe-run-board/private key" | head -c 31` prints only the PEM header. Found: an SSH Key item, header `-----BEGIN RSA PRIVATE KEY-----`, as for the release
@@ -55,14 +55,14 @@ group 2.
 
 ## 4. The declarations that name the App
 
-- [ ] 4.1 Add `troupe-run-board` to `oob/app-installations.json` with the permissions found in group 3 and
+- [x] 4.1 Add `troupe-run-board` to `oob/app-installations.json` with the permissions found in group 3 and
       `repository_selection: selected` (design D4). Verify `uv run scripts/oob.py` reports no difference for App
       installations, where before this edit it reported the new App
-- [ ] 4.2 Add `BOARD_APP_CLIENT_ID` to `tofu/board.tf`, holding the client ID from 2.4, as a `github_actions_variable`
+- [x] 4.2 Add `BOARD_APP_CLIENT_ID` to `tofu/board.tf`, holding the client ID from 2.4, as a `github_actions_variable`
       on `module.repo_website`. Verify `uv run scripts/check.py` passes
-- [ ] 4.3 Document the steps done by hand in `oob/README.md` (design D4): a "website's board App (set up by hand)"
+- [x] 4.3 Document the steps done by hand in `oob/README.md` (design D4): a "website's board App (set up by hand)"
       section with creating and installing the App, storing and setting the key, checking it by name, and rotating
-      it. Add a row for `troupe-run-board` with `website` in the table of repositories, confirmed by the owner with
+      it. Add a row for `troupe-run-board` with none (design D1) in the table of repositories, confirmed by the owner with
       the date. Verify the documented `gh api` check commands run as written
 
 ## 5. The plan

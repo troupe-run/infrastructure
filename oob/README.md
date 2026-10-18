@@ -46,6 +46,7 @@ lists below are checked by hand in each App's settings, by any change that adds,
 | `troupe-run-infrastructure` | `troupe`, `.github`, `infrastructure`, `website` | 2026-10-11, owner |
 | `dco` | `troupe`, `.github`, `infrastructure` | 2026-10-11, owner |
 | `troupe-run-release` | `troupe` | 2026-10-13, owner |
+| `troupe-run-board` | none | 2026-10-18, by the App's own token (`GET /installation/repositories` returned `[]`) |
 
 A repository the infrastructure App isn't installed on shows only its public view to OpenTofu (merge settings read as
 off, no security settings), so the first plan after adding one will show that it's missing from this list.
@@ -87,6 +88,43 @@ because both keys are valid until the old one is deleted.
 
 **The infrastructure App's "Variables: write"** was granted for this (2026-10-13), so OpenTofu can write
 `RELEASE_APP_CLIENT_ID`. It's declared in `app-installations.json`.
+
+## website's board App (set up by hand)
+
+website's weekly link check opens its "Broken external links" issue with `GITHUB_TOKEN`, which can't write to an org
+project. A job of its own adds the issue to the troupe roadmap board with the `troupe-run-board` App's token instead
+(spec: board-credentials, #59). GitHub has no API for creating an App, and OpenTofu never holds a secret, so these
+steps are the owner's. The App's IDs are recorded on #59. `tofu/board.tf` declares the `board` environment and the
+client-ID variable.
+
+**Creating it** (done 2026-10-18). In the org's settings, under GitHub Apps, create a new App:
+- name `troupe-run-board`, installable only on this account, webhook off;
+- organisation permission "Projects: read and write", and nothing else: no repository or account permissions;
+- install it with "Only select repositories" and select none. It reads the public issues it adds without being
+  installed on their repository, so the table above lists none (add-link-issue-to-board design D6). If website goes
+  private, adding its issues fails, and the App would need website and "Issues: read".
+
+Its installation is checked by `oob.py` against `app-installations.json`. Its client ID goes in `tofu/board.tf`.
+
+**Its key.** Generate a private key in the App's settings. Store it in 1Password as an SSH Key item named
+`troupe-run-board` in vault `troupe.run`, by importing the downloaded `.pem`, then delete the file. Once the `board`
+environment exists (after the apply that creates it), set the secret. Nothing is printed:
+
+```sh
+export OP_ACCOUNT=l-a-u.1password.com
+op read -n "op://troupe.run/troupe-run-board/private key" \
+  | gh secret set BOARD_APP_PRIVATE_KEY --env board -R troupe-run/website
+```
+
+Check it by name, never by value:
+
+```sh
+gh api repos/troupe-run/website/environments/board/secrets --jq '.secrets[].name'
+```
+
+**Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run the
+command above again. Then delete the old key in the App's settings. A run between the two steps still works, because
+both keys are valid until the old one is deleted.
 
 ## troupe.run's DNS (set up by hand)
 

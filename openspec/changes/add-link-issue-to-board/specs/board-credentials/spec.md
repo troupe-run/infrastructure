@@ -8,22 +8,27 @@ installation, the main-only environment on troupe-run/website that holds its key
 ## ADDED Requirements
 
 ### Requirement: The board App is narrow
-The board App `troupe-run-board` SHALL have the organisation permission "Projects: read and write" and no other
-permission that can write. Its repository permissions SHALL be no wider than metadata and issues read. Its
-installation SHALL select repositories and SHALL cover `troupe-run/website` only. Any difference SHALL be reported by
-the drift check (spec: teams-and-access).
+The board App `troupe-run-board` SHALL have exactly one permission, the organisation permission "Projects: read and
+write", and no repository permission. Its installation SHALL select repositories and SHALL cover none: it reads the
+public issues it adds without being installed on their repository (design D6). Its permissions and repository
+selection SHALL be checked by the drift check, and its repository list by hand (spec: teams-and-access).
 
 #### Scenario: The board App gains a permission
-- **WHEN** the board App's installation gains a permission on GitHub, such as issues write or administration, without
+- **WHEN** the board App's installation gains a permission on GitHub, such as issues read or administration, without
   the declaration changing
 - **THEN** the drift check reports the permission and exits non-zero
 
 #### Scenario: The board App is switched to all repositories
-- **WHEN** the board App's installation is changed to all repositories, or gains a repository
+- **WHEN** the board App's installation is changed to all repositories
 - **THEN** the drift check reports it and exits non-zero
 
+#### Scenario: The board App gains a repository
+- **WHEN** a repository is added to the board App's installation
+- **THEN** the next hand check of its repository list, made by any change that depends on it, finds it, and it's
+  removed or the declaration is changed in a pull request
+
 #### Scenario: The declared board App matches
-- **WHEN** the board App has exactly the declared permissions and selected repositories
+- **WHEN** the board App has exactly the declared permission and repository selection
 - **THEN** the drift check reports no difference for it
 
 ### Requirement: The board key is readable from website's main only

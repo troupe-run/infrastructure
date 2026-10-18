@@ -61,7 +61,11 @@ This was #59's decision. The owner chose option A on 2026-10-18. The options as 
 **Option A, chosen: a new App, `troupe-run-board`.**
 - Permissions: organisation "Projects: read and write". On website, "Metadata: read", which GitHub always grants,
   and "Issues: read" only if the probe (D6) shows the token needs it to resolve the issue's URL. Nothing else.
-- Installed on website only.
+  The probe showed it doesn't, so the App has no repository permission.
+- Installed on no repository, with selected repositories. The plan was website only, but the probe found the
+  installation covers none and still works, because website is public, so the owner chose to keep it on none
+  (2026-10-18). If website ever goes private, `item-add` fails
+  visibly, and the App would need website and "Issues: read".
 - Blast radius if its key leaks: someone can add, edit or remove items on the org's projects, and change fields on
   them. Today that means project 1 only (`oob/projects.json`). That's annoying but recoverable. They can't change any
   repository's code, settings, rulesets or members.
@@ -121,7 +125,7 @@ test first and see it fail before `board.tf` exists.
 ### D4. The App is declared in `oob/`, and its key is set by the owner
 
 This follows release-app D1 and D4. The App gets a row in `oob/app-installations.json` with its exact permissions and
-`repository_selection: selected`, and a row in `oob/README.md`'s table (`website`). A new section, "website's board
+`repository_selection: selected`, and a row in `oob/README.md`'s table (none, D1). A new section, "website's board
 App (set up by hand)", gives the creation, key, secret and rotation steps.
 
 The secret is set with
