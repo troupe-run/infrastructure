@@ -18,10 +18,11 @@
 
 ## 2. Ignore the local settings
 
-- [ ] 2.1 Add `.claude/settings.local.json` to `.gitignore`. Verify `git check-ignore -v --no-index
+- [x] 2.1 Add `.claude/settings.local.json` to `.gitignore`. Verify `git check-ignore -v --no-index
       .claude/settings.local.json` names `.gitignore` (not the personal git config) as the rule's source, and `git
       check-ignore --no-index .claude/settings.json` prints nothing
-- [ ] 2.2 Commit (`chore: ignore .claude/settings.local.json in the repository`), signed off, after `uv run
+      Done 2026-10-18: `.gitignore:21:.claude/settings.local.json`; `.claude/settings.json` not ignored (exit 1)
+- [x] 2.2 Commit (`chore: ignore .claude/settings.local.json in the repository`), signed off, after `uv run
       scripts/check.py` passes. Verify `git diff --stat origin/main` touches only the nine generated files,
       `.gitignore` and this change's directory
 

@@ -16,3 +16,6 @@ tofu/probe/terraform.tfvars
 tofu/probe/README.probe.md
 tofu/probe/.terraform.lock.hcl
 *.tfstate.backup
+
+# Claude Code: each person's own settings. .claude/settings.json is shared, and delivered by the guard.
+.claude/settings.local.json
