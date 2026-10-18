@@ -159,9 +159,10 @@
     temp directory pytest's `tmp_path` sits in, which grants allow, so they passed for the wrong reason once the fix
     was in; they now climb to `/`, and `main`'s guard grants both, as it should for the test to mean anything.
     1119 tests pass; ruff and mypy clean.
-- [ ] 5.3 In `docs/development-workflow.md`, "What the guard grants" says every `--body-file`/`-F`/`--input` and
+- [x] 5.3 In `docs/development-workflow.md`, "What the guard grants" says every `--body-file`/`-F`/`--input` and
   `--attach` (each reading of `<file>#<alt>`) must be inside the repository or the temp directory. Verify
   `uv run scripts/check.py` passes.
+  - 2026-10-18: done; `uv run scripts/check.py` passes.
 
 ## 6. Integration
 
