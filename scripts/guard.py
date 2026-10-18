@@ -1580,6 +1580,40 @@ def gh_decision(words: Sequence[str], cwd: Path) -> Decision:
     return _not_listed(f"gh {group}{' ' + sub if sub else ''}")
 
 
+# Help requests (spec: development-workflow, "Agents' gh commands are allow-listed";
+# refuse-substituted-pr-body design D4).
+
+GH_BUILTIN_GROUPS = frozenset(
+    {
+        "agent-task", "alias", "api", "attestation", "auth", "browse", "cache", "codespace",
+        "completion", "config", "copilot", "discussion", "extension", "gist", "gpg-key", "issue",
+        "label", "licenses", "org", "pr", "preview", "project", "release", "repo", "ruleset", "run",
+        "search", "secret", "skill", "ssh-key", "status", "variable", "workflow",
+    }
+)  # fmt: skip
+"""gh's own command groups, from gh 2.102.0's `gh help` (CORE, GITHUB ACTIONS and ADDITIONAL
+COMMANDS). ALIAS COMMANDS are left out: `co` is an alias, and an alias or extension runs its own
+code with --help. When updating this for a new gh, check each new command for DisableFlagParsing:
+one that hands its arguments to another program belongs in GH_HELP_FORWARDED."""
+GH_HELP_FORWARDED = frozenset({("extension", "exec")})
+"""Built-in commands that pass --help on to another program rather than printing help:
+`gh extension exec <name>` runs the extension (gh 2.102.0, pkg/cmd/extension/command.go)."""
+HELP_FLAGS = ("--help", "-h")
+
+
+def gh_help_request(words: Sequence[str]) -> bool:
+    """True for `gh <built-in group> [<word> ...] --help|-h`: no word before the help flag is a
+    flag, so none can take it as a value, and gh prints help and runs nothing. A command that only
+    mentions --help, or a group that isn't gh's own, is judged as the command it is."""
+    program, args = _program(words)
+    if program != "gh" or len(args) < 2 or args[-1] not in HELP_FLAGS:
+        return False
+    named = args[:-1]
+    if any(word.startswith("-") for word in named) or named[0] not in GH_BUILTIN_GROUPS:
+        return False
+    return tuple(named[:2]) not in GH_HELP_FORWARDED
+
+
 TAMPER = Decision(
     TAMPER_RULE,
     "agents can't grant themselves an override or touch the override files.",
@@ -1626,6 +1660,8 @@ def shell_decisions(command: str, cwd: Path) -> list[Decision]:
         if tamper.refused:
             return [tamper]
         decisions.append(skip_hooks(words))
+        if gh_help_request(words):
+            continue  # it only prints help, whatever the command would be refused for
         decisions.append(pr_closes_issue(words, cwd))
         decisions.append(gh_decision(words, cwd))
     return decisions or [ALLOW]

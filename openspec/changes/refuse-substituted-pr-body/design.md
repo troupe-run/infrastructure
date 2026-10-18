@@ -31,7 +31,9 @@ See proposal.md for why. The current state of `scripts/guard.py`:
   guard's `override`): about 130 were refused. Every gh group's help (`gh pr --help`) is refused as not on the
   allow-list; every owner-only command's help (`gh repo edit --help`, `gh auth token -h`) as owner-only;
   `gh pr create --help` as having no description. `gh --help`, `gh -h` and `gh help <anything>` are allowed (in
-  `gh_decision`), as is help for an allowed command (`gh pr merge --help`). None of these help commands is granted.
+  `gh_decision`), as is help for an allowed command (`gh pr merge --help`). Help for a granted command is granted
+  (`gh issue view --help`), because `grantable` looks only at the command's first two words, its files and the
+  rules' decisions; other help commands aren't.
   Also refused: `guard.py override --help` (`guard-tamper`) and `git -c core.hooksPath=x commit --help`
   (`skip-hooks`).
 - gh 2.102.0 has 33 built-in command groups (its CORE, GITHUB ACTIONS and ADDITIONAL COMMANDS); the guard's tables
@@ -82,8 +84,10 @@ See proposal.md for why. The current state of `scripts/guard.py`:
   `$'...'` quoting aren't recognised, and keep today's message. Agents don't build descriptions with them.
 - `gh issue create`, which no check reads.
 - gh's long-flag prefixes. pflag doesn't accept abbreviated long flags, so there's nothing to copy.
-- Granting help requests. They go ahead but get no grant, so Claude Code decides on them as it does for `gh help`
-  today. Granting them would change "The guard grants the gh commands it allows".
+- Granting help requests. The help rule grants nothing new: a help request is granted only when the command it
+  asks about is one the guard grants (`GH_GRANTED`), as `gh issue view --help` already is. So `gh pr create -h`
+  becomes granted, like `gh pr create`, and `gh repo edit --help` or `gh pr --help` go ahead without a grant, for
+  Claude Code to decide. Granting more would change "The guard grants the gh commands it allows".
 - Help for `guard.py override` and for git with `core.hooksPath` changed. `guard-tamper` is deliberately
   unconditional, the override CLI is the owner's, and plain `git commit --help` is already allowed.
 - Help forms other than the last word (`gh repo create --help x`). gh accepts them, but agents ask for help with a
