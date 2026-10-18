@@ -564,3 +564,111 @@ def test_tags_that_cover_every_read_have_no_violations(
     reads: tuple[str, ...], tags: frozenset[str]
 ) -> None:
     assert violations(*reads, tags=tags) == []
+
+
+# Which scopes a test file's directory tags it with, and which entries match nothing
+# (scope-test-directories 2.4, design D4, D6)
+
+DIRECTORIES = """\
+version = 1
+
+[scopes.vcs_git]
+paths = ["packages/vcs-git/**"]
+tests = ["packages/vcs-git/tests/**", "packages/core/tests/**"]
+
+[scopes.blah]
+paths = ["path1/**"]
+tests = ["tests/a/**", "tests/shared/**"]
+
+[scopes.blech]
+paths = ["path1/**"]
+tests = ["tests/shared/**"]
+
+[scopes.docs]
+paths = ["docs/**"]
+"""
+
+
+@pytest.mark.parametrize(
+    ("path", "tags"),
+    [
+        ("packages/vcs-git/tests/test_x.py", {"vcs_git"}),
+        ("packages/core/tests/deep/er/test_y.py", {"vcs_git"}),
+        ("tests/a/test_z.py", {"blah"}),
+        ("tests/ab/test_z.py", set()),
+        ("tests/a", set()),
+        ("tests/shared/test_s.py", {"blah", "blech"}),
+        ("docs/test_d.py", set()),
+        ("packages/vcs-git/src/x.py", set()),
+    ],
+)
+def test_a_test_file_is_tagged_with_each_scope_whose_tests_cover_it(
+    path: str, tags: set[str]
+) -> None:
+    assert guard.directory_tags(path, declared(DIRECTORIES)) == frozenset(tags)
+
+
+def test_without_tests_keys_no_file_is_tagged() -> None:
+    assert guard.directory_tags("docs/test_d.py", declared()) == frozenset()
+
+
+def unmatched(files: list[str], roots: list[str]) -> list[tuple[str, str, str]]:
+    found = guard.unmatched_tests(files, roots, declared(DIRECTORIES))
+    return [(each.scope, each.entry, each.place) for each in found]
+
+
+EVERY_SUITE = [
+    "packages/vcs-git/tests/test_x.py",
+    "packages/core/tests/test_y.py",
+    "tests/a/test_z.py",
+    "tests/shared/test_s.py",
+]
+
+
+def test_every_entry_matching_a_test_reports_nothing() -> None:
+    assert unmatched(EVERY_SUITE, [""]) == []
+
+
+def test_an_entry_with_no_test_under_it_is_reported_in_declaration_order() -> None:
+    files = ["packages/vcs-git/tests/test_x.py", "tests/ab/test_z.py"]
+    assert unmatched(files, [""]) == [
+        ("vcs_git", "packages/core/tests/**", "scopes.vcs_git.tests[1]"),
+        ("blah", "tests/a/**", "scopes.blah.tests[0]"),
+        ("blah", "tests/shared/**", "scopes.blah.tests[1]"),
+        ("blech", "tests/shared/**", "scopes.blech.tests[0]"),
+    ]
+
+
+def test_the_message_names_the_file_the_scope_the_entry_and_the_fix() -> None:
+    (found,) = guard.unmatched_tests(
+        [f for f in EVERY_SUITE if "core" not in f], [""], declared(DIRECTORIES)
+    )
+    assert "scripts/check-paths.toml" in found.message
+    assert "scope `vcs_git`" in found.message
+    assert "`packages/core/tests/**`" in found.message
+    assert "scopes.vcs_git.tests[1]" in found.message
+    assert "--scope vcs_git" in found.message
+    assert "Correct the entry" in found.message
+
+
+@pytest.mark.parametrize(
+    ("roots", "reported"),
+    [
+        ([""], True),
+        (["packages"], True),
+        (["packages/core"], True),
+        (["packages/core/tests"], True),
+        (["packages/core/tests/test_y.py"], False),
+        (["packages/core/tests/unit"], False),
+        (["packages/vcs-git/tests"], False),
+        (["packages/cor"], False),
+        (["tests", "packages/vcs-git/tests/test_x.py"], False),
+        ([], False),
+    ],
+)
+def test_only_an_entry_inside_what_the_run_collects_is_checked(
+    roots: list[str], reported: bool
+) -> None:
+    files = [f for f in EVERY_SUITE if "core" not in f]
+    found = [entry for _, entry, _ in unmatched(files, roots)]
+    assert ("packages/core/tests/**" in found) is reported

@@ -26,12 +26,16 @@
 - [x] 2.3 Implement D1-D3 in `scripts/guard.py`: the `tests` key on scopes only, the directory-only entry rule built
   on `_check_paths_entry`, `CheckPaths.tests` with a `()` default, and `CHECK_PATHS_FIX` naming the new key. Verify
   2.1 and 2.2 pass, and `uv run mypy` and `uv run ruff check` are clean.
-- [ ] 2.4 Add `directory_tags` and `unmatched_tests` (design D4, D6) with tests on plain data: a file under an entry
+- [x] 2.4 Add `directory_tags` and `unmatched_tests` (design D4, D6) with tests on plain data: a file under an entry
   at any depth gets the scope, a sibling with a shared prefix (`tests/a/**` vs `tests/ab/x.py`) doesn't, two scopes
   listing one directory give both; an entry with no file under it is reported with its scope, and its message names
   `scripts/check-paths.toml`, the scope, the entry and the fix; an entry outside every root isn't reported, one
   inside the root or equal to a root is. Verify they pass, and fail when `_matches` is swapped for a plain
   `startswith` without the `/` boundary (then restore it).
+  - 2026-10-18: 22 new tests, failing before and passing after (131 in the file). With `_matches` swapped for
+    `path.startswith(entry[:-3])`, 3 failed (`tests/ab/test_z.py` and `tests/a` tagged `blah`; the unmatched list
+    lost `tests/a/**`); restored, all pass. The results are a small `UnmatchedTests` record whose `message` and
+    `place` the plugin uses.
 
 ## 3. The plugin applies it
 
