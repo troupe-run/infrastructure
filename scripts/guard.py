@@ -562,6 +562,66 @@ def tag_violations(test: TestReads, declaration: CheckPaths) -> list[str]:
     return found
 
 
+def directory_tags(path: str, declaration: CheckPaths) -> frozenset[str]:
+    """The scopes whose `tests` directories hold this test file, a repository-relative POSIX path.
+
+    A runner's adapter adds them to the test's own tags, before it selects by tag, so a scope
+    selects whole suites and tag_violations counts them like any other tag (scope-test-directories
+    design D4).
+    """
+    return frozenset(
+        name for name, entries in declaration.tests if any(_matches(e, path) for e in entries)
+    )
+
+
+@dataclass(frozen=True)
+class UnmatchedTests:
+    """A scope's `tests` entry that no collected test is under."""
+
+    scope: str
+    index: int
+    entry: str
+
+    @property
+    def place(self) -> str:
+        return f"scopes.{self.scope}.tests[{self.index}]"
+
+    @property
+    def message(self) -> str:
+        return (
+            f"{CHECK_PATHS}: scope `{self.scope}` runs the tests under `{self.entry}` "
+            f"({self.place}), but no collected test is there, so `--scope {self.scope}` would "
+            "quietly stop running them. Correct the entry if the directory moved, or take it out."
+        )
+
+
+def _under_root(path: str, root: str) -> bool:
+    """Whether a repository-relative path is the root or under it ("" is the repository)."""
+    return root == "" or path == root or path.startswith(root + "/")
+
+
+def unmatched_tests(
+    test_files: Iterable[str], roots: Iterable[str], declaration: CheckPaths
+) -> list[UnmatchedTests]:
+    """Each `tests` entry inside the run's roots that none of the collected test files is under.
+
+    The roots are what the run was asked to collect, as repository-relative POSIX paths ("" for
+    the repository). An entry outside every root isn't checked, so running one file or one suite
+    never fails for another (scope-test-directories design D6).
+    """
+    files = list(test_files)
+    run_roots = list(roots)
+    found = []
+    for name, entries in declaration.tests:
+        for index, entry in enumerate(entries):
+            directory = entry.removesuffix("/**")
+            if not any(_under_root(directory, root) for root in run_roots):
+                continue
+            if not any(_matches(entry, path) for path in files):
+                found.append(UnmatchedTests(scope=name, index=index, entry=entry))
+    return found
+
+
 def read_working_tree(root: Path) -> Callable[[str], str | None]:
     def read(path: str) -> str | None:
         target = root / path
