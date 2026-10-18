@@ -2,10 +2,10 @@
 
 ### Requirement: Issue types and the org project are checked for drift
 The org's issue types and its project SHALL be declared in this repository, including the repositories the project
-is linked to. A check SHALL report any difference between the declaration and GitHub without changing GitHub. The
-check SHALL run in CI whenever `main` is planned, daily included (spec: ci-apply), as well as by hand. Whatever
-OpenTofu can't manage SHALL be documented as outside OpenTofu's control, with the check named as its replacement. A
-value the check can't read SHALL be an error, never "no difference" and never a difference.
+is linked to. A check that only reads SHALL report any difference from GitHub, and SHALL run in CI whenever `main` is
+planned (spec: ci-apply) as well as by hand. What it can't read SHALL be an error, never a difference or "no
+difference". Whatever OpenTofu can't manage SHALL be documented as outside OpenTofu's control, with the check named
+as its replacement.
 
 #### Scenario: An issue type added by hand is reported
 - **WHEN** an issue type exists on GitHub that the declaration doesn't list
