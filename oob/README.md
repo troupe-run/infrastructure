@@ -31,8 +31,21 @@ Run it with your own `gh` login, which needs read access to the org:
 uv run scripts/oob.py
 ```
 
-It isn't run by CI: CI holds no credentials yet. Run it alongside every plan, and quote its
-output in the pull request.
+Run it alongside every plan of a pull request, and quote its output in the pull request: CI doesn't run it on pull
+requests.
+
+**CI runs it too,** in `tofu.yml`'s `drift (out of band)` job, whenever `main` is planned: daily at 06:00 UTC, after
+CI passes on a merge, and on `gh workflow run tofu.yml --ref main`. The job runs `uv run scripts/oob.py --ci` in the
+`plan-main` environment, with an installation token of the infrastructure App that can only read (spec: ci-apply).
+A difference, or a check it couldn't read, fails the job, and the run's summary lists each one. `--ci` leaves out the
+checks in `BY_HAND` in `scripts/oob.py`, today only App installations, since no token CI holds can read the org's
+installations. It names each one in the summary, and only a hand run checks them.
+
+**How a failure reaches you.** GitHub emails a failed scheduled run to whoever last changed the workflow's `cron`
+line, and a failed run after a merge to whoever's push started it, but only if their notification settings send
+failed Actions runs (Settings → Notifications → Actions). The `cron` line was last changed by the owner. A change to
+it moves the emails to whoever makes that change, so keep it the owner's, or check the setting again
+(run-oob-check-daily design D5).
 
 ## Which repositories each App is installed on (confirmed by hand)
 
