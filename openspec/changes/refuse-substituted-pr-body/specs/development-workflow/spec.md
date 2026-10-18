@@ -166,5 +166,7 @@ one place.
 - **THEN** the command is judged as the command it runs, here refused as owner-only
 
 #### Scenario: Help for an extension or an alias
-- **WHEN** an agent runs `gh <extension> --help` or `gh <alias> --help`, including `gh`'s own alias `co`
-- **THEN** the command is refused as before, because `gh` runs the extension or alias rather than printing help
+- **WHEN** an agent runs `gh <extension> --help`, `gh extension exec <name> --help` or `gh <alias> --help`,
+  including `gh`'s own alias `co`
+- **THEN** the command is refused as before, because `gh` runs the extension or alias, and passes it `--help`,
+  rather than printing help
