@@ -51,6 +51,16 @@ See proposal.md for why. The current state of `scripts/guard.py`:
     every argument after the name, `--help` included, to the extension** (`pkg/cmd/extension/command.go:541-557`).
     The other `DisableFlagParsing` commands are aliases, installed extensions and the hidden stubs for official
     extensions (`aw`, `stack`, `webhook`), none of which is a built-in group.
+  - `gh pr create`'s flags (`pkg/cmd/pr/create/create.go:387-407`) match `GH_PR_CREATE_VALUE_FLAGS` and the four
+    boolean short flags, except one: `--attach <file>`, a repeatable value flag with no short form
+    (`internal/attachments/flags.go:29-35`), which the table lacks. `-R`/`--repo` is gh's persistent flag
+    (`pkg/cmdutil/repo_override.go:37`).
+  - `--attach` is on `gh pr` and `gh issue` `create`, `comment` and `edit` (every caller of `attachments.AddFlag`),
+    and uploads the file. Its value is `<file>#<alt text>`: gh uses the whole value if that file exists, else the
+    longest part before a `#` that exists, else the part before the last `#` (`internal/attachments/flags.go:100-121`).
+- `grantable` checks local files only through `GH_FILE_FLAGS` (`--body-file`, `-F`, `--input`). It grants
+  `gh issue comment 1 --body x --attach /etc/hosts` and the same on `gh pr comment` today (checked on `fc61239`).
+  `--attach=/etc/hosts#alt` isn't granted only because an unquoted `#` isn't plain shell text.
 - 12 commands use `-h` for a value, not help: `--hostname` on the seven `gh auth` commands, `--homepage` on
   `gh repo create` and `gh repo edit`, `--host` on `gh config get`, `list` and `set` (from `gh help` on every
   command, gh 2.102.0). As the last word, that `-h` has no value, and pflag stops with "flag needs an argument"
@@ -208,6 +218,24 @@ runs after the edit. The source facts in Context were read once, during apply, a
 side agent's question about `gh extension exec` led to them. They aren't checked by running gh: the guard refuses
 `gh alias set`, and installing an extension changes this machine's gh config.
 
+### D6. `--attach` is a file read for grants, in every reading gh might make
+
+`_files_read` counts `--attach` (and `--attach=`) as a file flag. For its value it returns every path gh could
+read: the whole value, and the part before each `#` that isn't at the start. A command is granted only if all of
+them are inside the repository or the system temp directory, so the guard's answer doesn't depend on which files
+exist when gh runs. An empty value or `-` gives no grant, as for the other file flags (gh refuses `-` for
+`--attach` anyway).
+
+Every candidate, not gh's own pick: gh's choice depends on what exists at run time, and the guard checks before
+then. A prefix of a path inside the repository is usually inside it too, so a real attachment
+(`docs/shot.png#The new page`) is still granted.
+
+`--attach` is also added to `GH_PR_CREATE_VALUE_FLAGS`, so D3's reader skips its value, as gh does. That table also
+feeds `GH_REPO_VALUE_FLAGS`, which the repository lookup uses; skipping one more value there is what gh does too.
+
+*Alternative:* resolve the path the way gh will, by checking which candidates exist. Rejected: a file can appear
+between the check and the run, and the safe answer mustn't depend on it.
+
 ## Risks / Trade-offs
 
 - [Single-quoted literal text that looks like an expansion gets the new message] → D2: the refusal and its fix are
@@ -225,6 +253,10 @@ side agent's question about `gh extension exec` led to them. They aren't checked
   The one-off sweep in tasks.md checks real gh: every allowed help shape prints help and changes nothing.
 - [`GH_BUILTIN_GROUPS` falls behind gh] → A new group's help is refused, as today, with the allow-list message.
   Adding it is a one-line pull request.
+- [`--attach` with a `#` in the repository's own path loses its grant] → Only when a prefix before a `#` points
+  outside (a path starting `../`); the command still runs, with Claude Code's own check.
+- [gh adds another flag that reads a local file] → `GH_FILE_FLAGS` falls behind again. Its comment says so, and
+  points to `attachments.AddFlag` and `StringVarP(...file...)` as what to look for when gh is updated.
 - [The message names `--body-file` but the agent passes `$S/pr.md`] → D1's fix says "literal path", and the
   missing-file message covers it if they do.
 
