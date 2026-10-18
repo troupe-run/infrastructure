@@ -55,7 +55,7 @@
 
 ## 4. Documentation
 
-- [ ] 4.1 Update `oob/README.md` ("It isn't run by CI…"): where and when the job runs, that App installations is left
+- [x] 4.1 Update `oob/README.md` ("It isn't run by CI…"): where and when the job runs, that App installations is left
   to the hand run (pointing at `BY_HAND` in `oob.py`), that the manual run still goes in a PR that changes
   `oob/`, and D5's notification note (who GitHub emails, and that changing the `cron` line moves it). Update README.md's
   `oob.py` lines to match. Verify with `uv run scripts/check.py`, and check that no "isn't run by CI" wording is left:

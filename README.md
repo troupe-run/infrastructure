@@ -55,7 +55,7 @@ Claude Code session turns the hooks on too, and its hooks refuse the same shortc
 ```
 uv run scripts/tofu.py init
 uv run scripts/tofu.py plan
-uv run scripts/oob.py            # drift in what OpenTofu can't manage
+uv run scripts/oob.py            # drift in what OpenTofu can't manage (CI runs it too, with --ci)
 ```
 
 `scripts/tofu.py` runs `tofu` in `tofu/` as the `troupe-run-infrastructure` GitHub App:
@@ -71,9 +71,10 @@ key is ephemeral input, so a saved plan doesn't hold it either: applying a saved
 A local plan is read-only and always safe to run. Changes reach the org through CI (below).
 
 CI also plans `main` every day at 06:00 UTC, so drift (a change made on GitHub rather than declared here) shows within
-a day. A plan with changes waits for your approval like any plan of `main`; one with none asks nothing. GitHub pauses
-a public repository's scheduled workflows after 60 days without activity in it. `gh workflow enable tofu.yml` turns
-the daily plan back on.
+a day. A plan with changes waits for your approval like any plan of `main`; one with none asks nothing. Beside each
+plan of `main`, the `drift (out of band)` job runs `scripts/oob.py --ci`, and fails on any difference in what OpenTofu
+can't manage ([oob/README.md](oob/README.md)). GitHub pauses a public repository's scheduled workflows after 60 days
+without activity in it. `gh workflow enable tofu.yml` turns the daily plan and that check back on.
 
 ## Changing the org
 
