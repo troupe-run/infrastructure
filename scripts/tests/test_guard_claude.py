@@ -196,6 +196,80 @@ def test_a_body_file_that_closes_an_issue_goes_ahead(tmp_path: Path) -> None:
     assert not any(d.refused for d in decisions)
 
 
+# gh pr create's flags, read as gh (pflag) reads them (refuse-substituted-pr-body design D3). Each
+# row's reading was checked against gh 2.102.0's --dry-run (tasks.md 2.1).
+
+
+@pytest.mark.parametrize(
+    ("args", "expected"),
+    [
+        (["--body=x y"], [("--body", "x y")]),
+        (["--body", "x y"], [("--body", "x y")]),
+        (["--body="], [("--body", "")]),
+        (["--draft"], [("--draft", None)]),
+        (["--draft=true"], [("--draft", "true")]),
+        (["-bClose"], [("-b", "Close")]),
+        (["-b=Closes #1"], [("-b", "Closes #1")]),
+        (["-b", "Closes #1"], [("-b", "Closes #1")]),
+        (["-db", "Closes #1"], [("-d", None), ("-b", "Closes #1")]),
+        (["-dbClose"], [("-d", None), ("-b", "Close")]),
+        (["-df"], [("-d", None), ("-f", None)]),
+        (["-d=true", "-b", "x"], [("-d", "true"), ("-b", "x")]),
+        (["-dR", "troupe-run/.github"], [("-d", None), ("-R", "troupe-run/.github")]),
+        (["-F=pr.md"], [("-F", "pr.md")]),
+        (["--title", "-b", "--body", "x"], [("--title", "-b"), ("--body", "x")]),
+        (["--title", "--fill", "--body", "x"], [("--title", "--fill"), ("--body", "x")]),
+        (["-b", "-x"], [("-b", "-x")]),
+        (["--attach", "--body", "x"], [("--attach", "--body")]),
+        (["-zb", "x"], []),
+        (["--", "-b", "x"], []),
+        (["-b"], [("-b", None)]),
+        (["--body"], [("--body", None)]),
+        (["stray", "--web"], [("--web", None)]),
+    ],
+)
+def test_pr_create_flags_reads_each_form_as_gh_does(
+    args: list[str], expected: list[tuple[str, str | None]]
+) -> None:
+    assert guard.pr_create_flags(args) == expected
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh pr create --title t -b'Closes #22'",
+        "gh pr create --title t -b='Closes #22'",
+        "gh pr create --title t -db 'Closes #22'",
+        "gh pr create --title t -dbCloses\\ \\#22",
+        "gh pr create --title --fill --body 'Closes #22'",
+    ],
+)
+def test_a_description_given_in_any_short_flag_form_that_closes_an_issue_goes_ahead(
+    command: str,
+) -> None:
+    assert not any(d.refused for d in guard.shell_decisions(command, Path.cwd()))
+
+
+def test_an_attached_body_file_that_closes_an_issue_goes_ahead(tmp_path: Path) -> None:
+    (tmp_path / "pr.md").write_text("Closes #22\n", encoding="utf-8")
+    decisions = guard.shell_decisions("gh pr create --title t -Fpr.md", tmp_path)
+    assert not any(d.refused for d in decisions)
+
+
+def test_an_attached_body_that_closes_no_issue_says_so() -> None:
+    [decision] = [
+        d
+        for d in guard.shell_decisions("gh pr create --title t -b'no close'", Path.cwd())
+        if d.rule == "pr-closes-issue"
+    ]
+    assert decision.problem == "the pull request's description doesn't close an issue."
+
+
+def test_a_target_after_grouped_flags_is_read(troupe_clone: Repo) -> None:
+    command = "gh pr create -dR troupe-run/.github --title t --body 'Updates a link.'"
+    assert "pr-closes-issue" not in pr_rules(command, troupe_clone.path)
+
+
 # pr-closes-issue covers PRs into this repository only (#28)
 
 TROUPE_ORIGIN = "git@github.com:troupe-run/troupe.git"

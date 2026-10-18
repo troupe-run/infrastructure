@@ -915,12 +915,15 @@ REPO_URL = re.compile(r"(?:https|ssh)://(?:[^@/]+@)?([^@/:]+)(?::\d+)?/(.+)")
 REPO_SCP = re.compile(r"[^@/:]+@([^@/:]+):(.+)")
 GH_PR_CREATE_VALUE_FLAGS = frozenset(
     {
-        "-a", "--assignee", "-B", "--base", "-b", "--body", "-F", "--body-file", "-H", "--head",
-        "-l", "--label", "-m", "--milestone", "-p", "--project", "-R", "--repo", "--recover",
-        "-r", "--reviewer", "-T", "--template", "-t", "--title",
+        "-a", "--assignee", "--attach", "-B", "--base", "-b", "--body", "-F", "--body-file", "-H",
+        "--head", "-l", "--label", "-m", "--milestone", "-p", "--project", "-R", "--repo",
+        "--recover", "-r", "--reviewer", "-T", "--template", "-t", "--title",
     }
 )  # fmt: skip
-"""gh pr create's flags that take the next word as their value, so it isn't read as a flag."""
+"""gh pr create's flags that take the next word as their value, so it isn't read as a flag.
+From gh 2.102.0's pkg/cmd/pr/create/create.go, and -R/--repo from pkg/cmdutil/repo_override.go."""
+GH_PR_CREATE_BOOLEAN_SHORT_FLAGS = frozenset({"-d", "-e", "-f", "-w"})
+"""gh pr create's short flags that take no value: --draft, --editor, --fill and --web."""
 
 
 def normalise_repository(name: str) -> tuple[str, str, str] | None:
@@ -954,21 +957,60 @@ def remote_urls(cwd: Path) -> list[str]:
     return [fields[1] for line in listing.splitlines() if len(fields := line.split()) >= 2]
 
 
+def pr_create_flags(args: Sequence[str]) -> list[tuple[str, str | None]]:
+    """gh pr create's flags as gh (pflag) reads them, in order, as (flag, value): a long flag by
+    its long name, a short one as -x, and None for a flag given no value. Positional words are left
+    out, and -- ends the flags (refuse-substituted-pr-body design D3).
+
+    A long flag's value follows = or, for a flag that takes one, is the next word whatever it looks
+    like. A word starting with one - is short flags, read letter by letter: a boolean letter is
+    taken and the next one read; a letter that takes a value takes the rest of the word (dropping
+    one = when more follows) or, when nothing follows, the next word. An unknown letter ends the
+    word: gh refuses the command, so it creates nothing."""
+    flags: list[tuple[str, str | None]] = []
+    index = 0
+    while index < len(args):
+        word = args[index]
+        index += 1
+        if word == "--":
+            break
+        if word.startswith("--"):
+            name, equals, inline = word.partition("=")
+            if equals:
+                flags.append((name, inline))
+            elif name in GH_PR_CREATE_VALUE_FLAGS:
+                flags.append((name, args[index] if index < len(args) else None))
+                index += 1
+            else:
+                flags.append((name, None))
+            continue
+        letters = word[1:] if word.startswith("-") else ""
+        while letters:
+            flag, letters = f"-{letters[0]}", letters[1:]
+            after_equals = letters[1:] if letters[:1] == "=" and letters[1:] else None
+            if flag in GH_PR_CREATE_VALUE_FLAGS:
+                if letters:
+                    flags.append((flag, letters if after_equals is None else after_equals))
+                else:
+                    flags.append((flag, args[index] if index < len(args) else None))
+                    index += 1
+                break
+            if flag not in GH_PR_CREATE_BOOLEAN_SHORT_FLAGS:
+                break
+            if after_equals is not None:
+                flags.append((flag, after_equals))
+                break
+            flags.append((flag, None))
+    return flags
+
+
 def pr_target(words: Sequence[str], args: Sequence[str]) -> str | None:
     """The repository a gh pr create names, in gh's order: -R/--repo, then GH_REPO set for the
     command, then GH_REPO in the environment. None when it names none (design decision 1)."""
     target: str | None = None
-    index = 0
-    while index < len(args):
-        word = args[index]
-        name, equals, inline = word.partition("=")
-        if name in ("-R", "--repo"):
-            target = inline if equals else (args[index + 1] if index + 1 < len(args) else "")
-        elif word.startswith("-R") and not equals:
-            target = word[2:]
-        if not equals and word in GH_PR_CREATE_VALUE_FLAGS:
-            index += 1
-        index += 1
+    for flag, value in pr_create_flags(args):
+        if flag in ("-R", "--repo"):
+            target = value or ""
     if target is not None:
         return target
     for word in words:
@@ -1001,17 +1043,16 @@ def pr_closes_issue(words: Sequence[str], cwd: Path) -> Decision:
     body: str | None = None
     problem = "the pull request's description doesn't close an issue."
     fix = "Add a line like 'Closes #22' to the description (--body or --body-file)."
-    for index, word in enumerate(rest):
-        name, _, inline = word.partition("=")
+    for name, value in pr_create_flags(rest):
         if name in ("-f", "--fill", "--fill-first", "--fill-verbose"):
             body = None
             problem = "--fill writes the description from commits, so it can't be checked."
             fix = "Pass the description with --body or --body-file, including 'Closes #<issue>'."
             break
         if name in ("-b", "--body"):
-            body = inline if inline else (rest[index + 1] if index + 1 < len(rest) else "")
+            body = value or ""
         elif name in ("-F", "--body-file"):
-            path = inline if inline else (rest[index + 1] if index + 1 < len(rest) else "-")
+            path = "-" if value is None else value
             if path == "-":
                 body = None
                 problem = "a description read from stdin can't be checked before it's sent."
