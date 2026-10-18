@@ -131,11 +131,11 @@
     (stdout went through a token-redacting filter; there was nothing to redact).
   - Found: a trailing redirection takes a command out of the shape. `gh repo create --help </dev/null 2>&1` was
     refused as owner-only, because `split_command` makes `2>&1` the words `2>` and `1`. A pipe is fine
-    (`gh repo create --help | head`). Raised with the owner rather than widened here.
+    (`gh repo create --help | head`). The owner chose to keep the shape narrow (2026-10-18).
   - Found, outside this change: a gh command inside `$(...)` or backticks reaches no gh rule on `main`.
     `out=$(gh repo delete troupe-run/x --yes)`, `` x=`gh auth token` `` and `echo $(gh pr merge 1 --admin)` are all
     allowed, because the words are `out=$(gh` (read as an assignment) or `$(gh` (a program that isn't gh). Seen when
-    a loop here used `out=$(gh $c ...)`. Raised with the owner.
+    a loop here used `out=$(gh $c ...)`. The owner chose a separate issue, fixed next: #94.
 - [x] 4.5 In `docs/development-workflow.md`, the `gh-allow-list` and `owner-only` rows say a request for a built-in
   command's help goes ahead, in the narrow shape (D4), and is granted only when the command it asks about is; the `pr-closes-issue` row says the same for
   `gh pr create --help`. Verify `uv run scripts/check.py` passes.
@@ -144,15 +144,21 @@
 
 ## 5. An attachment is a file read
 
-- [ ] 5.1 Write the grant tests in `scripts/tests/test_guard_grants.py` (spec: "An attachment from outside the
+- [x] 5.1 Write the grant tests in `scripts/tests/test_guard_grants.py` (spec: "An attachment from outside the
   repository", "An attachment from inside the repository"): not granted: `gh issue comment 1 --body x --attach
   /etc/hosts`, the same on `gh pr comment`, `gh issue create`, `gh pr create`, `gh issue edit` and `gh pr edit`,
   `--attach=/etc/hosts`, `--attach '../outside.png#alt'`, `--attach 'shot.png#x/../../../etc/hosts'` (a prefix is
   inside, the whole value isn't), and an empty `--attach ''`; granted: `--attach shot.png`,
   `--attach 'docs/shot.png#The new page'` and a file in the system temp directory, each on `gh issue comment`. Verify
   the not-granted tests fail on the current code and the granted ones pass.
-- [ ] 5.2 Implement D6 in `_files_read` and `GH_FILE_FLAGS` (with the comment the design's risks name). Verify 5.1
+  - 2026-10-18: on `ad421e4` all 10 not-granted tests fail (each of the six commands is granted with
+    `--attach /etc/hosts`) and the 3 granted ones pass.
+- [x] 5.2 Implement D6 in `_files_read` and `GH_FILE_FLAGS` (with the comment the design's risks name). Verify 5.1
   and every test in `scripts/tests/` pass, and `uv run mypy` and `uv run ruff check` are clean.
+  - 2026-10-18: `--attach` in `GH_FILE_FLAGS`, and `_attachment_readings`. Two of 5.1's paths had stayed inside the
+    temp directory pytest's `tmp_path` sits in, which grants allow, so they passed for the wrong reason once the fix
+    was in; they now climb to `/`, and `main`'s guard grants both, as it should for the test to mean anything.
+    1119 tests pass; ruff and mypy clean.
 - [ ] 5.3 In `docs/development-workflow.md`, "What the guard grants" says every `--body-file`/`-F`/`--input` and
   `--attach` (each reading of `<file>#<alt>`) must be inside the repository or the temp directory. Verify
   `uv run scripts/check.py` passes.

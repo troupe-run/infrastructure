@@ -159,6 +159,60 @@ def test_a_symlink_inside_the_repository_to_a_file_outside_is_not_granted(
     assert not guard.grantable("gh issue comment 1 --body-file body.md", repo, repo)
 
 
+# An attachment is a file read (refuse-substituted-pr-body design D6): gh uploads it, and reads the
+# whole value or a part before a '#', whichever exists when it runs.
+
+ATTACHING_COMMANDS = [
+    "gh issue comment 1",
+    "gh pr comment 1",
+    "gh issue create --title t",
+    "gh pr create --title t",
+    "gh issue edit 1",
+    "gh pr edit 1",
+]
+
+
+@pytest.mark.parametrize("command", ATTACHING_COMMANDS)
+def test_an_attachment_from_outside_the_repository_is_not_granted(
+    command: str, tmp_path: Path
+) -> None:
+    full = f"{command} --body 'Closes #1' --attach /etc/hosts"
+    assert not guard.grantable(full, tmp_path, tmp_path)
+
+
+UP = "../" * 40  # out of the test's repository and the temp directory it sits in, to /
+
+
+@pytest.mark.parametrize(
+    "flag",
+    [
+        "--attach=/etc/hosts",
+        f"--attach '{UP}etc/hosts#alt'",
+        f"--attach 'shot.png#x/{UP}etc/hosts'",  # the part before '#' is inside; the whole isn't
+        "--attach ''",
+    ],
+)
+def test_an_attachment_any_reading_of_which_is_outside_is_not_granted(
+    flag: str, tmp_path: Path
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    assert not guard.grantable(f"gh issue comment 1 --body x {flag}", repo, repo)
+
+
+@pytest.mark.parametrize("flag", ["--attach shot.png", "--attach 'docs/shot.png#The new page'"])
+def test_an_attachment_inside_the_repository_is_granted(flag: str, tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    assert guard.grantable(f"gh issue comment 1 --body x {flag}", repo, repo)
+
+
+def test_an_attachment_under_the_temp_directory_is_granted(tmp_path: Path) -> None:
+    shot = Path(tempfile.gettempdir()) / f"grant-test-{os.getpid()}.png"
+    command = f'gh issue comment 1 --body x --attach "{shot}#A screenshot"'
+    assert guard.grantable(command, tmp_path / "elsewhere", tmp_path / "elsewhere")
+
+
 # Only the reviewed guard grants (D3)
 
 
