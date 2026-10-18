@@ -11,25 +11,34 @@ doesn't manage them.
 
 ### What each check reads, and which credential can read it
 
-"No credentials" was probed on 2026-10-18 with unauthenticated `curl` (read-only). The other columns are
-**documented, not yet probed**: they come from GitHub's REST/GraphQL permission docs and from what was tried on
-2026-10-11 (memory: infra-secrets-and-auth). Task 3.2 probes them before anything depends on them.
+"No credentials" was probed on 2026-10-18 with unauthenticated `curl`. "Job's token" was probed on 2026-10-18
+(task 3.2), after the owner's grants (D6): an installation token minted from the App's key with exactly the job's
+repositories and read permissions. GitHub issued it with `issue_types`, `organization_administration`,
+`organization_projects`, `administration`, `contents` and `issues` read, plus `metadata` read. `GITHUB_TOKEN` wasn't
+probed: the job doesn't use it to read.
 
-| Check | API | No credentials (probed) | `GITHUB_TOKEN` (documented, not yet probed) | Infra App token (documented, not yet probed) |
-|---|---|---|---|---|
-| `.github` files | `GET repos/troupe-run/.github/git/trees/main` | 200 (public repository) | yes | yes (contents read; installed on `.github`) |
-| org settings (2FA) | `GET orgs/troupe-run`, field `two_factor_requirement_enabled` | 200, but the field is absent | no: the field is owner-only, and the token has no org permission | likely: org administration read |
-| App installations | `GET orgs/troupe-run/installations` | 401 | no | **no: refused 403 on 2026-10-11** (design D9 of adopt-org) |
-| issue types | `GET orgs/troupe-run/issue-types` | 401 | no | after the grant (D6): org "Issue types: read" |
-| projects | GraphQL `organization.projectsV2` | 403 | no: `GITHUB_TOKEN` can't read org projects | after the grant (D6): org "Projects: read" |
-| troupe specs → `cap:` labels | `GET repos/troupe-run/troupe/contents/openspec/specs` | 200 | yes | yes (contents read; installed on `troupe`) |
-| troupe spec Purposes | `GET repos/troupe-run/troupe/contents/openspec/specs/<name>/spec.md` | 200 | yes | yes |
-| code security configurations, defaults | `GET orgs/troupe-run/code-security/configurations` (and `/defaults`) | 401 | no | likely: org administration read |
-| code security attachment, per repository | `GET repos/troupe-run/<repo>/code-security-configuration` | 401 (all four) | no | likely: repository administration read, on the four installed repositories |
-| dependency graph, per repository | `GET repos/troupe-run/<repo>/dependency-graph/sbom` | 200 (all four) | yes | yes (contents read) |
-| undeclared milestones, per repository | `GET repos/troupe-run/<repo>/milestones?state=all` | 200 (all four) | yes | yes (issues read) |
+| Check | API | No credentials | Job's token |
+|---|---|---|---|
+| `.github` files | `GET repos/troupe-run/.github/git/trees/main` | 200 (public repository) | 200 |
+| org settings (2FA) | `GET orgs/troupe-run`, field `two_factor_requirement_enabled` | 200, but the field is absent | 200, the field reads `false` |
+| App installations | `GET orgs/troupe-run/installations` | 401 | **200**, against the 403 recorded on 2026-10-11 (adopt-org design D9); see below |
+| issue types | `GET orgs/troupe-run/issue-types` | 401 | 200 |
+| projects | GraphQL `organization.projectsV2` | 403 | 200, with the roadmap project's linked repositories |
+| troupe specs → `cap:` labels | `GET repos/troupe-run/troupe/contents/openspec/specs` | 200 | 200 |
+| troupe spec Purposes | `GET repos/troupe-run/troupe/contents/openspec/specs/<name>/spec.md` | 200 | read by `oob.py --ci`, no difference |
+| code security configurations, defaults | `GET orgs/troupe-run/code-security/configurations` (and `/defaults`) | 401 | 200, 200 |
+| code security attachment, per repository | `GET repos/troupe-run/<repo>/code-security-configuration` | 401 (all four) | 200 (all four) |
+| dependency graph, per repository | `GET repos/troupe-run/<repo>/dependency-graph/sbom` | 200 (all four) | 200 (all four) |
+| undeclared milestones, per repository | `GET repos/troupe-run/<repo>/milestones?state=all` | 200 (all four) | 200 (all four) |
 
-With the two read grants the owner chose (D6), App installations is the only check that has to stay manual.
+`uv run scripts/oob.py --ci` with that token reported no unreadable check and no difference.
+
+**The installations read.** It returned 200 to the job's token, listing all four installations (`total_count` 4:
+`dco`, `troupe-run-infrastructure`, `troupe-run-release`, `troupe-run-board`), each with its repository selection and
+full permissions, the same as the owner's login sees. A full `uv run scripts/oob.py` with that token, App
+installations included, found only `troupe-run-board` undeclared, which #59's change declares. So the 403 that
+adopt-org design D9 recorded on 2026-10-11 doesn't hold for this token. Which repositories each App covers is still
+unreadable to any token, and stays hand-confirmed (spec: teams-and-access).
 
 ## Goals / Non-Goals
 
