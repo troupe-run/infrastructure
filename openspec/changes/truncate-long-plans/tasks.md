@@ -2,10 +2,14 @@
 
 ## 1. Fixtures from real runs (design D3, D6)
 
-- [ ] 1.1 Take #96's plan text from run 39128121513's `plan (pull request)` log (`gh run view 39128121513 --log`,
+- [x] 1.1 Take #96's plan text from run 39128121513's `plan (pull request)` log (`gh run view 39128121513 --log`,
   the `tofu show` part of the Plan step) and save it as a fixture under `scripts/tests/`. Verify it's over 60,000
   bytes, holds both `github_repository_file` headers (troupe's and website's) and a `Plan:` line, and that
-  `uv run --no-project scripts/plan_secrets.py` passes on it.
+  `uv run --no-project scripts/plan_secrets.py` passes on it. (Done: `scripts/tests/fixtures/plan-pr96.txt`, 256,078
+  bytes, both headers, `Plan:` at line 4722. The log holds `tofu plan`'s output, so the fixture is its part from the
+  blank line before "OpenTofu used…" to the `Plan:` line; its first 60,000 bytes equal #96's posted comment byte for
+  byte. `plan_secrets.py` needs the keys locally, so instead of a 1Password prompt the evidence is that run's own
+  "The plan holds no key" step, which passed on this plan.)
 - [ ] 1.2 Save a small real plan comment from a recent pull request (its plan section, from `gh api
   .../issues/<n>/comments`) as the under-the-limit fixture. Verify its plan section starts with `<details><summary>Full
   plan</summary>` and ends with `</details>`.
@@ -16,7 +20,7 @@
   byte and has no note; over the limit (1.1's plan, `COMMENT_LIMIT`), the body is at most `COMMENT_LIMIT` bytes, lists
   both resource headers and the `Plan:` line above the plan, the plan ends on a whole line of the fixture, the code
   block and `<details>` close, and the note's line and byte counts and link are right; a resource list over a small
-  limit exits non-zero and writes nothing; a plan line starting with ```` ``` ```` gets a longer fence; the summary
+  limit exits non-zero and writes nothing; a plan holding a run of backticks (at a line's start or inside it) gets a longer fence; the summary
   target uses a bare code block. Run `uv run pytest scripts/tests/test_plan_comment.py` and see them fail.
 - [ ] 2.2 Write `scripts/plan_comment.py` (`--head`, `--plan`, `--plan-url`, `--target comment|summary`, `--out`),
   with `COMMENT_LIMIT` and `SUMMARY_LIMIT` named once at the top. Verify 2.1's tests pass, and that each fails when its
@@ -41,9 +45,24 @@
   whole with no note (this change's plan is small), and the `pr-plan` artifact exists on the run and holds the same
   plan. Quote both in the PR.
 
+## 4. A written file's content is sensitive (design D7)
+
+- [ ] 4.1 Write the tests first (design D6). One fails unless `content` on each `github_repository_file` in
+  `tofu/guard_delivery.tf` and `tofu/org_profile.tf` is wrapped in `sensitive(`. Name it as a check of the
+  configuration's text. The other feeds `hook_modes.py` a `plan.json` resource whose `after_sensitive` marks
+  `content`, and checks it still reads the content and its blob id. Run them: the first fails, and the second passes
+  already, since the script ignores `after_sensitive`.
+- [ ] 4.2 Wrap both `content` expressions in `sensitive()`. Leave `commit_message` as it is: it hashes the source
+  directly. Verify 4.1's tests pass and `uv run scripts/check.py` passes (`tofu validate` included).
+- [ ] 4.3 On this change's pull request, once the owner approves the plan run, check that the plan shows no change to
+  any `github_repository_file` resource and no mode to set (design D7, spec "Hiding the content changes nothing on its
+  own"). Quote the plan's `Plan:` / `No changes` line in the PR.
+
 ## Workflow follow-up
 
-- Open the PR with `Closes #98`, with 2.3's probe result and 3.3's check.
+- Open the PR with `Closes #98`, with 2.3's probe result and the checks from 3.3 and 4.3.
+- The first delivery after the merge that changes a delivered file's source: check its plan shows
+  `~ content = (sensitive value)`, the commit message's hash going old → new, and none of the file's content.
 - Archive on the branch before the owner merges by rebase.
 - After the merge, check the next plan of `main` uploads `main-plan` and shows its plan in the run summary. Comment on
   #98 with the PR and the archived change, check #98 is closed, and set its card to Done.
