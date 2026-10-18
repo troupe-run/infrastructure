@@ -51,7 +51,8 @@ group 2.
       installation. Update the spec's permission line to match. Verify that 3.2 then succeeds, and that
       `openspec validate add-link-issue-to-board --strict` passes. Not needed: 3.2 succeeded with no repository
       permission
-- [ ] 3.5 Owner: delete the probe project and the probe repository. Verify both are gone (404 / not listed)
+- [x] 3.5 Owner: delete the probe project and the probe repository. Verify both are gone (404 / not listed). Done:
+      neither resolves, and `oob.py` reports no differences
 
 ## 4. The declarations that name the App
 
