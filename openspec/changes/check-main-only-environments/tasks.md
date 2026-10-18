@@ -29,9 +29,12 @@
 
 ## 2. The comments (D4)
 
-- [ ] 2.1 Correct the `lifecycle` comment on `github_repository_environment.github_pages` in `tofu/environments.tf`
+- [x] 2.1 Correct the `lifecycle` comment on `github_repository_environment.github_pages` in `tofu/environments.tf`
       (D4), and add a one-line comment naming the test to the `ci` and `release` declarations. Verify
       `tofu fmt -check -recursive tofu` and `tofu validate` pass, and the module's tests still pass
+      Done 2026-10-18: the `ci` declarations share `environments.tf`'s header, so the line naming the test went there,
+      covering `github_pages` too. `tofu fmt -check` is clean, `tofu validate` reports `Success!`, and the module's
+      tests: `19 passed`
 - [ ] 2.2 Commit group 1, then group 2, as Conventional Commits, signed off, saying why. Verify the guard accepts
       each commit
 

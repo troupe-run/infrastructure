@@ -11,6 +11,8 @@
 # The website's, which its deploy job publishes troupe.run through:
 #
 #   github-pages  main only  no approval  the website's deploy (deploy.yml)
+#
+# scripts/tests/test_main_only_environments.py fails if a main-only one stops being declared so.
 
 locals {
   # The owner, the only required reviewer.
@@ -72,8 +74,10 @@ resource "github_repository_environment" "github_pages" {
     custom_branch_policies = true
   }
 
-  # Deleting it would let the next deploy recreate it with no branch rule (design D5). To stop
-  # managing it, use a `removed` block, which leaves it on GitHub.
+  # A destroy would let the next deploy recreate it with no branch rule (design D5).
+  # prevent_destroy refuses one only while this block exists: deleting the block deletes the
+  # guard too, which scripts/tests/test_main_only_environments.py catches (#61). To stop managing
+  # it, use a `removed` block, which leaves it on GitHub.
   lifecycle {
     prevent_destroy = true
   }
