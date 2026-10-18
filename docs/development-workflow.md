@@ -152,10 +152,10 @@ those that reach it, without a `pytestmark` in every module.
 
 A `tests` entry that no collected test is under fails the run, so a renamed directory can't quietly stop a suite
 running: a test named `scripts/check-paths.toml::scopes.<name>.tests[<i>]` fails, naming the scope, the entry and the
-fix. It carries the scope's marker, so the scope's own run fails too, rather than passing with nothing to test. An
-entry is checked only when the run collects from a directory that contains it (its path arguments, or `testpaths`
-without them), so running one file or one suite never fails for another. A run selecting a different scope doesn't
-check it either; the full run does. The rule is `guard.directory_tags` and `guard.unmatched_tests`.
+fix. It carries the scope's marker, so the scope's own run fails too, rather than passing with nothing to test. A
+run given no paths (the full check, or any `--scope`) checks every entry. A run given paths checks only the entries
+inside them, so running one file or one suite never fails for another. A run selecting a different scope doesn't
+fail for it either; the full run does. The rule is `guard.directory_tags` and `guard.unmatched_tests`.
 
 **Every test run checks the tags.** A test fails if it reads a file under a scope's paths without that scope's tag,
 or reads a skipped path at all. The message names the test, the file and the tag to add. So a new test that reads

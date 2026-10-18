@@ -320,17 +320,23 @@ def test_a_run_that_does_not_collect_from_the_entry_s_directory_does_not_check_i
     assert result.returncode == 0, result.stdout
 
 
-@pytest.mark.parametrize(("testpaths", "fails"), [('["suites"]', True), ('["suites/b"]', False)])
-def test_a_run_from_testpaths_checks_the_entries_inside_them(
-    tmp_path: Path, testpaths: str, fails: bool
-) -> None:
+@pytest.mark.parametrize("testpaths", ['["suites"]', '["suites/b"]'])
+def test_a_run_from_testpaths_checks_every_entry(tmp_path: Path, testpaths: str) -> None:
+    """Found in troupe: its runs collect from `testpaths`, which lists the real suites, so a stale
+    entry is outside every one of them. Checking only inside them let a missing suite pass."""
     root = suites(tmp_path, extra=GONE)
     (root / "pyproject.toml").write_text(
         f"[tool.pytest.ini_options]\ntestpaths = {testpaths}\n", encoding="utf-8"
     )
     result = run_pytest(root)
-    assert (result.returncode != 0) is fails, result.stdout
-    assert ("scope `sa` runs the tests under `suites/gone/**`" in result.stdout) is fails
+    assert result.returncode == 1, result.stdout
+    assert "scope `sa` runs the tests under `suites/gone/**`" in result.stdout
+
+
+def test_a_run_given_a_directory_containing_the_entry_checks_it(tmp_path: Path) -> None:
+    result = run_pytest(suites(tmp_path, extra=GONE), "suites")
+    assert result.returncode == 1, result.stdout
+    assert "scope `sa` runs the tests under `suites/gone/**`" in result.stdout
 
 
 def test_the_scope_s_marker_says_which_directories_it_runs(tmp_path: Path) -> None:

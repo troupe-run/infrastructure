@@ -107,7 +107,11 @@ def _relative(path: str | os.PathLike[str]) -> str | None:
 
 
 def _roots(config: pytest.Config) -> list[str]:
-    """What the run was asked to collect: its path arguments, or `testpaths` without them (D6)."""
+    """What the run was asked to collect (D6): its path arguments, or the whole repository when it
+    was given none. `testpaths` then lists the suites, and a stale `tests` entry is outside every
+    one of them, so checking only inside `testpaths` would miss the renamed directory it's for."""
+    if config.args_source is not pytest.Config.ArgsSource.ARGS:
+        return [""]
     roots = []
     for arg in config.args:
         target = Path(config.invocation_params.dir, arg.split("::", 1)[0])
