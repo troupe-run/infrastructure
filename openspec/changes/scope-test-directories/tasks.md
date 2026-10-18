@@ -2,7 +2,7 @@
 
 ## 1. Test dependency
 
-- [ ] 1.1 Add `pytest-xdist` to the `dev` group in `pyproject.toml` and lock it (`uv lock`), for the parallel tests
+- [x] 1.1 Add `pytest-xdist` to the `dev` group in `pyproject.toml` and lock it (`uv lock`), for the parallel tests
   in 3 only (design D7). Verify `uv run python -c "import xdist"` succeeds, `uv run pytest` still passes serially,
   and `uv run scripts/check.py` passes.
 
