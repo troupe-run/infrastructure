@@ -13,7 +13,7 @@ doesn't manage them.
 
 "No credentials" was probed on 2026-10-18 with unauthenticated `curl` (read-only). The other columns are
 **documented, not yet probed**: they come from GitHub's REST/GraphQL permission docs and from what was tried on
-2026-10-11 (memory: infra-secrets-and-auth). Task 3.1 probes them before anything depends on them.
+2026-10-11 (memory: infra-secrets-and-auth). Task 3.2 probes them before anything depends on them.
 
 | Check | API | No credentials (probed) | `GITHUB_TOKEN` (documented, not yet probed) | Infra App token (documented, not yet probed) |
 |---|---|---|---|---|
@@ -86,23 +86,33 @@ Today:
   `differences` reports that as a difference ("is None on GitHub, declared False"), which is wrong.
 
 The change: `run` reads each check through one wrapper that turns any fetch failure into `UnreadableError(check name,
-cause)`. The GraphQL read also fails when the answer carries `errors`. A declared field that GitHub returns as `null`
-is an `UnreadableError` too, not a difference. `null` is never a declared value in `oob/`, and a test pins that, so
-this can't hide a real difference. `run` goes on with the other checks after one fails, and `main` reports every
-unreadable check, so one bad read doesn't hide another.
+cause)`. That covers GraphQL too: `gh api graphql` exits 1 when the answer carries `errors` (checked 2026-10-18 with
+an undefined field), so the wrapper sees it as a failed read. `run` goes on with the other checks after one fails, and
+`main` reports every unreadable check, so one bad read doesn't hide another.
+
+A field GitHub hides from a reader that can't see it comes back `null`. A check whose fields GitHub hides that way
+carries `null_is_unreadable`, and a declared non-null field that reads back `null` is then an `UnreadableError`, not a
+difference. Today only org settings carries it (2FA is owner-only). It's not a rule for every check, because `null`
+can be a real value: `oob/projects.json` declares the roadmap project's `shortDescription` as `null`, and a project
+description cleared by hand reads `null` too, which is a real difference. (The first draft said "`null` is never a
+declared value in `oob/`". That was wrong, and was found while implementing task 1.)
 
 *Alternative:* letting the traceback stand. It exits non-zero, but nobody reading the run can tell a refused token
 from a bug.
 
 ### D4. Which checks run only by hand is declared in `oob.py`, and `--ci` leaves them out
 
-Each check in `oob.py` (`Check`, and the fixed names of the others) can carry `by_hand: str`, the reason CI can't run
-it. Today only App installations has one: "no token CI holds can read the org's installations (403, adopt-org design
-D9)". `uv run scripts/oob.py` runs every check, as now. `uv run scripts/oob.py --ci` makes no read for a `by_hand`
-check, and ends by naming each one with its reason. Any argument other than `--ci` exits 2 with the usage, before
-anything is read (rule: malformed input is an error). The reason lives next to the check it's about, in one named
-place, and a test pins that App installations is marked `by_hand`. If the probe (task 3.1) finds the App can't read
-another check either, that check gets a `by_hand` reason too, and this design says so.
+`oob.py`'s `BY_HAND` maps a check's name to the reason CI can't run it. Every check has a name in `CHECK_NAMES`,
+the `Check`s and the four that aren't a single declaration (troupe specs, troupe label descriptions, code security,
+milestones), and a test fails if a `BY_HAND` key isn't one of them. Today only App installations is in it: "no token
+CI holds can read the org's installations (403, adopt-org design D9)". (A `by_hand` field on `Check` was the first
+idea, but it couldn't mark the four checks that aren't `Check`s.)
+
+`uv run scripts/oob.py` runs every check, as now. `uv run scripts/oob.py --ci` makes no read for a check in
+`BY_HAND`, and names each one with its reason. Any argument other than `--ci` exits 2 with the usage, before anything
+is read (rule: malformed input is an error). The reasons live in `oob.py` with the checks, in one named place, and a
+test pins that App installations is in `BY_HAND`. If the probe (task 3.2) finds the App can't read
+another check either, that check goes in `BY_HAND` too, and this design says so.
 
 *Alternative:* `oob.py --skip "<check>"`, with the skip list on the workflow's `run:` line. That's the first draft's
 D4. It puts the list where CI is defined, but then the reason lives somewhere else (a comment or the README), and a
@@ -136,9 +146,9 @@ missing, which is the reminder.
 
 ## Risks / Trade-offs
 
-- [The "documented" cells are wrong. For example, org administration read might not show the 2FA field] → Task 3.1
+- [The "documented" cells are wrong. For example, org administration read might not show the 2FA field] → Task 3.2
   mints the job's exact token locally and runs `oob.py --ci` with it before merge. D3 makes a wrong guess fail
-  loudly, never pass quietly. A check the App truly can't read gets a `by_hand` reason (D4).
+  loudly, never pass quietly. A check the App truly can't read goes in `BY_HAND` (D4).
 - [GraphQL returns a partial answer, such as only public projects, with no `errors`] → The token has "Projects: read"
   (D6), so it sees private projects too. The probe confirms that the roadmap project's linked repositories read in
   full.

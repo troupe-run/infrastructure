@@ -2,6 +2,7 @@
 
 import base64
 import json
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -89,9 +90,11 @@ def fake_github(
     attachments: dict[str, Any] | None = None,
     graphs: dict[str, BaseException] | None = None,
     milestones: dict[str, Any] | None = None,
+    failures: dict[str, BaseException] | None = None,
 ) -> oob.Fetch:
     """GitHub as declared. attachments maps a repository to its attachment (None: 204, nothing
-    attached); graphs maps a repository to what reading its dependency graph raises."""
+    attached); graphs maps a repository to what reading its dependency graph raises; failures
+    maps a piece of a read's path (or "graphql") to what that read raises."""
     docs = {"cli": CLI_SPEC} if spec_docs is None else spec_docs
     configs = [BASELINE] if configurations is None else configurations
     attached = attachments or {}
@@ -100,6 +103,9 @@ def fake_github(
 
     def fetch(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
         calls.append(args)
+        for piece, failure in (failures or {}).items():
+            if piece in args[1]:
+                raise failure
         if "/milestones?" in args[1]:
             found = milestone_titles.get(args[1].split("/")[2], DECLARED_MILESTONES)
             if isinstance(found, BaseException):
@@ -134,7 +140,19 @@ def fake_github(
 
 def RUN(fetch: oob.Fetch, oob_dir: Path) -> list[str]:  # noqa: N802 (reads as the call under test)
     """oob.run with the fixture directory as both the oob/ and the repo root."""
-    return oob.run(fetch, oob_dir, root=oob_dir)
+    report = oob.run(fetch, oob_dir, root=oob_dir)
+    assert report.unreadable == [], report.unreadable
+    return report.differences
+
+
+def REPORT(fetch: oob.Fetch, oob_dir: Path, *, ci: bool = False) -> "oob.Report":  # noqa: N802
+    """The whole report, unreadable checks included."""
+    return oob.run(fetch, oob_dir, root=oob_dir, ci=ci)
+
+
+def refused(stderr: str) -> subprocess.CalledProcessError:
+    """What oob.gh raises when gh exits non-zero for anything but a 404."""
+    return subprocess.CalledProcessError(1, ["gh", "api"], "", stderr)
 
 
 def test_matching_declarations_report_nothing(oob_dir: Path) -> None:
@@ -293,7 +311,7 @@ def test_main_exits_non_zero_on_a_difference(
     monkeypatch.setattr(oob, "OOB", oob_dir)
     monkeypatch.setattr(oob, "ROOT", oob_dir)
     monkeypatch.setattr(oob, "gh", fake_github(TYPES[:1], PROJECTS, []))
-    assert oob.main() == 1
+    assert oob.main([]) == 1
     assert "1 difference(s)" in capsys.readouterr().out
 
 
@@ -303,7 +321,7 @@ def test_main_exits_zero_when_nothing_differs(
     monkeypatch.setattr(oob, "OOB", oob_dir)
     monkeypatch.setattr(oob, "ROOT", oob_dir)
     monkeypatch.setattr(oob, "gh", fake_github(TYPES, PROJECTS, []))
-    assert oob.main() == 0
+    assert oob.main([]) == 0
 
 
 def test_every_github_call_is_a_read() -> None:
@@ -371,8 +389,10 @@ def test_a_dependency_graph_github_says_is_missing_is_reported_as_off(oob_dir: P
 
 def test_a_dependency_graph_that_can_t_be_read_is_an_error_never_off(oob_dir: Path) -> None:
     graphs: dict[str, BaseException] = {"troupe": RuntimeError("HTTP 502")}
-    with pytest.raises(oob.UnreadableError, match=r"'troupe'.*dependency graph.*HTTP 502"):
-        RUN(fake_github(TYPES, PROJECTS, [], graphs=graphs), oob_dir)
+    report = REPORT(fake_github(TYPES, PROJECTS, [], graphs=graphs), oob_dir)
+    assert report.differences == []
+    assert len(report.unreadable) == 1
+    assert re.search(r"'troupe'.*dependency graph.*HTTP 502", report.unreadable[0])
 
 
 def test_main_exits_non_zero_naming_the_repository_when_a_graph_can_t_be_read(
@@ -382,7 +402,7 @@ def test_main_exits_non_zero_naming_the_repository_when_a_graph_can_t_be_read(
     monkeypatch.setattr(oob, "OOB", oob_dir)
     monkeypatch.setattr(oob, "ROOT", oob_dir)
     monkeypatch.setattr(oob, "gh", fake_github(TYPES, PROJECTS, [], graphs=graphs))
-    assert oob.main() == 1
+    assert oob.main([]) == 1
     out = capsys.readouterr().out
     assert "'website'" in out
     assert "HTTP 403" in out
@@ -446,5 +466,137 @@ def test_a_declared_milestone_missing_on_github_is_left_to_the_plan(oob_dir: Pat
 
 def test_milestones_that_can_t_be_read_are_an_error_naming_the_repository(oob_dir: Path) -> None:
     errors = {"website": RuntimeError("HTTP 502")}
-    with pytest.raises(oob.UnreadableError, match=r"'website'.*milestones.*HTTP 502"):
-        RUN(fake_github(TYPES, PROJECTS, [], milestones=errors), oob_dir)
+    report = REPORT(fake_github(TYPES, PROJECTS, [], milestones=errors), oob_dir)
+    assert report.differences == []
+    assert len(report.unreadable) == 1
+    assert re.search(r"'website'.*milestones.*HTTP 502", report.unreadable[0])
+
+
+# run-oob-check-daily design D3: anything that can't be read is unreadable, named, and never a
+# difference or "no difference".
+
+
+def test_a_refused_issue_types_read_is_unreadable_naming_the_check(oob_dir: Path) -> None:
+    failures: dict[str, BaseException] = {"issue-types": refused("gh: Forbidden (HTTP 403)")}
+    report = REPORT(fake_github(TYPES, PROJECTS, [], failures=failures), oob_dir)
+    assert report.differences == []
+    assert len(report.unreadable) == 1
+    assert "issue types" in report.unreadable[0]
+    assert "HTTP 403" in report.unreadable[0]
+
+
+def test_a_projects_read_gh_fails_for_a_graphql_error_is_unreadable(oob_dir: Path) -> None:
+    # gh api graphql exits 1 when the answer carries `errors` (design D3).
+    error = refused("gh: Resource not accessible by integration")
+    report = REPORT(fake_github(TYPES, PROJECTS, [], failures={"graphql": error}), oob_dir)
+    assert report.differences == []
+    assert len(report.unreadable) == 1
+    assert report.unreadable[0].startswith("projects:")
+    assert "Resource not accessible by integration" in report.unreadable[0]
+
+
+def test_two_factor_hidden_from_the_token_is_unreadable_not_a_difference(oob_dir: Path) -> None:
+    hidden = [{"name": "two_factor_requirement_enabled", "value": None}]
+    report = REPORT(fake_github(TYPES, PROJECTS, [], settings=hidden), oob_dir)
+    assert report.differences == []
+    assert len(report.unreadable) == 1
+    assert "org settings" in report.unreadable[0]
+    assert "two_factor_requirement_enabled" in report.unreadable[0]
+    assert "value" in report.unreadable[0]
+
+
+def test_a_project_short_description_declared_null_and_read_null_matches(oob_dir: Path) -> None:
+    # null is a real value outside the checks GitHub hides fields from (design D3).
+    projects = [{**PROJECTS[0], "shortDescription": None}]
+    (oob_dir / "projects.json").write_text(json.dumps(projects))
+    assert RUN(fake_github(TYPES, projects, []), oob_dir) == []
+
+
+def test_a_short_description_cleared_on_github_is_a_difference_not_unreadable(
+    oob_dir: Path,
+) -> None:
+    (oob_dir / "projects.json").write_text(
+        json.dumps([{**PROJECTS[0], "shortDescription": "Where troupe is going"}])
+    )
+    cleared = [{**PROJECTS[0], "shortDescription": None}]
+    assert RUN(fake_github(TYPES, cleared, []), oob_dir) == [
+        "projects: 1 shortDescription is None on GitHub, declared 'Where troupe is going'"
+    ]
+
+
+def test_main_reports_every_unreadable_check_and_every_difference(
+    oob_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    failures: dict[str, BaseException] = {
+        "issue-types": refused("gh: Forbidden (HTTP 403)"),
+        "graphql": refused("gh: Resource not accessible by integration"),
+    }
+    hand_made = {"website": [*DECLARED_MILESTONES, "0.3.0"]}
+    monkeypatch.setattr(oob, "OOB", oob_dir)
+    monkeypatch.setattr(oob, "ROOT", oob_dir)
+    monkeypatch.setattr(
+        oob, "gh", fake_github(TYPES, PROJECTS, [], failures=failures, milestones=hand_made)
+    )
+    assert oob.main([]) == 1
+    out = capsys.readouterr().out
+    assert "oob: issue types: couldn't read it (gh: Forbidden (HTTP 403))" in out
+    assert "oob: projects: couldn't read it (gh: Resource not accessible by integration)" in out
+    assert "milestones: website: '0.3.0' is on GitHub but not declared" in out
+    assert "1 difference(s)" in out
+    assert "no differences" not in out
+
+
+# run-oob-check-daily design D4: checks only a person can run, declared once with the reason, and
+# left out by --ci.
+
+
+def test_app_installations_is_the_one_check_run_by_hand() -> None:
+    assert list(oob.BY_HAND) == ["App installations"]
+    assert "403" in oob.BY_HAND["App installations"]
+
+
+def test_every_by_hand_name_is_a_check() -> None:
+    assert set(oob.BY_HAND) <= set(oob.CHECK_NAMES)
+
+
+def test_ci_makes_no_read_for_a_by_hand_check_and_names_it_with_its_reason(oob_dir: Path) -> None:
+    calls: list[list[str]] = []
+    report = REPORT(fake_github(TYPES, PROJECTS, calls), oob_dir, ci=True)
+    assert not any(c[1].endswith("/installations") for c in calls)
+    assert report.by_hand == [("App installations", oob.BY_HAND["App installations"])]
+    assert "App installations" not in report.ran
+    assert report.differences == []
+    assert report.unreadable == []
+
+
+def test_without_ci_the_by_hand_check_is_read(oob_dir: Path) -> None:
+    calls: list[list[str]] = []
+    report = REPORT(fake_github(TYPES, PROJECTS, calls), oob_dir)
+    assert any(c[1].endswith("/installations") for c in calls)
+    assert report.by_hand == []
+    assert report.ran == oob.CHECK_NAMES
+
+
+def test_main_with_ci_names_what_it_left_to_a_hand_run(
+    oob_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(oob, "OOB", oob_dir)
+    monkeypatch.setattr(oob, "ROOT", oob_dir)
+    monkeypatch.setattr(oob, "gh", fake_github(TYPES, PROJECTS, []))
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    assert oob.main(["--ci"]) == 0
+    out = capsys.readouterr().out
+    assert "oob: not run in CI: App installations" in out
+    assert oob.BY_HAND["App installations"] in out
+    assert "uv run scripts/oob.py" in out
+
+
+@pytest.mark.parametrize("argv", [["--skip", "projects"], ["ci"], ["--ci", "extra"], ["--CI"]])
+def test_any_other_argument_exits_2_before_reading_anything(
+    argv: list[str], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr(oob, "gh", fake_github(TYPES, PROJECTS, calls))
+    assert oob.main(argv) == 2
+    assert calls == []
+    assert "usage: uv run scripts/oob.py [--ci]" in capsys.readouterr().err

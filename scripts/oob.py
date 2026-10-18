@@ -1,17 +1,21 @@
 """Drift checks for what OpenTofu can't manage (design D6; see oob/README.md).
 
-Usage: uv run scripts/oob.py
+Usage: uv run scripts/oob.py [--ci]
 
-Compares each declaration in oob/ with GitHub, read with the owner's `gh`, prints every
-difference and exits 1 if there are any. It only reads: no call writes to GitHub.
+Compares each declaration in oob/ with GitHub, read with whatever login `gh` has (the owner's,
+or CI's read-only App token), prints every difference and every check it couldn't read, and exits
+1 if there are any. It only reads: no call writes to GitHub. --ci, used by tofu.yml's oob job,
+leaves out the checks in BY_HAND and names each one.
 """
 
 import base64
+import dataclasses
 import json
 import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +40,10 @@ class Check:
     key: str
     gh_args: list[str]
     derived: Callable[[Path], list[Record]] | None = None
+    # GitHub answers null for a field this reader isn't allowed to see, so a declared value read
+    # back as null is unreadable, not a difference. Only where GitHub hides fields that way: null is
+    # a real value elsewhere, such as a project's empty shortDescription (run-oob-check-daily D3).
+    null_is_unreadable: bool = False
 
 
 def org_profile_files(root: Path) -> list[Record]:
@@ -67,6 +75,8 @@ CHECKS = [
             "--jq",
             '[{name: "two_factor_requirement_enabled", value: .two_factor_requirement_enabled}]',
         ],
+        # Only an org owner sees whether 2FA is required.
+        null_is_unreadable=True,
     ),
     Check(
         name="App installations",
@@ -367,39 +377,137 @@ def gh(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
     return json.loads(result.stdout) if result.stdout.strip() else None
 
 
-def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT) -> list[str]:
-    found: list[str] = []
+# Every check, in the order run reads them: CHECKS, then the ones that aren't a single declaration.
+CHECK_NAMES = [
+    *(c.name for c in CHECKS),
+    "troupe specs",
+    "troupe label descriptions",
+    "code security",
+    "milestones",
+]
+
+# The checks only a person can run, and why: --ci leaves them out and names each one (spec:
+# ci-apply, teams-and-access; run-oob-check-daily design D4). The one place that says so.
+BY_HAND = {
+    "App installations": (
+        "no token CI holds can read the org's installations (403, adopt-org design D9)"
+    ),
+}
+
+
+def hidden_fields(check: Check, declared: list[Record], actual: list[Record]) -> None:
+    """Raise UnreadableError for a declared value read back as null (Check.null_is_unreadable)."""
+    want = {item[check.key]: item for item in declared}
+    for item in actual:
+        for field, value in sorted(item.items()):
+            wanted = want.get(item.get(check.key), {}).get(field)
+            if value is None and wanted is not None:
+                raise UnreadableError(
+                    f"{check.name}: {item.get(check.key)!r} {field} came back null, so this token "
+                    "can't see it"
+                )
+
+
+def reason(error: BaseException) -> str:
+    """What went wrong with a read, in gh's words where it gave some."""
+    if isinstance(error, subprocess.CalledProcessError):
+        lines = [line for line in str(error.stderr or "").splitlines() if line.strip()]
+        return lines[-1].strip() if lines else f"gh exited {error.returncode}"
+    return str(error) or type(error).__name__
+
+
+@dataclass
+class Report:
+    """What a run found: differences, checks that couldn't be read, and what it ran."""
+
+    differences: list[str] = dataclasses.field(default_factory=list)
+    unreadable: list[str] = dataclasses.field(default_factory=list)
+    ran: list[str] = dataclasses.field(default_factory=list)
+    by_hand: list[tuple[str, str]] = dataclasses.field(default_factory=list)
+    ci: bool = False
+
+    def attempt(self, name: str, body: Callable[[], list[str]]) -> bool:
+        """Run one check, unless it's left to a hand run under --ci. A failure to read is recorded
+        against it, never a difference or "no difference", and the other checks still run
+        (run-oob-check-daily D3, D4)."""
+        if self.ci and name in BY_HAND:
+            self.by_hand.append((name, BY_HAND[name]))
+            return False
+        try:
+            found = body()
+        except UnreadableError as error:
+            self.unreadable.append(str(error))
+            return False
+        except Exception as error:  # any failed read is unreadable, and named
+            self.unreadable.append(f"{name}: couldn't read it ({reason(error)})")
+            return False
+        self.differences += found
+        self.ran.append(name)
+        return True
+
+
+def check_declaration(check: Check, fetch: Fetch, oob_dir: Path, root: Path) -> list[str]:
+    if check.derived is not None:
+        declared = check.derived(root)
+    else:
+        declared = json.loads((oob_dir / check.declaration).read_text())
+    actual = fetch(check.gh_args)
+    if check.null_is_unreadable:
+        hidden_fields(check, declared, actual)
+    return differences(check.name, check.key, declared, actual)
+
+
+def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT, *, ci: bool = False) -> Report:
+    report = Report(ci=ci)
     for check in CHECKS:
-        if check.derived is not None:
-            declared = check.derived(root)
-        else:
-            declared = json.loads((oob_dir / check.declaration).read_text())
-        found += differences(check.name, check.key, declared, fetch(check.gh_args))
-    specs = fetch(SPECS_GH_ARGS)
-    found += unlabelled_specs(specs, root)
-    found += stale_descriptions(fetch, specs, oob_dir, root)
-    found += code_security(fetch, oob_dir)
-    found += undeclared_milestones(fetch, root)
-    return found
+        report.attempt(check.name, partial(check_declaration, check, fetch, oob_dir, root))
+    specs: list[str] = []
+
+    def labels() -> list[str]:
+        specs.extend(fetch(SPECS_GH_ARGS))
+        return unlabelled_specs(specs, root)
+
+    if report.attempt("troupe specs", labels):
+        report.attempt(
+            "troupe label descriptions", lambda: stale_descriptions(fetch, specs, oob_dir, root)
+        )
+    else:
+        report.unreadable.append(
+            "troupe label descriptions: not checked, since troupe's spec list couldn't be read"
+        )
+    report.attempt("code security", lambda: code_security(fetch, oob_dir))
+    report.attempt("milestones", lambda: undeclared_milestones(fetch, root))
+    return report
 
 
-def main() -> int:
-    try:
-        found = run(gh, OOB, ROOT)
-    except UnreadableError as error:
-        print(f"oob: {error}. Nothing is known about it until it can be read; run again.")
-        return 1
-    for line in found:
+USAGE = "usage: uv run scripts/oob.py [--ci]"
+
+
+def main(argv: list[str]) -> int:
+    if argv not in ([], ["--ci"]):
+        print(
+            f"{USAGE}\n  --ci  leave out the checks only a person can run, naming each one "
+            f"(BY_HAND in scripts/oob.py). Got: {' '.join(argv)!r}",
+            file=sys.stderr,
+        )
+        return 2
+    report = run(gh, OOB, ROOT, ci=argv == ["--ci"])
+    for line in report.differences:
         print(line)
-    if found:
-        print(f"oob: {len(found)} difference(s). Fix GitHub, or update the declaration in oob/.")
+    for error in report.unreadable:
+        print(f"oob: {error}. Nothing is known about it until it can be read; run again.")
+    for name, why in report.by_hand:
+        print(f"oob: not run in CI: {name}, since {why}. Run it by hand: uv run scripts/oob.py")
+    if report.differences:
+        print(
+            f"oob: {len(report.differences)} difference(s). Fix GitHub, or update the declaration "
+            "in oob/."
+        )
+    if report.differences or report.unreadable:
         return 1
-    print(
-        f"oob: no differences ({', '.join(c.name for c in CHECKS)}, "
-        "troupe specs, troupe label descriptions, code security, milestones)"
-    )
+    print(f"oob: no differences ({', '.join(report.ran)})")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
