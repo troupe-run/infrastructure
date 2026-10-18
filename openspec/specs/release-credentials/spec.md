@@ -39,6 +39,11 @@ a workflow run on any other branch can't read it.
 - **WHEN** someone widens the `release` environment's deployment branches, or allows admins to bypass them, on GitHub
 - **THEN** the next plan shows the change being reverted
 
+#### Scenario: Removing or weakening the declaration fails the check
+- **WHEN** a change deletes the `release` environment's declaration, lets it deploy from a branch other than `main`,
+  or lets admins bypass it
+- **THEN** `scripts/check.py` fails, naming the environment and what changed, before any plan is made
+
 ### Requirement: The release key's value never passes through this repository
 OpenTofu SHALL NOT hold or set the value of `RELEASE_APP_PRIVATE_KEY`. The owner SHALL set it from the password
 manager with a documented command that prints nothing. Checking that it's set SHALL read its name only.

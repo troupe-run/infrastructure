@@ -88,6 +88,11 @@ be declared in this repository, so a difference on GitHub shows in the next plan
 - **WHEN** a push to the website's `main` passes CI after the declaration has been applied
 - **THEN** the deploy job's deployment to `github-pages` succeeds, and https://troupe.run serves that commit
 
+#### Scenario: Removing or weakening the declaration fails the check
+- **WHEN** a change deletes the `github-pages` environment's declaration, lets it deploy from a branch other than
+  `main`, or lets admins bypass it
+- **THEN** `scripts/check.py` fails, naming the environment and what changed, before any plan is made
+
 ### Requirement: The website's Pages settings are declared
 The `website` repository's GitHub Pages site SHALL be declared here: its custom domain `troupe.run`, HTTPS enforced,
 and deploys from GitHub Actions. A difference from GitHub in any of these SHALL appear in the plan.
