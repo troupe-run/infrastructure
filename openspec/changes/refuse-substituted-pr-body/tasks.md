@@ -168,7 +168,8 @@
 
 - [ ] 6.1 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
   `scripts/guard.py` updated in place in troupe and website, and nothing else. Keep it for the pull request.
-- [ ] 6.2 Run `openspec validate refuse-substituted-pr-body --strict` and verify it passes.
+- [x] 6.2 Run `openspec validate refuse-substituted-pr-body --strict` and verify it passes.
+  - 2026-10-18: `Change 'refuse-substituted-pr-body' is valid`.
 
 ## Workflow follow-up
 
