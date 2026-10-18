@@ -8,15 +8,22 @@
 
 ## 2. The declaration reads `tests`
 
-- [ ] 2.1 Before changing the parser, add a differential test in `scripts/tests/test_guard_check_paths.py`: every
-  declaration the existing tests accept, plus the real `scripts/check-paths.toml`, parses to the same `skip` and
-  `scopes`, and to `tests == ()`. Verify it passes on the current code, before 2.2.
-- [ ] 2.2 Write the parsing tests (spec: "A scope can tag whole test directories", malformed and no-`tests`
+- [x] 2.1 Before changing the parser, add a property test in `scripts/tests/test_guard_check_paths.py`: any
+  declaration of `paths` alone (generated skip and scopes) reads back exactly as written, and this repository's
+  declaration reads. Verify it passes on the current code, before 2.2. After 2.3, compare the new parser with the
+  one before this change (`git show f8328f8:scripts/guard.py`) over the same generated declarations, once, and
+  record the result here. A lasting test can't do that comparison: after the merge, `main` is the new parser.
+  - 2026-10-18: both tests pass on `f8328f8`'s parser (`2 passed`). After 2.3, a scratchpad script ran both parsers
+    over 5,000 hypothesis-generated declarations (versions 1, 2 and `"1"`; skip and scope tables with `paths` and an
+    unknown `why`; good, wildcard, absolute, `..`, empty and `**` entries; bad and reserved scope names; non-list
+    and empty values). Every one gave the same `skip` and `scopes`, or a refusal with the same problem up to its
+    `;` (the scope's unknown-key hint now names `tests` too), and every accepted one had `tests == ()`.
+- [x] 2.2 Write the parsing tests (spec: "A scope can tag whole test directories", malformed and no-`tests`
   scenarios): a scope with `tests` parses into `CheckPaths.tests` in file order, with `scopes` unchanged; repeated
   and cross-scope overlapping entries are accepted; refused, each naming the place (`scopes.<name>.tests[i]`) and
   the entry: `tests` not a list, `tests = []`, a non-string, an exact file, `**`, a wildcard, a backslash, an
   absolute path, a `.`/`..`/empty segment, and `tests` under `[skip]`. Verify they fail on the current code.
-- [ ] 2.3 Implement D1-D3 in `scripts/guard.py`: the `tests` key on scopes only, the directory-only entry rule built
+- [x] 2.3 Implement D1-D3 in `scripts/guard.py`: the `tests` key on scopes only, the directory-only entry rule built
   on `_check_paths_entry`, `CheckPaths.tests` with a `()` default, and `CHECK_PATHS_FIX` naming the new key. Verify
   2.1 and 2.2 pass, and `uv run mypy` and `uv run ruff check` are clean.
 - [ ] 2.4 Add `directory_tags` and `unmatched_tests` (design D4, D6) with tests on plain data: a file under an entry
