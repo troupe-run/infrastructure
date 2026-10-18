@@ -188,7 +188,9 @@ The Claude Code hook can also answer "allow", so a command runs without a prompt
 - **A plain command, through the Bash tool:** exactly one `gh` command. Outside quotes it has no chaining,
   substitution, variable, redirection, glob, comment or escape, and inside double quotes no `$` or backtick. No
   environment prefix and no path to `gh`.
-- **Local files only from here:** every `--body-file`/`-F` is inside the repository or the system temp directory.
+- **Local files only from here:** every `--body-file`/`-F`, `--input` and `--attach` is inside the repository or the
+  system temp directory. For `--attach <file>#<alt text>`, gh reads the whole value or the part before a `#`,
+  whichever exists when it runs, so every one of those paths must be (refuse-substituted-pr-body, design D6).
 - **No refusal:** no rule refuses it, including one an override would excuse.
 - **The reviewed guard:** the running `scripts/guard.py` is identical to the one on `origin/main`. A guard edited on a
   branch refuses as usual but grants nothing.
