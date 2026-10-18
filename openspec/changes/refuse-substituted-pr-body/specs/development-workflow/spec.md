@@ -170,3 +170,15 @@ one place.
   including `gh`'s own alias `co`
 - **THEN** the command is refused as before, because `gh` runs the extension or alias, and passes it `--help`,
   rather than printing help
+
+
+
+#### Scenario: An attachment from outside the repository
+- **WHEN** an agent runs `gh issue comment 1 --body x --attach /etc/hosts`, or any granted command whose `--attach`
+  could name a file outside the repository and the system temp directory, in any `<file>#<alt text>` reading `gh`
+  might make of it
+- **THEN** the guard doesn't grant it, as for `--body-file`
+
+#### Scenario: An attachment from inside the repository
+- **WHEN** an agent runs `gh pr comment 74 --body x --attach 'docs/shot.png#The new page'`
+- **THEN** the guard may grant it, as for a `--body-file` inside the repository

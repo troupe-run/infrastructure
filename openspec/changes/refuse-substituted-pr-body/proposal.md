@@ -18,6 +18,12 @@ Planning found three more misreads of the same kind, and the owner asked for all
   command's help (`gh repo edit --help`) as owner-only. An agent can't read the help it needs, and the refusal
   misleads it about why. Only `gh help <command>` works, and nothing points to it.
 
+While applying, gh's source showed one more gap, live on `main` and more serious, which the owner asked to fix here
+too. gh's `--attach <file>` (on `gh pr` and `gh issue` `create`, `comment` and `edit`) uploads a local file to GitHub,
+but the guard's list of flags that read local files predates it. So `gh issue comment 1 --body x --attach /etc/hosts`
+is **granted**: it runs with no prompt and no auto-mode check, which is what "A grant is only for a plain gh
+command" exists to prevent for `--body-file`.
+
 ## What Changes
 
 - When `pr-closes-issue` refuses a `gh pr create` whose `--body`/`-b` value holds a shell expansion (command
@@ -36,6 +42,9 @@ Planning found three more misreads of the same kind, and the owner asked for all
   shape: `gh`, a built-in group, words that aren't flags, and `--help` or `-h` last. The shape leaves no room for a
   command that does something: `--help` as another flag's value (`--description --help`), an extension and an alias
   are judged as today. Help requests aren't granted, and help for `guard.py override` stays refused.
+- A granted command's `--attach` counts as a file read, like `--body-file`: the guard grants it only when every file
+  gh could read for it (gh tries the whole value, then each part before a `#`) is inside the repository or the
+  system temp directory. `--attach` is also read as a value-taking flag of `gh pr create`.
 - No other check reads a description, so the description changes are in `pr-closes-issue` only. `gh issue create`
   isn't checked, as today. The help rule sits in front of `pr-closes-issue`, `gh-allow-list` and `owner-only`.
 - The rules' rows in `docs/development-workflow.md` name the new cases.
@@ -57,13 +66,17 @@ None.
   the list, with scenarios for asking for help, a help flag that is another flag's value, and an extension or alias.
 - `development-workflow`: "Agents don't act as the owner" gains a scenario: help for an owner-only command goes
   ahead.
+- `development-workflow`: "A grant is only for a plain gh command" gains scenarios: an attachment from outside the
+  repository isn't granted; one from inside may be.
 
 ## Impact
 
 - `scripts/guard.py`: `pr_closes_issue` and `pr_target`, through one reader of `gh pr create`'s flags; a help-request
   test in `shell_decisions`, with a table of gh's built-in groups.
 - `scripts/tests/test_guard_claude.py` and `scripts/tests/test_guard_gh.py`: regression tests for the issue's
-  command, each new form and help requests, and tests for what must not change.
-- `docs/development-workflow.md`: the `pr-closes-issue`, `gh-allow-list` and `owner-only` rows.
+  command, each new form and help requests, and tests for what must not change. `scripts/tests/test_guard_grants.py`
+  for `--attach`.
+- `docs/development-workflow.md`: the `pr-closes-issue`, `gh-allow-list` and `owner-only` rows, and "What the guard
+  grants".
 - Delivery: `scripts/guard.py` changes in place in **troupe and website** (`guard_targets` in
   `tofu/guard_delivery.tf`), after the owner approves the plan. Neither repository's declaration or hooks change.

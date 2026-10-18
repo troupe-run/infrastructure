@@ -34,7 +34,8 @@
   `-F<file>` holding `Closes #22` go ahead, and `-b'no close'` is refused with "doesn't close an issue";
   `--title --fill --body 'Closes #22'` goes ahead; `-dR troupe-run/.github` with no closing line goes ahead from a
   troupe clone. Verify the decision tests fail on the current code.
-- [ ] 2.3 Implement `pr_create_flags` (D3) in `scripts/guard.py`, and move `pr_closes_issue` and `pr_target` onto it.
+- [ ] 2.3 Implement `pr_create_flags` (D3) in `scripts/guard.py`, with `--attach` added to `GH_PR_CREATE_VALUE_FLAGS`
+  (design D6), and move `pr_closes_issue` and `pr_target` onto it.
   Verify 1.1, 2.2 and every existing test in `scripts/tests/` pass, and `uv run mypy` and `uv run ruff check` are
   clean.
 
@@ -97,19 +98,34 @@
   command's help goes ahead, in the narrow shape (D4), and isn't granted; the `pr-closes-issue` row says the same for
   `gh pr create --help`. Verify `uv run scripts/check.py` passes.
 
-## 5. Integration
+## 5. An attachment is a file read
 
-- [ ] 5.1 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
+- [ ] 5.1 Write the grant tests in `scripts/tests/test_guard_grants.py` (spec: "An attachment from outside the
+  repository", "An attachment from inside the repository"): not granted: `gh issue comment 1 --body x --attach
+  /etc/hosts`, the same on `gh pr comment`, `gh issue create`, `gh pr create`, `gh issue edit` and `gh pr edit`,
+  `--attach=/etc/hosts`, `--attach '../outside.png#alt'`, `--attach 'shot.png#x/../../../etc/hosts'` (a prefix is
+  inside, the whole value isn't), and an empty `--attach ''`; granted: `--attach shot.png`,
+  `--attach 'docs/shot.png#The new page'` and a file in the system temp directory, each on `gh issue comment`. Verify
+  the not-granted tests fail on the current code and the granted ones pass.
+- [ ] 5.2 Implement D6 in `_files_read` and `GH_FILE_FLAGS` (with the comment the design's risks name). Verify 5.1
+  and every test in `scripts/tests/` pass, and `uv run mypy` and `uv run ruff check` are clean.
+- [ ] 5.3 In `docs/development-workflow.md`, "What the guard grants" says every `--body-file`/`-F`/`--input` and
+  `--attach` (each reading of `<file>#<alt>`) must be inside the repository or the temp directory. Verify
+  `uv run scripts/check.py` passes.
+
+## 6. Integration
+
+- [ ] 6.1 Run `uv run scripts/tofu.py plan` after fast-forwarding onto `origin/main`, and verify it shows
   `scripts/guard.py` updated in place in troupe and website, and nothing else. Keep it for the pull request.
-- [ ] 5.2 Run `openspec validate refuse-substituted-pr-body --strict` and verify it passes.
+- [ ] 6.2 Run `openspec validate refuse-substituted-pr-body --strict` and verify it passes.
 
 ## Workflow follow-up
 
 - Open the pull request with a Conventional title and `Closes #90`, the evidence from 2.1, 3.3 and 4.4 and the plan
-  from 5.1, with the description passed by `--body-file`. CI must be green on all three OSes before the delivery is
+  from 6.1, with the description passed by `--body-file`. CI must be green on all three OSes before the delivery is
   planned.
 - Archive the change on the branch before merging. The owner merges by rebase and approves the `apply` job, which
   delivers `scripts/guard.py` to troupe and website.
 - After the apply, confirm both repositories' delivered `scripts/guard.py` match `main` here.
-- Comment on #90 with the pull request and the archived change, noting the three cases added in planning, check it's
+- Comment on #90 with the pull request and the archived change, noting the three cases added in planning and the `--attach` grant found while applying, check it's
   closed, and check its roadmap card says Done.
