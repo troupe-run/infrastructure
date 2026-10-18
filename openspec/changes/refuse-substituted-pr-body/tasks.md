@@ -60,15 +60,25 @@
   and `uv run ruff check` are clean.
   - 2026-10-18: `SHELL_EXPANSION` and the new problem and fix, applied after the flags are read. 1082 tests pass;
     ruff and mypy clean.
-- [ ] 3.3 Run the one-off comparison (design D5): a scratchpad script runs `main`'s `pr_closes_issue`
+- [x] 3.3 Run the one-off comparison (design D5): a scratchpad script runs `main`'s `pr_closes_issue`
   (`git show main:scripts/guard.py`) and this branch's over at least 5,000 generated commands mixing every body,
   body-file, fill, title and repo form above. Verify every difference is one the spec allows: a new message only
   where the body holds an expansion, and a new decision only where the command uses an attached or grouped short
   flag or a flag-like value. Record the counts here.
-- [ ] 3.4 In `docs/development-workflow.md`, the `pr-closes-issue` row names a `--body` built by the shell as a case
+  - 2026-10-18, after rebasing onto `17a9c47` (whose `scripts/guard.py` is `4b613da`'s): a scratchpad script ran both
+    `pr_closes_issue`s over 6,000 seeded commands of 1-4 flags each (every body, body-file, fill, title, repo, grouped
+    and `--attach` form, from a clone whose remote is troupe-run/troupe). 3,845 got the same decision and message.
+    674 got the new message only, all with an expansion in the body. 877 got another message for a form D3 newly
+    reads (such as "has no description" becoming "doesn't close an issue" for `-b'…'`). 604 changed decision, all
+    using a newly read form. None was unexplained. Checked by direction on a second seed: refused → allowed (555)
+    is a later short-flag body that closes an issue or a grouped `-dR` naming another repository; allowed → refused
+    (78) is a later `-b"…"` or `-db '…'` with no closing line, which gh uses because the last body wins, or a grouped
+    `-df`, which now gets `--fill`'s existing refusal.
+- [x] 3.4 In `docs/development-workflow.md`, the `pr-closes-issue` row names a `--body` built by the shell as a case
   that can't be checked, its fix (`--body-file` with a literal path), that literal text in single quotes that looks
   like an expansion gets the same message (design D2), and that flags are read as gh reads them. Verify
   `uv run scripts/check.py` passes.
+  - 2026-10-18: the row and its fix updated; `uv run scripts/check.py` passes.
 
 ## 4. Help requests go ahead
 
