@@ -26,25 +26,31 @@ group 2.
       with the webhook off. Organisation permission: Projects read and write. No repository permissions beyond the
       metadata GitHub always grants. Install it on `troupe-run/website` only. Verify with
       `gh api orgs/troupe-run/installations --jq '.installations[] | select(.app_slug=="troupe-run-board") | {permissions, repository_selection}'`,
-      which should show `organization_projects: write`, `metadata: read` and `selected`
-- [ ] 2.3 Owner: generate a private key, store it in 1Password as `troupe-run-board`, field `private key`, in vault
+      which should show `organization_projects: write`, `metadata: read` and `selected`. Found (2026-10-18): App ID
+      5367918, installation 172676444, `organization_projects: write` and `selected`. GitHub lists no `metadata` for
+      an App with no repository permissions. The repository list is confirmed in 3.2, by the token's own
+      `GET /installation/repositories`
+- [x] 2.3 Owner: generate a private key, store it in 1Password as `troupe-run-board`, field `private key`, in vault
       `troupe.run`, and delete the downloaded file. Verify that
-      `op read -n "op://troupe.run/troupe-run-board/private key" | head -c 31` prints only the PEM header
-- [ ] 2.4 Record the App's ID and client ID on #59. Verify the comment exists
+      `op read -n "op://troupe.run/troupe-run-board/private key" | head -c 31` prints only the PEM header. Found: an SSH Key item, header `-----BEGIN RSA PRIVATE KEY-----`, as for the release
+      App
+- [x] 2.4 Record the App's ID and client ID on #59. Verify the comment exists. Done: #59 issuecomment-6249415918, with bot user ID 344329069
 
 ## 3. Probe the token (design D6)
 
-- [ ] 3.1 Owner: create a throwaway org project (for example "infra-probe board") and a `troupe-run/infra-probe-*`
+- [x] 3.1 Owner: create a throwaway org project (for example "infra-probe board") and a `troupe-run/infra-probe-*`
       repository with one issue. Verify both exist with `gh project list --owner troupe-run` and `gh issue list -R <probe>`
-- [ ] 3.2 Mint an installation token locally from the 1Password key, without printing it. Use it to run
+- [x] 3.2 Mint an installation token locally from the 1Password key, without printing it. Use it to run
       `gh project item-add <probe-project> --owner troupe-run --url <probe issue>`. Record in design.md D6 whether it
       succeeds without the App being installed on the probe repository (question 1), and whether gh accepts the
-      token (question 2). Verify the item shows in `gh project item-list <probe-project> --owner troupe-run`
-- [ ] 3.3 With the same token, try `gh issue comment` on a website issue. Verify that it's refused (question 3) and
-      record that in D6
-- [ ] 3.4 If 3.2 needed a repository permission, the owner adds "Issues: read" to the App and accepts it on the
+      token (question 2). Verify the item shows in `gh project item-list <probe-project> --owner troupe-run`. Done:
+      both yes, and the item showed on project 3 (design D6, Findings)
+- [x] 3.3 With the same token, try `gh issue comment` on a website issue. Verify that it's refused (question 3) and
+      record that in D6. Done, without a live write: an invalid label write on website gave 403 (design D6)
+- [x] 3.4 If 3.2 needed a repository permission, the owner adds "Issues: read" to the App and accepts it on the
       installation. Update the spec's permission line to match. Verify that 3.2 then succeeds, and that
-      `openspec validate add-link-issue-to-board --strict` passes
+      `openspec validate add-link-issue-to-board --strict` passes. Not needed: 3.2 succeeded with no repository
+      permission
 - [ ] 3.5 Owner: delete the probe project and the probe repository. Verify both are gone (404 / not listed)
 
 ## 4. The declarations that name the App
