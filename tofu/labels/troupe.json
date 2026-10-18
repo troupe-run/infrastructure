@@ -60,6 +60,11 @@
     "description": "Append-only text events git can merge, read back in a stable order across branches and forks"
   },
   {
+    "name": "cap:flake-hunt",
+    "color": "1D76DB",
+    "description": "Finding flaky tests on demand, on every platform: repeated rounds, load, fresh inputs, evidence"
+  },
+  {
     "name": "cap:flows",
     "color": "1D76DB",
     "description": "TBD"
@@ -138,6 +143,16 @@
     "name": "cap:protocol",
     "color": "1D76DB",
     "description": "Strict, language-neutral JSON Schema contracts in protocol/ and each plugin, for every surface"
+  },
+  {
+    "name": "cap:python-support",
+    "color": "1D76DB",
+    "description": "Which Python versions troupe supports, how that is declared and enforced, in step with CI"
+  },
+  {
+    "name": "cap:quality-check",
+    "color": "1D76DB",
+    "description": "What scripts/check.py runs, its scoped form, and which paths need which part of the check"
   },
   {
     "name": "cap:releases",

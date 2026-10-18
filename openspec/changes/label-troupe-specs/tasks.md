@@ -2,19 +2,19 @@
 
 ## 1. Add the three capability labels
 
-- [ ] 1.1 Run `uv run scripts/oob.py` and verify that troupe's labels have exactly the four differences in design
+- [x] 1.1 Run `uv run scripts/oob.py` and verify that troupe's labels have exactly the four differences in design
       Context and nothing else; if there's more, stop and report it on #63
-- [ ] 1.2 Read the flake-hunt, python-support and quality-check Purposes from troupe's `main`
+- [x] 1.2 Read the flake-hunt, python-support and quality-check Purposes from troupe's `main`
       (`gh api repos/troupe-run/troupe/contents/openspec/specs/<name>/spec.md`), collapse their whitespace the way
       `scripts/oob.py`'s `purpose()` does, and add them to `oob/troupe-spec-purposes.json` in name order (design D2)
-- [ ] 1.3 Add `cap:flake-hunt`, `cap:python-support` and `cap:quality-check` to `tofu/labels/troupe.json`, colour
+- [x] 1.3 Add `cap:flake-hunt`, `cap:python-support` and `cap:quality-check` to `tofu/labels/troupe.json`, colour
       `1D76DB`, with the descriptions in design D1, in name order. Verify the file holds 43 labels, sorted by name
       (`jq -r '.[].name'` against `sort`), that `git diff` shows only the three additions, and that
       `uv run scripts/check.py` passes
 
 ## 2. Record cap:releases's Purpose
 
-- [ ] 2.1 Read the releases Purpose from troupe's `main` as in 1.2, check `cap:releases`'s description against it
+- [x] 2.1 Read the releases Purpose from troupe's `main` as in 1.2, check `cap:releases`'s description against it
       (design D3), and add it to `oob/troupe-spec-purposes.json` after `cap:quality-check`. Verify the file has 19
       entries and its keys are sorted (`jq -r 'keys_unsorted[]'` against `sort`)
 
