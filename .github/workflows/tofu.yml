@@ -330,7 +330,7 @@ jobs:
   # What OpenTofu can't manage, checked with scripts/oob.py whenever main is planned (spec: ci-apply;
   # run-oob-check-daily design D1-D5). Neither this nor the plan waits for the other. A difference, or
   # a check it couldn't read, fails this job: that failed run is how drift outside OpenTofu reaches
-  # the owner. The checks only a person can run are named in its summary (BY_HAND in oob.py).
+  # the owner. It runs every check a hand run does, and its summary lists them.
   oob:
     name: drift (out of band)
     if: >-

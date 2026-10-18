@@ -3,8 +3,8 @@
 ### Requirement: Each App's installation is declared and checked
 For each GitHub App installed in the org (today DCO, `troupe-run-infrastructure` and `troupe-run-release`), its
 permissions and its repository selection (all repositories, or selected ones) SHALL be declared here. A difference
-from GitHub SHALL be reported by a drift check that only reads. No token CI holds can read the org's installations,
-so this check SHALL be run by hand. CI's drift job SHALL name it as not run in every run (spec: ci-apply).
+from GitHub SHALL be reported by a drift check that only reads. The check SHALL run in CI whenever `main` is planned,
+daily included (spec: ci-apply), as well as by hand.
 
 #### Scenario: An App given a new permission is reported
 - **WHEN** an App's installation gains a permission on GitHub without the declaration changing
@@ -18,6 +18,6 @@ so this check SHALL be run by hand. CI's drift job SHALL name it as not run in e
 - **WHEN** each App's permissions and repository selection match the declaration
 - **THEN** the drift check reports no difference
 
-#### Scenario: CI says the installation check is left to a person
-- **WHEN** CI's drift job runs
-- **THEN** it doesn't read the org's installations, and its output names the App-installations check as run by hand
+#### Scenario: A permission granted by hand is caught within a day
+- **WHEN** an owner grants an App a new permission on GitHub, and nobody runs the check by hand
+- **THEN** the next daily run of `main`'s plan fails its drift job, naming the App and the permission

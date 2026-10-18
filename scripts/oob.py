@@ -5,7 +5,7 @@ Usage: uv run scripts/oob.py [--ci]
 Compares each declaration in oob/ with GitHub, read with whatever login `gh` has (the owner's,
 or CI's read-only App token), prints every difference and every check it couldn't read, and exits
 1 if there are any. It only reads: no call writes to GitHub. --ci, used by tofu.yml's oob job,
-leaves out the checks in BY_HAND and names each one.
+runs the same checks and adds error annotations and the run summary.
 """
 
 import base64
@@ -378,24 +378,6 @@ def gh(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
     return json.loads(result.stdout) if result.stdout.strip() else None
 
 
-# Every check, in the order run reads them: CHECKS, then the ones that aren't a single declaration.
-CHECK_NAMES = [
-    *(c.name for c in CHECKS),
-    "troupe specs",
-    "troupe label descriptions",
-    "code security",
-    "milestones",
-]
-
-# The checks only a person can run, and why: --ci leaves them out and names each one (spec:
-# ci-apply, teams-and-access; run-oob-check-daily design D4). The one place that says so.
-BY_HAND = {
-    "App installations": (
-        "no token CI holds can read the org's installations (403, adopt-org design D9)"
-    ),
-}
-
-
 def hidden_fields(check: Check, declared: list[Record], actual: list[Record]) -> None:
     """Raise UnreadableError for a declared value read back as null (Check.null_is_unreadable)."""
     want = {item[check.key]: item for item in declared}
@@ -424,16 +406,10 @@ class Report:
     differences: list[str] = dataclasses.field(default_factory=list)
     unreadable: list[str] = dataclasses.field(default_factory=list)
     ran: list[str] = dataclasses.field(default_factory=list)
-    by_hand: list[tuple[str, str]] = dataclasses.field(default_factory=list)
-    ci: bool = False
 
     def attempt(self, name: str, body: Callable[[], list[str]]) -> bool:
-        """Run one check, unless it's left to a hand run under --ci. A failure to read is recorded
-        against it, never a difference or "no difference", and the other checks still run
-        (run-oob-check-daily D3, D4)."""
-        if self.ci and name in BY_HAND:
-            self.by_hand.append((name, BY_HAND[name]))
-            return False
+        """Run one check. A failure to read is recorded against it, never a difference or "no
+        difference", and the other checks still run (run-oob-check-daily D3)."""
         try:
             found = body()
         except UnreadableError as error:
@@ -458,8 +434,8 @@ def check_declaration(check: Check, fetch: Fetch, oob_dir: Path, root: Path) -> 
     return differences(check.name, check.key, declared, actual)
 
 
-def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT, *, ci: bool = False) -> Report:
-    report = Report(ci=ci)
+def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT) -> Report:
+    report = Report()
     for check in CHECKS:
         report.attempt(check.name, partial(check_declaration, check, fetch, oob_dir, root))
     specs: list[str] = []
@@ -492,7 +468,7 @@ def plural(count: int, one: str, many: str) -> str:
 
 
 def summary(report: Report) -> str:
-    """The run summary in Markdown: what was found, what ran, and what was left to a person."""
+    """The run summary in Markdown: what was found, and what was checked."""
     found = []
     if report.differences:
         found.append(plural(len(report.differences), "difference", "differences"))
@@ -509,9 +485,6 @@ def summary(report: Report) -> str:
         lines += ["", "Couldn't be read, so nothing is known about them:", ""]
         lines += [f"- {line}" for line in report.unreadable]
     lines += ["", f"Checked: {', '.join(report.ran)}."]
-    if report.by_hand:
-        lines += ["", "Left to a hand run (`uv run scripts/oob.py` with the owner's login):", ""]
-        lines += [f"- {name}: {why}" for name, why in report.by_hand]
     return "\n".join(lines) + "\n"
 
 
@@ -521,13 +494,13 @@ USAGE = "usage: uv run scripts/oob.py [--ci]"
 def main(argv: list[str]) -> int:
     if argv not in ([], ["--ci"]):
         print(
-            f"{USAGE}\n  --ci  leave out the checks only a person can run, naming each one "
-            f"(BY_HAND in scripts/oob.py). Got: {' '.join(argv)!r}",
+            f"{USAGE}\n  --ci  for tofu.yml's oob job: the same checks, with error annotations and "
+            f"the run summary. Got: {' '.join(argv)!r}",
             file=sys.stderr,
         )
         return 2
     ci = argv == ["--ci"]
-    report = run(gh, OOB, ROOT, ci=ci)
+    report = run(gh, OOB, ROOT)
     if ci:
         for line in report.differences:
             print(annotation("difference", line))
@@ -540,8 +513,6 @@ def main(argv: list[str]) -> int:
         print(line)
     for error in report.unreadable:
         print(f"oob: {error}. Nothing is known about it until it can be read; run again.")
-    for name, why in report.by_hand:
-        print(f"oob: not run in CI: {name}, since {why}. Run it by hand: uv run scripts/oob.py")
     if report.differences:
         print(
             f"oob: {len(report.differences)} difference(s). Fix GitHub, or update the declaration "

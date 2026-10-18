@@ -21,7 +21,7 @@ probed: the job doesn't use it to read.
 |---|---|---|---|
 | `.github` files | `GET repos/troupe-run/.github/git/trees/main` | 200 (public repository) | 200 |
 | org settings (2FA) | `GET orgs/troupe-run`, field `two_factor_requirement_enabled` | 200, but the field is absent | 200, the field reads `false` |
-| App installations | `GET orgs/troupe-run/installations` | 401 | **200**, against the 403 recorded on 2026-10-11 (adopt-org design D9); see below |
+| App installations | `GET orgs/troupe-run/installations` | 401 | **200**, all four installations; see below |
 | issue types | `GET orgs/troupe-run/issue-types` | 401 | 200 |
 | projects | GraphQL `organization.projectsV2` | 403 | 200, with the roadmap project's linked repositories |
 | troupe specs → `cap:` labels | `GET repos/troupe-run/troupe/contents/openspec/specs` | 200 | 200 |
@@ -36,9 +36,10 @@ probed: the job doesn't use it to read.
 **The installations read.** It returned 200 to the job's token, listing all four installations (`total_count` 4:
 `dco`, `troupe-run-infrastructure`, `troupe-run-release`, `troupe-run-board`), each with its repository selection and
 full permissions, the same as the owner's login sees. A full `uv run scripts/oob.py` with that token, App
-installations included, found only `troupe-run-board` undeclared, which #59's change declares. So the 403 that
-adopt-org design D9 recorded on 2026-10-11 doesn't hold for this token. Which repositories each App covers is still
-unreadable to any token, and stays hand-confirmed (spec: teams-and-access).
+installations included, found only `troupe-run-board` undeclared, which #59's change declares. adopt-org design D9's 403
+(2026-10-11) was for a different endpoint, the repositories an installation covers (D4). Which repositories each App covers is still
+unreadable to any token, and stays hand-confirmed (spec: teams-and-access). The owner chose to run the check in CI
+(D4).
 
 ## Goals / Non-Goals
 
@@ -47,7 +48,7 @@ unreadable to any token, and stays hand-confirmed (spec: teams-and-access).
   sees.
 - A read that fails, or a value the credential can't see, is an error that names the check. It's never "no
   difference", and never a difference.
-- What CI doesn't check is stated on every run, never silently left out.
+- CI runs every check a hand run does, and says which ones it ran.
 
 **Non-Goals:**
 - Fixing drift automatically. `oob.py` stays read-only, so its token gets no write permission.
@@ -87,8 +88,8 @@ types. GitHub's "permissions required for GitHub Apps" page says `GET /orgs/{org
 action doesn't limit itself to its declared inputs: `lib/get-permissions-from-inputs.js` turns every
 `INPUT_PERMISSION-*` variable into a key of the token request (`permission-issue-types` → `issue_types`). So the job
 passes `permission-issue-types: read`, and the runner warns "Unexpected input". Task 3.2 confirms that GitHub
-accepts `issue_types` and that the token reads issue types. If it doesn't, issue types goes in `BY_HAND` rather than
-the token being widened.
+accepts `issue_types` and that the token reads issue types. If it doesn't, the job fails on issue types (D3) rather than the token
+being widened.
 
 *Alternative:* `GITHUB_TOKEN` alone. It can read only the public-repository checks, and none of the code security
 ones that motivated #62.
@@ -117,23 +118,24 @@ declared value in `oob/`". That was wrong, and was found while implementing task
 *Alternative:* letting the traceback stand. It exits non-zero, but nobody reading the run can tell a refused token
 from a bug.
 
-### D4. Which checks run only by hand is declared in `oob.py`, and `--ci` leaves them out
+### D4. CI runs every check, and `--ci` changes only the output
 
-`oob.py`'s `BY_HAND` maps a check's name to the reason CI can't run it. Every check has a name in `CHECK_NAMES`,
-the `Check`s and the four that aren't a single declaration (troupe specs, troupe label descriptions, code security,
-milestones), and a test fails if a `BY_HAND` key isn't one of them. Today only App installations is in it: "no token
-CI holds can read the org's installations (403, adopt-org design D9)". (A `by_hand` field on `Check` was the first
-idea, but it couldn't mark the four checks that aren't `Check`s.)
+`uv run scripts/oob.py --ci` runs the same checks as a hand run, App installations included. It differs only in its
+output: annotations and the run summary (D5). Any argument other than `--ci` exits 2 with the usage, before anything
+is read (rule: malformed input is an error).
 
-`uv run scripts/oob.py` runs every check, as now. `uv run scripts/oob.py --ci` makes no read for a check in
-`BY_HAND`, and names each one with its reason. Any argument other than `--ci` exits 2 with the usage, before anything
-is read (rule: malformed input is an error). The reasons live in `oob.py` with the checks, in one named place, and a
-test pins that App installations is in `BY_HAND`. If the probe (task 3.2) finds the App can't read
-another check either, that check goes in `BY_HAND` too, and this design says so.
+*How it got here.* The plan, and the first build, left App installations out of CI. A `BY_HAND` mapping in `oob.py`
+named it with its reason, and `--ci` skipped it and said so every run. That rested on a misreading of adopt-org design
+D9. Its 403 (2026-10-11) was for `GET /user/installations/{id}/repositories`, the list of repositories an installation
+covers, which the provider reads. `GET /orgs/troupe-run/installations`, the permissions and selection `oob.py` reads,
+was never tried with the App's token; issue #62's note and this plan's first draft took the one for the other. The
+probe of the job's token (task 3.2) read all four installations in full, so the owner chose on 2026-10-18 to run the
+check in CI and drop `BY_HAND`. The repository lists are still unreadable, and stay hand-confirmed. Keeping an empty
+`BY_HAND` would have been machinery with nothing to do. If a check ever can't be read by CI again, the job fails,
+naming it (D3), and the choice is made then.
 
-*Alternative:* `oob.py --skip "<check>"`, with the skip list on the workflow's `run:` line. That's the first draft's
-D4. It puts the list where CI is defined, but then the reason lives somewhere else (a comment or the README), and a
-test has to parse a shell line in YAML to check it.
+*Alternatives:* keeping App installations by hand, which leaves out a check CI can run. `oob.py --skip "<check>"`
+with the list on the workflow's `run:` line (the first draft), which would have put the reason away from the check.
 
 ### D5. A difference fails the job, and the summary and annotations list it
 
@@ -147,7 +149,8 @@ that user's notification settings allow failed Actions runs. The `cron` line was
 Lau, `39dc0aa`), so today the email reaches the owner. Nothing in the repository can make sure it stays that way, so:
 - `oob/README.md` says the owner should keep "Actions: failed workflows only" (or broader) email notifications on,
   and that a change to the `cron` line moves the notifications to whoever makes it;
-- task 3.3 checks the owner's setting with the owner before merge.
+- task 3.3 checks the owner's setting with the owner before merge. The owner confirmed on 2026-10-18 that failed
+  Actions runs are emailed to them.
 
 *Alternative:* the App opens or updates an issue (as website's weekly link check does, #59). That's more durable, but
 it needs an issues-write token, and the App can't add the issue to the roadmap board, which every issue must be on
@@ -165,7 +168,7 @@ missing, which is the reminder.
 
 - [The "documented" cells are wrong. For example, org administration read might not show the 2FA field] → Task 3.2
   mints the job's exact token locally and runs `oob.py --ci` with it before merge. D3 makes a wrong guess fail
-  loudly, never pass quietly. A check the App truly can't read goes in `BY_HAND` (D4).
+  loudly, never pass quietly.
 - [GraphQL returns a partial answer, such as only public projects, with no `errors`] → The token has "Projects: read"
   (D6), so it sees private projects too. The probe confirms that the roadmap project's linked repositories read in
   full.

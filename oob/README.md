@@ -41,9 +41,9 @@ declared in `app-installations.json`.
 **CI runs it too,** in `tofu.yml`'s `drift (out of band)` job, whenever `main` is planned: daily at 06:00 UTC, after
 CI passes on a merge, and on `gh workflow run tofu.yml --ref main`. The job runs `uv run scripts/oob.py --ci` in the
 `plan-main` environment, with an installation token of the infrastructure App that can only read (spec: ci-apply).
-A difference, or a check it couldn't read, fails the job, and the run's summary lists each one. `--ci` leaves out the
-checks in `BY_HAND` in `scripts/oob.py`, today only App installations, since no token CI holds can read the org's
-installations. It names each one in the summary, and only a hand run checks them.
+It runs every check a hand run does, App installations included. A difference, or a check it couldn't read, fails
+the job, and the run's summary lists each one with the checks it ran. Which repositories each App is installed on is
+still unreadable to any token, so the table below stays confirmed by hand.
 
 **How a failure reaches you.** GitHub emails a failed scheduled run to whoever last changed the workflow's `cron`
 line, and a failed run after a merge to whoever's push started it, but only if their notification settings send

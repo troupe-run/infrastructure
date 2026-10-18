@@ -145,9 +145,9 @@ def RUN(fetch: oob.Fetch, oob_dir: Path) -> list[str]:  # noqa: N802 (reads as t
     return report.differences
 
 
-def REPORT(fetch: oob.Fetch, oob_dir: Path, *, ci: bool = False) -> "oob.Report":  # noqa: N802
+def REPORT(fetch: oob.Fetch, oob_dir: Path) -> oob.Report:  # noqa: N802
     """The whole report, unreadable checks included."""
-    return oob.run(fetch, oob_dir, root=oob_dir, ci=ci)
+    return oob.run(fetch, oob_dir, root=oob_dir)
 
 
 def refused(stderr: str) -> subprocess.CalledProcessError:
@@ -546,49 +546,34 @@ def test_main_reports_every_unreadable_check_and_every_difference(
     assert "no differences" not in out
 
 
-# run-oob-check-daily design D4: checks only a person can run, declared once with the reason, and
-# left out by --ci.
+# run-oob-check-daily design D4: --ci runs every check a hand run does; only its output differs.
+
+EVERY_CHECK = [
+    ".github files",
+    "org settings",
+    "App installations",
+    "issue types",
+    "projects",
+    "troupe specs",
+    "troupe label descriptions",
+    "code security",
+    "milestones",
+]
 
 
-def test_app_installations_is_the_one_check_run_by_hand() -> None:
-    assert list(oob.BY_HAND) == ["App installations"]
-    assert "403" in oob.BY_HAND["App installations"]
-
-
-def test_every_by_hand_name_is_a_check() -> None:
-    assert set(oob.BY_HAND) <= set(oob.CHECK_NAMES)
-
-
-def test_ci_makes_no_read_for_a_by_hand_check_and_names_it_with_its_reason(oob_dir: Path) -> None:
-    calls: list[list[str]] = []
-    report = REPORT(fake_github(TYPES, PROJECTS, calls), oob_dir, ci=True)
-    assert not any(c[1].endswith("/installations") for c in calls)
-    assert report.by_hand == [("App installations", oob.BY_HAND["App installations"])]
-    assert "App installations" not in report.ran
-    assert report.differences == []
-    assert report.unreadable == []
-
-
-def test_without_ci_the_by_hand_check_is_read(oob_dir: Path) -> None:
-    calls: list[list[str]] = []
-    report = REPORT(fake_github(TYPES, PROJECTS, calls), oob_dir)
-    assert any(c[1].endswith("/installations") for c in calls)
-    assert report.by_hand == []
-    assert report.ran == oob.CHECK_NAMES
-
-
-def test_main_with_ci_names_what_it_left_to_a_hand_run(
+def test_ci_reads_the_org_s_installations_and_lists_every_check(
     oob_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    calls: list[list[str]] = []
+    summary = oob_dir / "summary.md"
     monkeypatch.setattr(oob, "OOB", oob_dir)
     monkeypatch.setattr(oob, "ROOT", oob_dir)
-    monkeypatch.setattr(oob, "gh", fake_github(TYPES, PROJECTS, []))
-    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    monkeypatch.setattr(oob, "gh", fake_github(TYPES, PROJECTS, calls))
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
     assert oob.main(["--ci"]) == 0
-    out = capsys.readouterr().out
-    assert "oob: not run in CI: App installations" in out
-    assert oob.BY_HAND["App installations"] in out
-    assert "uv run scripts/oob.py" in out
+    assert any(c[1] == "orgs/troupe-run/installations" for c in calls)
+    assert f"Checked: {', '.join(EVERY_CHECK)}." in summary.read_text()
+    assert f"oob: no differences ({', '.join(EVERY_CHECK)})" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("argv", [["--skip", "projects"], ["ci"], ["--ci", "extra"], ["--CI"]])
@@ -652,9 +637,8 @@ def test_the_summary_lists_differences_unreadable_checks_what_ran_and_what_was_l
     assert "**1 difference, 1 check couldn't be read.**" in text
     assert "- milestones: website: '0.3.0' is on GitHub but not declared" in text
     assert "- issue types: couldn't read it (gh: Forbidden (HTTP 403))" in text
-    ran = [n for n in oob.CHECK_NAMES if n not in {"issue types", "App installations"}]
+    ran = [n for n in EVERY_CHECK if n != "issue types"]
     assert f"Checked: {', '.join(ran)}." in text
-    assert f"- App installations: {oob.BY_HAND['App installations']}" in text
 
 
 def test_the_summary_says_no_differences_when_there_are_none(

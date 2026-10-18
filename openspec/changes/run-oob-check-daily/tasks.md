@@ -20,7 +20,7 @@
 - [x] 2.1 Test first, then add `BY_HAND` (check name to reason, design D4), holding only App installations, and
   `--ci`. With `--ci`, a `BY_HAND` check makes no read (the test's fetch records calls), and the report names it with
   its reason. Without `--ci`, it's read as today. Any other argument exits 2 with the usage before any read. A test
-  pins App installations in `BY_HAND`. Verify with `uv run pytest scripts/tests/test_oob.py`.
+  pins App installations in `BY_HAND`. Verify with `uv run pytest scripts/tests/test_oob.py`. (Removed again by 3.5.)
 - [x] 2.2 Test first, then write the report for CI. `--ci` prints an `::error::` line for each difference and each
   unreadable check, and, when `GITHUB_STEP_SUMMARY` is set, appends a Markdown summary to it: the differences, the
   unreadable checks, the checks that ran, and the by-hand checks with their reasons. Verify with tests of the
@@ -34,17 +34,18 @@
 - [x] 3.1 The owner grants the infrastructure App org "Issue types: read" and "Projects: read" in its settings, and
   accepts them on the installation. Then declare both in `oob/app-installations.json`, and verify the hand run of
   `uv run scripts/oob.py` shows no App-installations difference.
-- [ ] 3.2 Probe the token the job will use, before the job depends on it. With the owner present for the 1Password
+- [x] 3.2 Probe the token the job will use, before the job depends on it. With the owner present for the 1Password
   prompt, mint an installation token locally from the App's key, with exactly D2's repositories and read permissions.
   Check the action's `permission-*` input names for issue types and projects against its documentation. Never print
   the key or the token. Run `GH_TOKEN=<that token> uv run scripts/oob.py --ci`. Record each read's result in
   design.md's table, replacing "documented, not yet probed". Any check that's still unreadable goes in `BY_HAND`
   (D4), recorded in design.md. Done when `--ci` with that token reports no unreadable check and no
   difference.
-- [ ] 3.3 Show a difference failing with that token. Run `--ci` against a temporary copy of `oob/` with one field
-  changed (pointed at by a test-only path, never committed), and check it exits 1 with the `::error::` line naming
-  the difference. Then ask the owner to confirm their GitHub notification setting for Actions sends email for failed
-  workflows (D5). Record the answer in design.md.
+- [ ] 3.3 Show a difference failing with that token. After 3.5, run `--ci` with the job's token. The org has a real
+  difference today, #59's `troupe-run-board` App installed but not yet declared, so check the run exits 1 with an
+  `::error::` line naming it. (The plan was a temporary edit to a copy of `oob/`; a real difference shows the same
+  thing without one.) Then ask the owner to confirm their GitHub notification setting for Actions sends email for
+  failed workflows (D5), and record the answer in design.md.
 - [ ] 3.4 Add the `oob` job to `.github/workflows/tofu.yml`. It gets the `plan` job's `if`, the `plan-main` environment
   (`deployment: false`), `permissions: contents: read`, and the read-only token from `actions/create-github-app-token`
   (D2) as `GH_TOKEN`. It runs `uv run --no-project scripts/oob.py --ci`, with no `needs:` on `plan` and not needed by
@@ -52,6 +53,12 @@
   that fails if the job's `if` differs from `plan`'s, its environment isn't `plan-main`, it gains a write permission
   or a write `permission-*` input, it needs or is needed by `plan`, or it doesn't run `oob.py --ci`. Verify each
   failure by mutating a copy of the loaded workflow in the test, and run `uv run scripts/check.py`.
+
+- [x] 3.5 Run App installations in CI too (owner, 2026-10-18; design D4): the probe read all four installations in
+  full with the job's token. Remove `BY_HAND`, the skip and its output, and the tests of them. Add a test that
+  `--ci` reads the org's installations and that the summary lists App installations among the checks run. Update
+  `oob/README.md`, README.md and the job's comment in `tofu.yml`. Verify with `uv run scripts/check.py`, and with
+  `grep -rn "BY_HAND\|\.by_hand\|not run in CI" scripts .github oob README.md` finding nothing.
 
 ## 4. Documentation
 
@@ -66,5 +73,5 @@
 - Open the PR with `Closes #62`, and quote `scripts/oob.py`'s output (task 2.3) and the probe's results (task 3.2).
 - Archive on the branch before the owner merges by rebase.
 - After the merge, once CI passes on `main`, check the `oob` job's first run: it passes, its summary lists the checks
-  run and App installations as by hand, and it made no write. Comment on #62 with the PR, the archived change and
+  run, App installations among them, and it made no write. Comment on #62 with the PR, the archived change and
   that run's URL, check #62 is closed, and set its card to Done.
