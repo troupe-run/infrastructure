@@ -10,25 +10,28 @@
   blank line before "OpenTofu used…" to the `Plan:` line; its first 60,000 bytes equal #96's posted comment byte for
   byte. `plan_secrets.py` needs the keys locally, so instead of a 1Password prompt the evidence is that run's own
   "The plan holds no key" step, which passed on this plan.)
-- [ ] 1.2 Save a small real plan comment from a recent pull request (its plan section, from `gh api
+- [x] 1.2 Save a small real plan comment from a recent pull request (its plan section, from `gh api
   .../issues/<n>/comments`) as the under-the-limit fixture. Verify its plan section starts with `<details><summary>Full
-  plan</summary>` and ends with `</details>`.
+  plan</summary>` and ends with `</details>`. (Done: `scripts/tests/fixtures/comment-pr93.md`, #93's whole body, 2,015
+  characters as the API reports, a three-resource plan.)
 
 ## 2. The renderer (design D1, D2, D3, D4)
 
-- [ ] 2.1 Write `scripts/tests/test_plan_comment.py` first: under the limit, the plan section matches 1.2's byte for
+- [x] 2.1 Write `scripts/tests/test_plan_comment.py` first: under the limit, the plan section matches 1.2's byte for
   byte and has no note; over the limit (1.1's plan, `COMMENT_LIMIT`), the body is at most `COMMENT_LIMIT` bytes, lists
   both resource headers and the `Plan:` line above the plan, the plan ends on a whole line of the fixture, the code
   block and `<details>` close, and the note's line and byte counts and link are right; a resource list over a small
   limit exits non-zero and writes nothing; a plan holding a run of backticks (at a line's start or inside it) gets a longer fence; the summary
   target uses a bare code block. Run `uv run pytest scripts/tests/test_plan_comment.py` and see them fail.
-- [ ] 2.2 Write `scripts/plan_comment.py` (`--head`, `--plan`, `--plan-url`, `--target comment|summary`, `--out`),
+- [x] 2.2 Write `scripts/plan_comment.py` (`--head`, `--plan`, `--plan-url`, `--target comment|summary`, `--out`),
   with `COMMENT_LIMIT` and `SUMMARY_LIMIT` named once at the top. Verify 2.1's tests pass, and that each fails when its
-  property is broken (for example, cutting with `[:limit]` instead of at a line).
-- [ ] 2.3 Render 1.1's plan as a comment and post it as an issue comment on a throwaway `troupe-run/infra-probe-*`
+  property is broken (for example, cutting with `[:limit]` instead of at a line). (Done: 18 tests, a hypothesis
+  property test among them. Six mutations of the script, cutting mid-line by bytes, counting characters, a fixed
+  fence, no resource list, never refusing, and no note, each fail at least one test.)
+- [x] 2.3 Render 1.1's plan as a comment and post it as an issue comment on a throwaway `troupe-run/infra-probe-*`
   repository. Verify GitHub accepts it, the `<details>` and code blocks render closed, and the note and resource list
   show; record the result in design.md; then delete the repository.
-- [ ] 2.4 Run `uv run scripts/check.py`, which must pass.
+- [x] 2.4 Run `uv run scripts/check.py`, which must pass.
 
 ## 3. The workflow (design D5)
 

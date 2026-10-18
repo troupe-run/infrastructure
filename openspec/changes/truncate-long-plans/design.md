@@ -141,6 +141,14 @@ to any file resource.
 content in the comment, not the log. Moving delivery out of OpenTofu would redesign delivery to fix how it's
 displayed. Neither keeps the hash in the plan as simply as this does.
 
+### Probe: GitHub accepts and renders the truncated comment (2026-10-18)
+
+#96's plan, rendered by `plan_comment.py --target comment` under #96's own heading, was posted as an issue comment on
+the throwaway `troupe-run/infra-probe-plan-comment` (deleted afterwards). It's 64,959 bytes and characters, under
+`COMMENT_LIMIT`. GitHub accepted it, and its rendered HTML has one `<details>` and two closed `<pre>` blocks. The first
+lists both resources, website's included, and the `Plan:` line. The note shows as text after `</details>`:
+"Truncated: showing the first 1,190 of 4,722 lines (64,096 of 256,078 bytes)", with the link.
+
 ## Risks / Trade-offs
 
 - [GitHub counts the comment limit differently from bytes] → bytes are an upper bound on characters, and the posting
