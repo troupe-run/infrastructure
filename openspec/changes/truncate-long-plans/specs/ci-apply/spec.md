@@ -28,3 +28,23 @@ line SHALL be listed in full above the cut. A plan SHALL never be cut without th
 #### Scenario: A summary that can't fit fails the step
 - **WHEN** the resource change lines and the `Plan:` line alone don't fit within the limit
 - **THEN** the step fails, naming the limit, and posts nothing with any of them left out
+
+### Requirement: A plan identifies a file it writes by its content's hash, not its content
+A plan SHALL NOT print the content of a file OpenTofu writes into a repository, such as the guard's delivered files
+and the files of `troupe-run/.github`. It SHALL show that file's resource as changing, and the commit message it
+plans SHALL carry the hash of the content it writes, so a reader can tell which content each change delivers. The
+content is reviewed in the pull request's diff of its source.
+
+#### Scenario: A changed source shows its hash, not its content
+- **WHEN** a pull request changes the source of a delivered file
+- **THEN** its plan shows each delivery of that file as an update, with the commit message's content hash going from
+  old to new, and no line of the file's content
+
+#### Scenario: A drifted file is shown being restored, without its content
+- **WHEN** a delivered file is changed in a target repository outside OpenTofu
+- **THEN** the next plan shows that file's resource as an update that restores it, and prints neither the target's
+  content nor the source's
+
+#### Scenario: Hiding the content changes nothing on its own
+- **WHEN** the plan that first hides file content runs, and no source has changed
+- **THEN** it shows no change to any file resource, and no repository gets a commit
