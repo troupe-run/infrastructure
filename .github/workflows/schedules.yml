@@ -1,0 +1,85 @@
+name: schedules
+
+# Notices when a watched scheduled workflow in the org stops running (spec: schedule-watch; #60;
+# openspec/changes/watch-website-link-check/design.md).
+#
+# GitHub turns off a public repository's scheduled workflows after 60 days without activity in it.
+# Then nothing runs, so nothing fails and no issue opens. A watcher in that repository would stop
+# with it, so it lives here. For each workflow in scripts/watched-schedules.json (today, website's
+# weekly external link check), the watch job reads its state and its latest scheduled run, and
+# keeps one "Scheduled workflows stopped running" issue: opened, commented on when what's stopped
+# changes, and closed by a clean run. A run that finds a problem fails.
+#
+#   watch   GITHUB_TOKEN, issues: write    reads; opens, comments on or closes the issue
+#   board   env board (main only)          adds the issue to the troupe roadmap board with the
+#                                          board App's token, when watch opened or commented
+#
+# This file is paused too if infrastructure goes 60 days without activity; its state commits keep
+# it active. `gh workflow enable schedules.yml` turns it back on.
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+    inputs:
+      extra-workflow:
+        description: "One more workflow to watch this run, as troupe-run/<repository>/<file>.yml. For proving the issue path; leave empty for a normal run."
+        type: string
+        required: false
+        default: ""
+
+permissions: {}
+
+jobs:
+  watch:
+    name: watch scheduled workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    outputs:
+      issue-url: ${{ steps.watch.outputs.issue-url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+      # The watched repositories are public, so GITHUB_TOKEN reads them (design D6).
+      - name: Watch
+        id: watch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXTRA_WORKFLOW: ${{ inputs.extra-workflow }}
+        run: uv run --no-project scripts/watch_schedules.py --extra-workflow="$EXTRA_WORKFLOW"
+
+  board:
+    name: add the issue to the board
+    # watch fails whenever it finds a problem, so this runs on any outcome but cancelled, when it
+    # handed over a URL.
+    needs: watch
+    if: ${{ !cancelled() && needs.watch.outputs.issue-url != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: board
+      deployment: false
+    permissions: {}
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: token
+        with:
+          client-id: ${{ vars.BOARD_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BOARD_APP_PRIVATE_KEY }}
+          owner: troupe-run
+          permission-organization-projects: write
+      - name: Add the issue to the troupe roadmap board
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          ISSUE_URL: ${{ needs.watch.outputs.issue-url }}
+        run: |
+          # What watch hands over is checked before it's used.
+          if [[ ! "$ISSUE_URL" =~ ^https://github\.com/troupe-run/infrastructure/issues/[0-9]+$ ]]; then
+            printf '::error::issue-url from the watch job is not an issue in troupe-run/infrastructure: %q\n' "$ISSUE_URL"
+            exit 1
+          fi
+          gh project item-add 1 --owner troupe-run --url "$ISSUE_URL"
