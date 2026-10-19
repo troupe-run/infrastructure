@@ -3,9 +3,7 @@
 ### Requirement: Each repository requires its own checks
 Each repository with a `main` ruleset SHALL require the checks that run on its pull requests:
 - `infrastructure`: its CI check, its `guard tests` check, the `guard` check, DCO, and its pull request's plan;
-- `troupe`: its CI `check` result, which reports for every OS and Python leg, the `guard` check and DCO. It SHALL NOT
-  require the legs themselves: a skipped matrix job reports under its unexpanded name, so a required leg would never
-  report on a push that skips them;
+- `troupe`: its CI `check`, not its legs, the `guard` check and DCO;
 - `website`: its CI test and the `guard` check. It SHALL NOT require DCO: its contributions are accepted under its
   own licences, with no sign-off (owner, 2026-10-16).
 
@@ -18,7 +16,9 @@ The required names SHALL be declared in one place.
 
 #### Scenario: troupe's legs aren't required, their result is
 - **WHEN** this repository's tests run
-- **THEN** they fail if troupe's required checks leave out `check`, or name any `check (<os>, Python <version>)` leg
+- **THEN** they fail if troupe's required checks leave out `check`, or name any `check (<os>, Python <version>)` leg:
+  a skipped matrix job reports under its unexpanded name, so a required leg would never report on a push that skips
+  them
 
 #### Scenario: A renamed job can't be merged past
 - **WHEN** a pull request renames a required job, so the old name never reports
