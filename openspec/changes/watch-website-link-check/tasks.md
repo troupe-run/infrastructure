@@ -71,22 +71,29 @@ merge (Workflow follow-up).
 
 ## 5. Prove the watch job on a throwaway repository (design D6, D7)
 
-- [ ] 5.1 Create `troupe-run/infra-probe-schedule-watch` (public), push to it the script, the declaration, and a copy
+- [x] 5.1 Create `troupe-run/infra-probe-schedule-watch` (public), push to it the script, the declaration, and a copy
       of `schedules.yml` without the board job, plus a scheduled workflow `probe.yml`, and turn `probe.yml` off with
       `gh workflow disable`. Verify `gh workflow list -R troupe-run/infra-probe-schedule-watch --all` shows `probe.yml`
-      disabled
-- [ ] 5.2 Run the probe's watch by hand without input. Verify, from its log, that it read website's
+      disabled. Done: `probe	disabled_manually`
+- [x] 5.2 Run the probe's watch by hand without input. Verify, from its log, that it read website's
       `links-weekly.yml` with `GITHUB_TOKEN` and found it fine, and record in design D6 whether the installation token
       read another repository's Actions API. If it was refused, switch to the drift check's read-only App token, update
-      D6 and group 3, and run again
-- [ ] 5.3 Run it with `extra-workflow=troupe-run/infra-probe-schedule-watch/probe.yml`. Verify the run failed, the
+      D6 and group 3, and run again. Done: it read (run 39229499413, "website/links-weekly.yml: running on its
+      schedule"); recorded in D6
+- [x] 5.3 Run it with `extra-workflow=troupe-run/infra-probe-schedule-watch/probe.yml`. Verify the run failed, the
       tracking issue opened in the probe repository naming `not-active`/`disabled_manually` and the fix, and
       `issue-url` was set. Run it again with the same input: verify no new comment. Run it once more without input:
-      verify the issue is closed with a comment linking the run
-- [ ] 5.4 Run it with `extra-workflow=someone-else/repo/x.yml`. Verify the run fails naming the value, and the probe
-      repository has no new issue or comment
-- [ ] 5.5 Delete the probe repository. Verify `gh repo view troupe-run/infra-probe-schedule-watch` fails with not
-      found
+      verify the issue is closed with a comment linking the run. Done: run 39229570426 failed and opened #1
+      (`bug`, by `app/github-actions`, naming `disabled_manually` and `gh workflow enable probe.yml -R …`). The probe
+      had no board job, so a probe-only `handover` job printed the output: the same input again (39229651692) failed,
+      added no comment and handed over nothing. With `probe.yml` turned on, the problem became `never-ran` (39229731476):
+      it commented and handed over `…/issues/1`. Without input (39229801975) it succeeded and closed #1 with the run's
+      link
+- [x] 5.4 Run it with `extra-workflow=someone-else/repo/x.yml`. Verify the run fails naming the value, and the probe
+      repository has no new issue or comment. Done: run 39229862776 failed with "extra-workflow 'someone-else/repo/x.yml'
+      isn't troupe-run/<repository>/<workflow file>.yml. Fix it; nothing was read."; #1 stayed closed with 2 comments
+- [x] 5.5 Delete the probe repository. Verify `gh repo view troupe-run/infra-probe-schedule-watch` fails with not
+      found. Done: "Could not resolve to a Repository"
 
 ## 6. The plan
 

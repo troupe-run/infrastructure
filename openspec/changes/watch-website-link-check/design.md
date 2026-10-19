@@ -145,6 +145,10 @@ in D3 need no permission on them. If a run shows the installation token refused 
 in the first proof run, tasks 5), the fallback is the read-only infrastructure App token the drift check already mints,
 and this decision is updated.
 
+**Found (2026-10-19, task 5.2):** it reads. A run in `troupe-run/infra-probe-schedule-watch` with a job token of
+`contents: read, issues: write` read website's `links-weekly.yml` and its scheduled runs, and reported it running
+on its schedule (run 39229499413). No fallback is needed.
+
 ### D7. A hand-started run can name one extra workflow
 
 `workflow_dispatch` takes `extra-workflow`, in the form `troupe-run/<repository>/<workflow file>`, checked against
