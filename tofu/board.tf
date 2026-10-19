@@ -1,7 +1,9 @@
-# What website's weekly link check needs from the org to put its "Broken external links" issue on
-# the troupe roadmap board (spec: board-credentials; #59). It opens the issue with GITHUB_TOKEN, which
+# What the org's automated runs need to put an issue they opened on the troupe roadmap board
+# (spec: board-credentials): website's weekly link check (#59), and infrastructure's watch of the
+# org's scheduled workflows (#60, spec: schedule-watch). Each opens its issue with GITHUB_TOKEN, which
 # can't write an org project, so a separate job adds it with the troupe-run-board App's token. The
-# App itself is created by hand and declared in oob/app-installations.json (design D1, D4).
+# App itself is created by hand and declared in oob/app-installations.json (add-link-issue-to-board
+# design D1, D4). Both repositories get the same environment and variable.
 
 locals {
   # Not a secret: it names the App, and minting a token also needs the key. The App's IDs are
@@ -34,6 +36,33 @@ resource "github_repository_environment_deployment_policy" "board_main_only" {
 # The infrastructure App writes it with "Variables: write", which it already has on website.
 resource "github_actions_variable" "board_app_client_id" {
   repository    = module.repo_website.name
+  variable_name = "BOARD_APP_CLIENT_ID"
+  value         = local.board_app_client_id
+}
+
+# The same, on infrastructure, for the watch's board job (.github/workflows/schedules.yml;
+# watch-website-link-check design D5). The owner sets BOARD_APP_PRIVATE_KEY here from the same
+# 1Password item (oob/README.md).
+resource "github_repository_environment" "board_infrastructure" {
+  repository          = module.repo_infrastructure.name
+  environment         = "board"
+  can_admins_bypass   = false
+  prevent_self_review = false
+
+  deployment_branch_policy {
+    protected_branches     = false
+    custom_branch_policies = true
+  }
+}
+
+resource "github_repository_environment_deployment_policy" "board_infrastructure_main_only" {
+  repository     = module.repo_infrastructure.name
+  environment    = github_repository_environment.board_infrastructure.environment
+  branch_pattern = "main"
+}
+
+resource "github_actions_variable" "board_app_client_id_infrastructure" {
+  repository    = module.repo_infrastructure.name
   variable_name = "BOARD_APP_CLIENT_ID"
   value         = local.board_app_client_id
 }
