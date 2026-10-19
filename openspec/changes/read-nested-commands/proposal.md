@@ -18,6 +18,11 @@ found by accident (#90, task 4.4), when a loop's `out=$(gh $c ...)` went through
 shapes, not tricks: of 20,612 Bash commands in earlier sessions, 1,135 hold a substitution that mentions git or gh,
 1,646 run a command after `do`, 393 after `until`, and 96 inside `{ … }`.
 
+The hook also covers the PowerShell tool, but reads its text as bash, so PowerShell's own forms go through:
+`Invoke-Expression "gh auth token"`, `iex "gh auth token"`, `$t = $(gh auth token)`, `pwsh -Command "gh auth token"`,
+`cmd /c gh auth token`, `Start-Process gh -ArgumentList "auth","token"` and `1..2 | ForEach-Object { gh auth token }`
+are all allowed on `main`. The owner asked (2026-10-19) for PowerShell to be included.
+
 The owner chose (2026-10-19) to fix all the forms in this one change, by reading what can be read and refusing the
 rest: a git or gh command the guard finds but can't read is refused, never allowed.
 
@@ -34,6 +39,11 @@ rest: a git or gh command the guard finds but can't read is refused, never allow
   program the guard doesn't know to treat it as data), a program named by an expansion (`$G auth token`) in a command
   that mentions git or gh, a shell reading its commands from a pipe or here-string, an alias for git or gh, and a
   substitution the reader can't follow (a `case` inside `$(...)`, or one nested too deep).
+- A command run through the PowerShell tool is read with PowerShell's rules, not bash's: `$( )`, `@( )` and script
+  blocks `{ }` are read, the backtick is an escape, the `&` and `.` call operators are skipped, and
+  `Invoke-Expression`/`iex`, `pwsh`/`powershell -Command` (and `-EncodedCommand`, decoded) and `cmd /c` have their
+  command strings read. What it can't read (`Start-Process`, `Start-Job`, a call operator on a variable) is refused as
+  for bash.
 - What stays the same: a command with no nesting gets the decision it gets today; a word that only names git or gh
   as data (`which gh`, `grep -n git x`, `echo gh`, `command -v gh`, `for c in gh git`) isn't refused; the inner `cat`
   of `--body "$(cat <<'EOF' … EOF)"` goes ahead and the outer `gh pr create` keeps #90's message; a quoted heredoc's
@@ -66,7 +76,8 @@ None.
 - `scripts/tests/test_guard_claude.py` (or a new `scripts/tests/test_guard_nested.py`): the issue's four commands and
   every form above, tests that pin today's decisions for commands without nesting (written and passing before the
   change), and a differential test against real bash, and zsh where it's installed, using stub `gh` and `git`
-  programs that only record their arguments.
+  programs that only record their arguments, and under `pwsh` where it's installed (CI's runners have it on all three
+  OSes; this Mac doesn't). `shell_decisions` is told which tool ran the command.
 - `docs/development-workflow.md`: the `command-unparseable` row and what the guard reads.
 - Delivery: `scripts/guard.py` changes in place in **troupe and website** (`guard_targets` in
   `tofu/guard_delivery.tf`), after the owner approves the plan. Neither repository's declaration or hooks change.

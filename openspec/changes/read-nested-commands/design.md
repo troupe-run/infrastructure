@@ -18,6 +18,11 @@ See proposal.md for why. The current state of `scripts/guard.py` (`82efe9f`):
 - `pr_closes_issue` needs the outer `--body` word to keep its `$(...)` text, so that `SHELL_EXPANSION` can give
   #90's message (refuse-substituted-pr-body D1, D2). `grantable` grants only text with no shell syntax at all
   (`_plain_shell_text`), so nothing nested is granted today.
+- `SHELL_TOOLS` is `("Bash", "PowerShell")`: the hook judges the PowerShell tool's commands too, but through the same
+  bash reader. So PowerShell's own forms (`Invoke-Expression`, `iex`, `$( )` read as part of a word, `pwsh -Command`,
+  `cmd /c`, `Start-Process`, script blocks) go through on `main`, and a backtick, PowerShell's escape character, is
+  taken for a substitution. The survey found no PowerShell tool calls (every session ran on this Mac), so the
+  PowerShell tables in D7 come from PowerShell's documented rules, not from usage.
 - The Bash tool runs the user's shell: zsh on this Mac, bash on Linux, Git Bash on Windows. All three read `$(...)`,
   backticks, `<(...)`, subshells, groups and the reserved words the same way. zsh adds `=(...)`, `noglob`,
   `nocorrect` and `repeat N`.
@@ -167,9 +172,39 @@ can't be read, as now.
   arguments to a log, runs a table of commands under `bash` (and `zsh` where it's installed), and asserts that the
   git and gh commands the reader finds are the ones the shell ran. A hypothesis variant composes nestings from D2's
   and D3's forms. The commands only run stubs, in a temporary directory; no real git or gh runs. It is skipped on a
-  platform with no `bash`, and runs in CI on Linux, macOS and Windows (Git Bash). Forms where the shell runs more than
+  platform with no `bash`, and runs in CI on Linux, macOS and Windows (Git Bash). The PowerShell scenarios run the
+  same way under `pwsh`, with stub `gh.cmd`/`git.cmd` on Windows and stub scripts elsewhere, skipped where `pwsh` is
+  missing (it is on CI's runners, not on this Mac). Forms where the shell runs more than
   the reader can know (a function called later, `xargs`) are unreadable by D5, so the test asserts those are
   refused instead.
+
+### D7. PowerShell is read with its own rules
+
+`shell_decisions` is told which tool ran the command, and the reader takes a dialect: bash (D2 to D4) for the Bash
+tool, PowerShell for the PowerShell tool. Reading PowerShell with bash's rules would be wrong both ways: a backtick
+escapes in PowerShell, and `{ }` holds a script block that runs.
+
+- **Quoting.** `'…'` is literal, with `''` for a quote. `"…"` expands `$( )` (read) and `$var`. The backtick escapes the
+  next character, in and out of double quotes. Here-strings: `@"…"@` expands like `"…"`, `@'…'@` is literal.
+- **Nested commands.** `$( … )`, `@( … )` and `( … )` hold commands, and so does a script block `{ … }`: what's
+  passed to `ForEach-Object`, `Where-Object`, `Invoke-Command` or `&` runs, so every script block is read as
+  commands. Separators are `;`, `|`, `&&`, `||` and newlines.
+- **The program.** Names are matched case-insensitively and without `.exe`. The `&` and `.` call operators before a
+  name are skipped. A call operator on a variable, an expression or a string built at run time (`& $c`, `& ("g"+"h")`)
+  is a program named by an expansion: unreadable (D5).
+- **Command strings.** `Invoke-Expression` and `iex` have their string read as PowerShell. `pwsh` and `powershell`
+  with `-Command`/`-c` have the rest read as PowerShell, and with `-EncodedCommand`/`-ec`/`-e` the value is decoded
+  (base64 of UTF-16LE, as PowerShell encodes it) and read. Text that doesn't decode is unreadable. `-File` runs a
+  script, a non-goal like `bash script.sh`. `cmd /c` and `cmd /k` have the rest read, split on `&`, `&&`, `||` and
+  `|`, with `^` as the escape.
+- **Unreadable.** `Start-Process` (and its aliases `saps` and `start`) and `Start-Job` (and `-FilePath` forms) run
+  programs the reader can't follow, so a git or gh word among their arguments makes the command unreadable, through
+  D5's default for unknown programs.
+- **Data.** `Write-Output`, `echo`, `Write-Host`, `Get-Command`, `gcm` and `Select-String` join `DATA_PROGRAMS` for the
+  PowerShell dialect.
+
+Alternative: refuse every PowerShell command that mentions git or gh. Rejected: the PowerShell tool is how an agent
+runs commands on Windows, so that would refuse every git and gh command there.
 
 ## Risks / Trade-offs
 
@@ -180,6 +215,9 @@ can't be read, as now.
   so the owner sees the cost before merging.
 - [The data list is too short and refuses an ordinary command] → it's one table, extended by pull request, as the gh
   allow-list is; the comparison over the survey finds the common cases now.
+- [The PowerShell data list and unreadable list come from documentation, with no usage behind them, and may refuse
+  ordinary Windows commands] → they're tables, extended by pull request; D6's `pwsh` tests check the reader against a
+  real PowerShell.
 - [The outer split changes for text with `( )`] → D6's pinned decisions and the comparison with `main` catch a change
   for commands with no nesting.
 - [Two Python versions or OSes read text differently] → the reader is plain string scanning plus `shlex`, which the
