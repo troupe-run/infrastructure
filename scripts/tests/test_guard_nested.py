@@ -32,6 +32,11 @@ STUB = """#!/bin/sh
 """
 
 
+BASH_ENV = """case "$(uname -s)" in
+  MINGW* | MSYS* | CYGWIN*) STUB_BIN="$(cygpath -u "$STUB_BIN")" ;;
+esac
+PATH="$STUB_BIN:$PATH"
+"""
 PY_STUB = """import os, sys
 with open(os.environ["STUB_LOG"], "a", encoding="utf-8") as log:
     log.write("\\x1f".join(sys.argv[1:]) + "\\n")
@@ -59,6 +64,10 @@ class Stubs:
         self.log = root / "ran.log"
         self.cwd = root / "work"
         self.cwd.mkdir()
+        # bash reads BASH_ENV after its own startup, so the stubs stay first on PATH even where
+        # the shell puts its own directories first when it starts, as Git Bash does on Windows.
+        self.bash_env = root / "stubs-first.sh"
+        self.bash_env.write_text(BASH_ENV, encoding="utf-8", newline="\n")
         logger = root / "stub.py"
         logger.write_text(PY_STUB, encoding="utf-8")
         for name in PROGRAMS:
@@ -77,6 +86,8 @@ class Stubs:
         env = dict(os.environ)
         env["PATH"] = f"{self.bin}{os.pathsep}{env.get('PATH', '')}"
         env["STUB_LOG"] = str(self.log)
+        env["STUB_BIN"] = str(self.bin)
+        env["BASH_ENV"] = str(self.bash_env)
         # zsh -f and pwsh -NoProfile skip the user's startup files, which could put the real
         # programs first on PATH.
         if shell == PWSH:
@@ -189,7 +200,7 @@ NESTED = [
     ('bash -c "gh auth token"', "gh auth token", ALL),
     ("sh -c 'gh auth token'", "gh auth token", ALL),
     ("bash -ec 'gh auth token'", "gh auth token", ALL),
-    ('zsh -f -c "gh auth token"', "gh auth token", ALL),
+    ('zsh -f -c "gh auth token"', "gh auth token", ("zsh",)),  # needs zsh installed
     ('eval "gh auth token"', "gh auth token", ALL),
     ("eval gh auth token", "gh auth token", ALL),
     # A script fed to a shell by a heredoc
