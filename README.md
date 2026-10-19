@@ -24,13 +24,14 @@ that closes the issue. Specs live in `openspec/specs/`.
 | `tofu/guard_delivery.tf` | The guard's files in each repository that receives it, and the generated list of them |
 | `tofu/environments.tf` | CI's three environments on infrastructure (`plan-pr`, `plan-main`, `apply`), and the website's `github-pages`, which only `main` may deploy through |
 | `tofu/release.tf` | What troupe's release workflow needs: the `release` environment, limited to `main`, the release App's client ID, and the ruleset that lets only the App create or update `release-please--*` branches. The App and its key are set up by hand ([oob/README.md](oob/README.md#troupes-release-app-set-up-by-hand)) |
-| `tofu/board.tf` | What website's weekly link check needs to put its issue on the troupe roadmap board: the `board` environment, limited to `main`, and the board App's client ID. The App and its key are set up by hand ([oob/README.md](oob/README.md#websites-board-app-set-up-by-hand)) |
+| `tofu/board.tf` | What website's weekly link check and the schedule watch need to put their issues on the troupe roadmap board: a `board` environment on website and on infrastructure, each limited to `main`, and the board App's client ID in each. The App and its key are set up by hand ([oob/README.md](oob/README.md#the-board-app-set-up-by-hand)) |
 | `tofu/milestones.json`, `tofu/milestones.tf` | The release milestones (0.1.0, 0.2.0, 1.0.0), the same in every managed repository so the roadmap board groups them by title. A finished release is closed by setting its state, never removed, and a milestone's key never changes, so a rename happens in place |
 | `tofu/dns.json`, `tofu/dns.tf` | troupe.run's DNS records in Cloudflare: the site's, the org's and Pages' domain verification, the mail lockdown and the CAA policy, and the zone's Universal SSL setting, declared off so Cloudflare adds no CAA records of its own. No record is proxied, TTLs are automatic, and a record's key never changes, so an edit happens in place. The zone, the token and the nameservers at Gandi are set up by hand ([oob/README.md](oob/README.md#trouperuns-dns-set-up-by-hand)) |
 | `org-profile/` | The source of `troupe-run/.github`'s files, byte for byte |
 | `scripts/guard.py`, `scripts/guard_pytest.py`, `.githooks/`, `.claude/settings.json`, `.github/workflows/guard.yml` | The guard: this repo's own, and the source of every delivered copy |
 | `docs/development-workflow.md` | Every rule the guard enforces, and how an override works |
 | `oob/` | What OpenTofu can't manage, and `scripts/oob.py`'s declarations |
+| `.github/workflows/schedules.yml`, `scripts/watch_schedules.py`, `scripts/watched-schedules.json` | The schedule watch: daily, it checks each scheduled workflow listed in `watched-schedules.json` (today, website's weekly link check) is still on and has run on its schedule, and keeps one "Scheduled workflows stopped running" issue on the board while one isn't (spec: schedule-watch, #60). A new scheduled workflow is watched by adding it to the list |
 | `scripts/` | `tofu.py` (the only way to run `tofu`), `oob.py` (drift checks), `plan_checks.py` (a plan's failed check blocks as warnings on the run), `plan_secrets.py` (fails a plan job if any rendering of the plan holds a key), `check.py` (the repo's check), `check-paths.toml` (what a change to each path needs from the check), `guard.py` |
 
 ## Setup
@@ -75,6 +76,12 @@ a day. A plan with changes waits for your approval like any plan of `main`; one 
 plan of `main`, the `drift (out of band)` job runs `scripts/oob.py --ci`, and fails on any difference in what OpenTofu
 can't manage ([oob/README.md](oob/README.md)). GitHub pauses a public repository's scheduled workflows after 60 days
 without activity in it. `gh workflow enable tofu.yml` turns the daily plan and that check back on.
+
+The schedule watch (`schedules.yml`, daily at 12:00 UTC) notices when that happens to a watched workflow in another
+repository, such as website's weekly link check: it opens an issue here, on the board, that names the workflow and the
+command that turns it back on. It can't notice this repository going quiet, since it's paused with it; the state
+commits after each apply keep this repository active. Run `uv run scripts/watch_schedules.py` to see what it would
+report; outside CI it changes nothing.
 
 ## Changing the org
 

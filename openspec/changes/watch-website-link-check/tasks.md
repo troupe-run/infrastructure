@@ -62,10 +62,10 @@ merge (Workflow follow-up).
 
 ## 4. Documentation
 
-- [ ] 4.1 README.md: a layout row for `schedules.yml`, `watch_schedules.py` and `watched-schedules.json`, and in
+- [x] 4.1 README.md: a layout row for `schedules.yml`, `watch_schedules.py` and `watched-schedules.json`, and in
       "Running a plan", a sentence that the watch reports website's check stopping, and that it stops too if this
       repository goes 60 days without activity. Verify `uv run scripts/check.py` passes (the docs tests)
-- [ ] 4.2 oob/README.md: in the board App's section, the command to set `BOARD_APP_PRIVATE_KEY` on infrastructure's
+- [x] 4.2 oob/README.md: in the board App's section, the command to set `BOARD_APP_PRIVATE_KEY` on infrastructure's
       `board` environment and to check it by name, beside website's. Verify the check command runs as written
       (it returns 404 for the environment until the apply, which is expected)
 
