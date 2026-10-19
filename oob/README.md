@@ -147,6 +147,44 @@ gh api repos/troupe-run/infrastructure/environments/board/secrets --jq '.secrets
 commands above again. Then delete the old key in the App's settings. A run between the two steps still works, because
 both keys are valid until the old one is deleted.
 
+## The docs App (set up by hand)
+
+troupe's workflows start the website's docs build on every push to troupe's `main` and every new `troupe-v*` tag
+(troupe-run/troupe#120). A run's `GITHUB_TOKEN` covers only its own repository, so the job that sends the trigger
+mints the `troupe-run-docs` App's token, which can start a `workflow_dispatch` run on website and write nothing there
+(spec: docs-build-credentials, #109). GitHub has no API for creating an App, and OpenTofu never holds a secret, so
+these steps are the owner's. The App's IDs are recorded on #109. `tofu/docs.tf` declares a `docs` environment and the
+client-ID variable on troupe. The sending step and the website's side are troupe-run/website#23's.
+
+**Creating it** (done 2026-10-19). In the org's settings, under GitHub Apps, create a new App:
+- name `troupe-run-docs`, installable only on this account, webhook off;
+- repository permission "Actions: read and write", and nothing else: no organisation or account permissions. GitHub
+  adds "Metadata: read";
+- install it with "Only select repositories" and select `website` only. It needn't be installed on troupe: the run
+  mints a token for website's installation.
+
+Its installation is checked by `oob.py` against `app-installations.json`. Its client ID goes in `tofu/docs.tf`.
+
+**Its key.** Generate a private key in the App's settings. Store it in 1Password as an SSH Key item named
+`troupe-run-docs` in vault `troupe.run`, by importing the downloaded `.pem`, then delete the file. Once the `docs`
+environment exists on troupe (after the apply that creates it), set the secret there. Nothing is printed:
+
+```sh
+export OP_ACCOUNT=l-a-u.1password.com
+op read -n "op://troupe.run/troupe-run-docs/private key" \
+  | gh secret set DOCS_APP_PRIVATE_KEY --env docs -R troupe-run/troupe
+```
+
+Check it by name, never by value:
+
+```sh
+gh api repos/troupe-run/troupe/environments/docs/secrets --jq '.secrets[].name'
+```
+
+**Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run the
+command above again. Then delete the old key in the App's settings. A run between the two steps still works, because
+both keys are valid until the old one is deleted.
+
 ## troupe.run's DNS (set up by hand)
 
 troupe.run is registered at Gandi and served by Cloudflare. `tofu/dns.tf` manages its records (spec: dns). The zone,

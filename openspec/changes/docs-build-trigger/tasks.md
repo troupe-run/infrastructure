@@ -58,10 +58,11 @@ If the owner chooses option B in D1, stop after 2.1 and update the change (`/ops
 
 ## 4. The declarations that name the App
 
-- [ ] 4.1 Add `troupe-run-docs` to `oob/app-installations.json` with the permissions found in group 3 and
+- [x] 4.1 Add `troupe-run-docs` to `oob/app-installations.json` with the permissions found in group 3 and
       `repository_selection: selected` (design D6). Verify `uv run scripts/oob.py` reports no difference for App
-      installations, where before this edit it reported the new App
-- [ ] 4.2 Add `DOCS_APP_CLIENT_ID` to `tofu/docs.tf`, holding the client ID from 2.4 in a `locals` block, as a
+      installations, where before this edit it reported the new App. Done: before, "'troupe-run-docs' is on GitHub
+      but not declared"; after, no differences
+- [x] 4.2 Add `DOCS_APP_CLIENT_ID` to `tofu/docs.tf`, holding the client ID from 2.4 in a `locals` block, as a
       `github_actions_variable` on `module.repo_troupe`. Verify `uv run scripts/check.py` passes
 - [ ] 4.3 Document the steps done by hand in `oob/README.md` (design D6): a "The docs App (set up by hand)" section
       with creating and installing the App, storing and setting the key, checking it by name, and rotating it. Add a
