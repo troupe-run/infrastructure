@@ -49,11 +49,39 @@ guard: commit-on-main: commits aren't made on main; work reaches main through a 
 | `edit-branch-change` | Claude | an Edit, Write, MultiEdit or NotebookEdit to a repository file when the branch has no matching change | switch to, or create, the change's branch |
 | `pr-closes-issue` | Claude | `gh pr create` into this repository whose `--body` or `--body-file` doesn't close an issue, or that uses `--fill` or stdin. A `--body` built by the shell (`$VAR`, `$(...)` or backticks, such as `"$(cat <<'EOF' ... EOF)"`) whose own text closes no issue can't be checked before it's sent, and is refused saying so; because the guard sees words after quoting is removed, literal text in single quotes that looks like an expansion gets the same message. Flags are read as gh reads them (`-b'…'`, `-b=…`, `-Fpr.md`, grouped `-db …`, and a flag-like value such as `--title --fill`), and the last body flag wins. The target is named by `--repo`/`-R`, else `GH_REPO`, else it's this repository; a PR into another repository isn't checked, and a target that can't be read, or a clone with no remote, counts as this one. `gh pr create --help` and `-h` go ahead, as help requests (see `gh-allow-list`) | add `Closes #<issue>`, or name the other repository with `--repo`; for a body built by the shell, write it to a file in an earlier command and pass `--body-file` with a literal path |
 | `skip-hooks` | Claude | `--no-verify`, `git commit -n`, and setting, unsetting or overriding `core.hooksPath` | fix what the hook reports |
-| `command-unparseable` | Claude | a `git` or `gh` command that can't be parsed (for example, unbalanced quotes) | simplify the command |
+| `command-unparseable` | Claude | a `git` or `gh` command that can't be parsed (for example, unbalanced quotes), or one the guard finds but can't read (see "Which commands the guard reads"): `gh` or `git` given to a program it doesn't know to treat them as data (`xargs`, `sudo`, `find -exec`, `docker`), a program named by an expansion (`$G auth token`, `& $c`), a shell reading its commands from a pipe or here-string, an alias, a `case` inside a substitution, a wrapper option it doesn't know (`env -S`), or commands nested more than 16 deep. A command that never mentions `git` or `gh` isn't refused for this (read-nested-commands, design D5) | run the `git` or `gh` command on its own, as a separate command, not through another program, a variable or a pipe into a shell; for unbalanced quotes, simplify the command |
 | `delivered-file` | git | in a repository that receives the guard, a commit that changes a file listed in `.github/guard-delivery.json` (the Claude Code hook refuses the edit too, and the `guard` check fails such a commit unless its author is the infrastructure App; one that gets past them shows in the daily plan) | change the file in `troupe-run/infrastructure`, and deliver it from there |
 | `owner-only` | Claude | a `gh` command doing what only the owner does, in any repository: merging past a pull request's rules (`gh pr merge --admin`, or any merge through the API), approving or rejecting a deployment, changing a ruleset, branch protection or environment, org and repository administration (secrets, variables, labels, repository settings, Pages, issue types, project definitions, transfers), and the login's credentials (`gh auth token`, `auth status --show-token`, login and logout). The throwaway repositories `troupe-run/infra-probe-*`, `spike-*` and `bakeoff-*` are exempt, except deleting, archiving, unarchiving or renaming a `spike-*` or `bakeoff-*` record. The list is `GH_OWNER_ONLY`, `GH_API_OWNER_ONLY` and `GH_MUTATIONS_OWNER_ONLY` in `scripts/guard.py`. Its help (`gh repo edit --help`) isn't refused: see `gh-allow-list` | ask the owner, or change it in `troupe-run/infrastructure` through a pull request |
 | `gh-allow-list` | Claude | any other `gh` command not on the allow-list (reads, and the everyday pull request, issue, comment, sub-issue, project-item and workflow-run writes): an unknown subcommand, an extension, an alias, an unlisted `gh api` write, any GraphQL mutation (each everyday write has one way to do it, its `gh` command: guard-issue-mutations, design D1), and a GraphQL query that can't be read before it runs (stdin, or a file not yet written). The list is the `GH_*` tables in `scripts/guard.py`, built from the commands agents ran in earlier sessions (refuse-admin-merge, design D4). A request for a built-in command's help goes ahead whatever the command would be refused for: `gh`, one of gh's own groups (`GH_BUILTIN_GROUPS`), words that aren't flags, and `--help` or `-h` as the last word (refuse-substituted-pr-body, design D4). `--help` after a flag, or followed by anything (a redirection included), is judged as the command it is; an extension, an alias and `gh extension exec` aren't help requests. A help request is granted only when the command it asks about is | for a GraphQL mutation, the refusal names it and, when there is one, the `gh` command that does the same (`updateIssueIssueType` → `gh issue edit <n> --type <name>`); otherwise ask the owner, or add it to the list in `troupe-run/infrastructure`; a read with fields needs `-X GET` |
 | `guard-tamper` | Claude | running the override command, naming a path in the override directory, or editing under `.git/`. **No override unlocks this rule.** | ask the owner |
+
+## Which commands the guard reads
+
+Every Claude rule reaches every `git` and `gh` command a Bash or PowerShell command would run, wherever it sits, and
+decides it as it would the same command run on its own: the same rule, message and fix (read-nested-commands). So
+`out=$(gh repo delete troupe-run/x --yes)` is refused as `owner-only`, and `x=$(git commit --no-verify -m 'fix: x')`
+as `skip-hooks`, while `git log $(git merge-base main HEAD)..HEAD` goes ahead. The reader is `read_shell` in
+`scripts/guard.py`, and its tests check what it reads against what bash, zsh and PowerShell really run.
+
+- **Bash and zsh (the Bash tool):** command substitution (`$(...)` and backticks, in or out of double quotes, nested
+  to any depth), process substitution (`<(...)`, `>(...)`, zsh's `=(...)`), `${...}` and arithmetic, a heredoc whose
+  body the shell expands, subshells and `{ ...; }` groups, loop, conditional and function bodies, `!`, leading
+  assignments and redirections, the wrappers in `SHELL_WRAPPERS` (`time`, `command`, `builtin`, `exec`, `env`,
+  `nice`, `nohup`, `timeout`, zsh's `noglob` and `nocorrect`), the `-c` string of `bash`, `sh`, `zsh`, `dash` and
+  `ksh`, `eval`'s words, and a heredoc a shell runs as its script.
+- **PowerShell (the PowerShell tool):** subexpressions (`$(...)`, `@(...)`, `(...)`), script blocks (`{ ... }`),
+  expandable strings and here-strings (`"..."`, `@"..."@`; a backtick is an escape), the `&` and `.` call operators,
+  assignments, the command strings of `Invoke-Expression` and `iex`, `pwsh` and `powershell` (`-Command`, and
+  `-EncodedCommand` decoded), and `cmd /c`.
+- **Words that only name `git` or `gh`** aren't refused: the programs in `DATA_PROGRAMS` (`echo`, `printf`, `which`,
+  `type`, `grep`, `rg`, `man`, `for … in`, …), `command -v`, and in PowerShell those in `POWERSHELL_DATA_PROGRAMS`
+  (`Write-Output`, `Get-Command`, `Select-String`, PowerShell's keywords). To add one, change the table by pull
+  request: a program earns a place only if no option of it runs a word it's given.
+- **What the guard can't read** is refused under `command-unparseable` when the command mentions `git` or `gh`; see
+  its row.
+- **Out of reach:** commands that programs and scripts run themselves (`bash script.sh`, `uv run scripts/check.py`,
+  `make`, Python's `subprocess`, a git alias starting with `!`, `source`), and a program's name hidden on purpose,
+  such as `$'\x67h'`. These are under "Known gaps".
 
 ## What a commit runs
 
@@ -282,8 +310,11 @@ troupe's release ruleset, is different: getting past it takes the App's key (#47
   (`curl`, a script, a `gh` extension the guard refuses to run but a script could) bypasses them, and so does an MCP
   tool, which the hook doesn't see. Refusing `gh auth token` makes the token harder to reach, not unreachable: it's
   also in the keychain and gh's config.
-- **A command assembled at run time** (`eval`, `sh -c "$X"`) isn't known before it runs, so its `gh` words can't
-  be checked.
+- **The guard reads the command line, not the programs it runs.** A script the agent writes and then runs, a
+  program that runs `git` or `gh` itself (`make`, Python's `subprocess`, a git alias starting with `!`), and a name
+  hidden on purpose (`$'\x67h'`) aren't seen. A command built at run time from a variable (`$X`, `sh -c "$X"`,
+  `& $c`) is refused when its text mentions `git` or `gh`, and isn't seen when it doesn't. Whether agents should get a
+  GitHub login of their own, which GitHub would then hold to its rules, is #101.
 - **A throwaway repository is a naming convention.** An agent can create `troupe-run/spike-x` and do anything there;
   that's confined to a repository nothing depends on.
 - **Pull requests opened through `gh api`** aren't checked for a closing reference. They're refused anyway, as

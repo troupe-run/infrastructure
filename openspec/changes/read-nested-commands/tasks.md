@@ -138,12 +138,16 @@
 
 ## 5. Document it
 
-- [ ] 5.1 In `docs/development-workflow.md`, the `command-unparseable` row says what can't be read and the fix (run
+- [x] 5.1 In `docs/development-workflow.md`, the `command-unparseable` row says what can't be read and the fix (run
   the git or gh command on its own), and a short paragraph under the rules table says that every rule reaches the git
   and gh commands a Bash or PowerShell command runs, wherever they sit, lists the forms read in each, the data programs and the wrappers by
   their table names, and says what is out of reach (scripts and programs that run git or gh themselves, `source`,
   obfuscated names). Verify each example command in the new text gets the decision the text says, by running it
   through `shell_decisions` in a scratchpad script.
+  - 2026-10-19: a new section, "Which commands the guard reads"; the `command-unparseable` row; and the known gap on
+    commands built at run time, rewritten to say what's read now and what isn't, pointing to #101. All 25 example
+    commands in the new text, through the Bash or PowerShell tool as the text says, get the decision it says (0
+    mismatches), and the doc tests pass.
 
 ## 6. Integration
 
