@@ -99,7 +99,7 @@ merge (Workflow follow-up).
 
 - [ ] 6.1 Open the pull request (`Closes #60`) and get CI's plan. Verify it creates only the `board` environment, its
       deployment policy and `BOARD_APP_CLIENT_ID` on infrastructure, changes no ruleset and touches no secret
-- [ ] 6.2 Verify `openspec validate watch-website-link-check --strict` passes
+- [x] 6.2 Verify `openspec validate watch-website-link-check --strict` passes. Done: "Change 'watch-website-link-check' is valid"
 
 ## Workflow follow-up
 
