@@ -64,6 +64,7 @@ lists below are checked by hand in each App's settings, by any change that adds,
 | `dco` | `troupe`, `.github`, `infrastructure` | 2026-10-11, owner |
 | `troupe-run-release` | `troupe` | 2026-10-13, owner |
 | `troupe-run-board` | none | 2026-10-18, by the App's own token (`GET /installation/repositories` returned `[]`) |
+| `troupe-run-docs` | `website` | 2026-10-19, by the App's own token (`GET /installation/repositories` returned `website` only) |
 
 A repository the infrastructure App isn't installed on shows only its public view to OpenTofu (merge settings read as
 off, no security settings), so the first plan after adding one will show that it's missing from this list.
