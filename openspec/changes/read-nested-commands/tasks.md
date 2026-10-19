@@ -158,9 +158,12 @@
 
 ## 6. Integration
 
-- [ ] 6.1 Verify the delivery plan shows `scripts/guard.py` updated in place in troupe and website, and nothing else,
+- [x] 6.1 Verify the delivery plan shows `scripts/guard.py` updated in place in troupe and website, and nothing else,
   and keep it for the pull request. The evidence is CI's pull-request plan (`tofu.yml`'s `plan (pull request)` job),
   not a local one.
+  *2026-10-19: run 39199978813 on `4b58aa0`, posted on PR #102: `Plan: 0 to add, 2 to change, 0 to destroy.` The two
+  are `github_repository_file.guard["troupe:scripts/guard.py"]` and `["website:scripts/guard.py"]`, updated in place
+  (content and commit message only). No modes to set after the apply.*
 - [x] 6.2 Run `openspec validate read-nested-commands --strict` and verify it passes.
   - 2026-10-19: `Change 'read-nested-commands' is valid`.
 
