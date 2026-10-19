@@ -1,6 +1,7 @@
 """Tasks 3.1-3.5: the Claude Code rules, and the PreToolUse entry point fed real-shaped JSON."""
 
 import io
+import itertools
 import json
 import subprocess
 import sys
@@ -325,6 +326,82 @@ def test_a_body_file_after_an_expanded_body_is_what_s_read(tmp_path: Path) -> No
 def test_a_target_after_grouped_flags_is_read(troupe_clone: Repo) -> None:
     command = "gh pr create -dR troupe-run/.github --title t --body 'Updates a link.'"
     assert "pr-closes-issue" not in pr_rules(command, troupe_clone.path)
+
+
+# What read-nested-commands must not change (its design D6, "Pin first"): a command with no nested
+# command is refused for exactly what its pieces are refused for, one at a time.
+
+PLAIN_PIECES = [
+    "git status",
+    "git log -n 3",
+    "git commit -m 'fix: a && b; c | d'",
+    "git commit --no-verify -m 'fix: x'",
+    "gh issue view 1",
+    "gh auth token",
+    "gh pr merge 17 --rebase --admin",
+    "gh repo edit --visibility public",
+    "gh frobnicate",
+    "gh pr create --title t --body 'Closes #1'",
+    "gh pr create --title t --body 'no closing line'",
+    "echo 'a | b'",
+    'echo "x; y && z"',
+    "ls -la",
+]
+QUOTED_HEREDOCS = [
+    "cat <<'EOF'\n$(gh auth token) && `git commit --no-verify`\nEOF",
+    "git commit -q -F - <<'EOF'\nfix: it's (one) thing; really\nEOF",
+]
+
+
+def _refusals(command: str) -> set[tuple[str | None, str]]:
+    return {(d.rule, d.problem) for d in guard.shell_decisions(command, Path.cwd()) if d.refused}
+
+
+@st.composite
+def plain_command(draw: st.DrawFn) -> tuple[str, list[str]]:
+    pieces = draw(st.lists(st.sampled_from(PLAIN_PIECES + QUOTED_HEREDOCS), min_size=1, max_size=5))
+    text = pieces[0]
+    for previous, piece in itertools.pairwise(pieces):
+        # A heredoc's closing line must end its line, so whatever follows it starts a new one.
+        joiner = (
+            "\n"
+            if previous in QUOTED_HEREDOCS
+            else draw(st.sampled_from([" && ", " || ", "; ", " | ", "\n"]))
+        )
+        text += joiner + piece
+    return text, pieces
+
+
+@settings(suppress_health_check=[HealthCheck.too_slow])
+@given(plain_command())
+def test_a_command_with_nothing_nested_is_refused_for_what_its_pieces_are_refused_for(
+    case: tuple[str, list[str]],
+) -> None:
+    command, pieces = case
+    expected = set().union(*(_refusals(piece) for piece in pieces))
+    assert _refusals(command) == expected
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        # Reads inside other commands
+        "git log $(git merge-base main HEAD)..HEAD",
+        'cd "$(git rev-parse --show-toplevel)"',
+        "for n in 1 2; do gh issue view $n; done",
+        # Words that only name git or gh
+        "which gh git",
+        "command -v gh",
+        "type gh",
+        "echo gh",
+        'grep -n "git" notes.md',
+        "for c in gh git; do echo $c; done",
+        # A heredoc the shell leaves alone
+        "cat <<'EOF'\n$(gh auth token)\nEOF",
+    ],
+)
+def test_reads_data_words_and_a_literal_heredoc_go_ahead(command: str) -> None:
+    assert not any(d.refused for d in guard.shell_decisions(command, Path.cwd()))
 
 
 # pr-closes-issue covers PRs into this repository only (#28)

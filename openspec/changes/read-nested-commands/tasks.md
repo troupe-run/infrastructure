@@ -2,7 +2,7 @@
 
 ## 1. Pin what must not change
 
-- [ ] 1.1 Before changing the guard, add to `scripts/tests/test_guard_claude.py` the hypothesis property test of
+- [x] 1.1 Before changing the guard, add to `scripts/tests/test_guard_claude.py` the hypothesis property test of
   design D6 ("Pin first"): commands built from plain pieces (git and gh commands from the rules' existing tests,
   `echo`, `ls`, quoted words holding operators, heredocs with quoted delimiters) joined by `&&`, `||`, `;`, `|` and
   newlines, with no nesting, get from `shell_decisions` the refusals their pieces get one at a time. Name it for that.
@@ -10,6 +10,9 @@
   in "Words that only name git or gh", `cat <<'EOF'` with `$(gh auth token)` in its body, and #90's
   `--body "$(cat <<'EOF' … EOF)"` message. Verify they pass on `main`'s guard (`82efe9f`) before 2.2. Record the
   counts here.
+  - 2026-10-19: 11 tests, all passing on `82efe9f`'s guard: the property test (100 examples, from 14 plain pieces and
+    2 quoted heredocs, joined by `&&`, `||`, `;`, `|` and newlines) and 10 pinned commands. #90's message was
+    already pinned by `test_a_body_built_by_the_shell_is_refused_as_one_that_can_t_be_checked`, so no new test.
 
 ## 2. Read every command a shell line runs
 
