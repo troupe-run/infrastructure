@@ -5,17 +5,17 @@ If the owner chooses option B in D1, stop after 2.1 and update the change (`/ops
 
 ## 1. The `docs` environment
 
-- [ ] 1.1 Add `("repo_troupe", "docs"): False` to `MAIN_ONLY` in `scripts/tests/test_main_only_environments.py`, and
+- [x] 1.1 Add `("repo_troupe", "docs"): False` to `MAIN_ONLY` in `scripts/tests/test_main_only_environments.py`, and
       `tofu/docs.tf` to `TF_FILES` (design D6). Verify that
       `uv run pytest scripts/tests/test_main_only_environments.py` fails, naming `docs` as not declared, before 1.2
-- [ ] 1.2 Add `tofu/docs.tf` (design D3, D6): the `docs` environment on `module.repo_troupe`, with
+- [x] 1.2 Add `tofu/docs.tf` (design D3, D6): the `docs` environment on `module.repo_troupe`, with
       `can_admins_bypass = false`, `prevent_self_review = false`, no reviewers and custom branch policies, plus its
       `main`-only deployment policy, each with a comment naming the spec (docs-build-credentials). Verify that the
       test from 1.1 passes and that `uv run scripts/check.py` passes (tofu fmt, validate)
-- [ ] 1.3 Check the test catches weakening, not only removal. On a scratch copy, set `can_admins_bypass = true`, and
+- [x] 1.3 Check the test catches weakening, not only removal. On a scratch copy, set `can_admins_bypass = true`, and
       separately change the policy's `branch_pattern` to `*`. Verify the test fails each time, naming `docs` and what
       changed, then restore the file
-- [ ] 1.4 Add `tofu/docs.tf` to README.md's layout table. Verify `uv run scripts/check.py` passes
+- [x] 1.4 Add `tofu/docs.tf` to README.md's layout table. Verify `uv run scripts/check.py` passes
 
 ## 2. The App (owner, on GitHub and in 1Password)
 
