@@ -1,0 +1,3 @@
+[
+  {"repository": "website", "workflow": "links-weekly.yml", "max_age_days": 8}
+]
