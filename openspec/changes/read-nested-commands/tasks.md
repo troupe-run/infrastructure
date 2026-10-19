@@ -16,11 +16,13 @@
 
 ## 2. Read every command a shell line runs
 
-- [ ] 2.1 Write the stub-shell harness of design D6 ("Compare with real shells") in a new
+- [x] 2.1 Write the stub-shell harness of design D6 ("Compare with real shells") in a new
   `scripts/tests/test_guard_nested.py`: stub `gh` and `git` programs, first on `PATH` in a temporary directory, that
   only append their arguments to a log; a helper that runs a command under `bash` (and `zsh` when installed) from that
   directory and returns the git and gh commands that ran. Skip when no `bash` is found. Verify by a test that a plain
   `gh auth token` and `git status` run the stubs and are logged, on this Mac under both shells.
+  - 2026-10-19: `test_the_stubs_record_each_git_and_gh_command_the_shell_runs` passes under bash (Homebrew) and
+    zsh on this Mac. zsh runs with `-f`, so the user's startup files can't put the real programs ahead of the stubs.
 - [ ] 2.2 Write the tests of the requirement "The rules reach every command a shell line runs", one per scenario:
   the issue's four commands refused as `owner-only` with the message the command gets on its own; nesting,
   backticks in `$(...)` and `$(...)` in backticks; `<(...)`, `${T:-$(…)}` and zsh's `=(…)`; the heredoc pair; each
