@@ -132,9 +132,16 @@
     (the 14 `pwsh` ones skipped), mypy and ruff are clean, and 2.4's bash test passes over 1,000 more examples.
     A PowerShell statement runs a program only when it starts with a bare word or a call operator; one that starts
     with a variable, a string, a number or a bracket is an expression, whose substitutions and blocks are read.
-- [ ] 4.3 After pushing, verify from CI's logs that the `pwsh` tests ran, not skipped, on Linux, macOS and Windows,
+- [x] 4.3 After pushing, verify from CI's logs that the `pwsh` tests ran, not skipped, on Linux, macOS and Windows,
   and record the counts here. If a runner has no `pwsh`, stop and raise it with the owner rather than leaving them
   skipped.
+  - 2026-10-19, CI run 39199978774 on `4b58aa0`, all 11 jobs green: no job reports the `pwsh` tests skipped. The
+    only skips anywhere are 3 existing Windows tests ("Git for Windows has no executable bit"), so the 14 `pwsh`
+    tests ran and passed on ubuntu (Python 3.13, 3.14, 3.15, and the `check` job), macOS (3.12 to 3.15) and Windows
+    (3.12 to 3.15). The first run, 39199136640 on `906e99e`, had found two harness bugs, fixed in `4b58aa0`. On
+    Windows, Git Bash put its own directories first on PATH, so the real git ran in place of the stub, in an empty
+    temporary directory. A `BASH_ENV` file now puts the stubs first. The `zsh -f -c` row needs zsh installed, so it
+    now runs only under zsh.
 
 ## 5. Document it
 
