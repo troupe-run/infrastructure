@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+import guard
+
 SHELL_NAMES = ("bash", "zsh")
 PROGRAMS = ("gh", "git")
 SEPARATOR = "\x1f"
@@ -85,3 +87,147 @@ def stubs(tmp_path: Path) -> Stubs:
 def test_the_stubs_record_each_git_and_gh_command_the_shell_runs(stubs: Stubs, shell: str) -> None:
     ran = stubs.run("gh auth token; git status --short 'a b'", shell)
     assert ran == [["gh", "auth", "token"], ["git", "status", "--short", "a b"]]
+
+
+# Task 2.2: every rule reaches a git or gh command wherever it sits in the line
+
+ALL = tuple(SHELL_NAMES)
+NONE: tuple[str, ...] = ()
+
+
+def _refusals(command: str, cwd: Path | None = None) -> set[tuple[str | None, str, str]]:
+    decisions = guard.shell_decisions(command, cwd or Path.cwd())
+    return {(d.rule, d.problem, d.fix) for d in decisions if d.refused}
+
+
+def _judged(command: str) -> list[list[str]]:
+    """The git and gh commands the guard reads in `command`, as the stubs would log them."""
+    found = []
+    for words in guard.commands_run(command):
+        program, args = guard._program(words)
+        if program in PROGRAMS:
+            found.append([program, *args])
+    return found
+
+
+# (command, the command it runs that a rule refuses, the shells that can check the reading). A
+# shell checks the reading only when every git and gh word in the line is literal and runs once.
+NESTED = [
+    # An owner-only command in a command substitution (#94's four)
+    ("out=$(gh repo delete troupe-run/x --yes)", "gh repo delete troupe-run/x --yes", ALL),
+    ('echo "$(gh repo delete troupe-run/x --yes)"', "gh repo delete troupe-run/x --yes", ALL),
+    ("x=`gh auth token`", "gh auth token", ALL),
+    ("echo $(gh pr merge 1 --admin)", "gh pr merge 1 --admin", ALL),
+    # Nested substitutions
+    ('echo "$(echo $(gh auth token))"', "gh auth token", ALL),
+    ("echo $(echo `gh auth token`)", "gh auth token", ALL),
+    ("echo `echo $(gh auth token)`", "gh auth token", ALL),
+    ("echo `echo \\`gh auth token\\``", "gh auth token", ALL),
+    # Process substitution and parameter defaults
+    ("cat <(gh auth token)", "gh auth token", ALL),
+    ('echo "${T:-$(gh auth token)}"', "gh auth token", ALL),
+    ("cat =(gh auth token)", "gh auth token", ("zsh",)),
+    # A heredoc the shell expands
+    ("cat <<EOF\n$(gh auth token)\nEOF", "gh auth token", ALL),
+    ("cat <<-EOF\n\t`gh auth token`\n\tEOF", "gh auth token", ALL),
+    # Subshells, groups, loops and conditions
+    ("(gh auth token)", "gh auth token", ALL),
+    ("(cd . && gh auth token)", "gh auth token", ALL),
+    ("{ gh auth token; }", "gh auth token", ALL),
+    ("if gh auth token; then :; fi", "gh auth token", ALL),
+    ("if true; then gh auth token; fi", "gh auth token", ALL),
+    ("if false; then :; elif true; then gh auth token; fi", "gh auth token", ALL),
+    ("if false; then :; else gh auth token; fi", "gh auth token", ALL),
+    ("while gh auth token; do break; done", "gh auth token", ALL),
+    ("until gh auth token; do :; done", "gh auth token", ALL),
+    ("for i in 1; do gh auth token; done", "gh auth token", ALL),
+    ("! gh auth token", "gh auth token", ALL),
+    ("f(){ gh auth token; }; f", "gh auth token", ALL),
+    ("f() { gh auth token; }\nf", "gh auth token", ALL),
+    ("function f { gh auth token; }; f", "gh auth token", ALL),
+    ("2>/dev/null gh auth token", "gh auth token", ALL),
+    # Wrappers that run the command as written
+    ("time gh auth token", "gh auth token", ALL),
+    ("time -p gh auth token", "gh auth token", ("bash",)),
+    ("command gh auth token", "gh auth token", ALL),
+    ("command -p gh auth token", "gh auth token", NONE),  # -p searches the default PATH
+    ("exec gh auth token", "gh auth token", ALL),
+    ("env GH_REPO=troupe-run/x gh auth token", "gh auth token", ALL),
+    ("env -u GH_REPO -- gh auth token", "gh auth token", ALL),
+    ("nice -n 5 gh auth token", "gh auth token", ALL),
+    ("nohup gh auth token", "gh auth token", ALL),
+    ("timeout 5 gh auth token", "gh auth token", NONE),  # macOS has no timeout
+    ("timeout -k 1 --foreground 5s gh auth token", "gh auth token", NONE),
+    ("noglob gh auth token", "gh auth token", ("zsh",)),
+    ("nocorrect gh auth token", "gh auth token", ("zsh",)),
+    # A shell's command string
+    ('bash -c "gh auth token"', "gh auth token", ALL),
+    ("sh -c 'gh auth token'", "gh auth token", ALL),
+    ("bash -ec 'gh auth token'", "gh auth token", ALL),
+    ('zsh -f -c "gh auth token"', "gh auth token", ALL),
+    ('eval "gh auth token"', "gh auth token", ALL),
+    ("eval gh auth token", "gh auth token", ALL),
+    # A script fed to a shell by a heredoc
+    ("bash <<'EOF'\ngh auth token\nEOF", "gh auth token", ALL),
+    ("bash <<EOF\ngh auth token\nEOF", "gh auth token", ALL),
+    ("sh -s <<\\EOF\ngh auth token\nEOF", "gh auth token", ALL),
+    # Git's hooks skipped from inside another command
+    ("(git commit --no-verify -m 'fix: x')", "git commit --no-verify -m 'fix: x'", ALL),
+    ("x=$(git commit --no-verify -m 'fix: x')", "git commit --no-verify -m 'fix: x'", ALL),
+    # A pull request opened inside a substitution
+    (
+        "url=$(gh pr create --title t --body 'no closing line')",
+        "gh pr create --title t --body 'no closing line'",
+        ALL,
+    ),
+]
+
+
+@pytest.mark.parametrize(("command", "inner", "shells"), NESTED)
+def test_a_nested_command_is_refused_as_it_is_on_its_own(
+    command: str, inner: str, shells: tuple[str, ...]
+) -> None:
+    alone = _refusals(inner)
+    assert alone, f"{inner!r} should be refused on its own"
+    assert _refusals(command) == alone
+
+
+@needs_bash
+@pytest.mark.parametrize(
+    ("command", "shell"),
+    [(command, shell) for command, _, shells in NESTED for shell in shells if shell in SHELLS],
+)
+def test_the_guard_reads_the_git_and_gh_commands_the_shell_runs(
+    stubs: Stubs, command: str, shell: str
+) -> None:
+    assert sorted(_judged(command)) == sorted(stubs.run(command, shell))
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git log $(git merge-base main HEAD)..HEAD",
+        'cd "$(git rev-parse --show-toplevel)"',
+        "for n in 1 2; do gh issue view $n; done",
+        "n=$(gh issue view 1 --json title -q .title) && echo $n",
+        "(git status && gh pr list)",
+    ],
+)
+def test_reads_inside_other_commands_go_ahead(command: str) -> None:
+    assert not _refusals(command)
+
+
+def test_the_cat_in_a_body_built_by_the_shell_is_not_refused() -> None:
+    command = "gh pr create --title t --body \"$(cat <<'EOF'\nDoes the thing.\nEOF\n)\""
+    [refusal] = _refusals(command)
+    rule, problem, _ = refusal
+    assert rule == "pr-closes-issue"
+    assert "built by the shell" in problem
+    assert "cat" in [guard._program(words)[0] for words in guard.commands_run(command)]
+
+
+@pytest.mark.parametrize(
+    "command", ["n=$(gh issue view 1)", "(gh issue view 1)", "{ gh pr ready 74; }"]
+)
+def test_a_nested_command_is_never_granted(command: str) -> None:
+    assert not guard.grantable(command, Path.cwd(), Path.cwd())

@@ -23,18 +23,27 @@
   `gh auth token` and `git status` run the stubs and are logged, on this Mac under both shells.
   - 2026-10-19: `test_the_stubs_record_each_git_and_gh_command_the_shell_runs` passes under bash (Homebrew) and
     zsh on this Mac. zsh runs with `-f`, so the user's startup files can't put the real programs ahead of the stubs.
-- [ ] 2.2 Write the tests of the requirement "The rules reach every command a shell line runs", one per scenario:
+- [x] 2.2 Write the tests of the requirement "The rules reach every command a shell line runs", one per scenario:
   the issue's four commands refused as `owner-only` with the message the command gets on its own; nesting,
   backticks in `$(...)` and `$(...)` in backticks; `<(...)`, `${T:-$(…)}` and zsh's `=(…)`; the heredoc pair; each
   grouping, keyword and function form; each wrapper in `SHELL_WRAPPERS`; `bash -c`, `sh -c`, `zsh -c` and `eval`; a
   heredoc fed to `bash`; `skip-hooks` in a subshell and a substitution; `pr-closes-issue` in a substitution. For each
   command the stubs can run, also assert, with 2.1's harness, that the commands the guard judged are the ones the
   shell ran. Verify the new decision tests fail on `main`'s guard and 1.1 still passes.
-- [ ] 2.3 Implement design D1 to D4 in `scripts/guard.py`: the D2 scanner, `commands_run`, `split_command`'s new
+  - 2026-10-19: in `test_guard_nested.py`, 52 nested commands, each refused as its inner command is on its own,
+    with the readings checked against bash and zsh. Each row's inner command was first confirmed to be the one
+    command the shells run (0 mismatches). On `main`'s guard 150 of the 160 tests fail. Ten pass: the harness, 4 of
+    the 5 reads and the never-granted tests, which `main` gets right too, and `sh -s <<\EOF`, which `main` refuses
+    only because it doesn't see `<<\EOF` as a heredoc and reads the body as commands. 1.1 still passes. Committed
+    with 2.3, since the commit check runs the tests.
+- [x] 2.3 Implement design D1 to D4 in `scripts/guard.py`: the D2 scanner, `commands_run`, `split_command`'s new
   operators, `_program`'s skipping, `SHELL_WRAPPERS`, `DATA_PROGRAMS` (with the comment saying what earns a place),
   shells' `-c` and `eval`, and `strip_heredocs` keeping each body and its quoting, with `<<\WORD` and `<<E"OF"` read
   as quoted. `shell_decisions` judges every command `commands_run` returns, `guard_tamper` included. Verify 1.1, 2.2
   and every existing test pass, and `uv run mypy` and `uv run ruff check` are clean.
+  - 2026-10-19: `read_shell` (`_ShellReader`) in `scripts/guard.py`; `split_command` and `strip_heredocs` now use it.
+    All 1,360 tests pass, and mypy and ruff are clean. 1.1's property test also passes at 3,000 examples. Still
+    allowed until 3.2, as planned: `xargs gh …` and `sudo gh …`.
 - [ ] 2.4 Add the hypothesis variant of 2.1's harness (design D6): compose nestings from D2's and D3's forms around
   generated `gh` and `git` commands, and assert the commands the guard finds are the ones bash ran, or that the guard
   refuses the command as `command-unparseable`. Verify it passes over at least 500 examples locally, and record any
