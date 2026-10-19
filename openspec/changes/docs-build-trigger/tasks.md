@@ -53,8 +53,9 @@ If the owner chooses option B in D1, stop after 2.1 and update the change (`/ops
       spec's permission line changes to match. Verify that 3.2 then succeeds and that
       `openspec validate docs-build-trigger --strict` passes. Mark not needed if 3.2 succeeded as it is. Not needed: 3.2
       succeeded with `actions: write` alone
-- [ ] 3.5 Remove the probe repository from the App's installation and delete it. Verify the repository returns 404,
-      and the installation's repositories are website only
+- [x] 3.5 Remove the probe repository from the App's installation and delete it. Verify the repository returns 404,
+      and the installation's repositories are website only. Done: deleting the repository removed it from the
+      installation; it returns 404, and the App's own token lists `troupe-run/website` only
 
 ## 4. The declarations that name the App
 
@@ -64,7 +65,7 @@ If the owner chooses option B in D1, stop after 2.1 and update the change (`/ops
       but not declared"; after, no differences
 - [x] 4.2 Add `DOCS_APP_CLIENT_ID` to `tofu/docs.tf`, holding the client ID from 2.4 in a `locals` block, as a
       `github_actions_variable` on `module.repo_troupe`. Verify `uv run scripts/check.py` passes
-- [ ] 4.3 Document the steps done by hand in `oob/README.md` (design D6): a "The docs App (set up by hand)" section
+- [x] 4.3 Document the steps done by hand in `oob/README.md` (design D6): a "The docs App (set up by hand)" section
       with creating and installing the App, storing and setting the key, checking it by name, and rotating it. Add a
       row for `troupe-run-docs` with `website` to the table of repositories, confirmed with the date. Verify the
       documented `gh api` check commands run as written
