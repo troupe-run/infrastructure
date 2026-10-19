@@ -42,9 +42,11 @@ website#23, the later and more specific of the two, and leaves that to it (D4).
 
 ## Decisions
 
-### D1. Which App sends it — OPEN QUESTION for the owner
+### D1. A new, narrow App, `troupe-run-docs` (owner, 2026-10-19)
 
-**Option A, recommended: a new App, `troupe-run-docs`.**
+The owner chose option A on 2026-10-19. The options as they were put:
+
+**Option A, chosen: a new App, `troupe-run-docs`.**
 - Permissions: repository "Actions: read and write", and "Metadata: read", which GitHub always grants with a
   repository permission. No organisation permission.
 - Installed on troupe-run/website only, with selected repositories. It doesn't need to be installed on troupe: the
@@ -67,10 +69,6 @@ CI. A leak there could undo every control this repository declares.
 **Why A.** It's the release-and-board precedent: one narrow App per job, holding no more than that job needs. The
 saving from B or C is one App's setup. Their cost is a wider credential in a repository that runs third-party
 dependencies on `main`. The constraints say to take the choice that can't lock the owner out, and C's could.
-
-The spec, and the names below (`docs` environment, `DOCS_APP_CLIENT_ID`, `DOCS_APP_PRIVATE_KEY`), assume A. If the
-owner chooses B, the spec changes before any code: no new App, environment or variable, and the release-credentials
-spec gains website and "Actions: write" instead.
 
 ### D2. The trigger is `workflow_dispatch`, which needs "Actions: write"
 
@@ -166,7 +164,7 @@ The infrastructure App needs no new permission: it already writes environments a
 
 ## Migration Plan
 
-1. The owner decides D1. Tasks that need the App wait for it. The environment and the test don't.
+1. The owner decided D1: a new App (2026-10-19).
 2. The owner creates and installs the App, and stores its key. The probe (D5) runs.
 3. The declarations land, and CI's plan shows only the `docs` environment, its policy and `DOCS_APP_CLIENT_ID` being
    created.
@@ -177,4 +175,4 @@ reads them until website#23 lands.
 
 ## Open Questions
 
-- D1: which App. A new `troupe-run-docs` is recommended.
+None. D1 was decided by the owner on 2026-10-19.
