@@ -155,6 +155,7 @@ NESTED = [
     # Wrappers that run the command as written
     ("time gh auth token", "gh auth token", ALL),
     ("time -p gh auth token", "gh auth token", ("bash",)),
+    ("/usr/bin/time -p gh auth token", "gh auth token", NONE),  # not installed on every runner
     ("command gh auth token", "gh auth token", ALL),
     ("command -p gh auth token", "gh auth token", NONE),  # -p searches the default PATH
     ("exec gh auth token", "gh auth token", ALL),
