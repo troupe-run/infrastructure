@@ -28,9 +28,13 @@
 
 - [x] 3.1 Run `uv run scripts/check.py`; it passes. Record the result here.
   - 2026-10-19: all gates passed: ruff, mypy --strict, 1439 tests passed (14 skipped), tofu fmt, init and validate.
-- [ ] 3.2 Open the pull request (`Closes #104`), saying in its body that it merges and is applied before
+- [x] 3.2 Open the pull request (`Closes #104`), saying in its body that it merges and is applied before
   troupe-run/troupe#117 (design D2). Once the owner approves the plan run, record here that the plan changes only
   troupe's "protect main" ruleset: 12 required checks removed, `check` (integration 15368) added, nothing else.
+  - 2026-10-19: PR #106, run 39231562719 (`plan (pull request)` success, for 405a537 merged onto `main`): "Plan: 0 to
+    add, 1 to change, 0 to destroy." The one change is `module.repo_troupe.github_repository_ruleset.main[0]`, in
+    place: the 12 `check (<os>, Python <version>)` required checks (integration 15368) removed, `check` (integration
+    15368) added. The other 2 required checks and every other attribute are unchanged.
 
 ## Workflow follow-up
 
