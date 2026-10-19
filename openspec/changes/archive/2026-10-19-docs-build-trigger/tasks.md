@@ -72,9 +72,10 @@ If the owner chooses option B in D1, stop after 2.1 and update the change (`/ops
 
 ## 5. The plan
 
-- [ ] 5.1 Open the pull request (`Closes #109`), saying that the website's side and troupe's sending step are
+- [x] 5.1 Open the pull request (`Closes #109`), saying that the website's side and troupe's sending step are
       website#23's (design D4), and get CI's plan. Verify the plan creates only the `docs` environment, its deployment
-      policy and `DOCS_APP_CLIENT_ID` on troupe, changes no ruleset, and touches no secret
+      policy and `DOCS_APP_CLIENT_ID` on troupe, changes no ruleset, and touches no secret. Done: #110, CI's plan for
+      ca81a16 `Plan: 3 to add, 0 to change, 0 to destroy.`, the three creations only (#110 issuecomment-6267852374)
 
 ## Workflow follow-up
 
