@@ -328,3 +328,44 @@ def test_an_unparseable_command_whose_gh_is_only_in_a_heredoc_is_refused() -> No
     so a script fed to bash that only it mentioned gh in was allowed."""
     command = "bash <<EOF\necho $(gh auth token 'it\nEOF"
     assert {rule for rule, _, _ in _refusals(command)} == {"command-unparseable"}
+
+
+# Task 3.1: a git or gh command the guard can't read is refused (spec: "A git or gh command the
+# guard can't read is refused"; design D5)
+
+DEEP = "echo " + "$(echo " * (guard.MAX_DEPTH + 1) + "{c}" + ")" * (guard.MAX_DEPTH + 1)
+UNREADABLE = [
+    # (with git or gh, the same shape without)
+    ("echo 1 | xargs gh issue view", "echo 1 | xargs ls"),
+    ("sudo gh auth status", "sudo ls"),
+    (r"find . -name x -exec git add {} \;", r"find . -name x -exec rm {} \;"),
+    ("docker run img git status", "docker run img ls"),
+    ("G=gh; $G auth token", "G=ls; $G -la"),
+    ("echo 'gh auth token' | bash", "echo 'ls' | bash"),
+    ("bash <<< 'gh auth token'", "bash <<< 'ls'"),
+    ("alias g=gh", "alias l=ls"),
+    ("echo $(case x in a) gh auth token;; esac)", "echo $(case x in a) ls;; esac)"),
+    ("env -S 'gh auth token'", "env -S 'ls -la'"),
+    (DEEP.format(c="gh auth token"), DEEP.format(c="ls")),
+]
+
+
+@pytest.mark.parametrize(("command", "_"), UNREADABLE)
+def test_a_git_or_gh_command_the_guard_can_t_read_is_refused(command: str, _: str) -> None:
+    [(rule, problem, fix)] = _refusals(command)
+    assert rule == "command-unparseable"
+    assert problem.startswith("this command runs git or gh where the guardrails can't read it (")
+    assert fix == (
+        "Run the git or gh command on its own, as a separate Bash command, not through another "
+        "program, a variable or a pipe into a shell."
+    )
+
+
+@pytest.mark.parametrize(("_", "command"), UNREADABLE)
+def test_the_same_shape_without_git_or_gh_goes_ahead(_: str, command: str) -> None:
+    assert not _refusals(command)
+
+
+@pytest.mark.parametrize("command", ["echo $(gh auth token", "x=`gh auth token"])
+def test_a_substitution_with_no_end_is_refused_as_unparseable(command: str) -> None:
+    assert {rule for rule, _, _ in _refusals(command)} == {"command-unparseable"}
