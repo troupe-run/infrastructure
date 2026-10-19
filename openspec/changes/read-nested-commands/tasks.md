@@ -91,11 +91,24 @@
     Found while implementing: shlex makes `<<<` a word of its own, so `bash <<< 'gh …'` read the here-string as a
     script file. A shell's redirections and here-strings, and their targets, are now set aside before its options
     are read. A shell's other arguments get the git-or-gh word test too: `bash -c '"$0" auth token' gh` runs gh.
-- [ ] 3.3 Run the one-off comparison of design D6 ("Compare with main over the survey"): a scratchpad script runs
+- [x] 3.3 Run the one-off comparison of design D6 ("Compare with main over the survey"): a scratchpad script runs
   `main`'s `shell_decisions` and this branch's over the surveyed Bash commands and lists each command whose decisions
   differ. Classify every difference as meant (a nested command now read or refused, by which scenario) or a
   regression, fix each regression with a test, and record the counts here (not the commands: they are session
   history). Verify no difference is left unclassified.
+  - 2026-10-19: 20,750 Bash commands from this machine's earlier troupe sessions (this session left out), judged by
+    `82efe9f`'s guard and by this branch's. The first run differed on 54. Eight were a regression: `/usr/bin/time
+    -p git commit …`, refused because the `time` program wasn't a wrapper, though the `time` keyword was. It's now
+    in `SHELL_WRAPPERS`, with a test. The rerun differs on 46, every one meant:
+    - newly `command-unparseable` (26): `xargs gh` 11, `xargs git` 2, an expansion as the program 10 (one of them,
+      `$R/docs/…` with `R="gh api …"`, does run gh), `docker run … git` 1, `gitleaks git` 1 (gitleaks' own
+      subcommand, refused through D5's default for programs the guard doesn't know), and 1 unparseable command
+      that mentions git or gh only in what reads as a heredoc body (2.4's fail-open fix);
+    - newly `owner-only` (9): `GITHUB_TOKEN=$(gh auth token) …` and `gh repo edit` in `for` loops over
+      `troupe-run/$r`, a repository that can't be told to be a throwaway;
+    - newly `gh-allow-list` (10): GraphQL mutations and API writes in substitutions, and `gh $c` in a loop;
+    - a changed message (1): a `gh api -X DELETE …/$(gh api …)` refusal now names the whole path, not `$(gh`.
+    No refusal `main` gave was lost.
 
 ## 4. PowerShell
 

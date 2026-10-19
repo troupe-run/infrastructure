@@ -797,6 +797,11 @@ SHELL_WRAPPERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "nohup": (frozenset(), frozenset()),
     "noglob": (frozenset(), frozenset()),
     "nocorrect": (frozenset(), frozenset()),
+    # The shell's time keyword takes -p; /usr/bin/time (BSD and GNU) takes the rest.
+    "time": (
+        frozenset({"-p", "-l", "-a", "-h", "-v", "--verbose", "--portability", "--append"}),
+        frozenset({"-o", "--output", "-f", "--format"}),
+    ),
     "timeout": (
         frozenset({"--foreground", "--preserve-status", "-v", "--verbose"}),
         frozenset({"-s", "--signal", "-k", "--kill-after"}),
@@ -1109,9 +1114,6 @@ class _ShellReader:
                     i += 1  # the operator's target is the next word
             elif word in RESERVED_WORDS:
                 pass
-            elif word == "time":
-                if i + 1 < len(words) and words[i + 1] == "-p":
-                    i += 1
             elif word == "function":
                 i += 1  # its name
             else:
