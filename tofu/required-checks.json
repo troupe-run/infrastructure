@@ -23,51 +23,7 @@
   ],
   "troupe": [
     {
-      "context": "check (ubuntu-latest, Python 3.12)",
-      "app": "github-actions"
-    },
-    {
-      "context": "check (ubuntu-latest, Python 3.13)",
-      "app": "github-actions"
-    },
-    {
-      "context": "check (ubuntu-latest, Python 3.14)",
-      "app": "github-actions"
-    },
-    {
-      "context": "check (ubuntu-latest, Python 3.15)",
-      "app": "github-actions"
-    },
-    {
-      "context": "check (macos-latest, Python 3.12)",
-      "app": "github-actions"
-    },
-    {
-      "context": "check (macos-latest, Python 3.13)",
-      "app": "github-actions"
-    },
-    {
-      "context": "check (macos-latest, Python 3.14)",
-      "app": "github-actions"
-    },
-    {
-      "context": "check (macos-latest, Python 3.15)",
-      "app": "github-actions"
-    },
-    {
-      "context": "check (windows-latest, Python 3.12)",
-      "app": "github-actions"
-    },
-    {
-      "context": "check (windows-latest, Python 3.13)",
-      "app": "github-actions"
-    },
-    {
-      "context": "check (windows-latest, Python 3.14)",
-      "app": "github-actions"
-    },
-    {
-      "context": "check (windows-latest, Python 3.15)",
+      "context": "check",
       "app": "github-actions"
     },
     {
