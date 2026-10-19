@@ -22,30 +22,37 @@ If the owner chooses option B in D1, stop after 2.1 and update the change (`/ops
 - [x] 2.1 Owner: decide design D1 (a new `troupe-run-docs` App, the release App, or the infrastructure App) and
       record it in design.md as "(owner, <date>)". Verify that design.md's D1 no longer says OPEN QUESTION. Done: option
       A, a new App (owner, 2026-10-19), and D1 says so
-- [ ] 2.2 Owner: create the GitHub App `troupe-run-docs` in the troupe-run org, installable only on this account, with
-      the webhook off. Repository permission: Actions read and write, and nothing else beyond the metadata GitHub
-      always grants. No organisation permission. Install it on `troupe-run/website` only. Verify with
+- [x] 2.2 Owner: create the GitHub App `troupe-run-docs` in the troupe-run org, installable only on this account, with
+      the webhook off. Repository permission: Actions read and write, and nothing else beyond the metadata GitHub always
+      grants. No organisation permission. Install it on `troupe-run/website` only. Verify with
       `gh api orgs/troupe-run/installations --jq '.installations[] | select(.app_slug=="troupe-run-docs") | {permissions, repository_selection}'`,
-      which should show `actions: write`, `metadata: read` and `selected`
-- [ ] 2.3 Owner: generate a private key, store it in 1Password as `troupe-run-docs`, field `private key`, in vault
+      which should show `actions: write`, `metadata: read` and `selected`. Found (2026-10-19): App ID 5380996,
+      installation 173027176, `actions: write`, `metadata: read`, `selected`, and no webhook events. The repository list
+      is checked with the App's own token in 3.5
+- [x] 2.3 Owner: generate a private key, store it in 1Password as `troupe-run-docs`, field `private key`, in vault
       `troupe.run`, and delete the downloaded file. Verify that
-      `op read -n "op://troupe.run/troupe-run-docs/private key" | head -c 31` prints only the PEM header
-- [ ] 2.4 Record the App's ID and client ID on #109. Verify the comment exists
+      `op read -n "op://troupe.run/troupe-run-docs/private key" | head -c 31` prints only the PEM header. Found: with
+      `OP_ACCOUNT=l-a-u.1password.com`, it prints `-----BEGIN RSA PRIVATE KEY-----`
+- [x] 2.4 Record the App's ID and client ID on #109. Verify the comment exists. Done: #109 issuecomment-6267530696
 
 ## 3. Probe the token (design D5)
 
-- [ ] 3.1 Create `troupe-run/infra-probe-docs-trigger` with a workflow that has `on: workflow_dispatch` and one job
-      that echoes its ref, and add it to the docs App's installation (owner accepts on GitHub). Verify the repository
-      and workflow exist with `gh workflow list -R troupe-run/infra-probe-docs-trigger`, and the installation lists it
-- [ ] 3.2 Mint an installation token locally from the 1Password key for the probe repository, without printing it.
-      Use it to create a `workflow_dispatch` event on `main`. Record in design.md D5 whether a run starts. Verify with
-      `gh run list -R troupe-run/infra-probe-docs-trigger --event workflow_dispatch`
-- [ ] 3.3 With the same token, try to create a branch (`POST git/refs`), a tag, and a file (`PUT contents/<path>`) in
-      the probe repository. Verify each is refused with 403, that `gh api repos/troupe-run/infra-probe-docs-trigger/git/refs`
-      shows nothing new, and record that in D5
-- [ ] 3.4 If 3.2 needed another permission, the owner adds it to the App and accepts it on the installation, and the
+- [x] 3.1 Create `troupe-run/infra-probe-docs-trigger` with a workflow that has `on: workflow_dispatch` and one job that
+      echoes its ref, and add it to the docs App's installation (owner accepts on GitHub). Verify the repository and
+      workflow exist with `gh workflow list -R troupe-run/infra-probe-docs-trigger`, and the installation lists it.
+      Done: workflow `probe` (389402012), and the owner added the repository to installation 173027176
+- [x] 3.2 Mint an installation token locally from the 1Password key for the probe repository, without printing it. Use
+      it to create a `workflow_dispatch` event on `main`. Record in design.md D5 whether a run starts. Verify with
+      `gh run list -R troupe-run/infra-probe-docs-trigger --event workflow_dispatch`. Done: 204, and run 39254721925
+      started on `main` and succeeded (design D5, Findings)
+- [x] 3.3 With the same token, try to create a branch (`POST git/refs`), a tag, and a file (`PUT contents/<path>`) in
+      the probe repository. Verify each is refused with 403, that
+      `gh api repos/troupe-run/infra-probe-docs-trigger/git/refs` shows nothing new, and record that in D5. Done: 403
+      for each, and the refs are `refs/heads/main` only (design D5, Findings)
+- [x] 3.4 If 3.2 needed another permission, the owner adds it to the App and accepts it on the installation, and the
       spec's permission line changes to match. Verify that 3.2 then succeeds and that
-      `openspec validate docs-build-trigger --strict` passes. Mark not needed if 3.2 succeeded as it is
+      `openspec validate docs-build-trigger --strict` passes. Mark not needed if 3.2 succeeded as it is. Not needed: 3.2
+      succeeded with `actions: write` alone
 - [ ] 3.5 Remove the probe repository from the App's installation and delete it. Verify the repository returns 404,
       and the installation's repositories are website only
 

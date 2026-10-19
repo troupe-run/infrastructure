@@ -136,6 +136,17 @@ The table in D2 comes from GitHub's documentation. Before the plan, prove it on 
 
 The App is installed on the probe repository for the probe, then removed from it, and the repository is deleted.
 
+**Findings (2026-10-19).** A token minted locally from the 1Password key, for the probe repository only, came back
+with exactly `actions: write` and `metadata: read`.
+
+1. Yes. `POST actions/workflows/probe.yml/dispatches` on `main` returned 204, and run 39254721925 started on `main`
+   and succeeded. No other permission was needed.
+2. Yes. Creating a branch (`POST git/refs`, `refs/heads/probe-branch`), a tag (`refs/tags/troupe-v0.0.0-probe`) and a
+   file (`PUT contents/probe.txt`) each returned 403. Afterwards the repository had only `refs/heads/main`, and no
+   new file.
+3. Yes. The token was minted outside any workflow, from the key and the installation alone, as a troupe run would
+   mint it. The App isn't installed on troupe.
+
 ### D6. The declarations sit in `tofu/docs.tf` and `oob/`
 
 - `tofu/docs.tf`: the `docs` environment on `module.repo_troupe`, its `main`-only deployment policy, and
