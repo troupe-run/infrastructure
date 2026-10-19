@@ -45,7 +45,7 @@ merge (Workflow follow-up).
 
 ## 3. The workflow (spec: schedule-watch; design D1, D5 to D7)
 
-- [ ] 3.1 Write `scripts/tests/test_schedules_workflow.py` first, as `test_oob_job.py` does for the drift job: the
+- [x] 3.1 Write `scripts/tests/test_schedules_workflow.py` first, as `test_oob_job.py` does for the drift job: the
       triggers are a daily schedule and `workflow_dispatch` with `extra-workflow` only (no `pull_request`, no `push`);
       top-level `permissions: {}`; the watch job has exactly `contents: read` and `issues: write`, no environment and
       `GH_TOKEN: ${{ github.token }}`; the board job needs the watch job, runs on `!cancelled()` and a non-empty
@@ -53,10 +53,10 @@ merge (Workflow follow-up).
       infrastructure's issue pattern, and mints a token with only `permission-organization-projects: write`. Each
       way it can go wrong is named, as in `test_each_way_the_job_can_go_wrong_is_named`. Verify they fail because the
       file doesn't exist
-- [ ] 3.2 Write `.github/workflows/schedules.yml` (cron `0 12 * * *`), with a header comment naming the spec, #60 and
+- [x] 3.2 Write `.github/workflows/schedules.yml` (cron `0 12 * * *`), with a header comment naming the spec, #60 and
       the 60-day pause, in the style of `tofu.yml`. Verify the tests from 3.1 pass and `uv run scripts/check.py`
       passes
-- [ ] 3.3 Check the board job's URL guard as a shell snippet: run its `[[ =~ ]]` test locally against
+- [x] 3.3 Check the board job's URL guard as a shell snippet: run its `[[ =~ ]]` test locally against
       `https://github.com/troupe-run/infrastructure/issues/12` (accepted), and website's issue URL, `…/pull/12`,
       `…/issues/12/x` and an empty string (each refused). Verify the outputs
 
