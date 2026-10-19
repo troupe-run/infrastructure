@@ -6,15 +6,15 @@ merge (Workflow follow-up).
 
 ## 1. The `board` environment on infrastructure (spec: board-credentials; design D5)
 
-- [ ] 1.1 Key `MAIN_ONLY` in `scripts/tests/test_main_only_environments.py` by `(repository module, environment)`,
+- [x] 1.1 Key `MAIN_ONLY` in `scripts/tests/test_main_only_environments.py` by `(repository module, environment)`,
       keeping every existing entry, test name and message, and add `("repo_infrastructure", "board")`. Verify the
       existing tests still pass on the old entries, and that the suite fails naming infrastructure's `board` as not
       declared, before 1.2
-- [ ] 1.2 In `tofu/board.tf`, declare the `board` environment on `module.repo_infrastructure` with its `main`-only
+- [x] 1.2 In `tofu/board.tf`, declare the `board` environment on `module.repo_infrastructure` with its `main`-only
       deployment policy and `BOARD_APP_CLIENT_ID` from the same `local.board_app_client_id`, and update the file's
       header comment to name both repositories and #60. Verify the test from 1.1 passes and `uv run scripts/check.py`
       passes (tofu fmt, validate)
-- [ ] 1.3 Add a test that a deleted infrastructure `board` declaration is named, next to
+- [x] 1.3 Add a test that a deleted infrastructure `board` declaration is named, next to
       `test_a_deleted_board_declaration_is_named`. Verify it fails on a scratch copy with the block removed, naming
       the repository and environment, then passes on the real file
 

@@ -5,7 +5,9 @@ prevent_destroy goes with its block: deleting an environment's declaration plans
 nothing refuses, and the next job that names the environment makes GitHub recreate it with no
 branch rule and no reviewer (#61). So this test reads the declarations as text and fails when one
 of these environments is no longer declared, no longer limited to main, or open to an admin bypass.
-Removing one means changing MAIN_ONLY below, in the same diff the owner reviews.
+Removing one means changing MAIN_ONLY below, in the same diff the owner reviews. `board` is in two
+repositories (watch-website-link-check design D5), so an environment is named with its repository
+wherever its name alone would be ambiguous.
 """
 
 import re
@@ -23,20 +25,16 @@ TF_FILES = (
 )
 
 
-@dataclass(frozen=True)
-class Expected:
-    repository: str  # the module that declares the repository
-    owner_reviews: bool  # the owner must be a required reviewer
-
-
-# The one place that says which environments are main-only (design D1). plan-main has no reviewer
-# by design, so it isn't checked either way.
+# The one place that says which environments are main-only (design D1), keyed by the module that
+# declares the repository and the environment's name. The value is whether the owner must be a
+# required reviewer. plan-main has no reviewer by design, so it isn't checked either way.
 MAIN_ONLY = {
-    "plan-main": Expected("repo_infrastructure", owner_reviews=False),
-    "apply": Expected("repo_infrastructure", owner_reviews=True),
-    "release": Expected("repo_troupe", owner_reviews=False),
-    "github-pages": Expected("repo_website", owner_reviews=False),
-    "board": Expected("repo_website", owner_reviews=False),
+    ("repo_infrastructure", "plan-main"): False,
+    ("repo_infrastructure", "apply"): True,
+    ("repo_troupe", "release"): False,
+    ("repo_website", "github-pages"): False,
+    ("repo_website", "board"): False,
+    ("repo_infrastructure", "board"): False,
 }
 
 
@@ -306,35 +304,37 @@ def problems(texts: dict[str, str]) -> list[str]:
     """What's wrong with each main-only environment's declaration (design D1, D3)."""
     environments, patterns = declarations(texts)
     found = []
-    for name, expected in MAIN_ONLY.items():
+    for (repository, name), owner_reviews in MAIN_ONLY.items():
+        expected_on = [module for module, other in MAIN_ONLY if other == name]
+        label = f"{name} on {repository}" if len(expected_on) > 1 else name
         here = [env for env in environments if env.name == name]
-        on_repository = [env for env in here if env.repository == expected.repository]
+        on_repository = [env for env in here if env.repository == repository]
         if not on_repository:
-            elsewhere = sorted(env.repository for env in here)
+            elsewhere = sorted(env.repository for env in here if env.repository not in expected_on)
             found.append(
-                f"{name}: declared on {', '.join(elsewhere)}, not {expected.repository}"
+                f"{label}: declared on {', '.join(elsewhere)}, not {repository}"
                 if elsewhere
-                else f"{name}: not declared"
+                else f"{label}: not declared"
             )
             continue
         if len(on_repository) > 1:
-            raise ValueError(f"{name} is declared more than once on {expected.repository}")
+            raise ValueError(f"{name} is declared more than once on {repository}")
         env = on_repository[0]
         if env.can_admins_bypass:
-            found.append(f"{name}: can_admins_bypass isn't false")
+            found.append(f"{label}: can_admins_bypass isn't false")
         policy = env.branch_policy
         if policy is None:
-            found.append(f"{name}: has no deployment branch policy, so any branch can deploy")
+            found.append(f"{label}: has no deployment branch policy, so any branch can deploy")
         else:
             if boolean(policy.attrs.get("protected_branches", "true"), None):
-                found.append(f"{name}: protected_branches isn't false")
+                found.append(f"{label}: protected_branches isn't false")
             if not boolean(policy.attrs.get("custom_branch_policies", "false"), None):
-                found.append(f"{name}: custom_branch_policies isn't true")
-        declared = sorted(patterns.get((expected.repository, name), []))
+                found.append(f"{label}: custom_branch_policies isn't true")
+        declared = sorted(patterns.get((repository, name), []))
         if declared != ["main"]:
-            found.append(f"{name}: its branch policies are {declared}, not ['main']")
-        if expected.owner_reviews and "local.owner_user_id" not in env.reviewers:
-            found.append(f"{name}: the owner isn't a required reviewer")
+            found.append(f"{label}: its branch policies are {declared}, not ['main']")
+        if owner_reviews and "local.owner_user_id" not in env.reviewers:
+            found.append(f"{label}: the owner isn't a required reviewer")
     return found
 
 
@@ -367,6 +367,10 @@ RELEASE = 'resource "github_repository_environment" "release" {'
 RELEASE_POLICY = 'resource "github_repository_environment_deployment_policy" "release_main_only" {'
 BOARD = 'resource "github_repository_environment" "board" {'
 BOARD_POLICY = 'resource "github_repository_environment_deployment_policy" "board_main_only" {'
+BOARD_INFRASTRUCTURE = 'resource "github_repository_environment" "board_infrastructure" {'
+BOARD_INFRASTRUCTURE_POLICY = (
+    'resource "github_repository_environment_deployment_policy" "board_infrastructure_main_only" {'
+)
 CI_BYPASS = "can_admins_bypass   = false\n  prevent_self_review = false\n\n  dynamic"
 PAGES_BYPASS = (
     "can_admins_bypass   = false\n  prevent_self_review = false\n\n  deployment_branch_policy {"
@@ -405,7 +409,26 @@ def test_a_deleted_release_declaration_is_named() -> None:
 def test_a_deleted_board_declaration_is_named() -> None:
     texts = real_texts()
     texts["board.tf"] = delete_block(delete_block(texts["board.tf"], BOARD), BOARD_POLICY)
-    assert problems(texts) == ["board: not declared"]
+    assert problems(texts) == ["board on repo_website: not declared"]
+
+
+def test_a_deleted_infrastructure_board_declaration_is_named() -> None:
+    """The other board still declared on website doesn't count for infrastructure's."""
+    texts = real_texts()
+    texts["board.tf"] = delete_block(
+        delete_block(texts["board.tf"], BOARD_INFRASTRUCTURE), BOARD_INFRASTRUCTURE_POLICY
+    )
+    assert problems(texts) == ["board on repo_infrastructure: not declared"]
+
+
+def test_infrastructure_s_board_open_to_an_admin_bypass_is_named() -> None:
+    texts = real_texts()
+    text = texts["board.tf"]
+    start = text.index(BOARD_INFRASTRUCTURE)
+    texts["board.tf"] = text[:start] + edit(
+        text[start:], "can_admins_bypass   = false", "can_admins_bypass   = true"
+    )
+    assert problems(texts) == ["board on repo_infrastructure: can_admins_bypass isn't false"]
 
 
 def test_apply_dropped_from_the_ci_environments_is_named() -> None:
