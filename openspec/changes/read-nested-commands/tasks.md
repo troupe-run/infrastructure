@@ -76,14 +76,21 @@
 
 ## 3. Refuse what can't be read
 
-- [ ] 3.1 Write the tests of the requirement "A git or gh command the guard can't read is refused", one per scenario:
+- [x] 3.1 Write the tests of the requirement "A git or gh command the guard can't read is refused", one per scenario:
   `xargs`, `sudo`, `find -exec` and `docker` running git or gh; `G=gh; $G auth token`; a pipe and a here-string into
   `bash`; `alias g=gh`; `$(case x in a) gh auth token;; esac)` and an unclosed `$(`; `env -S 'gh auth token'`; the
   depth cap. Each is refused as `command-unparseable` with D5's message, and the same shapes without git or gh go
   ahead. Verify they fail on the code from 2.3.
-- [ ] 3.2 Implement design D5: the reader's unreadable marks, the git-or-gh word test, and the
+  - 2026-10-19: 24 tests in `test_guard_nested.py`. On 2.3's code the 11 refusals fail, and the 11 look-alikes
+    without git or gh pass, as they should. The two unclosed substitutions pass too, through the existing
+    unbalanced-text refusal, which keeps its message.
+- [x] 3.2 Implement design D5: the reader's unreadable marks, the git-or-gh word test, and the
   `command-unparseable` message and fix. Unbalanced quotes keep today's message. Verify 1.1, 2.2, 2.4, 3.1 and every
   existing test pass, and `uv run mypy` and `uv run ruff check` are clean.
+  - 2026-10-19: all 1,402 tests pass, mypy and ruff are clean, and 2.4's test passes over 3,000 examples twice more.
+    Found while implementing: shlex makes `<<<` a word of its own, so `bash <<< 'gh …'` read the here-string as a
+    script file. A shell's redirections and here-strings, and their targets, are now set aside before its options
+    are read. A shell's other arguments get the git-or-gh word test too: `bash -c '"$0" auth token' gh` runs gh.
 - [ ] 3.3 Run the one-off comparison of design D6 ("Compare with main over the survey"): a scratchpad script runs
   `main`'s `shell_decisions` and this branch's over the surveyed Bash commands and lists each command whose decisions
   differ. Classify every difference as meant (a nested command now read or refused, by which scenario) or a

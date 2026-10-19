@@ -1130,11 +1130,23 @@ class _ShellReader:
             return False
         self.reading.commands.append([*assignments, *rest])
         name = Path(rest[0]).name.lower().removesuffix(".exe")
-        if name == "eval":
+        if "$" in rest[0] or "`" in rest[0]:
+            self.reading.unreadable.append(f"its program is the expansion {rest[0]}")
+        elif name == "alias" and any("=" in word for word in rest[1:]):
+            self.reading.unreadable.append("it defines an alias")
+        elif name == "eval":
             self.read(" ".join(rest[1:]), depth + 1)
         elif name in SHELLS:
             return self._shell(rest, heredocs, depth)
+        elif name not in ("git", "gh") and not _is_data(rest):
+            self._git_or_gh_given_to(name, rest[1:])
         return False
+
+    def _git_or_gh_given_to(self, program: str, args: Sequence[str]) -> None:
+        """A program the guard can't follow that's given git or gh may run it (design D5)."""
+        named = next((word for word in args if _names_git_or_gh(word)), None)
+        if named is not None:
+            self.reading.unreadable.append(f"{named} is given to {program}, which may run it")
 
     def _wrapper_options(
         self, name: str, words: list[str], i: int, assignments: list[str]
@@ -1173,34 +1185,49 @@ class _ShellReader:
     def _shell(self, words: list[str], heredocs: list[_Heredoc], depth: int) -> bool:
         """A shell's -c string, or the heredoc it reads as its script (design D3). True if it
         reads its heredocs as its script."""
-        command_string = stdin = False
+        # Redirections and here-strings first, each with its target when that's a separate word.
+        here_string = False
+        rest: list[str] = []
         i = 1
         while i < len(words):
             word = words[i]
+            redirection = REDIRECTION.match(word)
+            if word.startswith("<<<"):
+                here_string = True
+                i += 1 if word != "<<<" else 2
+            elif redirection is not None:
+                i += 1 if redirection.group(1) else 2
+            else:
+                rest.append(word)
+                i += 1
+        command_string = stdin = False
+        i = 0
+        while i < len(rest):
+            word = rest[i]
             if word == "--":
                 i += 1
                 break
             if word in ("-o", "+o"):
                 i += 2
                 continue
-            if REDIRECTION.match(word) or word.startswith("<<<"):
+            if word.startswith("--"):
                 i += 1
                 continue
-            if word.startswith("--") or not word.startswith(("-", "+")) or word in ("-", "+"):
-                if word.startswith("--"):
-                    i += 1
-                    continue
+            if not word.startswith(("-", "+")) or word in ("-", "+"):
                 break
             command_string = command_string or "c" in word[1:]
             stdin = stdin or "s" in word[1:]
             i += 1
-        operands = [w for w in words[i:] if not REDIRECTION.match(w) and not w.startswith("<<<")]
+        operands = rest[i:]
         if command_string:
             if operands:
                 self.read(operands[0], depth + 1)
+                self._git_or_gh_given_to(words[0], operands[1:])
             return False
         if operands and not stdin:
-            return False  # a script file: what it runs isn't in the command (a non-goal)
+            # A script file: what it runs isn't in the command (a non-goal).
+            self._git_or_gh_given_to(words[0], operands)
+            return False
         if heredocs:
             # An unquoted body is expanded before the shell reads it: what it substitutes runs
             # first, and the script holds only the results, whose text isn't known.
@@ -1213,11 +1240,21 @@ class _ShellReader:
                     self.nested(inner, depth)
                 self.read(script, depth + 1)
             return True
-        if any(w.startswith("<<<") for w in words):
+        if here_string:
             self.reading.unreadable.append(f"{words[0]} reading its commands from a here-string")
         else:
             self.reading.unreadable.append(f"{words[0]} reading its commands from a pipe")
         return False
+
+
+def _names_git_or_gh(word: str) -> bool:
+    return Path(word).name.lower().removesuffix(".exe") in ("git", "gh")
+
+
+def _is_data(words: Sequence[str]) -> bool:
+    """True for a command whose words only name things (DATA_PROGRAMS, `command -v`)."""
+    name = Path(words[0]).name.lower().removesuffix(".exe")
+    return name in DATA_PROGRAMS or (name == "command" and words[1:2] in (["-v"], ["-V"]))
 
 
 def read_shell(command: str) -> ShellReading:
@@ -2062,7 +2099,7 @@ def shell_decisions(command: str, cwd: Path) -> list[Decision]:
     included (read-nested-commands design D1)."""
     text = strip_heredocs(command)
     try:
-        simple_commands = read_shell(command).commands
+        reading = read_shell(command)
     except ValueError as error:
         if GUARD_DIR in text.lower() or re.search(r"guard\.py\S*\s+override\b", text.lower()):
             return [TAMPER]
@@ -2078,7 +2115,7 @@ def shell_decisions(command: str, cwd: Path) -> list[Decision]:
             )
         ]
     decisions: list[Decision] = []
-    for words in simple_commands:
+    for words in reading.commands:
         tamper = guard_tamper(words)
         if tamper.refused:
             return [tamper]
@@ -2087,6 +2124,16 @@ def shell_decisions(command: str, cwd: Path) -> list[Decision]:
             continue  # it only prints help, whatever the command would be refused for
         decisions.append(pr_closes_issue(words, cwd))
         decisions.append(gh_decision(words, cwd))
+    if reading.unreadable and re.search(r"\b(git|gh)\b", command):
+        decisions.append(
+            Decision(
+                "command-unparseable",
+                "this command runs git or gh where the guardrails can't read it "
+                f"({reading.unreadable[0]}).",
+                "Run the git or gh command on its own, as a separate Bash command, not through "
+                "another program, a variable or a pipe into a shell.",
+            )
+        )
     return decisions or [ALLOW]
 
 
