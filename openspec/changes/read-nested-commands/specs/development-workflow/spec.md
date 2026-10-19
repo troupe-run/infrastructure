@@ -2,7 +2,7 @@
 
 ### Requirement: The rules reach every command a shell line runs
 In a Claude Code session, every rule for git and gh commands SHALL apply to each git or gh command a Bash command
-would run, wherever it sits in that command, and SHALL decide it as it decides the same command run on its own: the
+or PowerShell command would run, wherever it sits, read by that shell's rules, and SHALL decide it as it decides the same command run on its own: the
 same rule, message and fix. A command that holds no nested command SHALL get the decision it got before.
 
 #### Scenario: An owner-only command in a command substitution
@@ -72,12 +72,27 @@ same rule, message and fix. A command that holds no nested command SHALL get the
   `type gh`, `echo gh`, `grep -n "git" notes.md` or `for c in gh git; do echo $c; done`
 - **THEN** the command goes ahead
 
+#### Scenario: PowerShell subexpressions and script blocks
+- **WHEN** an agent runs, through the PowerShell tool, `$t = $(gh auth token)`, `@(gh auth token)`,
+  `& gh auth token` or `1..2 | ForEach-Object { gh auth token }`
+- **THEN** the command is refused as `owner-only`
+
+#### Scenario: PowerShell command strings
+- **WHEN** an agent runs, through the PowerShell tool, `Invoke-Expression "gh auth token"`, `iex 'gh auth token'`,
+  `pwsh -Command "gh auth token"`, `powershell -c "gh auth token"`, `cmd /c gh auth token`, or
+  `pwsh -EncodedCommand` with `gh auth token` encoded as PowerShell encodes it (base64 of UTF-16LE)
+- **THEN** the command is refused as `owner-only`
+
+#### Scenario: PowerShell's backtick is an escape
+- **WHEN** an agent runs, through the PowerShell tool, ``Write-Output "a`nb"; git status``
+- **THEN** the command goes ahead, since the backtick escapes a character and runs nothing
+
 #### Scenario: A nested command is never granted
 - **WHEN** an agent runs a granted gh command inside a substitution or a group, such as `n=$(gh issue view 1)`
 - **THEN** the guard doesn't grant it, and Claude Code decides as it would without the guard
 
 ### Requirement: A git or gh command the guard can't read is refused
-In a Claude Code session, a Bash command that would run git or gh in a way the guard can't read SHALL be refused,
+In a Claude Code session, a Bash or PowerShell command that would run git or gh in a way the guard can't read SHALL be refused,
 never allowed, with a message that says the guardrails can't read it there and to run the git or gh command on its
 own. A command the guard can't read that never mentions git or gh SHALL go ahead.
 
@@ -109,4 +124,9 @@ own. A command the guard can't read that never mentions git or gh SHALL go ahead
 #### Scenario: A wrapper option the guard doesn't know
 - **WHEN** an agent runs gh after a known wrapper with an option the guard doesn't know, such as `env -S 'gh auth
   token'`
+- **THEN** the command is refused as `command-unparseable`
+
+#### Scenario: PowerShell that can't be read
+- **WHEN** an agent runs, through the PowerShell tool, `Start-Process gh -ArgumentList "auth","token"`,
+  `Start-Job { gh auth token }` or `$c = 'gh'; & $c auth token`
 - **THEN** the command is refused as `command-unparseable`

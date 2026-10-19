@@ -51,26 +51,41 @@
   regression, fix each regression with a test, and record the counts here (not the commands: they are session
   history). Verify no difference is left unclassified.
 
-## 4. Document it
+## 4. PowerShell
 
-- [ ] 4.1 In `docs/development-workflow.md`, the `command-unparseable` row says what can't be read and the fix (run
+- [ ] 4.1 Write the PowerShell scenario tests (spec: "PowerShell subexpressions and script blocks", "PowerShell command
+  strings", "PowerShell's backtick is an escape", "PowerShell that can't be read"), judged as the PowerShell tool's
+  commands, and extend 2.1's harness to run them under `pwsh` (stub `gh.cmd`/`git.cmd` on Windows, stub scripts
+  elsewhere), skipped where `pwsh` is missing. Include an `-EncodedCommand` built the way PowerShell encodes it.
+  Verify the decision tests fail on `main`'s guard.
+- [ ] 4.2 Implement design D7 in `scripts/guard.py`: `shell_decisions` takes the tool, and the reader's PowerShell
+  dialect (quoting, here-strings, subexpressions, script blocks, call operators, command strings, `cmd /c`, and the
+  PowerShell entries of `DATA_PROGRAMS`). Verify 1.1, 2.2, 2.4, 3.1, 4.1 and every existing test pass, the existing
+  PowerShell hook tests in `test_guard_claude.py` included, and `uv run mypy` and `uv run ruff check` are clean.
+- [ ] 4.3 After pushing, verify from CI's logs that the `pwsh` tests ran, not skipped, on Linux, macOS and Windows,
+  and record the counts here. If a runner has no `pwsh`, stop and raise it with the owner rather than leaving them
+  skipped.
+
+## 5. Document it
+
+- [ ] 5.1 In `docs/development-workflow.md`, the `command-unparseable` row says what can't be read and the fix (run
   the git or gh command on its own), and a short paragraph under the rules table says that every rule reaches the git
-  and gh commands a Bash command runs, wherever they sit, lists the forms read, the data programs and the wrappers by
+  and gh commands a Bash or PowerShell command runs, wherever they sit, lists the forms read in each, the data programs and the wrappers by
   their table names, and says what is out of reach (scripts and programs that run git or gh themselves, `source`,
   obfuscated names). Verify each example command in the new text gets the decision the text says, by running it
   through `shell_decisions` in a scratchpad script.
 
-## 5. Integration
+## 6. Integration
 
-- [ ] 5.1 Verify the delivery plan shows `scripts/guard.py` updated in place in troupe and website, and nothing else,
+- [ ] 6.1 Verify the delivery plan shows `scripts/guard.py` updated in place in troupe and website, and nothing else,
   and keep it for the pull request. The evidence is CI's pull-request plan (`tofu.yml`'s `plan (pull request)` job),
   not a local one.
-- [ ] 5.2 Run `openspec validate read-nested-commands --strict` and verify it passes.
+- [ ] 6.2 Run `openspec validate read-nested-commands --strict` and verify it passes.
 
 ## Workflow follow-up
 
-- Open the pull request with a Conventional title and `Closes #94`, the evidence from 1.1, 2.4 and 3.3 and the plan
-  from 5.1, with the description passed by `--body-file`. CI must be green on all three OSes before the delivery is
+- Open the pull request with a Conventional title and `Closes #94`, the evidence from 1.1, 2.4, 3.3 and 4.3 and the
+  plan from 6.1, with the description passed by `--body-file`. CI must be green on all three OSes before the delivery is
   planned.
 - Archive the change on the branch before merging. The owner merges by rebase and approves the `apply` job, which
   delivers `scripts/guard.py` to troupe and website.
