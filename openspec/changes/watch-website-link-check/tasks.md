@@ -20,26 +20,26 @@ merge (Workflow follow-up).
 
 ## 2. The declaration and the logic (spec: schedule-watch; design D2 to D4, D8)
 
-- [ ] 2.1 Save real API payloads as fixtures under `scripts/tests/fixtures/schedule-watch/`: website's
+- [x] 2.1 Save real API payloads as fixtures under `scripts/tests/fixtures/schedule-watch/`: website's
       `links-weekly.yml` workflow, its `runs?event=schedule&per_page=1` page, an empty runs page (from a workflow with
       no scheduled runs) and a 404 body, each read with `gh api` and trimmed only of fields the script doesn't read.
       Verify each file's source command is recorded in a README in that directory
-- [ ] 2.2 Write the tests first, in `scripts/tests/test_watch_schedules.py`, one per spec scenario that's decidable
+- [x] 2.2 Write the tests first, in `scripts/tests/test_watch_schedules.py`, one per spec scenario that's decidable
       offline: declaration parsing (website's entry is there; a malformed or unknown field is refused, naming the entry
       and field), the four problem kinds, a manual run not counting, errors other than 404 raising rather than
       reporting, the issue-action table in design D4 (open, nothing, comment, close, nothing), the fingerprint
       ignoring ages, the oldest of two tracking issues chosen, a person's issue with the same title ignored, and the
       `extra-workflow` check refusing values outside `troupe-run/<repository>/<file>.yml`. Verify they fail because
       the script doesn't exist yet
-- [ ] 2.3 Add `scripts/watched-schedules.json` with website's `links-weekly.yml` at 8 days, and
+- [x] 2.3 Add `scripts/watched-schedules.json` with website's `links-weekly.yml` at 8 days, and
       `scripts/watch_schedules.py` (standard library; pure functions plus a `gh` layer; prints only when
       `GITHUB_ACTIONS` is unset; writes `issue-url` to `GITHUB_OUTPUT` only when it opened or commented; exits non-zero
       after updating the issue when it found a problem). Verify the tests from 2.2 pass and `uv run scripts/check.py`
       passes (ruff, mypy --strict)
-- [ ] 2.4 Run `uv run scripts/watch_schedules.py` locally with the owner's `gh` login. Verify it prints website's
+- [x] 2.4 Run `uv run scripts/watch_schedules.py` locally with the owner's `gh` login. Verify it prints website's
       `links-weekly.yml` as fine, says it would take no action, and changes nothing on GitHub (no new issue, comment
       or closure on infrastructure)
-- [ ] 2.5 Decide the declaration's check scope: add `scripts/watched-schedules.json` to `scripts/check-paths.toml`
+- [x] 2.5 Decide the declaration's check scope: add `scripts/watched-schedules.json` to `scripts/check-paths.toml`
       with the tests tagged for it, or leave it in no group (full check). Verify `uv run scripts/check.py` passes and
       the guard's `check-scope` names the chosen scope for a change to that file
 

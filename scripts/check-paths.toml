@@ -27,6 +27,10 @@ paths = ["tofu/milestones.json"]
 [scopes.labels]
 paths = ["tofu/labels/**"]
 
+# The workflows the schedule watch reads (spec: schedule-watch).
+[scopes.schedules]
+paths = ["scripts/watched-schedules.json"]
+
 # The OpenTofu configuration, each top-level file by name: `tofu/**` would overlap the scopes above, so a DNS change
 # would run these tests too. A new .tf file is in no group, and runs the full check, until it's listed here.
 [scopes.tofu]
