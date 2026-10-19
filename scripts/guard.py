@@ -782,6 +782,7 @@ ARRAY_START = re.compile(r"(?:^|\s)[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])?\+?=$")
 REDIRECTION = re.compile(r"^\d*(?:>>?|<>?|&>>?|>&|<&|>\|)(.*)$")
 RESERVED_WORDS = frozenset({"!", "{", "}", "if", "then", "elif", "else", "while", "until", "do"})
 MAX_DEPTH = 16
+COMMAND_START = re.compile(r"^\s*$|(?:^|[\s;])(?:if|while|until|then|do|else|elif|!|\{|time)\s*$")
 CASE_STATEMENT = re.compile(r"(?:^|[;&|(\n{]|\b(?:then|do|else))\s*case\s")
 
 SHELL_WRAPPERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
@@ -937,7 +938,7 @@ class _ShellReader:
         """If a substitution or other nested text starts at `i`, its end and the commands in it."""
         if text.startswith("$((", i):
             end = self._closing(text, i + 3, depth=2)
-            return end, self.substitutions(text[i + 3 : end - 2])
+            return end, self.heredoc_substitutions(text[i + 3 : end - 2])
         if text.startswith("$(", i):
             end = self._closing(text, i + 2)
             return end, [text[i + 2 : end - 1]]
@@ -950,6 +951,9 @@ class _ShellReader:
             return end, [inner]
         if quote is not None:
             return None
+        if text.startswith("((", i) and COMMAND_START.search(word):  # an arithmetic command
+            end = self._closing(text, i + 2, depth=2)
+            return end, self.heredoc_substitutions(text[i + 2 : end - 2])
         if text[i] in "<>" and text.startswith("(", i + 1):
             end = self._closing(text, i + 2)
             return end, [text[i + 2 : end - 1]]
@@ -1033,29 +1037,41 @@ class _ShellReader:
 
     @staticmethod
     def heredoc_substitutions(body: str) -> list[str]:
-        """The commands an unquoted heredoc's body substitutes: its quotes are literal text."""
+        """The commands substituted in an unquoted heredoc's body, or in arithmetic: text where
+        quotes are literal and only $(...), backticks and ${...} hold commands."""
+        return _ShellReader._expand(body)[0]
+
+    @staticmethod
+    def _expand(body: str) -> tuple[list[str], str]:
+        """`heredoc_substitutions`, and the body as the shell passes it on: each expansion is a
+        word whose value isn't known, and the expansion's escapes are gone."""
         found: list[str] = []
+        out: list[str] = []
         i = 0
         while i < len(body):
-            if body[i] == "\\":
+            if body[i] == "\\" and i + 1 < len(body):
+                out.append(body[i + 1] if body[i + 1] in "`\\$" else body[i : i + 2])
                 i += 2
                 continue
             if body.startswith("$((", i):
                 end = _ShellReader._closing(body, i + 3, depth=2)
-                found.extend(_ShellReader.heredoc_substitutions(body[i + 3 : end - 2]))
+                found.extend(_ShellReader._expand(body[i + 3 : end - 2])[0])
             elif body.startswith("$(", i):
                 end = _ShellReader._closing(body, i + 2)
                 found.append(body[i + 2 : end - 1])
             elif body.startswith("${", i):
                 end = _ShellReader._closing(body, i + 2, "{")
-                found.extend(_ShellReader.heredoc_substitutions(body[i + 2 : end - 1]))
+                found.extend(_ShellReader._expand(body[i + 2 : end - 1])[0])
             elif body[i] == "`":
                 end = _ShellReader._backtick_end(body, i + 1)
                 found.append(re.sub(r"\\([`\\$])", r"\1", body[i + 1 : end - 1]))
             else:
-                end = i + 1
+                out.append(body[i])
+                i += 1
+                continue
+            out.append("_")
             i = end
-        return found
+        return found, "".join(out)
 
     # Reading (design D1).
 
@@ -1065,12 +1081,11 @@ class _ShellReader:
             return
         for piece, nested in self.split(self.take_heredocs(text)):
             words, heredocs = self.words(piece)
+            scripts = self.command(words, heredocs, depth) if words else False
             for heredoc in heredocs:
-                if not heredoc.quoted:
+                if not heredoc.quoted and not scripts:
                     for inner in self.heredoc_substitutions(heredoc.body):
                         self.nested(inner, depth)
-            if words:
-                self.command(words, heredocs, depth)
             for inner in nested:
                 self.nested(inner, depth)
 
@@ -1080,8 +1095,9 @@ class _ShellReader:
             return
         self.read(text, depth + 1)
 
-    def command(self, words: list[str], heredocs: list[_Heredoc], depth: int) -> None:
-        """Emit one simple command, after what comes before its program (design D3)."""
+    def command(self, words: list[str], heredocs: list[_Heredoc], depth: int) -> bool:
+        """Emit one simple command, after what comes before its program (design D3). True if a
+        shell ran its heredocs as its script, which reads their substitutions too."""
         assignments: list[str] = []
         i = 0
         while i < len(words):
@@ -1105,19 +1121,20 @@ class _ShellReader:
                 skipped = self._wrapper_options(name, words, i + 1, assignments)
                 if skipped is None:
                     self.reading.commands.append([*assignments, *words[i:]])
-                    return
+                    return False
                 i = skipped
                 continue
             i += 1
         rest = words[i:]
         if not rest:
-            return
+            return False
         self.reading.commands.append([*assignments, *rest])
         name = Path(rest[0]).name.lower().removesuffix(".exe")
         if name == "eval":
             self.read(" ".join(rest[1:]), depth + 1)
         elif name in SHELLS:
-            self._shell(rest, heredocs, depth)
+            return self._shell(rest, heredocs, depth)
+        return False
 
     def _wrapper_options(
         self, name: str, words: list[str], i: int, assignments: list[str]
@@ -1153,8 +1170,9 @@ class _ShellReader:
             i += 1  # the duration
         return i
 
-    def _shell(self, words: list[str], heredocs: list[_Heredoc], depth: int) -> None:
-        """A shell's -c string, or the heredoc it reads as its script (design D3)."""
+    def _shell(self, words: list[str], heredocs: list[_Heredoc], depth: int) -> bool:
+        """A shell's -c string, or the heredoc it reads as its script (design D3). True if it
+        reads its heredocs as its script."""
         command_string = stdin = False
         i = 1
         while i < len(words):
@@ -1180,16 +1198,26 @@ class _ShellReader:
         if command_string:
             if operands:
                 self.read(operands[0], depth + 1)
-            return
+            return False
         if operands and not stdin:
-            return  # a script file: what it runs isn't in the command (a non-goal)
+            return False  # a script file: what it runs isn't in the command (a non-goal)
         if heredocs:
+            # An unquoted body is expanded before the shell reads it: what it substitutes runs
+            # first, and the script holds only the results, whose text isn't known.
             for heredoc in heredocs:
-                self.read(heredoc.body, depth + 1)
-        elif any(w.startswith("<<<") for w in words):
+                if heredoc.quoted:
+                    self.read(heredoc.body, depth + 1)
+                    continue
+                substituted, script = self._expand(heredoc.body)
+                for inner in substituted:
+                    self.nested(inner, depth)
+                self.read(script, depth + 1)
+            return True
+        if any(w.startswith("<<<") for w in words):
             self.reading.unreadable.append(f"{words[0]} reading its commands from a here-string")
         else:
             self.reading.unreadable.append(f"{words[0]} reading its commands from a pipe")
+        return False
 
 
 def read_shell(command: str) -> ShellReading:
@@ -2038,7 +2066,8 @@ def shell_decisions(command: str, cwd: Path) -> list[Decision]:
     except ValueError as error:
         if GUARD_DIR in text.lower() or re.search(r"guard\.py\S*\s+override\b", text.lower()):
             return [TAMPER]
-        if not re.search(r"\b(git|gh)\b", text):
+        # The whole command, heredoc bodies included: a shell may run one as its script.
+        if not re.search(r"\b(git|gh)\b", command):
             return [ALLOW]
         return [
             Decision(

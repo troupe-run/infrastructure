@@ -329,37 +329,54 @@ def test_a_target_after_grouped_flags_is_read(troupe_clone: Repo) -> None:
 
 
 # What read-nested-commands must not change (its design D6, "Pin first"): a command with no nested
-# command is refused for exactly what its pieces are refused for, one at a time.
+# command is refused for exactly what main's guard refused its pieces for, one at a time. The
+# expected refusals were recorded from main's guard at 82efe9f, before the reader changed, so a
+# change in how a plain command is judged fails here.
 
-PLAIN_PIECES = [
-    "git status",
-    "git log -n 3",
-    "git commit -m 'fix: a && b; c | d'",
-    "git commit --no-verify -m 'fix: x'",
-    "gh issue view 1",
-    "gh auth token",
-    "gh pr merge 17 --rebase --admin",
-    "gh repo edit --visibility public",
-    "gh frobnicate",
-    "gh pr create --title t --body 'Closes #1'",
-    "gh pr create --title t --body 'no closing line'",
-    "echo 'a | b'",
-    'echo "x; y && z"',
-    "ls -la",
-]
-QUOTED_HEREDOCS = [
-    "cat <<'EOF'\n$(gh auth token) && `git commit --no-verify`\nEOF",
-    "git commit -q -F - <<'EOF'\nfix: it's (one) thing; really\nEOF",
-]
+SKIP_HOOKS = ("skip-hooks", "this would skip or disable the repository's git hooks.")
+MAIN_REFUSALS: dict[str, set[tuple[str, str]]] = {
+    "git status": set(),
+    "git log -n 3": set(),
+    "git commit -m 'fix: a && b; c | d'": set(),
+    "git commit --no-verify -m 'fix: x'": {SKIP_HOOKS},
+    "gh issue view 1": set(),
+    "gh auth token": {("owner-only", "agents don't handle the login's credentials.")},
+    "gh pr merge 17 --rebase --admin": {
+        ("owner-only", "only the owner merges past a pull request's rules.")
+    },
+    "gh repo edit --visibility public": {
+        ("owner-only", "only the owner changes the org's or a repository's administration.")
+    },
+    "gh frobnicate": {("gh-allow-list", "gh frobnicate isn't on the guard's gh allow-list.")},
+    "gh pr create --title t --body 'Closes #1'": set(),
+    "gh pr create --title t --body 'no closing line'": {
+        ("pr-closes-issue", "the pull request's description doesn't close an issue.")
+    },
+    "echo 'a | b'": set(),
+    'echo "x; y && z"': set(),
+    "ls -la": set(),
+}
+QUOTED_HEREDOCS: dict[str, set[tuple[str, str]]] = {
+    "cat <<'EOF'\n$(gh auth token) && `git commit --no-verify`\nEOF": set(),
+    "git commit -q -F - <<'EOF'\nfix: it's (one) thing; really\nEOF": set(),
+}
+PLAIN_PIECES = {**MAIN_REFUSALS, **QUOTED_HEREDOCS}
 
 
 def _refusals(command: str) -> set[tuple[str | None, str]]:
     return {(d.rule, d.problem) for d in guard.shell_decisions(command, Path.cwd()) if d.refused}
 
 
+@pytest.mark.parametrize(("piece", "expected"), PLAIN_PIECES.items())
+def test_each_plain_piece_is_refused_for_what_main_s_guard_refused_it_for(
+    piece: str, expected: set[tuple[str, str]]
+) -> None:
+    assert _refusals(piece) == expected
+
+
 @st.composite
 def plain_command(draw: st.DrawFn) -> tuple[str, list[str]]:
-    pieces = draw(st.lists(st.sampled_from(PLAIN_PIECES + QUOTED_HEREDOCS), min_size=1, max_size=5))
+    pieces = draw(st.lists(st.sampled_from(list(PLAIN_PIECES)), min_size=1, max_size=5))
     text = pieces[0]
     for previous, piece in itertools.pairwise(pieces):
         # A heredoc's closing line must end its line, so whatever follows it starts a new one.
@@ -374,11 +391,11 @@ def plain_command(draw: st.DrawFn) -> tuple[str, list[str]]:
 
 @settings(suppress_health_check=[HealthCheck.too_slow])
 @given(plain_command())
-def test_a_command_with_nothing_nested_is_refused_for_what_its_pieces_are_refused_for(
+def test_a_command_with_nothing_nested_is_refused_for_what_main_refused_its_pieces_for(
     case: tuple[str, list[str]],
 ) -> None:
     command, pieces = case
-    expected = set().union(*(_refusals(piece) for piece in pieces))
+    expected: set[tuple[str | None, str]] = set().union(*(PLAIN_PIECES[p] for p in pieces))
     assert _refusals(command) == expected
 
 

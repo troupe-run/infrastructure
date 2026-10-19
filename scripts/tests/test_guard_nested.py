@@ -6,11 +6,14 @@ The reader is checked against real shells, not only against itself (design D6): 
 gh command runs."""
 
 import os
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 import guard
 
@@ -101,12 +104,15 @@ def _refusals(command: str, cwd: Path | None = None) -> set[tuple[str | None, st
 
 
 def _judged(command: str) -> list[list[str]]:
-    """The git and gh commands the guard reads in `command`, as the stubs would log them."""
+    """The git and gh commands the guard reads in `command`, as the stubs would log them. The
+    rules see a trailing redirection such as `2>/dev/null` as a word, as they always have; the
+    program never does."""
     found = []
     for words in guard.commands_run(command):
         program, args = guard._program(words)
         if program in PROGRAMS:
-            found.append([program, *args])
+            kept = [a for a in args if not (m := guard.REDIRECTION.match(a)) or not m.group(1)]
+            found.append([program, *kept])
     return found
 
 
@@ -231,3 +237,94 @@ def test_the_cat_in_a_body_built_by_the_shell_is_not_refused() -> None:
 )
 def test_a_nested_command_is_never_granted(command: str) -> None:
     assert not guard.grantable(command, Path.cwd(), Path.cwd())
+
+
+# Task 2.4: composed nestings, read as bash runs them
+
+# Each form wraps one command ({c}, or {q} for it as one quoted word). The forms that end in a
+# heredoc's closing line only go outermost, since nothing may follow that line on it.
+FORMS = [
+    "x=$({c})",
+    'echo "$({c})"',
+    "echo $({c})",
+    "cat <({c})",
+    "({c})",
+    "{{ {c}; }}",
+    "if {c}; then :; fi",
+    "if true; then {c}; fi",
+    "for i in 1; do {c}; done",
+    "! {c}",
+    "time {c}",
+    "command {c}",
+    "env A=1 {c}",
+    "nice -n 1 {c}",
+    "nohup {c}",
+    "f(){{ {c}; }}; f",
+    'echo "${{T:-$({c})}}"',
+    "bash -c {q}",
+    "bash -ec {q}",
+    "eval {q}",
+    "A=1 {c} 2>/dev/null",
+]
+SIMPLE_ONLY = {"command {c}", "env A=1 {c}", "nice -n 1 {c}", "nohup {c}", "A=1 {c} 2>/dev/null"}
+"""Forms that wrap a simple command: around a subshell or group they're a syntax error."""
+EXTERNAL = {"env A=1 {c}", "nice -n 1 {c}", "nohup {c}"}
+"""Programs, not shell words: they can't run a builtin such as eval."""
+WRAPPERS = EXTERNAL | {"command {c}"}
+"""Each takes the first word after it as the program, so an assignment there is a program's name."""
+BACKTICK_FORM = "x=`{c}`"
+OUTERMOST_FORMS = ["cat <<EOF\n$({c})\nEOF", "bash <<'EOF'\n{c}\nEOF", "bash <<EOF\n{c}\nEOF"]
+ARGUMENT = st.one_of(
+    st.sampled_from(
+        ["status", "auth", "token", "-x", "--json", "a b", "it's", "x;y", "a|b", "(z)"]
+    ),
+    st.text(alphabet=st.sampled_from("abz09-_./=:"), min_size=1, max_size=6),
+)
+
+
+@st.composite
+def nested_command(draw: st.DrawFn) -> str:
+    program = draw(st.sampled_from(PROGRAMS))
+    args = draw(st.lists(ARGUMENT, max_size=3))
+    command = shlex.join([program, *args])
+    simple = program_first = True
+    assigns_first = False
+    for _ in range(draw(st.integers(min_value=1, max_value=3))):
+        forms = [f for f in FORMS if simple or f not in SIMPLE_ONLY]
+        forms = [f for f in forms if program_first or f not in EXTERNAL]
+        forms = [f for f in forms if assigns_first is False or f not in WRAPPERS]
+        forms += [] if "`" in command else [BACKTICK_FORM]
+        form = draw(st.sampled_from(forms))
+        command = form.format(c=command, q=shlex.quote(command))
+        simple = not form.startswith(("(", "{", "if ", "for ", "! ", "time ", "f()"))
+        assigns_first = form.startswith("A=1")
+        program_first = simple and not assigns_first and not form.startswith(("eval", "command"))
+    if draw(st.booleans()):
+        command = draw(st.sampled_from(OUTERMOST_FORMS)).format(c=command)
+    return command
+
+
+@pytest.fixture(scope="module")
+def shared_stubs(tmp_path_factory: pytest.TempPathFactory) -> Stubs:
+    return Stubs(tmp_path_factory.mktemp("stubs"))
+
+
+@needs_bash
+@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@given(command=nested_command())
+def test_composed_nestings_are_read_as_bash_runs_them_or_refused_as_unreadable(
+    shared_stubs: Stubs, command: str
+) -> None:
+    try:
+        judged = _judged(command)
+    except ValueError:
+        assert "command-unparseable" in {rule for rule, _, _ in _refusals(command)}
+        return
+    assert sorted(judged) == sorted(shared_stubs.run(command, "bash"))
+
+
+def test_an_unparseable_command_whose_gh_is_only_in_a_heredoc_is_refused() -> None:
+    """Found by the composed test: the git-or-gh test looked at the text without heredoc bodies,
+    so a script fed to bash that only it mentioned gh in was allowed."""
+    command = "bash <<EOF\necho $(gh auth token 'it\nEOF"
+    assert {rule for rule, _, _ in _refusals(command)} == {"command-unparseable"}

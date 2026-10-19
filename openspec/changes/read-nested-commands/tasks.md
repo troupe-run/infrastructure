@@ -13,6 +13,12 @@
   - 2026-10-19: 11 tests, all passing on `82efe9f`'s guard: the property test (100 examples, from 14 plain pieces and
     2 quoted heredocs, joined by `&&`, `||`, `;`, `|` and newlines) and 10 pinned commands. #90's message was
     already pinned by `test_a_body_built_by_the_shell_is_refused_as_one_that_can_t_be_checked`, so no new test.
+  - 2026-10-19, corrected during 2.4 (raised by a side agent): the property test worked out its expected
+    refusals with whichever guard was running, so after the rewrite it would have compared the new guard with
+    itself. The pieces' expected refusals are now a fixed table, `MAIN_REFUSALS`, recorded from `82efe9f`'s guard
+    (read from `git show 82efe9f:scripts/guard.py` in the scratchpad). A parametrized test checks each piece alone
+    against it, and the property test checks joined commands against the table's union. Both pass on the new
+    reader.
 
 ## 2. Read every command a shell line runs
 
@@ -44,10 +50,29 @@
   - 2026-10-19: `read_shell` (`_ShellReader`) in `scripts/guard.py`; `split_command` and `strip_heredocs` now use it.
     All 1,360 tests pass, and mypy and ruff are clean. 1.1's property test also passes at 3,000 examples. Still
     allowed until 3.2, as planned: `xargs gh …` and `sudo gh …`.
-- [ ] 2.4 Add the hypothesis variant of 2.1's harness (design D6): compose nestings from D2's and D3's forms around
+- [x] 2.4 Add the hypothesis variant of 2.1's harness (design D6): compose nestings from D2's and D3's forms around
   generated `gh` and `git` commands, and assert the commands the guard finds are the ones bash ran, or that the guard
   refuses the command as `command-unparseable`. Verify it passes over at least 500 examples locally, and record any
   disagreement it found and how it was resolved, here.
+  - 2026-10-19: `test_composed_nestings_are_read_as_bash_runs_them_or_refused_as_unreadable` passes over 3,000
+    examples in each of seven runs under bash 5.3 (21,000 in all). Disagreements it found, and how each was resolved:
+    - The guard's bugs, fixed in `scripts/guard.py`:
+      - A shell reading an unquoted heredoc: the body's substitutions were read twice. The outer shell expands them
+        first, so they're now read once, and the script is read with each expansion as a word of unknown value.
+      - `((gh))` is an arithmetic command, not two subshells. `((` at a command's start, including after `{` and
+        `time`, is now arithmetic. Arithmetic is scanned only for `$(`, backticks and `${`, since `<(` there is
+        less-than and a bracket.
+      - **A fail-open:** when the reader can't split a command, it was refused only if its text mentioned git or
+        gh, and the text checked had its heredoc bodies taken out. So a script fed to bash, whose only `gh` was in
+        the body, went through. The whole command is now checked
+        (`test_an_unparseable_command_whose_gh_is_only_in_a_heredoc_is_refused`).
+    - The generator's bugs, where the shell itself ran nothing: `command (gh)` and `env A=1 eval gh` are errors,
+      `command A=1 gh` looks up a program named `A=1`, and `sh` on macOS has no `<(…)`. Wrappers now wrap only
+      simple commands that start with a program, and the generated shell forms use bash.
+    - Allowed by the test as task 2.4 says: deeply re-quoted words inside an unquoted heredoc that the reader can't
+      split are refused as `command-unparseable`.
+    - Not changed: the rules see a trailing redirection (`2>/dev/null`) as a word, as before, so the test leaves
+      attached redirections out when comparing with what the shell ran.
 
 ## 3. Refuse what can't be read
 
