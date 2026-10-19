@@ -19,8 +19,9 @@ If the owner chooses option B in D1, stop after 2.1 and update the change (`/ops
 
 ## 2. The App (owner, on GitHub and in 1Password)
 
-- [ ] 2.1 Owner: decide design D1 (a new `troupe-run-docs` App, the release App, or the infrastructure App) and
-      record it in design.md as "(owner, <date>)". Verify that design.md's D1 no longer says OPEN QUESTION
+- [x] 2.1 Owner: decide design D1 (a new `troupe-run-docs` App, the release App, or the infrastructure App) and
+      record it in design.md as "(owner, <date>)". Verify that design.md's D1 no longer says OPEN QUESTION. Done: option
+      A, a new App (owner, 2026-10-19), and D1 says so
 - [ ] 2.2 Owner: create the GitHub App `troupe-run-docs` in the troupe-run org, installable only on this account, with
       the webhook off. Repository permission: Actions read and write, and nothing else beyond the metadata GitHub
       always grants. No organisation permission. Install it on `troupe-run/website` only. Verify with
