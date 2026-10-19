@@ -5,10 +5,12 @@ The reader is checked against real shells, not only against itself (design D6): 
 `git` programs, first on PATH, record each run's arguments and do nothing else, so no real git or
 gh command runs."""
 
+import base64
 import os
 import shlex
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -18,6 +20,7 @@ from hypothesis import strategies as st
 import guard
 
 SHELL_NAMES = ("bash", "zsh")
+PWSH = "pwsh"
 PROGRAMS = ("gh", "git")
 SEPARATOR = "\x1f"
 STUB = """#!/bin/sh
@@ -26,6 +29,12 @@ STUB = """#!/bin/sh
   for a in "$@"; do printf '\\037%s' "$a"; done
   printf '\\n'
 }} >> "$STUB_LOG"
+"""
+
+
+PY_STUB = """import os, sys
+with open(os.environ["STUB_LOG"], "a", encoding="utf-8") as log:
+    log.write("\\x1f".join(sys.argv[1:]) + "\\n")
 """
 
 
@@ -50,10 +59,15 @@ class Stubs:
         self.log = root / "ran.log"
         self.cwd = root / "work"
         self.cwd.mkdir()
+        logger = root / "stub.py"
+        logger.write_text(PY_STUB, encoding="utf-8")
         for name in PROGRAMS:
             stub = self.bin / name
             stub.write_text(STUB.format(name=name), encoding="utf-8", newline="\n")
             stub.chmod(0o755)
+            # PowerShell on Windows runs only files PATHEXT names, such as .cmd.
+            cmd = self.bin / f"{name}.cmd"
+            cmd.write_text(f'@"{sys.executable}" "{logger}" {name} %*\r\n', encoding="utf-8")
 
     def run(self, command: str, shell: str) -> list[list[str]]:
         """The git and gh commands `shell` ran for `command`, in order, as argument lists."""
@@ -63,10 +77,14 @@ class Stubs:
         env = dict(os.environ)
         env["PATH"] = f"{self.bin}{os.pathsep}{env.get('PATH', '')}"
         env["STUB_LOG"] = str(self.log)
-        # zsh -f skips the user's startup files, which could put the real programs first on PATH.
-        flags = ["-f"] if shell == "zsh" else []
+        # zsh -f and pwsh -NoProfile skip the user's startup files, which could put the real
+        # programs first on PATH.
+        if shell == PWSH:
+            argv = [executable, "-NoProfile", "-NonInteractive", "-Command", command]
+        else:
+            argv = [executable, *(["-f"] if shell == "zsh" else []), "-c", command]
         subprocess.run(
-            [executable, *flags, "-c", command],
+            argv,
             cwd=self.cwd,
             env=env,
             capture_output=True,
@@ -370,3 +388,104 @@ def test_the_same_shape_without_git_or_gh_goes_ahead(_: str, command: str) -> No
 @pytest.mark.parametrize("command", ["echo $(gh auth token", "x=`gh auth token"])
 def test_a_substitution_with_no_end_is_refused_as_unparseable(command: str) -> None:
     assert {rule for rule, _, _ in _refusals(command)} == {"command-unparseable"}
+
+
+# Task 4.1: PowerShell, read by its own rules (spec: "PowerShell subexpressions and script blocks",
+# "PowerShell command strings", "PowerShell's backtick is an escape", "PowerShell that can't be
+# read"; design D7)
+
+needs_pwsh = pytest.mark.skipif(_shell(PWSH) is None, reason="no pwsh on this machine")
+ENCODED = base64.b64encode("gh auth token".encode("utf-16-le")).decode("ascii")
+ON_PWSH = (PWSH,)
+
+
+def _ps_refusals(command: str) -> set[tuple[str | None, str, str]]:
+    decisions = guard.shell_decisions(command, Path.cwd(), "PowerShell")
+    return {(d.rule, d.problem, d.fix) for d in decisions if d.refused}
+
+
+def _ps_judged(command: str) -> list[list[str]]:
+    found = []
+    for words in guard.commands_run(command, "PowerShell"):
+        program, args = guard._program(words)
+        if program in PROGRAMS:
+            found.append([program, *args])
+    return found
+
+
+PS_NESTED = [
+    # PowerShell subexpressions and script blocks
+    ("$t = $(gh auth token)", "gh auth token", ON_PWSH),
+    ('Write-Output "token: $(gh auth token)"', "gh auth token", ON_PWSH),
+    ("@(gh auth token)", "gh auth token", ON_PWSH),
+    ("(gh auth token).Length", "gh auth token", ON_PWSH),
+    ("& gh auth token", "gh auth token", ON_PWSH),
+    ("& 'gh' auth token", "gh auth token", ON_PWSH),
+    (". gh auth token", "gh auth token", ON_PWSH),
+    ("GH.exe auth token", "gh auth token", NONE),  # gh.exe exists only on Windows
+    ("1..2 | ForEach-Object { gh auth token }", "gh auth token", NONE),  # runs twice
+    ("if ($true) { gh auth token }", "gh auth token", ON_PWSH),
+    ("Start-Job { gh auth token }", "gh auth token", NONE),  # runs in another process
+    ('$x = @"\n$(gh auth token)\n"@', "gh auth token", ON_PWSH),
+    # PowerShell command strings
+    ('Invoke-Expression "gh auth token"', "gh auth token", ON_PWSH),
+    ("iex 'gh auth token'", "gh auth token", ON_PWSH),
+    ('pwsh -NoProfile -Command "gh auth token"', "gh auth token", ON_PWSH),
+    ('powershell -c "gh auth token"', "gh auth token", NONE),  # Windows PowerShell
+    ("cmd /c gh auth token", "gh auth token", NONE),  # cmd is Windows only
+    (f"pwsh -NoProfile -EncodedCommand {ENCODED}", "gh auth token", ON_PWSH),
+    # Git's hooks skipped, inside a script block
+    ("& { git commit --no-verify -m 'fix: x' }", "git commit --no-verify -m 'fix: x'", ON_PWSH),
+]
+
+
+@pytest.mark.parametrize(("command", "inner", "_"), PS_NESTED)
+def test_a_powershell_nested_command_is_refused_as_it_is_on_its_own(
+    command: str, inner: str, _: tuple[str, ...]
+) -> None:
+    alone = _ps_refusals(inner)
+    assert alone, f"{inner!r} should be refused on its own"
+    assert _ps_refusals(command) == alone
+
+
+@needs_pwsh
+@pytest.mark.parametrize("command", [c for c, _, shells in PS_NESTED if PWSH in shells])
+def test_the_guard_reads_the_git_and_gh_commands_powershell_runs(
+    stubs: Stubs, command: str
+) -> None:
+    assert sorted(_ps_judged(command)) == sorted(stubs.run(command, PWSH))
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'Write-Output "a`nb"; git status',
+        'Write-Output "`$(gh auth token)"',
+        "Write-Output '$(gh auth token)'",
+        "$x = @'\n$(gh auth token)\n'@",
+        "Write-Output gh; Get-Command git; Select-String -Pattern gh notes.md",
+        "git log --oneline -3 | ForEach-Object { $_ }",
+        "$n = (gh issue view 1 --json title | ConvertFrom-Json).title",
+    ],
+)
+def test_powershell_escapes_literals_data_and_reads_go_ahead(command: str) -> None:
+    assert not _ps_refusals(command)
+
+
+PS_UNREADABLE = [
+    ('Start-Process gh -ArgumentList "auth","token"', "Start-Process notepad"),
+    ("saps git -ArgumentList status", "saps notepad"),
+    ("$c = 'gh'; & $c auth token", "$c = 'ls'; & $c"),
+    ("& (Get-Command gh) auth token", "& (Get-Command ls)"),
+]
+
+
+@pytest.mark.parametrize(("command", "_"), PS_UNREADABLE)
+def test_powershell_that_can_t_be_read_is_refused(command: str, _: str) -> None:
+    rules = {rule for rule, _, _ in _ps_refusals(command)}
+    assert rules == {"command-unparseable"}
+
+
+@pytest.mark.parametrize(("_", "command"), PS_UNREADABLE)
+def test_the_same_powershell_without_git_or_gh_goes_ahead(_: str, command: str) -> None:
+    assert not _ps_refusals(command)

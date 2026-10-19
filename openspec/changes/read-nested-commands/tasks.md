@@ -112,15 +112,26 @@
 
 ## 4. PowerShell
 
-- [ ] 4.1 Write the PowerShell scenario tests (spec: "PowerShell subexpressions and script blocks", "PowerShell command
+- [x] 4.1 Write the PowerShell scenario tests (spec: "PowerShell subexpressions and script blocks", "PowerShell command
   strings", "PowerShell's backtick is an escape", "PowerShell that can't be read"), judged as the PowerShell tool's
   commands, and extend 2.1's harness to run them under `pwsh` (stub `gh.cmd`/`git.cmd` on Windows, stub scripts
   elsewhere), skipped where `pwsh` is missing. Include an `-EncodedCommand` built the way PowerShell encodes it.
   Verify the decision tests fail on `main`'s guard.
-- [ ] 4.2 Implement design D7 in `scripts/guard.py`: `shell_decisions` takes the tool, and the reader's PowerShell
+  - 2026-10-19: 49 tests in `test_guard_nested.py` and 2 hook tests in `test_guard_claude.py`. On 3.3's code,
+    whose PowerShell reading is `main`'s (the bash reader), all of them fail, the 14 `pwsh` reading tests aside.
+    Those skip here: this Mac has no `pwsh`, so they're checked in CI (4.3). Corrected while writing: the spec
+    gave `Start-Job { gh auth token }` as unreadable, but D7 reads every script block, so it's refused as
+    `owner-only`. It moved to the script-block scenario, and the design says so. An example of an expression
+    program, `& ("g" + "h")`, never names gh in its text, which is the obfuscation the design leaves out of scope,
+    so the test uses `& (Get-Command gh)` instead.
+- [x] 4.2 Implement design D7 in `scripts/guard.py`: `shell_decisions` takes the tool, and the reader's PowerShell
   dialect (quoting, here-strings, subexpressions, script blocks, call operators, command strings, `cmd /c`, and the
   PowerShell entries of `DATA_PROGRAMS`). Verify 1.1, 2.2, 2.4, 3.1, 4.1 and every existing test pass, the existing
   PowerShell hook tests in `test_guard_claude.py` included, and `uv run mypy` and `uv run ruff check` are clean.
+  - 2026-10-19: `_PowerShellReader` in `scripts/guard.py`, and `shell_decisions` takes the tool. 1,439 tests pass
+    (the 14 `pwsh` ones skipped), mypy and ruff are clean, and 2.4's bash test passes over 1,000 more examples.
+    A PowerShell statement runs a program only when it starts with a bare word or a call operator; one that starts
+    with a variable, a string, a number or a bracket is an expression, whose substitutions and blocks are read.
 - [ ] 4.3 After pushing, verify from CI's logs that the `pwsh` tests ran, not skipped, on Linux, macOS and Windows,
   and record the counts here. If a runner has no `pwsh`, stop and raise it with the owner rather than leaving them
   skipped.

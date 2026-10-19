@@ -829,3 +829,21 @@ def test_a_command_the_guard_allows_but_doesn_t_grant_gets_nothing(
 ) -> None:
     repo = reviewed(make_repo())
     assert pre_tool_use(repo.path, "Bash", {"command": "gh pr merge 32 --rebase"}) is None
+
+
+# read-nested-commands design D7: the hook reads the PowerShell tool's commands as PowerShell
+
+
+def test_the_hook_denies_a_gh_command_in_a_powershell_command_string(
+    make_repo: Callable[[], Repo],
+) -> None:
+    command = 'Invoke-Expression "gh auth token"'
+    reason = denial_reason(pre_tool_use(make_repo().path, "PowerShell", {"command": command}))
+    assert reason.startswith("guard: owner-only:")
+
+
+def test_the_hook_reads_a_backtick_in_a_powershell_command_as_an_escape(
+    make_repo: Callable[[], Repo],
+) -> None:
+    command = 'Write-Output "`$(gh auth token)"'
+    assert pre_tool_use(make_repo().path, "PowerShell", {"command": command}) is None

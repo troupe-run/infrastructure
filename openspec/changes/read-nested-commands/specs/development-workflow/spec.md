@@ -1,9 +1,10 @@
 ## ADDED Requirements
 
 ### Requirement: The rules reach every command a shell line runs
-In a Claude Code session, every rule for git and gh commands SHALL apply to each git or gh command a Bash command
-or PowerShell command would run, wherever it sits, read by that shell's rules, and SHALL decide it as it decides the same command run on its own: the
-same rule, message and fix. A command that holds no nested command SHALL get the decision it got before.
+In a Claude Code session, every rule for git and gh commands SHALL apply to each git or gh command a Bash or
+PowerShell command would run, wherever it sits, read by that shell's rules, and SHALL decide it as it decides the
+same command run on its own: the same rule, message and fix. A command that holds no nested command SHALL get the
+decision it got before.
 
 #### Scenario: An owner-only command in a command substitution
 - **WHEN** an agent runs any of `out=$(gh repo delete troupe-run/x --yes)`, `echo "$(gh repo delete troupe-run/x
@@ -74,8 +75,8 @@ same rule, message and fix. A command that holds no nested command SHALL get the
 
 #### Scenario: PowerShell subexpressions and script blocks
 - **WHEN** an agent runs, through the PowerShell tool, `$t = $(gh auth token)`, `@(gh auth token)`,
-  `& gh auth token` or `1..2 | ForEach-Object { gh auth token }`
-- **THEN** the command is refused as `owner-only`
+  `& gh auth token`, `1..2 | ForEach-Object { gh auth token }` or `Start-Job { gh auth token }`
+- **THEN** the command is refused as `owner-only`, since every script block is read as commands
 
 #### Scenario: PowerShell command strings
 - **WHEN** an agent runs, through the PowerShell tool, `Invoke-Expression "gh auth token"`, `iex 'gh auth token'`,
@@ -92,9 +93,9 @@ same rule, message and fix. A command that holds no nested command SHALL get the
 - **THEN** the guard doesn't grant it, and Claude Code decides as it would without the guard
 
 ### Requirement: A git or gh command the guard can't read is refused
-In a Claude Code session, a Bash or PowerShell command that would run git or gh in a way the guard can't read SHALL be refused,
-never allowed, with a message that says the guardrails can't read it there and to run the git or gh command on its
-own. A command the guard can't read that never mentions git or gh SHALL go ahead.
+In a Claude Code session, a Bash or PowerShell command that would run git or gh in a way the guard can't read SHALL
+be refused, never allowed, with a message that says the guardrails can't read it there and to run the git or gh
+command on its own. A command the guard can't read that never mentions git or gh SHALL go ahead.
 
 #### Scenario: Run by another program
 - **WHEN** an agent runs git or gh through a program that isn't known to run its arguments as written, such as
@@ -128,5 +129,5 @@ own. A command the guard can't read that never mentions git or gh SHALL go ahead
 
 #### Scenario: PowerShell that can't be read
 - **WHEN** an agent runs, through the PowerShell tool, `Start-Process gh -ArgumentList "auth","token"`,
-  `Start-Job { gh auth token }` or `$c = 'gh'; & $c auth token`
+  `saps git -ArgumentList status` or `$c = 'gh'; & $c auth token`
 - **THEN** the command is refused as `command-unparseable`

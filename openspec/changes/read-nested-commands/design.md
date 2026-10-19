@@ -197,9 +197,10 @@ escapes in PowerShell, and `{ }` holds a script block that runs.
   (base64 of UTF-16LE, as PowerShell encodes it) and read. Text that doesn't decode is unreadable. `-File` runs a
   script, a non-goal like `bash script.sh`. `cmd /c` and `cmd /k` have the rest read, split on `&`, `&&`, `||` and
   `|`, with `^` as the escape.
-- **Unreadable.** `Start-Process` (and its aliases `saps` and `start`) and `Start-Job` (and `-FilePath` forms) run
-  programs the reader can't follow, so a git or gh word among their arguments makes the command unreadable, through
-  D5's default for unknown programs.
+- **Unreadable.** `Start-Process` (and its aliases `saps` and `start`) runs a program the reader can't follow, so a
+  git or gh word among its arguments makes the command unreadable, through D5's default for unknown programs.
+  `Start-Job { … }` needs nothing of its own: its script block is read like any other. (Corrected while applying:
+  this said `Start-Job` was unreadable, but its block is read, and refused by the rule it breaks.)
 - **Data.** `Write-Output`, `echo`, `Write-Host`, `Get-Command`, `gcm` and `Select-String` join `DATA_PROGRAMS` for the
   PowerShell dialect.
 
