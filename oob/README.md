@@ -106,13 +106,14 @@ because both keys are valid until the old one is deleted.
 **The infrastructure App's "Variables: write"** was granted for this (2026-10-13), so OpenTofu can write
 `RELEASE_APP_CLIENT_ID`. It's declared in `app-installations.json`.
 
-## website's board App (set up by hand)
+## The board App (set up by hand)
 
-website's weekly link check opens its "Broken external links" issue with `GITHUB_TOKEN`, which can't write to an org
-project. A job of its own adds the issue to the troupe roadmap board with the `troupe-run-board` App's token instead
-(spec: board-credentials, #59). GitHub has no API for creating an App, and OpenTofu never holds a secret, so these
-steps are the owner's. The App's IDs are recorded on #59. `tofu/board.tf` declares the `board` environment and the
-client-ID variable.
+website's weekly link check opens its "Broken external links" issue, and this repository's schedule watch its
+"Scheduled workflows stopped running" issue, with `GITHUB_TOKEN`, which can't write to an org project. In each, a job
+of its own adds the issue to the troupe roadmap board with the `troupe-run-board` App's token instead (spec:
+board-credentials, #59, #60). GitHub has no API for creating an App, and OpenTofu never holds a secret, so these steps
+are the owner's. The App's IDs are recorded on #59. `tofu/board.tf` declares a `board` environment and the client-ID
+variable on website and on infrastructure.
 
 **Creating it** (done 2026-10-18). In the org's settings, under GitHub Apps, create a new App:
 - name `troupe-run-board`, installable only on this account, webhook off;
@@ -125,22 +126,25 @@ Its installation is checked by `oob.py` against `app-installations.json`. Its cl
 
 **Its key.** Generate a private key in the App's settings. Store it in 1Password as an SSH Key item named
 `troupe-run-board` in vault `troupe.run`, by importing the downloaded `.pem`, then delete the file. Once the `board`
-environment exists (after the apply that creates it), set the secret. Nothing is printed:
+environment exists in a repository (after the apply that creates it), set the secret there. Nothing is printed:
 
 ```sh
 export OP_ACCOUNT=l-a-u.1password.com
 op read -n "op://troupe.run/troupe-run-board/private key" \
   | gh secret set BOARD_APP_PRIVATE_KEY --env board -R troupe-run/website
+op read -n "op://troupe.run/troupe-run-board/private key" \
+  | gh secret set BOARD_APP_PRIVATE_KEY --env board -R troupe-run/infrastructure
 ```
 
-Check it by name, never by value:
+Check each by name, never by value:
 
 ```sh
 gh api repos/troupe-run/website/environments/board/secrets --jq '.secrets[].name'
+gh api repos/troupe-run/infrastructure/environments/board/secrets --jq '.secrets[].name'
 ```
 
-**Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run the
-command above again. Then delete the old key in the App's settings. A run between the two steps still works, because
+**Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run both
+commands above again. Then delete the old key in the App's settings. A run between the two steps still works, because
 both keys are valid until the old one is deleted.
 
 ## troupe.run's DNS (set up by hand)
