@@ -4,7 +4,9 @@ run on a pull request, as GitHub reports them (spec: rulesets; required-checks d
 A required name that no job reports blocks every pull request, and a job left out can fail
 without blocking anything. troupe's and website's own jobs can't be read from here, so they are
 not tested; the guard check each repository receiving the guard requires is, since its workflow is
-delivered from here.
+delivered from here. troupe's list is pinned to its `check` result rather than its legs
+(require-troupe-check design D3): that can't prove troupe's CI reports `check`, only that the legs
+don't come back.
 """
 
 import itertools
@@ -194,6 +196,14 @@ def test_every_repository_receiving_the_guard_requires_its_check_by_its_name_her
         repo: sorted(guard_jobs - required(repo, "github-actions")) for repo in guard_targets()
     }
     assert {repo: jobs for repo, jobs in missing.items() if jobs} == {}
+
+
+def test_troupe_requires_its_check_result_and_none_of_its_legs() -> None:
+    """require-troupe-check design D1: a skipped matrix job reports under its unexpanded name, so a
+    required leg would never report on a push that skips them; troupe's `check` reports for them."""
+    names = required("troupe", "github-actions")
+    assert "check" in names
+    assert sorted(name for name in names if name.startswith("check (")) == []
 
 
 def test_every_required_check_names_an_app_opentofu_maps_to_an_id() -> None:

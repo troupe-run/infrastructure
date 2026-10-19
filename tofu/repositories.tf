@@ -14,10 +14,11 @@ locals {
 
   # The checks each repository's pull requests need before they merge (spec: rulesets), named
   # as GitHub reports them. infrastructure's are tested against its workflows
-  # (scripts/tests/test_required_checks.py); troupe's and website's were read from their latest
-  # merged pull requests on 2026-10-12 (required-checks design D1). Each repository receiving the
-  # guard requires its `guard` check, which is tested too. website requires no DCO: it takes no
-  # sign-off (owner, 2026-10-16; govern-website D3).
+  # (scripts/tests/test_required_checks.py); website's were read from its latest merged pull
+  # request on 2026-10-12 (required-checks design D1), and troupe's `check`, which reports for
+  # its OS and Python legs, from troupe#117 on 2026-10-19 (require-troupe-check). Each repository
+  # receiving the guard requires its `guard` check, which is tested too. website requires no DCO:
+  # it takes no sign-off (owner, 2026-10-16; govern-website D3).
   required_checks = jsondecode(file("${path.module}/required-checks.json"))
 
   # The App that posts each check, so a status of the same name from anything else doesn't count.
