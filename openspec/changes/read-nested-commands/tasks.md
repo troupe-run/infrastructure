@@ -161,7 +161,8 @@
 - [ ] 6.1 Verify the delivery plan shows `scripts/guard.py` updated in place in troupe and website, and nothing else,
   and keep it for the pull request. The evidence is CI's pull-request plan (`tofu.yml`'s `plan (pull request)` job),
   not a local one.
-- [ ] 6.2 Run `openspec validate read-nested-commands --strict` and verify it passes.
+- [x] 6.2 Run `openspec validate read-nested-commands --strict` and verify it passes.
+  - 2026-10-19: `Change 'read-nested-commands' is valid`.
 
 ## Workflow follow-up
 
