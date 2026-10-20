@@ -32,7 +32,7 @@ merge (Workflow follow-up).
       the plan's every `~`, `+` and `-` line is one of: the org's `description`, troupe's and website's `description`
       and `topics`, and the profile file's content and commit message in `.github`. Nothing else changes, and in
       particular no `homepage_url`
-- [ ] 2.3 Record the plan's summary in the PR description as evidence, alongside CI's posted plan. Verify the two
+- [x] 2.3 Record the plan's summary in the PR description as evidence, alongside CI's posted plan. Verify the two
       agree
 
 ## 3. The other repositories (design D4)
