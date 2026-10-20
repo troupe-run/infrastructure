@@ -46,7 +46,7 @@ merge (Workflow follow-up).
 - [x] 3.2 Open an issue in troupe-run/troupe the same way, to change the README's paragraph so that it opens with the
       sentence, keeping its status paragraph after "Pre-alpha: there's nothing to install yet". Link it as a sub-issue
       of #108. Verify its card is on the board in the same way
-- [ ] 3.3 Name both issues in the PR description. Verify the PR body says `Closes #108` and links both
+- [x] 3.3 Name both issues in the PR description. Verify the PR body says `Closes #108` and links both
 
 ## Workflow follow-up
 
