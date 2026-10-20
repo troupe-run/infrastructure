@@ -6,17 +6,17 @@ merge (Workflow follow-up).
 
 ## 1. The declaration and its check (spec: descriptions; design D1, D2)
 
-- [ ] 1.1 Write `scripts/tests/test_descriptions.py` first, tagged `@pytest.mark.descriptions`. Its tests: the
+- [x] 1.1 Write `scripts/tests/test_descriptions.py` first, tagged `@pytest.mark.descriptions`. Its tests: the
       profile carries the tagline as its bold line; a paragraph starts with the sentence; the status line is there;
       tagline plus sentence come to 160 characters or fewer. Each failure names the missing string, or gives the length
       and the limit. Add pure-function tests that feed in a profile with the old sentence and an over-long sentence,
       and check that each is refused with that message. Verify the tests fail because `tofu/descriptions.json`
       doesn't exist yet
-- [ ] 1.2 Add `tofu/descriptions.json` with the three strings exactly as in design D1, and a `[scopes.descriptions]`
+- [x] 1.2 Add `tofu/descriptions.json` with the three strings exactly as in design D1, and a `[scopes.descriptions]`
       entry for it in `scripts/check-paths.toml`, next to `dns` and `milestones`. Verify the profile tests still fail
       (the profile has the old paragraph), the length test passes (119 characters), and
       `uv run scripts/guard.py check-scope` names `descriptions` for a change to that file alone
-- [ ] 1.3 Change the paragraph in `org-profile/profile/README.md` so that it opens with the sentence, leaving the
+- [x] 1.3 Change the paragraph in `org-profile/profile/README.md` so that it opens with the sentence, leaving the
       source note, tagline, status line and links as they are. Verify `uv run scripts/check.py` passes, and that
       `git diff` shows only the paragraph's lines changing
 

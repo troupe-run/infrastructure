@@ -17,12 +17,15 @@ version = 1
 [skip]
 paths = ["openspec/**"]
 
-# The declarations OpenTofu reads, one scope each (spec: dns, milestones, labels).
+# The declarations OpenTofu reads, one scope each (spec: dns, milestones, labels, descriptions).
 [scopes.dns]
 paths = ["tofu/dns.json"]
 
 [scopes.milestones]
 paths = ["tofu/milestones.json"]
+
+[scopes.descriptions]
+paths = ["tofu/descriptions.json"]
 
 [scopes.labels]
 paths = ["tofu/labels/**"]
