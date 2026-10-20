@@ -12,6 +12,13 @@ locals {
   # stands in for one. Every repository gets them (spec: labels; label-troupe-specs D4).
   kind_labels = jsondecode(file("${path.module}/labels/kinds.json"))
 
+  # How troupe is described: the org's description and troupe's repository description are the
+  # tagline then the sentence. The org profile is held to the same file by a test, and website's
+  # brand guide is the reference across repositories, which troupe's README and the website follow
+  # (spec: descriptions; align-troupe-descriptions design D1 to D3).
+  descriptions = jsondecode(file("${path.module}/descriptions.json"))
+  one_line     = "${local.descriptions.tagline} ${local.descriptions.sentence}"
+
   # The checks each repository's pull requests need before they merge (spec: rulesets), named
   # as GitHub reports them. infrastructure's are tested against its workflows
   # (scripts/tests/test_required_checks.py); website's were read from its latest merged pull
@@ -37,8 +44,9 @@ locals {
 module "repo_troupe" {
   source       = "./modules/repository"
   name         = "troupe"
-  description  = "troupe: run your development process with agents and people in named roles"
+  description  = local.one_line
   homepage_url = "https://troupe.run"
+  topics       = ["ai-agents", "developer-tools", "human-in-the-loop", "python", "workflow"]
   # troupe.json is troupe's capability labels, declared here and changed by pull request: troupe
   # keeps no separate list (spec: labels; owner, 2026-10-12, #22). release.json is release-please's
   # two labels, which it finds its release pull request by (release-app design D5).
@@ -83,7 +91,8 @@ module "repo_infrastructure" {
 module "repo_website" {
   source      = "./modules/repository"
   name        = "website"
-  description = "troupe.run \u2014 website and landing page"
+  description = "The troupe.run website and landing page"
+  topics      = ["astro", "website"]
   # Set by the owner on GitHub after rename-website, and declared here (required-checks).
   homepage_url = "https://troupe.run/"
   labels       = concat(local.github_default_labels, local.workflow_labels, local.kind_labels)

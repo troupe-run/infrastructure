@@ -14,7 +14,7 @@ resource "github_organization_settings" "org" {
   location      = "Australia"
   blog          = ""
   company       = ""
-  description   = ""
+  description   = local.one_line
   email         = ""
 
   default_repository_permission            = "read"
