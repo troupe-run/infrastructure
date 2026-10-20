@@ -3,8 +3,8 @@
 
 **Your agents need a director.**
 
-troupe runs your development process with agents and people in named roles. Work branches and loops, decisions go
-to whoever owns them, and every decision records who made it.
+troupe runs your development process with a team of agents, asking only when it needs you. Work branches and loops,
+decisions go to whoever owns them, and every decision records who made it.
 
 Pre-alpha: there's nothing to install yet.
 
