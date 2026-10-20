@@ -27,7 +27,7 @@
   At `47a50b1`, the unchanged guard reported #114's read in 4 of 5 runs; the new one in 0 of 3. Two
   `test_git_state_cache.py` tests failed in all 8 runs with either guard: the branch's own, not the guard's
 - [x] 3.2 Run `uv run scripts/check.py` and `openspec validate guard-hypothesis-reads --strict`, and verify both pass
-- [ ] 3.3 Run `uv run scripts/tofu.py plan` after rebasing onto `origin/main`, and verify it shows only
+- [x] 3.3 Run `uv run scripts/tofu.py plan` after rebasing onto `origin/main`, and verify it shows only
   `scripts/guard_pytest.py` updated in place in troupe and website. Keep it for the pull request
 
 ## Workflow follow-up
