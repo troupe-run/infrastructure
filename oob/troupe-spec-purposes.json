@@ -3,6 +3,7 @@
   "cap:artifact-store": "Content-addressed storage for run artifacts that are too large or too sensitive for git, such as raw transcripts, so that lineage can reference them by hash and any copy can be verified.",
   "cap:cli": "The command-line surface of troupe: a thin client over the core's commands and queries, covering how it is invoked, how global flags are parsed, and how results and errors are rendered and reported through exit codes.",
   "cap:client-protocol": "Defines the commands and queries every surface uses to reach troupe's core: language-neutral messages that the CLI calls in process today and a run server will serve later, so no behaviour exists in only one surface.",
+  "cap:docs-publishing": "How a change to troupe reaches troupe.run: which pushes notify the website to rebuild `/docs`, and what the job that sends the notice may do.",
   "cap:event-store": "Records troupe's events as append-only text that git can merge without conflicts, and reads them back in a stable local order that meets the `eventsourcing` library's recorder contract, across branches, merges and forks.",
   "cap:flake-hunt": "Finding flaky tests on demand, on every platform: repeating tests in overlapping rounds, under optional load and with fresh randomised inputs, and reporting each failure with the evidence an issue needs.",
   "cap:identity": "Works out who is acting, through an ordered, pluggable chain of identity sources, so that every event names a real actor and troupe fails rather than guesses when nobody can be identified.",
@@ -17,5 +18,6 @@
   "cap:runs": "Records each run of an actor in the theatre's event store, with lineage, from its first runner event to its derived outcome, and reads runs back as projections so a person can see what is happening and what happened.",
   "cap:scripted-runner": "A deterministic actor runner for tests: it plays a script or replays a recorded stream through the runner contract, so every run outcome can be produced on demand, offline and for free.",
   "cap:stages": "Defines where an actor runs and whether troupe can enforce what it may touch there: the stage port, and the local stage, which can't enforce any effect and so runs an actor only when policy allows it.",
+  "cap:user-docs": "troupe's user documentation, which troupe.run's `/docs` is built from: where it lives, the page contract the site builds from, which reference is generated and how it's kept true, how pages describe built and unbuilt behaviour, and the vocabulary rules they follow.",
   "cap:vcs": "The version-control port troupe reads the working tree's state through, so the event store and lineage work the same whether a theatre uses git or no version control at all."
 }
