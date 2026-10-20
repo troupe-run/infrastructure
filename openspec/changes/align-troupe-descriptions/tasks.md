@@ -28,7 +28,7 @@ merge (Workflow follow-up).
       description to "The troupe.run website and landing page" and its topics to `["astro", "website"]`. In
       `tofu/org.tf`, set `description` from the same local. Verify `uv run scripts/check.py` passes (tofu fmt,
       validate)
-- [ ] 2.2 Fast-forward onto `origin/main` if its state commit is ahead, then run `uv run scripts/tofu.py plan`. Verify
+- [x] 2.2 Fast-forward onto `origin/main` if its state commit is ahead, then run `uv run scripts/tofu.py plan`. Verify
       the plan's every `~`, `+` and `-` line is one of: the org's `description`, troupe's and website's `description`
       and `topics`, and the profile file's content and commit message in `.github`. Nothing else changes, and in
       particular no `homepage_url`
@@ -37,13 +37,13 @@ merge (Workflow follow-up).
 
 ## 3. The other repositories (design D4)
 
-- [ ] 3.1 Open an issue in troupe-run/website with `--project "troupe roadmap"`: record the canonical set in the brand
+- [x] 3.1 Open an issue in troupe-run/website with `--project "troupe roadmap"`: record the canonical set in the brand
       guide (tagline, sentence, paragraph, status line, one-line description, page title and the deliberate variants),
       then apply it to `src/content/copy/hero.md` (subtitle), and to `src/pages/index.astro` (title "troupe: your
       agents need a director", and the one-line description plus the status line as the description). Quote the text
       exactly, cite #108 and the owner's decision of 2026-10-20. Link it as a sub-issue of #108. Verify with
       `gh issue view <n> -R troupe-run/website --json projectItems` that its card is there
-- [ ] 3.2 Open an issue in troupe-run/troupe the same way, to change the README's paragraph so that it opens with the
+- [x] 3.2 Open an issue in troupe-run/troupe the same way, to change the README's paragraph so that it opens with the
       sentence, keeping its status paragraph after "Pre-alpha: there's nothing to install yet". Link it as a sub-issue
       of #108. Verify its card is on the board in the same way
 - [ ] 3.3 Name both issues in the PR description. Verify the PR body says `Closes #108` and links both
