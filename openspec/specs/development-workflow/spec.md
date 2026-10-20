@@ -166,7 +166,8 @@ its tests, to those tagged with any of the scopes. It SHALL refuse a scope its d
 ### Requirement: Test tags cover what each test reads
 Whenever a repository's tests run, a test SHALL fail if it reads a file under a scope's paths without that scope's
 tag, or reads a file under a skipped path. Only files inside the repository count. The message SHALL name the test,
-the file, and the tag to add or the skip entry it contradicts.
+the file, and the tag to add or the skip entry it contradicts. A file Hypothesis opens to collect constants from a
+module's source SHALL NOT count as the test's read.
 
 #### Scenario: A test reads a scope's path without its tag
 - **WHEN** the declaration has a scope `docs` covering `docs/**`, and a test without the `docs` tag reads
@@ -188,6 +189,15 @@ the file, and the tag to add or the skip entry it contradicts.
 #### Scenario: Files outside the repository
 - **WHEN** a test reads files in a temporary directory that its own fixture created
 - **THEN** those reads don't count
+
+#### Scenario: Hypothesis reads a module's source for its own constants
+- **WHEN** a test tagged with scope `pkg` imports a module under `pkg/`, and then an untagged Hypothesis test draws,
+  so Hypothesis reads that module's source to collect constants
+- **THEN** the untagged test doesn't fail: the read is Hypothesis's own, not the test's
+
+#### Scenario: A Hypothesis test that reads a scope's path itself
+- **WHEN** an untagged Hypothesis test opens a file under `pkg/` in its own body
+- **THEN** it fails as any other test does, naming the file and the `pkg` tag
 
 ### Requirement: A scope can tag whole test directories
 A scope in the declaration MAY list the test directories it runs, as a `tests` list of `dir/**` entries. Every test
