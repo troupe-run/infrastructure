@@ -22,7 +22,7 @@ merge (Workflow follow-up).
 
 ## 2. GitHub's side (spec: descriptions; design D1, D3, D5)
 
-- [ ] 2.1 In `tofu/repositories.tf`, decode `descriptions.json` into a local, with a comment naming the brand guide as
+- [x] 2.1 In `tofu/repositories.tf`, decode `descriptions.json` into a local, with a comment naming the brand guide as
       the reference across repositories (design D3). Set `repo_troupe`'s description to tagline plus sentence and its
       topics to `["ai-agents", "developer-tools", "human-in-the-loop", "python", "workflow"]`. Set `repo_website`'s
       description to "The troupe.run website and landing page" and its topics to `["astro", "website"]`. In
