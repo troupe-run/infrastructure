@@ -2,11 +2,11 @@
 
 ## 1. Add the two capability labels
 
-- [ ] 1.1 Read the user-docs and docs-publishing Purposes from troupe's `main`
+- [x] 1.1 Read the user-docs and docs-publishing Purposes from troupe's `main`
       (`gh api repos/troupe-run/troupe/contents/openspec/specs/<name>/spec.md`) through `scripts/oob.py`'s `purpose()`,
       and add them to `oob/troupe-spec-purposes.json` where design D2 says. Verify the file has 21 entries and its
       keys are sorted (`jq -r 'keys_unsorted[]'` against `sort`)
-- [ ] 1.2 Add `cap:docs-publishing` and `cap:user-docs` to `tofu/labels/troupe.json`, colour `1D76DB`, with the
+- [x] 1.2 Add `cap:docs-publishing` and `cap:user-docs` to `tofu/labels/troupe.json`, colour `1D76DB`, with the
       descriptions in design D1, where design D2 says. Verify the file holds 45 labels sorted by name
       (`jq -r '.[].name'` against `sort`), that `git diff` shows only the two additions, and that
       `uv run scripts/check.py` passes

@@ -45,6 +45,11 @@
     "description": "Open requests addressed to a role, with a brief, raised by gates and escalations"
   },
   {
+    "name": "cap:docs-publishing",
+    "color": "1D76DB",
+    "description": "How a change to troupe reaches troupe.run: which pushes rebuild /docs, what the notice job may do"
+  },
+  {
     "name": "cap:effects",
     "color": "1D76DB",
     "description": "What an actor may touch (files, network), declared in config and enforced by its stage"
@@ -203,6 +208,11 @@
     "name": "cap:theatre",
     "color": "1D76DB",
     "description": "A project troupe serves: a directory with troupe config, addressed by id"
+  },
+  {
+    "name": "cap:user-docs",
+    "color": "1D76DB",
+    "description": "troupe's user docs, built into troupe.run's /docs: page contract, generated reference, vocabulary"
   },
   {
     "name": "cap:vcs",
