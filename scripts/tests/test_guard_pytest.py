@@ -202,7 +202,6 @@ PKG = DECLARATION + '\n[scopes.pkg]\npaths = ["pkg/**"]\n'
 PKG_FILES = {"pkg/__init__.py": "", "pkg/mod.py": "VALUE = 1\n"}
 
 
-@pytest.mark.xfail(strict=True, reason="#114")
 def test_hypothesis_reading_an_imported_module_s_source_does_not_count_against_the_test(
     tmp_path: Path,
 ) -> None:
