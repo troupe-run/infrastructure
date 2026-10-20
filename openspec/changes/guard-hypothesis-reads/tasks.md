@@ -12,12 +12,13 @@
 
 ## 2. Skip Hypothesis's own reads (design D1)
 
-- [ ] 2.1 In `scripts/guard_pytest.py`, name the file (`hypothesis/internal/constants_ast.py`) as a module constant,
+- [x] 2.1 In `scripts/guard_pytest.py`, name the file (`hypothesis/internal/constants_ast.py`) as a module constant,
   and make `_record` skip an in-repository read when a frame on the stack comes from it, with `\` normalised to `/`.
   Update the module docstring's account of what counts as a read. Verify by removing 1.1's xfail: both tests pass
-- [ ] 2.2 Verify `uv run mypy --strict scripts` and `uv run ruff check scripts` are clean, and that `guard_pytest`
+- [x] 2.2 Verify `uv run mypy --strict scripts` and `uv run ruff check scripts` are clean, and that `guard_pytest`
   still imports nothing outside the standard library (`grep -n "^import\|^from" scripts/guard_pytest.py`)
-- [ ] 2.3 Time `uv run pytest scripts/tests/test_guard_pytest.py` before and after 2.1, and record both
+- [x] 2.3 Time `uv run pytest scripts/tests/test_guard_pytest.py` before and after 2.1, and record both. Before: 19.98, 19.46,
+  19.80 s (30 passed, 1 xfailed). After: 17.25, 19.74, 19.81 s (31 passed). No measurable cost
 
 ## 3. Integration
 
