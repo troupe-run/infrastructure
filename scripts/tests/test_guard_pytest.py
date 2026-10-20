@@ -196,6 +196,52 @@ def test_a_shared_fixture_s_read_counts_for_every_test_that_uses_it(tmp_path: Pa
     assert "test_first reads" not in result.stdout
 
 
+# Reads Hypothesis makes for itself (guard-hypothesis-reads, #114)
+
+PKG = DECLARATION + '\n[scopes.pkg]\npaths = ["pkg/**"]\n'
+PKG_FILES = {"pkg/__init__.py": "", "pkg/mod.py": "VALUE = 1\n"}
+
+
+@pytest.mark.xfail(strict=True, reason="#114")
+def test_hypothesis_reading_an_imported_module_s_source_does_not_count_against_the_test(
+    tmp_path: Path,
+) -> None:
+    """Found in troupe: before a draw, Hypothesis reads the source of every first-party module
+    imported since its last draw, to collect constants. The guard charged those reads to the test
+    that drew, which never read them."""
+    root = project(
+        tmp_path,
+        "from hypothesis import given, strategies as st\n\n"
+        "@pytest.mark.pkg\n"
+        "def test_imports():\n"
+        "    import pkg.mod\n"
+        "    assert pkg.mod.VALUE\n\n"
+        "@given(st.integers())\n"
+        "def test_draws(n):\n"
+        "    assert isinstance(n, int)\n",
+        declaration=PKG,
+        files=PKG_FILES,
+    )
+    result = run_pytest(root)
+    assert result.returncode == 0, result.stdout
+
+
+def test_a_hypothesis_test_reading_a_scope_s_path_itself_still_fails(tmp_path: Path) -> None:
+    root = project(
+        tmp_path,
+        "from hypothesis import given, strategies as st\n\n"
+        "@given(st.integers())\n"
+        "def test_draws(n):\n"
+        '    assert (ROOT / "pkg/mod.py").read_text()\n',
+        declaration=PKG,
+        files=PKG_FILES,
+    )
+    result = run_pytest(root)
+    assert result.returncode != 0, result.stdout
+    assert "test_reads.py::test_draws reads pkg/mod.py" in result.stdout
+    assert "`pkg`" in result.stdout
+
+
 # A scope's `tests` directories (scope-test-directories tasks 3.1-3.2, design D5, D6)
 
 SUITES = """\

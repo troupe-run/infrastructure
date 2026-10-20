@@ -2,12 +2,12 @@
 
 ## 1. Reproduce the false report (#114)
 
-- [ ] 1.1 In `scripts/tests/test_guard_pytest.py`, add a test that builds the throwaway project with a scope `pkg`
+- [x] 1.1 In `scripts/tests/test_guard_pytest.py`, add a test that builds the throwaway project with a scope `pkg`
   covering `pkg/**` (with `pkg/__init__.py` and `pkg/mod.py`). A test tagged `pkg` imports `pkg.mod`, then an
   untagged `@given(st.integers())` test draws. The test asserts that the run passes. Verify it **fails** on the
   unchanged guard, naming `test_draws` and `pkg/mod.py`, and commit it marked `xfail(strict=True, reason="#114")`
   with the failure quoted in the message
-- [ ] 1.2 Add the guard's other side: an untagged `@given` test that opens `pkg/mod.py` in its own body fails, naming
+- [x] 1.2 Add the guard's other side: an untagged `@given` test that opens `pkg/mod.py` in its own body fails, naming
   the file and the `pkg` tag. Verify it passes on the unchanged guard (it pins what must not change)
 
 ## 2. Skip Hypothesis's own reads (design D1)
