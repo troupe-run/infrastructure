@@ -14,7 +14,7 @@
 ## 2. Verify
 
 - [x] 2.1 Run `uv run scripts/oob.py` on the branch and verify it reports nothing; keep its output for the pull request
-- [ ] 2.2 Run `uv run scripts/tofu.py plan` and verify it shows the two `cap:` labels created on troupe-run/troupe and
+- [x] 2.2 Run `uv run scripts/tofu.py plan` and verify it shows the two `cap:` labels created on troupe-run/troupe and
       nothing else created, changed or deleted; keep its output for the pull request
 - [x] 2.3 Run `openspec validate label-troupe-docs-specs --strict` and verify it passes
 
