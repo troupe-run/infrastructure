@@ -3,6 +3,8 @@
   "cap:artifact-store": "Content-addressed storage for run artifacts that are too large or too sensitive for git, such as raw transcripts, so that lineage can reference them by hash and any copy can be verified.",
   "cap:cli": "The command-line surface of troupe: a thin client over the core's commands and queries, covering how it is invoked, how global flags are parsed, and how results and errors are rendered and reported through exit codes.",
   "cap:client-protocol": "Defines the commands and queries every surface uses to reach troupe's core: language-neutral messages that the CLI calls in process today and a run server will serve later, so no behaviour exists in only one surface.",
+  "cap:config": "Holds a theatre's config as events with lineage, works out the config every command uses from them, including across merged branches, and defines the actor, the first kind of config.",
+  "cap:config-files": "Projects a theatre's config to files under `.troupe/` that a person can read and review as diffs, never losing a file a person wrote, and keeps the theatre's own git files holding what troupe needs.",
   "cap:docs-publishing": "How a change to troupe reaches troupe.run: which pushes notify the website to rebuild `/docs`, and what the job that sends the notice may do.",
   "cap:event-store": "Records troupe's events as append-only text that git can merge without conflicts, and reads them back in a stable local order that meets the `eventsourcing` library's recorder contract, across branches, merges and forks.",
   "cap:flake-hunt": "Finding flaky tests on demand, on every platform: repeating tests in overlapping rounds, under optional load and with fresh randomised inputs, and reporting each failure with the evidence an issue needs.",
