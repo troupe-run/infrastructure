@@ -32,7 +32,12 @@
   {
     "name": "cap:config",
     "color": "1D76DB",
-    "description": "Config files under .troupe/: layout, per-file schemas, the hand-edit sweep and write-back"
+    "description": "A theatre's config as events with lineage, merged across branches, and the actor, its first kind"
+  },
+  {
+    "name": "cap:config-files",
+    "color": "1D76DB",
+    "description": "Config projected to files under .troupe/ for review as diffs, never losing a file a person wrote"
   },
   {
     "name": "cap:core-api",
