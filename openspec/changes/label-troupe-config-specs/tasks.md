@@ -15,7 +15,7 @@
 
 - [x] 2.1 Run `uv run scripts/oob.py` on the branch and verify it reports exactly two differences: the recorded
       `cap:config` and `cap:config-files` Purposes have no spec on troupe's `main` (design D4)
-- [ ] 2.2 Verify the plan shows `cap:config-files` created and `cap:config`'s description updated on
+- [x] 2.2 Verify the plan shows `cap:config-files` created and `cap:config`'s description updated on
       troupe-run/troupe, and nothing else created, changed or deleted. Read it from the pull request's `plan-pr` run,
       not a local `uv run scripts/tofu.py plan`: 1Password couldn't be reached on 2026-10-21 (owner away), and the
       owner chose the pull request's plan. So this is checked together with 3.2
@@ -27,7 +27,7 @@
       `uv run scripts/oob.py`. Verify it reports nothing; keep its output for the pull request. If it reports a
       changed Purpose for `config` or `config-files`, update the record and the description together (design D2)
       and re-run 1.2's checks. Stop and revise the change if it reports anything else
-- [ ] 3.2 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows
+- [x] 3.2 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows
       only 2.2's two changes. Tick 2.2 and 3.2 in the same push as the archive, so the owner approves one more run
 
 ## Workflow follow-up
