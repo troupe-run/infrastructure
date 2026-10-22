@@ -23,18 +23,18 @@
 
 ## 3. Verify after troupe#60 merges
 
-- [ ] 3.1 Once troupe#60's change is on troupe's `main`, fast-forward this branch onto `origin/main` and run
+- [x] 3.1 Once troupe#60's change is on troupe's `main`, fast-forward this branch onto `origin/main` and run
       `uv run scripts/oob.py`. Verify it reports nothing; keep its output for the pull request. If it reports a
       changed Purpose for `config` or `config-files`, update the record and the description together (design D2)
       and re-run 1.2's checks. Stop and revise the change if it reports anything else
-- [ ] 3.2 Once the owner approves the pull request's `plan-pr` run (after the archive, so it's asked once), read its
-      plan comment and verify it shows only 2.2's two changes
+- [ ] 3.2 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows
+      only 2.2's two changes. Tick 2.2 and 3.2 in the same push as the archive, so the owner approves one more run
 
 ## Workflow follow-up
 
 - Open the pull request with `Closes #116`, `oob.py`'s output from 3.1 and design D3's table.
-  Its plan comment is 2.2 and 3.2's evidence. Archive the change and rebase onto `main`'s state commit before asking the owner to approve the `plan-pr` run, so
-  it's asked once.
+  Its plan comment is 2.2 and 3.2's evidence. Before the second `plan-pr` approval, archive the change and rebase
+  onto `main`'s state commit in one push.
 - The owner merges by rebase, after troupe#60 (design D4).
 - After the merge, the owner reads the `plan (main)` plan and approves the `apply` job. Verify the labels with
   `gh label list -R troupe-run/troupe`, and check that the next drift job passes.
