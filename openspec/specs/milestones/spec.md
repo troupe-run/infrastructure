@@ -23,6 +23,15 @@ description and state.
 - **WHEN** a pull request changes a declared milestone's title and a plan runs
 - **THEN** the plan shows that milestone renamed in place in every listed repository, with nothing destroyed
 
+#### Scenario: A declared description changes
+- **WHEN** a pull request changes a declared milestone's description and a plan runs
+- **THEN** the plan shows that milestone's description changed in place in every listed repository, with nothing
+  destroyed, and every issue in it stays in it
+
+#### Scenario: A milestone is added
+- **WHEN** a pull request declares a new milestone and a plan runs
+- **THEN** the plan shows it created in every listed repository, and no other milestone changes
+
 ### Requirement: The milestones go to every managed repository
 The repositories that get the milestones SHALL be exactly the managed repositories, and `scripts/check.py` SHALL fail
 when the two differ, naming each repository that is in one and not the other.
@@ -69,8 +78,8 @@ The out-of-band drift check SHALL report each milestone, open or closed, on a li
 declared, naming the repository, the title and where to declare it.
 
 #### Scenario: A milestone made on GitHub
-- **WHEN** someone creates a `0.3.0` milestone on troupe-run/website on GitHub without declaring it
-- **THEN** the drift check prints a difference naming `website`, `0.3.0` and `tofu/milestones.json`, and exits 1
+- **WHEN** someone creates a `someday` milestone on troupe-run/website on GitHub without declaring it
+- **THEN** the drift check prints a difference naming `website`, `someday` and `tofu/milestones.json`, and exits 1
 
 #### Scenario: Every milestone is declared
 - **WHEN** every milestone on every listed repository is declared
