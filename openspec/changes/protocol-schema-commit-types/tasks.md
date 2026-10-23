@@ -52,13 +52,13 @@
 
 ## 3. Push and CI (design D5)
 
-- [ ] 3.1 Add the range decision over commits (paths from `git diff-tree --no-commit-id --name-only --no-renames -r
+- [x] 3.1 Add the range decision over commits (paths from `git diff-tree --no-commit-id --name-only --no-renames -r
   --root`), naming each failing commit as `<sha7> '<first line>' (<schema files>)`, and call it from `run_pre_push`
   and `run_ci`. Verify with tests in `scripts/tests/test_guard_push_and_ci.py`: a pushed commit reworded to
   `chore: tidy` after it changed a schema is refused, naming it; a pull request carrying a `--no-verify`
   `test:` schema commit fails the check under `schema-commit-type`; a range of releasing schema commits passes; a
   repository whose first commit adds a schema under `chore:` fails
-- [ ] 3.2 Update the `pre-push` and GitHub check rows or prose in `docs/development-workflow.md` that list which rules
+- [x] 3.2 Update the `pre-push` and GitHub check rows or prose in `docs/development-workflow.md` that list which rules
   each layer re-applies, so they name `schema-commit-type`. Verify by reading the section against `run_pre_push` and
   `run_ci`
 
