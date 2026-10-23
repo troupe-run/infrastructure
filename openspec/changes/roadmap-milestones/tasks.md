@@ -18,7 +18,7 @@
 
 ## 2. Verify the plan
 
-- [ ] 2.1 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify the summary
+- [x] 2.1 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify the summary
       reads `72 to add, 13 to change, 0 to destroy`, 12 of the changes are `description` only on `0.1.0`, `0.2.0`
       and `1.0.0` in each of the four repositories, the 13th is `.github`'s `CONTRIBUTING.md`, and the 72 adds are
       `0.3.0` to `0.20.0` in each (design D2). If it shows anything else, stop and fix the declaration. Tick this in the same push as the archive, rebased onto
