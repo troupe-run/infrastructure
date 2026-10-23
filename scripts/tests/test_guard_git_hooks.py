@@ -117,7 +117,6 @@ def test_a_feat_commit_changing_a_schema_is_made(make_repo: Callable[[], Repo]) 
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.xfail(strict=True, reason="#122")
 def test_a_docs_commit_changing_a_schema_is_refused_and_leaves_no_commit(
     make_repo: Callable[[], Repo],
 ) -> None:
@@ -161,7 +160,6 @@ def commit_msg_with_index(
     return guard.run_commit_msg(repo.path, message_file)
 
 
-@pytest.mark.xfail(strict=True, reason="#122")
 def test_the_index_git_is_committing_is_judged_as_commit_a_builds_it(
     make_repo: Callable[[], Repo], monkeypatch: pytest.MonkeyPatch
 ) -> None:

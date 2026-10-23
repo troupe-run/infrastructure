@@ -16,36 +16,38 @@
   refuses any unstaged tracked change first (1.4), so they call the commit-msg entry with `GIT_INDEX_FILE` set as
   git sets it: an index holding the schema edit (as `-a` builds) is refused under `docs:`; a schema edit only in the
   working tree isn't. Verify the refusing case is `xfail(strict=True)` on the unchanged guard and the others pass
-- [ ] 1.4 Record, in the pull request's notes, what the pre-commit hook's `git diff --cached` sees during
+- [x] 1.4 Record, in the pull request's notes, what the pre-commit hook's `git diff --cached` sees during
   `git commit -a` (`.git/index` versus `GIT_INDEX_FILE`), from a scratch repository with the hooks on. If its
   `commit-checks` or `delivered-file` reading is wrong there, comment on infrastructure#103 with the reproduction
   (design, Risks); don't change it here
 
 ## 2. The rule (design D1-D4, D6)
 
-- [ ] 2.1 In `scripts/guard.py`, add `SCHEMA_PATHS` beside `RELEASE_REPOSITORIES` and `RELEASING_TYPES` beside
+- [x] 2.1 In `scripts/guard.py`, add `SCHEMA_PATHS` beside `RELEASE_REPOSITORIES` and `RELEASING_TYPES` beside
   `COMMIT_TYPES`, each with a docstring naming its source (troupe#140; release-please `src/util/filter-commits.ts`),
   and add `schema-commit-type` to `OVERRIDABLE_RULES`. Verify `uv run pytest scripts/tests/test_guard_docs.py` now
   fails, naming the undocumented rule
-- [ ] 2.2 Add a pure decision `schema_commit_type(message, paths)`: allow when no path is under `SCHEMA_PATHS`, when
+- [x] 2.2 Add a pure decision `schema_commit_type(message, paths)`: allow when no path is under `SCHEMA_PATHS`, when
   the message isn't a Conventional Commit (left to `commit-message`), or when the type (after autosquash prefixes)
   is in `RELEASING_TYPES` or the commit is breaking (`!`, or a line starting `BREAKING CHANGE:` or
   `BREAKING-CHANGE:`); otherwise refuse naming up to five schema files, the type, the releasing types and the fix.
   Verify with parametrised tests in `scripts/tests/test_guard_commit_rules.py` covering every scenario of the spec's
   new requirement, including `fixup! docs: x` refused and `fixup! feat: x` allowed, a rename out of
   `protocol/schemas/`, and the refusal's text naming the files and every releasing type
-- [ ] 2.3 Add a Hypothesis property test: for any accepted type, optional scope and `!`, and any set of paths, the
+- [x] 2.3 Add a Hypothesis property test: for any accepted type, optional scope and `!`, and any set of paths, the
   decision refuses exactly when a path is under `protocol/schemas/` and the commit is neither of a releasing type nor
-  breaking. Verify it passes, and that it fails when `RELEASING_TYPES` drops `perf` (check by hand, then restore)
-- [ ] 2.4 Add a test pinning `RELEASING_TYPES` to the visible sections of release-please's
+  breaking. Verify it passes, and that it fails when `RELEASING_TYPES` drops `perf` (check by hand, then restore).
+  Drawing the type with Hypothesis missed the dropped `perf` in one run, so the test is parametrised over every type,
+  and Hypothesis draws the rest; it then failed on `[perf]` in 3 of 3 runs with `perf` dropped, and passed restored
+- [x] 2.4 Add a test pinning `RELEASING_TYPES` to the visible sections of release-please's
   `DEFAULT_CHANGELOG_SECTIONS` as read on 2026-10-23 (copied into the test with its source), and verify it passes
-- [ ] 2.5 Call the rule from `run_commit_msg` after `commit_message`, with the staged paths read through the hook's
+- [x] 2.5 Call the rule from `run_commit_msg` after `commit_message`, with the staged paths read through the hook's
   `GIT_INDEX_FILE` when set (D4), every other git call still stripping it. Verify by removing the `xfail` marks from
   1.2 and 1.3: every test in groups 1 passes
-- [ ] 2.6 Add the `schema-commit-type` row to `docs/development-workflow.md`'s rules table: what it refuses, where
+- [x] 2.6 Add the `schema-commit-type` row to `docs/development-workflow.md`'s rules table: what it refuses, where
   the paths and types are declared (`SCHEMA_PATHS`, `RELEASING_TYPES` in `scripts/guard.py`), that it's inert without
   `protocol/schemas/`, and the fix. Verify `uv run pytest scripts/tests/test_guard_docs.py` passes
-- [ ] 2.7 Verify an owner's override excuses the rule once and is logged, as for the other git rules, with a test
+- [x] 2.7 Verify an owner's override excuses the rule once and is logged, as for the other git rules, with a test
   beside the existing override tests in `scripts/tests/test_guard_overrides.py`
 
 ## 3. Push and CI (design D5)

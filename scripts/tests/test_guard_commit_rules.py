@@ -85,6 +85,127 @@ def test_a_first_line_without_a_colon_is_always_refused(line: str) -> None:
     assert guard.commit_message(line).rule == "commit-message"
 
 
+# Rule: schema-commit-type (#122)
+
+ERROR_SCHEMA = "protocol/schemas/error.schema.json"
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "feat(protocol): add the notice schema",
+        "fix: correct the error schema",
+        "perf(protocol): flatten the schema",
+        "revert: put the run fields back",
+        "refactor(protocol)!: rename the run fields",
+        "chore!: drop the old schema",
+        "docs: describe it\n\nBREAKING CHANGE: the field is gone",
+        "test: cover it\n\nBREAKING-CHANGE: the field is gone",
+        "fixup! feat: add the notice schema",
+        "squash! refactor!: rename the run fields",
+        "Add a schema",
+    ],
+)
+def test_a_schema_change_under_a_type_that_releases_is_allowed(message: str) -> None:
+    """The last case isn't a Conventional Commit: commit-message refuses it, not this rule."""
+    assert guard.schema_commit_type(message, [ERROR_SCHEMA]) == guard.ALLOW
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "docs(protocol): describe the error codes",
+        "refactor: tidy the schema",
+        "test: cover the schema",
+        "chore: tidy",
+        "style: format the schemas",
+        "build: regenerate",
+        "ci: check the schemas",
+        "fixup! docs: describe the error codes",
+        "amend! chore: tidy",
+        "docs: !important note",
+        "docs: mention it\n\nThis is not a BREAKING CHANGE: just words.",
+    ],
+)
+def test_a_schema_change_under_a_type_that_releases_nothing_is_refused(message: str) -> None:
+    decision = guard.schema_commit_type(message, [ERROR_SCHEMA, "protocol/README.md"])
+    assert decision.rule == "schema-commit-type"
+    assert ERROR_SCHEMA in decision.problem
+    assert "protocol/README.md" not in decision.problem
+
+
+def test_the_refusal_names_the_type_every_releasing_type_and_breaking_changes() -> None:
+    decision = guard.schema_commit_type("docs: describe", [ERROR_SCHEMA])
+    assert "type 'docs'" in decision.problem
+    for kind in ("feat", "fix", "perf", "revert"):
+        assert kind in decision.fix
+    assert "breaking change of any type" in decision.fix
+    assert "BREAKING CHANGE:" in decision.fix
+
+
+def test_the_refusal_lists_five_schemas_and_counts_the_rest() -> None:
+    paths = [f"protocol/schemas/s{n}.schema.json" for n in range(7)]
+    decision = guard.schema_commit_type("chore: tidy", paths)
+    assert "protocol/schemas/s4.schema.json and 2 more" in decision.problem
+    assert "s5.schema.json" not in decision.problem
+
+
+@pytest.mark.parametrize(
+    "paths",
+    [
+        ["protocol/README.md", "protocol/CHANGELOG.md"],
+        ["packages/troupe/src/troupe/protocol/error.schema.json"],
+        ["protocol/schemas.md", "README.md"],
+        [],
+    ],
+)
+def test_a_change_outside_protocol_schemas_isn_t_judged(paths: list[str]) -> None:
+    assert guard.schema_commit_type("docs: explain versioning", paths) == guard.ALLOW
+
+
+def test_moving_a_schema_out_of_protocol_schemas_counts_as_changing_it() -> None:
+    """With --no-renames a move lists both sides, so the old path is judged."""
+    paths = [ERROR_SCHEMA, "protocol/old/error.schema.json"]
+    assert guard.schema_commit_type("refactor: move it", paths).rule == "schema-commit-type"
+
+
+@pytest.mark.parametrize("kind", guard.COMMIT_TYPES)
+@given(
+    scope=st.none() | SCOPE,
+    bang=st.booleans(),
+    footer=st.sampled_from(["", "\n\nBREAKING CHANGE: x", "\n\nBREAKING-CHANGE: x"]),
+    paths=st.lists(
+        st.sampled_from(
+            [ERROR_SCHEMA, "protocol/schemas/runner/x.schema.json", "protocol/README.md", "a.txt"]
+        ),
+        unique=True,
+    ),
+    subject=SUBJECT,
+)
+def test_a_commit_is_refused_exactly_when_it_changes_a_schema_and_releases_nothing(
+    kind: str, scope: str | None, bang: bool, footer: str, paths: list[str], subject: str
+) -> None:
+    message = f"{kind}{f'({scope})' if scope else ''}{'!' if bang else ''}: {subject}{footer}"
+    touches = any(path.startswith("protocol/schemas/") for path in paths)
+    releases = kind in {"feat", "fix", "perf", "revert"} or bang or bool(footer)
+    refused = guard.schema_commit_type(message, paths).refused
+    assert refused == (touches and not releases)
+
+
+# release-please's DEFAULT_CHANGELOG_SECTIONS, from googleapis/release-please
+# src/util/filter-commits.ts as read on 2026-10-23: the types it releases for are the visible ones.
+RELEASE_PLEASE_DEFAULT_SECTIONS = {
+    "feat": False, "fix": False, "perf": False, "revert": False, "chore": True, "docs": True,
+    "style": True, "refactor": True, "test": True, "build": True, "ci": True,
+}  # fmt: skip
+
+
+def test_the_releasing_types_are_release_please_s_visible_default_sections() -> None:
+    visible = {kind for kind, hidden in RELEASE_PLEASE_DEFAULT_SECTIONS.items() if not hidden}
+    assert set(guard.RELEASING_TYPES) == visible
+    assert set(RELEASE_PLEASE_DEFAULT_SECTIONS) == set(guard.COMMIT_TYPES)
+
+
 # Rules: commit-on-main, commit-branch-change
 
 
