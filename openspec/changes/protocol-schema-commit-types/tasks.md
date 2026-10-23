@@ -2,18 +2,20 @@
 
 ## 1. Pin what must not change, before the rule exists
 
-- [ ] 1.1 In `scripts/tests/test_guard_git_hooks.py`, add hook tests in a temporary repository with a
+- [x] 1.1 In `scripts/tests/test_guard_git_hooks.py`, add hook tests in a temporary repository with a
   `protocol/schemas/a.schema.json` committed: a `docs:` commit changing only `protocol/README.md` and
   `protocol/CHANGELOG.md` is made; a `chore:` commit in a repository with no `protocol/` is made; a `feat:` commit
   changing a schema is made. Verify all three **pass on the unchanged guard** (they pin the proposal's "unaffected"
   cases), and commit them
-- [ ] 1.2 Add the failing side: a `docs(protocol):` commit changing `protocol/schemas/a.schema.json` is refused, with
+- [x] 1.2 Add the failing side: a `docs(protocol):` commit changing `protocol/schemas/a.schema.json` is refused, with
   no commit made. Verify it **fails** on the unchanged guard (the commit is made), and commit it marked
   `xfail(strict=True, reason="#122")`
-- [ ] 1.3 Add hook tests for how the commit was made (spec: "Only the files being committed count"): `git commit -a`
-  with a schema edit under `docs:` is refused; `git commit protocol/README.md` under `docs:` with a schema edit left
-  unstaged is made; staging a schema then committing only another path with `git commit <path>` under `docs:` is
-  made. Verify the refusing case is `xfail(strict=True)` on the unchanged guard and the others pass
+- [x] 1.3 Add tests for how the commit was made (spec: "Only the files being committed count"). End to end through the
+  hooks: staging a schema, then committing only another path with `git commit <path>` under `docs:`, is made. The
+  `git commit -a` and unstaged-schema cases can't reach the commit-msg hook end to end, because `commit-checks`
+  refuses any unstaged tracked change first (1.4), so they call the commit-msg entry with `GIT_INDEX_FILE` set as
+  git sets it: an index holding the schema edit (as `-a` builds) is refused under `docs:`; a schema edit only in the
+  working tree isn't. Verify the refusing case is `xfail(strict=True)` on the unchanged guard and the others pass
 - [ ] 1.4 Record, in the pull request's notes, what the pre-commit hook's `git diff --cached` sees during
   `git commit -a` (`.git/index` versus `GIT_INDEX_FILE`), from a scratch repository with the hooks on. If its
   `commit-checks` or `delivered-file` reading is wrong there, comment on infrastructure#103 with the reproduction
