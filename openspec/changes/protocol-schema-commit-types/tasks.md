@@ -64,14 +64,14 @@
 
 ## 4. Integration
 
-- [ ] 4.1 Copy the new `scripts/guard.py` into a scratch clone of troupe at `origin/main`, turn its hooks on, and
+- [x] 4.1 Copy the new `scripts/guard.py` into a scratch clone of troupe at `origin/main`, turn its hooks on, and
   verify: a `docs:` commit changing a file under `protocol/schemas/` is refused naming it; the same change as `fix:`
   is made. Then run `uv run scripts/guard.py ci --base origin/main~50 --head origin/main --branch main` there and
   record what it reports in the pull request: history isn't refused after delivery, but it shows whether troupe has
   already shipped a schema change under a non-releasing type
-- [ ] 4.2 Run `uv run scripts/check.py` and `openspec validate protocol-schema-commit-types --strict`, and verify both
+- [x] 4.2 Run `uv run scripts/check.py` and `openspec validate protocol-schema-commit-types --strict`, and verify both
   pass
-- [ ] 4.3 After rebasing onto `origin/main`, run `uv run scripts/tofu.py plan` and verify it shows only
+- [x] 4.3 After rebasing onto `origin/main`, run `uv run scripts/tofu.py plan` and verify it shows only
   `scripts/guard.py` updated in place in troupe and website. Keep it for the pull request
 
 ## Workflow follow-up
