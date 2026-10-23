@@ -2723,6 +2723,32 @@ def nonconforming_commits(root: Path, commits: Iterable[str]) -> Decision:
     )
 
 
+def schema_commit_types(root: Path, commits: Iterable[str]) -> Decision:
+    """The schema-commit-type rule over many commits, each judged on its own changes, so a commit
+    amended, reworded or made with --no-verify is still caught (design D5)."""
+    bad: list[str] = []
+    for sha in commits:
+        message = git(root, "log", "-1", "--format=%B", sha)
+        # --root so a repository's first commit lists its files; --no-renames so a move lists both.
+        paths = git(
+            root, "diff-tree", "--no-commit-id", "--name-only", "--no-renames", "-r", "--root", sha
+        ).splitlines()
+        if schema_commit_type(message, paths).refused:
+            first = next((line for line in message.splitlines() if line.strip()), "")
+            bad.append(f"{sha[:7]} '{first}' ({', '.join(schema_files(paths)[:5])})")
+    if not bad:
+        return ALLOW
+    listed = "; ".join(bad[:5]) + (f"; and {len(bad) - 5} more" if len(bad) > 5 else "")
+    return Decision(
+        "schema-commit-type",
+        f"{len(bad)} commit(s) change protocol schemas under a type that releases nothing: "
+        f"{listed}.",
+        f"Reword each to a type that releases ({', '.join(RELEASING_TYPES)}), or mark it "
+        "breaking: git commit --amend for the last commit, or git rebase with reword for earlier "
+        "ones. If the rest of a commit's work shouldn't release, split the schema change out.",
+    )
+
+
 def delivered_changes_by_others(
     root: Path, commits: Iterable[str], delivered: frozenset[str]
 ) -> Decision:
@@ -2761,7 +2787,7 @@ def run_ci(
     decides whether a release branch's name exempts it from the branch rule (open-release-exemption
     design D2; drop-forgery-resistance design D1, #47)."""
     commits = commits_in_range(root, base, head)
-    decisions = [nonconforming_commits(root, commits)]
+    decisions = [nonconforming_commits(root, commits), schema_commit_types(root, commits)]
     if title is not None:
         decisions.append(pr_title(title))
     if branch and branch != "main" and not reserved_release_branch(branch, repository):
@@ -2817,8 +2843,9 @@ def run_pre_push(root: Path, refs: Iterable[str]) -> int:
         local_ref, local_sha, _, remote_sha = parts
         if _is_null(local_sha):
             continue  # deleting a remote branch sends no commits
-        decision = nonconforming_commits(root, commits_in_range(root, remote_sha, local_sha))
-        refusal = first_refusal(root, [decision], f"push {local_ref}")
+        commits = commits_in_range(root, remote_sha, local_sha)
+        decisions = [nonconforming_commits(root, commits), schema_commit_types(root, commits)]
+        refusal = first_refusal(root, decisions, f"push {local_ref}")
         if refusal is not None:
             print(refusal.text(), file=sys.stderr)
             return 1

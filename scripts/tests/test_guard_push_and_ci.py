@@ -85,6 +85,33 @@ def test_deleting_a_remote_branch_checks_nothing(make_repo: Callable[[], Repo]) 
     assert guard.run_pre_push(repo.path, [line]) == 0
 
 
+# Rule: schema-commit-type before a push (#122)
+
+SCHEMA = "protocol/schemas/a.schema.json"
+
+
+def test_a_pushed_schema_commit_reworded_to_chore_is_refused_naming_it(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo = make_repo()
+    repo.hooks_on()
+    with_remote(repo, tmp_path)
+    repo.change("add-thing")
+    repo.switch("add-thing")
+    repo.commit("docs(openspec): plan add-thing")
+    repo.write(SCHEMA, "{}\n")
+    made = repo.commit("feat(protocol): add a schema")
+    assert made.returncode == 0, made.stderr
+    # Rewording runs the commit-msg hook against an index with nothing new staged (design D5).
+    reworded = git(repo.path, "commit", "-q", "--amend", "-m", "chore: tidy", check=False)
+    assert reworded.returncode == 0, reworded.stderr
+    result = git(repo.path, "push", "-u", "origin", "add-thing", check=False)
+    assert result.returncode != 0
+    assert "guard: schema-commit-type:" in result.stderr
+    assert f"{repo.head()[:7]} 'chore: tidy' ({SCHEMA})" in result.stderr
+    assert "add-thing" not in git(repo.path, "ls-remote", "--heads", "origin").stdout
+
+
 # Task 7.3: the same rules on GitHub
 
 
@@ -113,6 +140,44 @@ def test_a_pull_request_with_a_no_verify_bad_message_fails_naming_the_commit(
     [refusal] = guard.run_ci(repo.path, base, repo.head(), "add-thing")
     assert refusal.rule == "commit-message"
     assert bad[:7] in refusal.problem
+
+
+def test_a_pull_request_with_a_no_verify_test_schema_commit_fails_naming_it(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base = pr_repo(make_repo, tmp_path)
+    bad = commit_without_hooks(repo, "test: cover the schema", SCHEMA)
+    commit_without_hooks(repo, "docs(protocol): explain it", "protocol/README.md")
+    [refusal] = guard.run_ci(repo.path, base, repo.head(), "add-thing")
+    assert refusal.rule == "schema-commit-type"
+    assert refusal.problem.startswith("1 commit(s)")
+    assert f"{bad[:7]} 'test: cover the schema' ({SCHEMA})" in refusal.problem
+
+
+def test_a_pull_request_of_releasing_schema_commits_passes(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base = pr_repo(make_repo, tmp_path)
+    commit_without_hooks(repo, "feat(protocol): add a schema", SCHEMA)
+    commit_without_hooks(repo, "refactor(protocol)!: rename it", "protocol/schemas/b.schema.json")
+    commit_without_hooks(repo, "perf: a faster schema", "protocol/schemas/c.schema.json")
+    assert guard.run_ci(repo.path, base, repo.head(), "add-thing") == []
+
+
+def test_a_repository_whose_first_commit_adds_a_schema_under_chore_fails(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "fresh"
+    path.mkdir()
+    git(path, "init", "-q", "-b", "main")
+    git(path, "config", "user.email", "tester@example.com")
+    git(path, "config", "user.name", "Tester")
+    git(path, "config", "commit.gpgsign", "false")
+    repo = Repo(path)
+    first = commit_without_hooks(repo, "chore: initial", SCHEMA)
+    [refusal] = guard.run_ci(path, None, first, "main")
+    assert refusal.rule == "schema-commit-type"
+    assert SCHEMA in refusal.problem
 
 
 def test_a_pull_request_from_a_branch_with_no_change_fails(

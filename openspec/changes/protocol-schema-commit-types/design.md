@@ -66,7 +66,11 @@ repository, for a setting troupe doesn't use. Rejected for now; a test pins the 
 
 A separate id rather than a second meaning for `commit-message`: the refusal's problem and fix are different (the
 message is well formed; its type is wrong for what it changes), and an owner's override for one must not excuse the
-other. It goes in `OVERRIDABLE_RULES` like every git rule, so the owner can grant a one-off.
+other. It goes in `OVERRIDABLE_RULES` like every git rule. As for those, an override excuses one local hook run and
+nothing more: the `guard` check ignores overrides, so a commit made under one still fails the pull request. That's
+intended. Every schema change that merges must release, so the only way through is a releasing type; an override is
+for local work in progress that will be reworded before it's pushed. A CI-side exception would let changed schemas
+ship under the old version, which is what the rule exists to stop.
 
 The problem names up to five schema files and the commit's type. The fix lists the releasing types, says a breaking
 change of any type is allowed, and gives an example (`fix(protocol): <what changed>`). It also says the schema change

@@ -114,14 +114,19 @@ def test_a_schema_commit_type_override_allows_one_commit_then_the_rule_applies_a
     repo.change("add-thing")
     repo.switch("add-thing")
     repo.commit("docs(openspec): propose add-thing")
-    assert grant(repo, "schema-commit-type", "--reason", "whitespace only").returncode == 0
+    assert (
+        grant(
+            repo, "schema-commit-type", "--reason", "work in progress, reworded before the push"
+        ).returncode
+        == 0
+    )
 
     repo.write("protocol/schemas/a.schema.json", "{ }\n")
     first = repo.commit("style(protocol): space the schema")
     assert first.returncode == 0, first.stderr
     [entry] = log_lines(repo)
     assert entry["rule"] == "schema-commit-type"
-    assert entry["reason"] == "whitespace only"
+    assert entry["reason"] == "work in progress, reworded before the push"
     assert "style(protocol): space the schema" in entry["allowed"]
 
     repo.write("protocol/schemas/a.schema.json", "{  }\n")
