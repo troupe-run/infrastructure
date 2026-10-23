@@ -10,19 +10,127 @@
       "key": "0.1.0",
       "title": "0.1.0",
       "state": "open",
-      "description": "Walking skeleton: troupe perform runs one actor end to end; status and logs read from projections"
+      "description": "One real actor, safely: an actor defined in config runs through Claude Code on a worktree, and you keep or discard its work. Installed with uv from a tag"
     },
     {
       "key": "0.2.0",
       "title": "0.2.0",
       "state": "open",
-      "description": "Actors defined in config, run through Claude Code on a local worktree stage"
+      "description": "Config by hand: edits made to troupe's files by hand are read back into config, and entities can be renamed"
+    },
+    {
+      "key": "0.3.0",
+      "title": "0.3.0",
+      "state": "open",
+      "description": "Gates: a run stops for approval before its work is kept; every gate is manual, and the approver is whoever runs troupe"
+    },
+    {
+      "key": "0.4.0",
+      "title": "0.4.0",
+      "state": "open",
+      "description": "A sequence: actors run one after another, with gates between them"
+    },
+    {
+      "key": "0.5.0",
+      "title": "0.5.0",
+      "state": "open",
+      "description": "Escalations: an actor that can't decide researches, then asks with a brief, so not everything needs a gate"
+    },
+    {
+      "key": "0.6.0",
+      "title": "0.6.0",
+      "state": "open",
+      "description": "Roles: people, their identities and the roles they hold; gates and escalations reach a role, for selective approval"
+    },
+    {
+      "key": "0.7.0",
+      "title": "0.7.0",
+      "state": "open",
+      "description": "In parallel: flows fork into tasks that run at once, and join again"
+    },
+    {
+      "key": "0.8.0",
+      "title": "0.8.0",
+      "state": "open",
+      "description": "Notes: what a run teaches feeds into the next"
+    },
+    {
+      "key": "0.9.0",
+      "title": "0.9.0",
+      "state": "open",
+      "description": "The house: runs outlive the terminal that started them, with live status"
+    },
+    {
+      "key": "0.10.0",
+      "title": "0.10.0",
+      "state": "open",
+      "description": "The web UI: non-technical users run workflows in a browser, installed without the command line"
+    },
+    {
+      "key": "0.11.0",
+      "title": "0.11.0",
+      "state": "open",
+      "description": "Loops: part of a flow repeats until a condition holds, such as a gate passing"
+    },
+    {
+      "key": "0.12.0",
+      "title": "0.12.0",
+      "state": "open",
+      "description": "Swarms: many actors work on one task, and their results are compared or combined"
+    },
+    {
+      "key": "0.13.0",
+      "title": "0.13.0",
+      "state": "open",
+      "description": "Contained: a Docker stage enforces each actor's declared effects"
+    },
+    {
+      "key": "0.14.0",
+      "title": "0.14.0",
+      "state": "open",
+      "description": "Another runner: an actor runs on a model on your own machine"
+    },
+    {
+      "key": "0.15.0",
+      "title": "0.15.0",
+      "state": "open",
+      "description": "Plugins over JSON-RPC: a generic bridge, and an SDK for writing plugins in Python"
+    },
+    {
+      "key": "0.16.0",
+      "title": "0.16.0",
+      "state": "open",
+      "description": "Policy: policy files with levels that can only tighten, including which plugin transports are allowed"
+    },
+    {
+      "key": "0.17.0",
+      "title": "0.17.0",
+      "state": "open",
+      "description": "Plugins from elsewhere: config names and pins plugins and guests, and troupe acquires them"
+    },
+    {
+      "key": "0.18.0",
+      "title": "0.18.0",
+      "state": "open",
+      "description": "Work tracking: troupe reads and updates work in a tracker, GitHub first"
+    },
+    {
+      "key": "0.19.0",
+      "title": "0.19.0",
+      "state": "open",
+      "description": "Together: approvals travel between installs"
+    },
+    {
+      "key": "0.20.0",
+      "title": "0.20.0",
+      "state": "open",
+      "description": "Telemetry: asked for, and inspectable"
     },
     {
       "key": "1.0.0",
       "title": "1.0.0",
       "state": "open",
-      "description": "The first stable release: roles, gates, the house and plugins; split into earlier releases as work comes up"
+      "description": "The first stable release: the stability promise for the protocol, config and recorded data"
     }
   ]
 }
