@@ -40,6 +40,23 @@ status; OpenSpec holds what the system does and how each change will do it.
 
 Small fixes follow the same path. A bug fix adds the scenario that reproduces the bug to the spec.
 
+## Milestones
+
+Each milestone is a planned troupe release, and its description says what a user gets from it. Every repository
+has the same milestones, so an issue anywhere is filed under the troupe release it's needed for. When a milestone's
+last issue is closed, that version is released.
+
+- **Planned work** goes in the release it's needed for.
+- **Completed work** always has a milestone: the one of the work it arose from or, when nothing fits, the release
+  that was in progress when it was done. That includes development process, org upkeep and flaky tests.
+- **Open work that isn't planned** has no milestone. 1.0.0 holds only the stability promise.
+- **A Decision** goes in the milestone of the earliest work it blocks or, when it blocks nothing, of the work it
+  shaped.
+
+Milestones may be renumbered, reordered or re-described as plans change. They're declared in
+[`tofu/milestones.json`](https://github.com/troupe-run/infrastructure/blob/main/tofu/milestones.json), and
+[troupe#139](https://github.com/troupe-run/troupe/issues/139) records why.
+
 ## Guardrails
 
 Each repository that builds with this workflow enforces it with git hooks, Claude Code hooks and a GitHub check.

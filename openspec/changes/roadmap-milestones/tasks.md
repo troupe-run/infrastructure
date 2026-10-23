@@ -2,19 +2,19 @@
 
 ## 1. Declare the milestones
 
-- [ ] 1.1 Rewrite `tofu/milestones.json`'s `milestones` as design D1 says: the 21 milestones in release order, each with
+- [x] 1.1 Rewrite `tofu/milestones.json`'s `milestones` as design D1 says: the 21 milestones in release order, each with
       `key` equal to `title`, state `open`, and #119's description word for word, keeping the keys `0.1.0`, `0.2.0` and
       `1.0.0`. Verify with `jq -r '.milestones[] | [.key, .title, .state] | @tsv'` that there are 21 rows in order and
       every key equals its title, compare each description with #119's table (`gh issue view 119 --json body`), and
       check `git diff` leaves `repositories` unchanged
-- [ ] 1.2 Update `README.md`'s milestones row as design D4 says. Verify `grep -rn "0\.2\.0, 1\.0\.0" README.md docs` finds
+- [x] 1.2 Update `README.md`'s milestones row as design D4 says. Verify `grep -rn "0\.2\.0, 1\.0\.0" README.md docs` finds
       nothing, and that `uv run scripts/check.py` passes (including `scripts/tests/test_milestones.py`)
-- [ ] 1.3 Add design D6's Milestones section to `org-profile/CONTRIBUTING.md`, after "How work flows". Verify the
+- [x] 1.3 Add design D6's Milestones section to `org-profile/CONTRIBUTING.md`, after "How work flows". Verify the
       source note is still the file's first line, `git diff` shows only the added section, and
       `uv run scripts/check.py` passes
-- [ ] 1.4 Run `uv run scripts/oob.py` and verify its milestones section reports nothing (every title on GitHub is
+- [x] 1.4 Run `uv run scripts/oob.py` and verify its milestones section reports nothing (every title on GitHub is
       already declared; the new ones just aren't created yet)
-- [ ] 1.5 Run `openspec validate roadmap-milestones --strict` and verify it passes
+- [x] 1.5 Run `openspec validate roadmap-milestones --strict` and verify it passes
 
 ## 2. Verify the plan
 
