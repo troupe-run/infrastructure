@@ -67,7 +67,7 @@
 - [ ] 4.1 Push the branch and verify, in the pull request's `guard` run log, that OpenSpec 1.14.3 is installed, every
   spec and active change here is validated (the branch changes `scripts/guard.py`), the rule passes, and the job's
   time is well inside 5 minutes. Record the time in the pull request
-- [ ] 4.2 With OpenSpec 1.14.3, run the new `guard.py`'s full validation against troupe's and website's `origin/main`
+- [x] 4.2 With OpenSpec 1.14.3, run the new `guard.py`'s full validation against troupe's and website's `origin/main`
   (scratch copies of each `openspec/`), and verify both pass. Record the counts in the pull request. If either fails,
   stop and tell the owner before the delivery is planned
 - [x] 4.3 Run `uv run scripts/check.py` and `openspec validate guard-strict-openspec --strict`, and verify both pass
