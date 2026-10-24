@@ -10,7 +10,7 @@ import guard
 pytestmark = pytest.mark.docs
 
 DOC = REPO / "docs" / "development-workflow.md"
-ROW = re.compile(r"^\| `([a-z-]+)` \| (git|Claude) \|", re.MULTILINE)
+ROW = re.compile(r"^\| `([a-z-]+)` \| (git|Claude|GitHub) \|", re.MULTILINE)
 
 
 def test_the_docs_list_exactly_the_guard_s_rules() -> None:

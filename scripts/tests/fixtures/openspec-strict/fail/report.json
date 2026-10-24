@@ -1,0 +1,54 @@
+{
+  "items": [
+    {
+      "id": "add-thing",
+      "type": "change",
+      "valid": false,
+      "issues": [
+        {
+          "level": "ERROR",
+          "path": "steps/spec.md",
+          "message": "ADDED \"Runs pause\" must include at least one scenario"
+        }
+      ],
+      "durationMs": 16
+    },
+    {
+      "id": "steps",
+      "type": "spec",
+      "valid": false,
+      "issues": [
+        {
+          "level": "WARNING",
+          "path": "requirements[2]",
+          "message": "Requirement text is very long (>500 characters). Move examples and edge cases into scenarios, or split it into separate requirements that each state one behavior."
+        }
+      ],
+      "durationMs": 3
+    }
+  ],
+  "summary": {
+    "totals": {
+      "items": 2,
+      "passed": 0,
+      "failed": 2
+    },
+    "byType": {
+      "change": {
+        "items": 1,
+        "passed": 0,
+        "failed": 1
+      },
+      "spec": {
+        "items": 1,
+        "passed": 0,
+        "failed": 1
+      }
+    }
+  },
+  "version": "1.0",
+  "root": {
+    "path": "/probe/fail",
+    "source": "nearest"
+  }
+}
