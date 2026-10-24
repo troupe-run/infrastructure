@@ -500,3 +500,29 @@ data "cloudflare_dns_records" "probe_all" {
 output "probe_all_count" {
   value = length(try(data.cloudflare_dns_records.probe_all[0].result, []))
 }
+
+# The milestone-interim-titles probe (design D6): the live milestones.tf's resource and title
+# expression, on the probe repository. The expression is a copy, kept in step by hand: change both
+# together. The milestones are JSON, decoded as the live file is, so a milestone without
+# interim_title takes the same path. Run with declared = false, so only milestones are managed:
+#   -var declared=false -var probe_repo=infra-probe-milestones -var 'probe_milestones=[
+#     {"key":"a","title":"0.2.0"},{"key":"b","title":"0.3.0"},{"key":"c","title":"0.4.0"}]'
+# then rotate the titles, without and then with interim_title, and plan and apply each step.
+variable "probe_milestones" {
+  description = "The probe's milestones as JSON, as milestones.json declares them (milestone-interim-titles D6)."
+  type        = string
+  default     = "[]"
+}
+
+locals {
+  probe_milestones = { for milestone in jsondecode(var.probe_milestones) : milestone.key => milestone }
+}
+
+resource "github_repository_milestone" "probe" {
+  for_each = local.probe_milestones
+
+  owner      = "troupe-run"
+  repository = var.probe_repo
+  title      = try(each.value.interim_title, each.value.title)
+  state      = "open"
+}

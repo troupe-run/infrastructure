@@ -4,7 +4,7 @@
 
 - [ ] 1.1 Create `troupe-run/infra-probe-milestones` (`gh repo create --public --add-readme`) and ask the owner to add it
   to the App's installation. Verify with a probe plan that can read the repository.
-- [ ] 1.2 Add `probe_milestones` to `tofu/probe/main.tf` (design D6), with the live title expression of design D1 and a
+- [x] 1.2 Add `probe_milestones` to `tofu/probe/main.tf` (design D6), with the live title expression of design D1 and a
   comment naming the copy. Verify with `tofu fmt -check` and `tofu validate` in `tofu/probe`.
 - [ ] 1.3 Step 1: apply keys `a`, `b`, `c` titled `0.2.0`, `0.3.0` and `0.4.0`, file one issue in each, and record each
   issue's milestone number. Verify with `gh api repos/troupe-run/infra-probe-milestones/milestones`.
@@ -18,17 +18,16 @@
 
 ## 2. Interim titles in the declaration's readers
 
-- [ ] 2.1 In `scripts/tests/test_milestones.py`, write tests for design D3 first: an interim title equal to another
+- [x] 2.1 In `scripts/tests/test_milestones.py`, write tests for design D3 first: an interim title equal to another
   milestone's title, equal to its own title, equal to another interim title, empty, and not a string, each named in
   the message. A milestone with a unique interim title is valid. Verify they fail before 2.2.
-- [ ] 2.2 Extend `declaration_problems` for D3, and verify 2.1's tests pass.
+- [x] 2.2 Extend `declaration_problems` for D3, and verify 2.1's tests pass.
 - [ ] 2.3 In `scripts/tests/test_oob.py`, write tests for design D4: a declared milestone on GitHub under its interim
   title, and under its title, reports nothing, and an undeclared title is still reported. Verify the first fails
   before 2.4.
 - [ ] 2.4 Make `undeclared_milestones` count interim titles as declared, update its comment, and verify 2.3's tests
   pass.
-- [ ] 2.5 Make `tofu/milestones.tf` apply the interim title (design D1): normalise each milestone, then `setproduct`.
-  Update its header comment. Verify with `tofu fmt -check`, `tofu validate`, and a local plan against current state
+- [ ] 2.5 Make `tofu/milestones.tf` apply the interim title (design D1). Update its header comment. Verify with `tofu fmt -check`, `tofu validate`, and a local plan against current state
   (fast-forward onto `origin/main` first) that shows no changes while the declaration has no interim titles.
 - [ ] 2.6 Update README's milestones row: a key and title can differ, the title is the version, and an interim title
   (design D2's format) lets titles move between milestones in two applies. Verify `uv run scripts/check.py` passes.

@@ -39,11 +39,13 @@ over a single change with a break-glass interim apply (2026-10-24).
 
 ### D1. An optional `interim_title` field, applied instead of `title`
 
-`tofu/milestones.tf` applies `interim_title` when it's declared, otherwise `title`. Each milestone is normalised to
-the same attributes before `setproduct`, with an `applied_title` built by `try(milestone.interim_title,
-milestone.title)`. `jsondecode` gives a tuple of objects, and once some have `interim_title` and others don't they
-no longer unify into one list type, which `setproduct` needs. The normalised object has the four existing fields
-plus `applied_title`, so the instance keys don't change.
+`tofu/milestones.tf` applies `interim_title` when it's declared, otherwise `title`:
+`title = try(each.value.milestone.interim_title, each.value.milestone.title)`. The instance keys don't change.
+
+A mix of milestones with and without `interim_title` still goes through `setproduct`. Every field is a string, so
+OpenTofu turns each object into a `map(string)`, and maps with different keys unify. Checked on OpenTofu 1.13.2 during
+apply. This design first said a mix wouldn't unify and needed a normalising step. It doesn't. A missing key on a map is an error, and
+`try` catches it.
 
 Alternatives:
 

@@ -48,7 +48,8 @@ def repository_problems(listed: list[str], managed: set[str]) -> list[str]:
 
 
 def declaration_problems(milestones: list[dict[str, Any]]) -> list[str]:
-    """Each key or title declared twice, and each state that isn't open or closed."""
+    """Each key or title declared twice, each state that isn't open or closed, and each interim
+    title that's malformed or already taken."""
     found: list[str] = []
     for field in ("key", "title"):
         seen: set[str] = set()
@@ -63,11 +64,33 @@ def declaration_problems(milestones: list[dict[str, Any]]) -> list[str]:
                 f"{milestone['title']}: state is {milestone['state']!r}; "
                 f"valid states are {', '.join(STATES)}"
             )
+    # Titles and interim titles share GitHub's one namespace per repository
+    # (milestone-interim-titles design D3). An interim title that's present but malformed is an
+    # error, not "use the title".
+    taken = {milestone["title"] for milestone in milestones}
+    for milestone in milestones:
+        if "interim_title" not in milestone:
+            continue
+        interim = milestone["interim_title"]
+        if not isinstance(interim, str) or not interim.strip():
+            found.append(
+                f"{milestone['title']}: interim title is {interim!r}; "
+                "an interim title must be a non-empty string"
+            )
+        elif interim in taken:
+            found.append(
+                f"{milestone['title']}: interim title {interim!r} is already a title or interim "
+                "title in tofu/milestones.json; an interim title must be one no milestone has"
+            )
+        else:
+            taken.add(interim)
     return found
 
 
-def milestone(key: str, title: str | None = None, state: str = "open") -> dict[str, Any]:
-    return {"key": key, "title": title or key, "state": state, "description": "x"}
+def milestone(
+    key: str, title: str | None = None, state: str = "open", **extra: object
+) -> dict[str, Any]:
+    return {"key": key, "title": title or key, "state": state, "description": "x", **extra}
 
 
 def test_every_managed_repository_gets_the_milestones_and_no_other() -> None:
@@ -119,3 +142,54 @@ def test_an_unknown_state_is_an_error_naming_the_valid_ones() -> None:
 
 def test_a_closed_milestone_is_valid() -> None:
     assert declaration_problems([milestone("0.1.0", state="closed")]) == []
+
+
+# milestone-interim-titles design D3: titles and interim titles share GitHub's one namespace per
+# repository, and a malformed interim title is an error, never a fall-through to the title.
+
+
+def test_an_interim_title_that_is_another_milestones_title_is_named() -> None:
+    found = declaration_problems(
+        [milestone("0.2.0", "0.3.0", interim_title="0.4.0"), milestone("0.4.0")]
+    )
+    assert found == [
+        "0.3.0: interim title '0.4.0' is already a title or interim title in "
+        "tofu/milestones.json; an interim title must be one no milestone has"
+    ]
+
+
+def test_an_interim_title_that_is_its_own_title_is_named() -> None:
+    assert declaration_problems([milestone("0.2.0", interim_title="0.2.0")]) == [
+        "0.2.0: interim title '0.2.0' is already a title or interim title in "
+        "tofu/milestones.json; an interim title must be one no milestone has"
+    ]
+
+
+def test_two_milestones_with_the_same_interim_title_are_named() -> None:
+    found = declaration_problems(
+        [
+            milestone("0.2.0", "0.3.0", interim_title="moving"),
+            milestone("0.3.0", "0.4.0", interim_title="moving"),
+        ]
+    )
+    assert found == [
+        "0.4.0: interim title 'moving' is already a title or interim title in "
+        "tofu/milestones.json; an interim title must be one no milestone has"
+    ]
+
+
+@pytest.mark.parametrize("value", ["", "   ", None, 2])
+def test_an_interim_title_that_is_not_a_non_empty_string_is_named(value: object) -> None:
+    assert declaration_problems([milestone("0.2.0", interim_title=value)]) == [
+        f"0.2.0: interim title is {value!r}; an interim title must be a non-empty string"
+    ]
+
+
+def test_a_unique_interim_title_is_valid() -> None:
+    found = declaration_problems(
+        [
+            milestone("0.2.0", "0.3.0", interim_title="0.3.0 (renumbering)"),
+            milestone("0.3.0", "0.2.0", interim_title="0.2.0 (renumbering)"),
+        ]
+    )
+    assert found == []
