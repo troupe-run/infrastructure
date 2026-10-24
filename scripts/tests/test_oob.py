@@ -464,6 +464,53 @@ def test_a_declared_milestone_missing_on_github_is_left_to_the_plan(oob_dir: Pat
     assert found == []
 
 
+# milestone-interim-titles design D4: a milestone's title and its interim title both count as
+# declared, so neither the old title before the apply nor the interim title after it is reported.
+SWAPPED = {
+    "repositories": ["troupe", "website"],
+    "milestones": [
+        {
+            "key": "0.1.0",
+            "title": "0.2.0",
+            "interim_title": "0.2.0 (renumbering)",
+            "state": "open",
+            "description": "now",
+        },
+        {
+            "key": "0.2.0",
+            "title": "0.1.0",
+            "interim_title": "0.1.0 (renumbering)",
+            "state": "closed",
+            "description": "next",
+        },
+    ],
+}
+
+
+def test_a_milestone_under_its_interim_title_reports_nothing(oob_dir: Path) -> None:
+    (oob_dir / "tofu" / "milestones.json").write_text(json.dumps(SWAPPED))
+    on_github = ["0.2.0 (renumbering)", "0.1.0 (renumbering)"]
+    made = {"troupe": on_github, "website": on_github}
+    assert RUN(fake_github(TYPES, PROJECTS, [], milestones=made), oob_dir) == []
+
+
+def test_a_milestone_under_its_title_while_it_has_an_interim_title_reports_nothing(
+    oob_dir: Path,
+) -> None:
+    (oob_dir / "tofu" / "milestones.json").write_text(json.dumps(SWAPPED))
+    assert RUN(fake_github(TYPES, PROJECTS, []), oob_dir) == []
+
+
+def test_an_undeclared_title_is_still_reported_beside_interim_titles(oob_dir: Path) -> None:
+    (oob_dir / "tofu" / "milestones.json").write_text(json.dumps(SWAPPED))
+    made = {"website": ["0.2.0 (renumbering)", "someday"]}
+    found = RUN(fake_github(TYPES, PROJECTS, [], milestones=made), oob_dir)
+    assert found == [
+        "milestones: website: 'someday' is on GitHub but not declared; "
+        "declare it in tofu/milestones.json"
+    ]
+
+
 def test_milestones_that_can_t_be_read_are_an_error_naming_the_repository(oob_dir: Path) -> None:
     errors = {"website": RuntimeError("HTTP 502")}
     report = REPORT(fake_github(TYPES, PROJECTS, [], milestones=errors), oob_dir)
