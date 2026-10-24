@@ -30,7 +30,7 @@
 
 ## 3. Verify the plan
 
-- [ ] 3.1 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it reads
+- [x] 3.1 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it reads
       `0 to add, 1 to change, 0 to destroy`, the one change being `github_repository_file.org_profile["CONTRIBUTING.md"]`.
       If it shows anything else, stop and find out why. Tick this in the same push as the archive, rebased onto
       `main`'s state commit, so the owner approves one more run
