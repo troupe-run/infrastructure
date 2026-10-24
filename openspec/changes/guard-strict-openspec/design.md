@@ -133,6 +133,10 @@ and the fix is:
 with `<id>` and `<type>` filled in when one item fails, and `--all` when several do. `<version>` is what
 `openspec --version` printed in the same run, so the message can't disagree with the CLI that produced it.
 
+Every run also prints one line saying what the rule judged: how many items, out of how many, with which version, or
+why OpenSpec wasn't run. A passing run's log is then evidence that the validation happened, which "every rule passes"
+alone isn't (found on this change's first push, task 4.1).
+
 The rule isn't overridable: it runs only on GitHub, where no override is consumed. It's added to `RULES` beside
 `TAMPER_RULE` as a CI-only rule, not to `OVERRIDABLE_RULES`, so `guard.py override openspec-strict` is refused by the
 existing choice check.
