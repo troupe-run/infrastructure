@@ -289,3 +289,8 @@ person can also grant themselves a local override in a clone of it.
    the repository, which then change through its own workflow.
 3. Remove it from `guard_targets` and `depends_on`, remove `app_bypass_id` from its module, and drop
    `guard (workflow rules)` from its required checks.
+
+## Licence
+
+[Apache-2.0](LICENSE). The troupe name, logo, mark and characters are trademarks of HPS.GD PTY LTD, and aren't
+covered by the licence.

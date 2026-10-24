@@ -2,11 +2,11 @@
 
 ## 0. infrastructure's licence
 
-- [ ] 0.1 Copy troupe's `LICENSE` to the repository root, as design D4 says. Verify
+- [x] 0.1 Copy troupe's `LICENSE` to the repository root, as design D4 says. Verify
       `gh api repos/troupe-run/troupe/contents/LICENSE --jq .content | base64 -d | diff - LICENSE` prints nothing
-- [ ] 0.2 Add `license = "Apache-2.0"` and `license-files = ["LICENSE"]` to `pyproject.toml`'s `[project]`. Verify
+- [x] 0.2 Add `license = "Apache-2.0"` and `license-files = ["LICENSE"]` to `pyproject.toml`'s `[project]`. Verify
       `uv lock --check` passes and `git diff uv.lock` is empty
-- [ ] 0.3 Add design D4's `## Licence` section to the end of `README.md`. Verify it links `LICENSE`, names Apache-2.0
+- [x] 0.3 Add design D4's `## Licence` section to the end of `README.md`. Verify it links `LICENSE`, names Apache-2.0
       and carries the trademark note, and that `uv run scripts/check.py` passes
 
 ## 1. The sign-off table and its test
