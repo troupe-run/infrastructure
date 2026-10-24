@@ -2,17 +2,17 @@
 
 ## 1. Prove the collision on a throwaway repository
 
-- [ ] 1.1 Create `troupe-run/infra-probe-milestones` (`gh repo create --public --add-readme`) and ask the owner to add it
+- [x] 1.1 Create `troupe-run/infra-probe-milestones` (`gh repo create --public --add-readme`) and ask the owner to add it
   to the App's installation. Verify with a probe plan that can read the repository.
 - [x] 1.2 Add `probe_milestones` to `tofu/probe/main.tf` (design D6), with the live title expression of design D1 and a
   comment naming the copy. Verify with `tofu fmt -check` and `tofu validate` in `tofu/probe`.
-- [ ] 1.3 Step 1: apply keys `a`, `b`, `c` titled `0.2.0`, `0.3.0` and `0.4.0`, file one issue in each, and record each
+- [x] 1.3 Step 1: apply keys `a`, `b`, `c` titled `0.2.0`, `0.3.0` and `0.4.0`, file one issue in each, and record each
   issue's milestone number. Verify with `gh api repos/troupe-run/infra-probe-milestones/milestones`.
-- [ ] 1.4 Step 2: plan and apply the rotation with no interim titles. Record GitHub's error, and what the next plan
+- [x] 1.4 Step 2: plan and apply the rotation with no interim titles. Record GitHub's error, and what the next plan
   shows. Verify it failed on the duplicate title. If it applied, stop and report on #128 and #129 (design, risks).
-- [ ] 1.5 Step 3: restore step 1, then apply the rotation with interim titles, then without them. Verify both plans
+- [x] 1.5 Step 3: restore step 1, then apply the rotation with interim titles, then without them. Verify both plans
   show only updates in place, both apply, and each issue's milestone number matches 1.3.
-- [ ] 1.6 Delete the repository and the probe's state, `terraform.tfvars` and anything else 1.1 to 1.5 left. Verify
+- [x] 1.6 Delete the repository and the probe's state, `terraform.tfvars` and anything else 1.1 to 1.5 left. Verify
   `gh repo view troupe-run/infra-probe-milestones` fails and `git status` in `tofu/probe` shows nothing
   untracked. Put the results from 1.4 and 1.5 in a comment on #129.
 
