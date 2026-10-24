@@ -17,7 +17,7 @@
       either spec, update the record and the description together (design D2) and re-run 1.2's checks. Stop and
       revise the change if it reports anything else about troupe's labels
 - [x] 2.2 Run `openspec validate cap-labels-for-new-specs --strict` and verify it passes
-- [ ] 2.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows
+- [x] 2.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows
       the two labels created on troupe-run/troupe, and nothing else created, changed or deleted. Tick this in the same
       push as the archive, so the owner approves one more run
 
