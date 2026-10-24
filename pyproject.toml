@@ -4,6 +4,8 @@
 name = "troupe-infrastructure"
 version = "0"
 requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 
 [tool.uv]
 package = false
