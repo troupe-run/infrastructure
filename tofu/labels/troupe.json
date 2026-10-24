@@ -15,6 +15,11 @@
     "description": "Content-addressed store for large or sensitive run artifacts, such as transcripts, kept by hash"
   },
   {
+    "name": "cap:claude-code-runner",
+    "color": "1D76DB",
+    "description": "Running an actor through Claude Code, mapping its stream-json onto run events"
+  },
+  {
     "name": "cap:cli",
     "color": "1D76DB",
     "description": "The troupe command line: a thin client over the core, with its flags, output and exit codes"
@@ -173,6 +178,11 @@
     "name": "cap:roles",
     "color": "1D76DB",
     "description": "Jobs in a process, such as reviewer; who holds each, and routing work to roles"
+  },
+  {
+    "name": "cap:run-workspaces",
+    "color": "1D76DB",
+    "description": "Where a run works, in its own git worktree, and how its changes are seen, accepted or discarded"
   },
   {
     "name": "cap:runner-protocol",

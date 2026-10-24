@@ -1,6 +1,7 @@
 {
   "cap:actor-runners": "How troupe runs an actor through an out-of-process runner: launching it, supervising the run within named limits, cancelling it, and deriving one trustworthy outcome per run.",
   "cap:artifact-store": "Content-addressed storage for run artifacts that are too large or too sensitive for git, such as raw transcripts, so that lineage can reference them by hash and any copy can be verified.",
+  "cap:claude-code-runner": "Runs an actor through Claude Code. The runner speaks troupe's runner contract and maps Claude Code's stream-json onto run events, so `troupe perform` can use the engine troupe was designed around.",
   "cap:cli": "The command-line surface of troupe: a thin client over the core's commands and queries, covering how it is invoked, how global flags are parsed, and how results and errors are rendered and reported through exit codes.",
   "cap:client-protocol": "Defines the commands and queries every surface uses to reach troupe's core: language-neutral messages that the CLI calls in process today and a run server will serve later, so no behaviour exists in only one surface.",
   "cap:config": "Holds a theatre's config as events with lineage, works out the config every command uses from them, including across merged branches, and defines the actor, the first kind of config.",
@@ -16,6 +17,7 @@
   "cap:python-support": "Which Python versions troupe supports, how that support is declared and enforced, and how the declaration stays exactly in step with the versions CI tests.",
   "cap:quality-check": "What troupe's `scripts/check.py` runs, the scoped form that narrows its tests, and troupe's declaration of which paths need which part of the check. The commit guard and CI read that declaration, and every test run keeps it true.",
   "cap:releases": "How troupe's packages get their versions, changelogs and releases: all derived from the Conventional Commits on `main` through a release pull request, never edited by hand.",
+  "cap:run-workspaces": "Defines where a run works, and what happens to what it changed. A run gets its own git worktree, where its changes are captured as a diff, and the person can see, accept or discard them, without anything the actor wrote reaching the theatre unasked.",
   "cap:runner-protocol": "The language-neutral contract between troupe and an actor runner, so that a runner can be written in any language and troupe can run any actor (Claude Code, a local model, a scripted runner) the same way.",
   "cap:runs": "Records each run of an actor in the theatre's event store, with lineage, from its first runner event to its derived outcome, and reads runs back as projections so a person can see what is happening and what happened.",
   "cap:scripted-runner": "A deterministic actor runner for tests: it plays a script or replays a recorded stream through the runner contract, so every run outcome can be produced on demand, offline and for free.",
