@@ -5,9 +5,14 @@ A form whose issue type the org doesn't have, or whose label a repository lacks,
 GitHub; the type or label is just dropped. So each form is checked here against what the org
 declares: issue types in oob/issue-types.json (which oob.py compares with GitHub) and the
 workflow's labels in tofu/labels/workflow.json (which every managed repository gets).
+
+The contributing guide's licence and sign-off table is checked the same way, against what the
+rulesets require (tofu/required-checks.json) and the licence pyproject.toml declares.
 """
 
 import json
+import re
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -205,3 +210,111 @@ def test_a_security_advisories_link_counts_as_the_security_policy(tmp_path: Path
         "    url: https://github.com/troupe-run/troupe/security/advisories/new\n",
     )
     assert len(security_link_problems(config)) == 1
+
+
+GUIDE = ORG_PROFILE / "CONTRIBUTING.md"
+REQUIRED_CHECKS = REPO / "tofu" / "required-checks.json"
+PYPROJECT = REPO / "pyproject.toml"
+
+# A row of the guide's licence and sign-off table: | [repo](link) | licence | sign-off |
+TABLE_ROW = re.compile(r"^\|\s*\[([^\]]+)\]\([^)]*\)\s*\|([^|]*)\|([^|]*)\|\s*$")
+
+
+def requires_dco(checks: list[dict[str, str]]) -> bool:
+    return any(c["context"] == "DCO" and c["app"] == "dco" for c in checks)
+
+
+def guide_table_problems(
+    guide: str, required_checks: dict[str, list[dict[str, str]]], licence: str
+) -> list[str]:
+    """What the guide's licence and sign-off table gets wrong, each naming the repository (specs:
+    org-profile, licensing; org-contributing-covers-website design D3).
+
+    Every repository in tofu/required-checks.json is governed, so each needs one row. Its sign-off
+    is DCO exactly when its pull requests require the DCO App's check, and infrastructure's licence
+    is the one pyproject.toml declares.
+    """
+    rows: dict[str, list[tuple[str, str]]] = {}
+    for line in guide.splitlines():
+        if match := TABLE_ROW.match(line):
+            name, row_licence, sign_off = (part.strip() for part in match.groups())
+            rows.setdefault(name, []).append((row_licence, sign_off))
+    problems = []
+    for repo, checks in sorted(required_checks.items()):
+        found = rows.get(repo, [])
+        if len(found) != 1:
+            problems.append(
+                f"{repo}: the guide's licence and sign-off table has {len(found)} rows for it, "
+                "not one"
+            )
+            continue
+        [(row_licence, sign_off)] = found
+        if requires_dco(checks) and not sign_off.startswith("DCO"):
+            problems.append(
+                f"{repo}: its pull requests require the DCO check, but the guide says {sign_off!r}"
+            )
+        if not requires_dco(checks) and not sign_off.startswith("None"):
+            problems.append(
+                f"{repo}: the guide says {sign_off!r}, but its pull requests don't require the "
+                "DCO check"
+            )
+        if repo == "infrastructure" and row_licence != licence:
+            problems.append(
+                f"infrastructure: the guide says {row_licence!r}, but pyproject.toml declares "
+                f"{licence!r}"
+            )
+    return problems
+
+
+@pytest.mark.tofu
+def test_the_guides_table_matches_the_rulesets_and_this_repositorys_licence() -> None:
+    required_checks = json.loads(REQUIRED_CHECKS.read_text(encoding="utf-8"))
+    licence = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["project"]["license"]
+    assert guide_table_problems(GUIDE.read_text(encoding="utf-8"), required_checks, licence) == []
+
+
+DCO = {"context": "DCO", "app": "dco"}
+GUARD = {"context": "guard (workflow rules)", "app": "github-actions"}
+CHECKS = {"infrastructure": [GUARD, DCO], "website": [GUARD]}
+SOUND_GUIDE = (
+    "| Repository | Licence | Sign-off |\n"
+    "|---|---|---|\n"
+    "| [infrastructure](https://github.com/troupe-run/infrastructure) | Apache-2.0 | DCO |\n"
+    "| [website](https://github.com/troupe-run/website) | MIT | None: no DCO, no CLA |\n"
+)
+
+
+def test_a_table_matching_the_checks_and_licence_has_no_problems() -> None:
+    assert guide_table_problems(SOUND_GUIDE, CHECKS, "Apache-2.0") == []
+
+
+def test_a_governed_repository_with_no_row_fails_naming_it() -> None:
+    guide = SOUND_GUIDE.replace("| [website](https://github.com/troupe-run/website) |", "| x |")
+    assert guide_table_problems(guide, CHECKS, "Apache-2.0") == [
+        "website: the guide's licence and sign-off table has 0 rows for it, not one"
+    ]
+
+
+def test_dco_for_a_repository_that_doesnt_require_it_fails_naming_it() -> None:
+    guide = SOUND_GUIDE.replace("None: no DCO, no CLA", "DCO")
+    assert guide_table_problems(guide, CHECKS, "Apache-2.0") == [
+        "website: the guide says 'DCO', but its pull requests don't require the DCO check"
+    ]
+
+
+def test_no_sign_off_for_a_repository_that_requires_dco_fails_naming_it() -> None:
+    guide = SOUND_GUIDE.replace("| Apache-2.0 | DCO |", "| Apache-2.0 | None |")
+    assert guide_table_problems(guide, CHECKS, "Apache-2.0") == [
+        "infrastructure: its pull requests require the DCO check, but the guide says 'None'"
+    ]
+
+
+def test_a_dco_check_from_another_app_doesnt_count() -> None:
+    checks = {**CHECKS, "website": [GUARD, {"context": "DCO", "app": "github-actions"}]}
+    assert guide_table_problems(SOUND_GUIDE, checks, "Apache-2.0") == []
+
+
+def test_a_licence_other_than_pyprojects_fails_naming_both() -> None:
+    assert guide_table_problems(SOUND_GUIDE, CHECKS, "MIT") == [
+        "infrastructure: the guide says 'Apache-2.0', but pyproject.toml declares 'MIT'"
+    ]

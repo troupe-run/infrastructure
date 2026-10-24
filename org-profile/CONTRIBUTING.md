@@ -6,16 +6,30 @@ its own. The [website](https://github.com/troupe-run/website) has its own.
 
 ## Licence and sign-off
 
-Contributions are accepted under the repository's licence (Apache-2.0 for troupe itself), with a sign-off under
-the [Developer Certificate of Origin](https://developercertificate.org/) (DCO). The sign-off is one line in each
-commit, which `git commit -s` adds for you:
+Contributions are accepted under the repository's licence. Some repositories also ask for a sign-off on each commit:
+
+| Repository | Licence | Sign-off |
+|---|---|---|
+| [troupe](https://github.com/troupe-run/troupe) | Apache-2.0 | DCO |
+| [infrastructure](https://github.com/troupe-run/infrastructure) | Apache-2.0 | DCO |
+| [website](https://github.com/troupe-run/website) | MIT for code, CC BY 4.0 for content | None: no DCO, no CLA |
+
+You keep the copyright in your work. There's no separate agreement to sign.
+
+The troupe name, logo, mark and characters are trademarks of HPS.GD PTY LTD and aren't covered by any of these
+licences.
+
+### The DCO sign-off
+
+Where a repository asks for it, the sign-off is under the
+[Developer Certificate of Origin](https://developercertificate.org/) (DCO). It's one line in each commit, which
+`git commit -s` adds for you:
 
 ```
 Signed-off-by: Your Name <you@example.com>
 ```
 
 It certifies that you wrote the change, or otherwise have the right to submit it under the repository's licence.
-You keep the copyright in your work. There's no separate agreement to sign.
 
 Forgot it? `git commit --amend -s` fixes the last commit, and `git rebase --signoff main` fixes every commit on
 your branch.
