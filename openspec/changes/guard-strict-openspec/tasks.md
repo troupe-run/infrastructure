@@ -71,7 +71,7 @@
   (scratch copies of each `openspec/`), and verify both pass. Record the counts in the pull request. If either fails,
   stop and tell the owner before the delivery is planned
 - [x] 4.3 Run `uv run scripts/check.py` and `openspec validate guard-strict-openspec --strict`, and verify both pass
-- [ ] 4.4 After rebasing onto `origin/main`, run `uv run scripts/tofu.py plan` and verify it shows only
+- [x] 4.4 After rebasing onto `origin/main`, run `uv run scripts/tofu.py plan` and verify it shows only
   `scripts/guard.py` and `.github/workflows/guard.yml` updated in place in troupe and website (four changes). Keep it
   for the pull request
 
