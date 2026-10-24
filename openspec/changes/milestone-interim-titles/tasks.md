@@ -22,14 +22,14 @@
   milestone's title, equal to its own title, equal to another interim title, empty, and not a string, each named in
   the message. A milestone with a unique interim title is valid. Verify they fail before 2.2.
 - [x] 2.2 Extend `declaration_problems` for D3, and verify 2.1's tests pass.
-- [ ] 2.3 In `scripts/tests/test_oob.py`, write tests for design D4: a declared milestone on GitHub under its interim
+- [x] 2.3 In `scripts/tests/test_oob.py`, write tests for design D4: a declared milestone on GitHub under its interim
   title, and under its title, reports nothing, and an undeclared title is still reported. Verify the first fails
   before 2.4.
-- [ ] 2.4 Make `undeclared_milestones` count interim titles as declared, update its comment, and verify 2.3's tests
+- [x] 2.4 Make `undeclared_milestones` count interim titles as declared, update its comment, and verify 2.3's tests
   pass.
-- [ ] 2.5 Make `tofu/milestones.tf` apply the interim title (design D1). Update its header comment. Verify with `tofu fmt -check`, `tofu validate`, and a local plan against current state
+- [x] 2.5 Make `tofu/milestones.tf` apply the interim title (design D1). Update its header comment. Verify with `tofu fmt -check`, `tofu validate`, and a local plan against current state
   (fast-forward onto `origin/main` first) that shows no changes while the declaration has no interim titles.
-- [ ] 2.6 Update README's milestones row: a key and title can differ, the title is the version, and an interim title
+- [x] 2.6 Update README's milestones row: a key and title can differ, the title is the version, and an interim title
   (design D2's format) lets titles move between milestones in two applies. Verify `uv run scripts/check.py` passes.
 
 ## 3. The declaration
