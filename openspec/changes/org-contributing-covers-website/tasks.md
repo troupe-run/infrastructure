@@ -11,11 +11,11 @@
 
 ## 1. The sign-off table and its test
 
-- [ ] 1.1 Add the test of design D3 to `scripts/tests/test_org_profile.py`, with its fixture tests (missing row, DCO
+- [x] 1.1 Add the test of design D3 to `scripts/tests/test_org_profile.py`, with its fixture tests (missing row, DCO
       where it isn't required, None where it is, a licence other than `pyproject.toml`'s), and run it against the
       current guide. Verify the fixture tests pass and the real-guide test fails, naming every governed repository as
       having no row
-- [ ] 1.2 Rewrite "Licence and sign-off" in `org-profile/CONTRIBUTING.md` as design D1 says. Verify the real-guide
+- [x] 1.2 Rewrite "Licence and sign-off" in `org-profile/CONTRIBUTING.md` as design D1 says. Verify the real-guide
       test now passes, that changing website's row to `DCO` makes it fail naming website, and that changing
       infrastructure's licence to `MIT` makes it fail naming both licences (revert both)
 
