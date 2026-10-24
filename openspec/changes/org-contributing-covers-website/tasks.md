@@ -21,11 +21,11 @@
 
 ## 2. The rest of the guide
 
-- [ ] 2.1 Make design D2's edits: the opening, the "A fix from outside" section, and the two additions to "How work
+- [x] 2.1 Make design D2's edits: the opening, the "A fix from outside" section, and the two additions to "How work
       flows". Verify `grep -n "has its own" org-profile/CONTRIBUTING.md` finds nothing, the guide names
       `Co-authored-by:` and Conventional Commits, the source note is still the first line, and `git diff` leaves the
       Milestones, Guardrails, pull request and Security sections unchanged
-- [ ] 2.2 Run `uv run scripts/check.py` and `openspec validate org-contributing-covers-website --strict`, and verify
+- [x] 2.2 Run `uv run scripts/check.py` and `openspec validate org-contributing-covers-website --strict`, and verify
       both pass
 
 ## 3. Verify the plan

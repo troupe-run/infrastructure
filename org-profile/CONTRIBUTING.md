@@ -1,12 +1,13 @@
 <!-- Source: troupe-run/infrastructure (org-profile/CONTRIBUTING.md). Change it there; this copy is written by the App. -->
 # Contributing to troupe
 
-Thanks for helping. This guide applies to every troupe-run repository that doesn't have a `CONTRIBUTING.md` of
-its own. The [website](https://github.com/troupe-run/website) has its own.
+Thanks for helping. This guide applies to every troupe-run repository. Setting up and running a repository is in
+its README.
 
 ## Licence and sign-off
 
-Contributions are accepted under the repository's licence. Some repositories also ask for a sign-off on each commit:
+Contributions are accepted under the repository's licence. Some repositories also ask for a sign-off on each
+commit:
 
 | Repository | Licence | Sign-off |
 |---|---|---|
@@ -47,12 +48,22 @@ status; OpenSpec holds what the system does and how each change will do it.
 2. **An OpenSpec change says how.** It lives under `openspec/changes/<name>/`, on a branch named `<name>`, with a
    proposal, spec deltas, a design and tasks. Its proposal cites the issue.
 3. **A pull request delivers it.** It names the change and closes the issue (`Closes #12`). Specs, code and tests
-   change together.
+   change together, and the repository's check passes before every commit (its README says how to run it).
 4. **Before the merge,** the change is archived on its branch, which updates `openspec/specs/`, so the pull
    request lands code, tests and specs together. It's merged by rebase.
 5. **After the merge,** the issue gets a comment linking the PR and the change, and is closed.
 
 Small fixes follow the same path. A bug fix adds the scenario that reproduces the bug to the spec.
+
+Commit messages are [Conventional Commits](https://www.conventionalcommits.org/), for example `feat(cli): ...`,
+`fix(docs): ...` or `ci: ...`.
+
+## A fix from outside
+
+A pull request made outside this workflow, for example in GitHub's editor, fails its `guard` check, because it isn't
+on an OpenSpec change's branch. That's expected. A maintainer carries your fix through the workflow instead: they
+put it on a change branch of their own, credit you as its co-author with a `Co-authored-by:` line, link your pull
+request from theirs, and close yours when theirs merges. You don't need to do anything else.
 
 ## Milestones
 
