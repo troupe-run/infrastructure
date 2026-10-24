@@ -41,7 +41,7 @@ What OpenSpec 1.14.3 does, measured on 2026-10-24 against a probe repository in 
 
 ### D1. A guard rule, not a separate workflow step
 
-`run_ci` gains one more decision, `openspec-strict`, and `guard.yml` only installs the CLI. Calling `openspec
+`guard.py ci` gains one more decision, `openspec-strict`, and `guard.yml` only installs the CLI. Calling `openspec
 validate` as its own step would be shorter, but its text output names a main spec's requirement only as
 `requirements[0]`, has no fix, and doesn't read like the guard's other refusals (spec: "Refusals name the rule and the
 fix"). In the guard, the rule's reading of OpenSpec's report is a function with tests, and `guard.py ci` stays the one

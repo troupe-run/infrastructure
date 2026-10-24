@@ -61,6 +61,14 @@ def test_tampering_can_never_be_overridden(make_repo: Callable[[], Repo]) -> Non
     assert grant(repo, guard.TAMPER_RULE, "--reason", "x").returncode != 0
 
 
+def test_the_ci_only_openspec_rule_can_t_be_overridden(make_repo: Callable[[], Repo]) -> None:
+    repo = make_repo()
+    result = grant(repo, guard.OPENSPEC_RULE, "--reason", "x")
+    assert result.returncode == 2
+    assert "invalid choice: 'openspec-strict'" in result.stderr
+    assert not (override_dir(repo) / "override.json").exists()
+
+
 def test_an_override_needs_a_reason(make_repo: Callable[[], Repo]) -> None:
     repo = make_repo()
     assert grant(repo, "commit-on-main", "--reason", "  ").returncode != 0
