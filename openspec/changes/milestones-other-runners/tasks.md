@@ -2,17 +2,17 @@
 
 ## 1. Start from #129's apply
 
-- [ ] 1.1 Check #129 is merged and applied: its state commit is on `origin/main`. Rebase this branch onto it. Verify
+- [x] 1.1 Check #129 is merged and applied: its state commit is on `origin/main`. Rebase this branch onto it. Verify
   `git rev-list --count HEAD..origin/main` is 0.
-- [ ] 1.2 Verify on GitHub that each of the four managed repositories has the 13 interim titles and the 8 unchanged
+- [x] 1.2 Verify on GitHub that each of the four managed repositories has the 13 interim titles and the 8 unchanged
   titles, and nothing else (`gh api repos/troupe-run/<repo>/milestones?state=all`). Save each milestone's number,
   title and open and closed counts, per repository, as the snapshot for 3.1, in the scratchpad.
 
 ## 2. The final titles
 
-- [ ] 2.1 Remove the 13 `interim_title` fields from `tofu/milestones.json` (design D1). Verify `uv run scripts/check.py`
+- [x] 2.1 Remove the 13 `interim_title` fields from `tofu/milestones.json` (design D1). Verify `uv run scripts/check.py`
   passes and `git diff` changes only those lines.
-- [ ] 2.2 Run a local plan. Verify it shows 52 updates in place, 13 in each of the four repositories, each changing
+- [x] 2.2 Run a local plan. Verify it shows 52 updates in place, 13 in each of the four repositories, each changing
   only the title from `<version> (renumbering)` to `<version>`, and nothing created, destroyed or replaced.
 - [ ] 2.3 Open the pull request with `Closes #128`, using `--body-file`. Verify the CI plan comment shows the same
   counts as 2.2.
