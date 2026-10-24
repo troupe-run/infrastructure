@@ -14,81 +14,94 @@
     },
     {
       "key": "0.2.0",
-      "title": "0.2.0",
+      "title": "0.3.0",
+      "interim_title": "0.3.0 (renumbering)",
       "state": "open",
       "description": "Config by hand: edits made to troupe's files by hand are read back into config, and entities can be renamed"
     },
     {
       "key": "0.3.0",
-      "title": "0.3.0",
+      "title": "0.4.0",
+      "interim_title": "0.4.0 (renumbering)",
       "state": "open",
       "description": "Gates: a run stops for approval before its work is kept; every gate is manual, and the approver is whoever runs troupe"
     },
     {
       "key": "0.4.0",
-      "title": "0.4.0",
+      "title": "0.5.0",
+      "interim_title": "0.5.0 (renumbering)",
       "state": "open",
       "description": "A sequence: actors run one after another, with gates between them"
     },
     {
       "key": "0.5.0",
-      "title": "0.5.0",
+      "title": "0.6.0",
+      "interim_title": "0.6.0 (renumbering)",
       "state": "open",
       "description": "Escalations: an actor that can't decide researches, then asks with a brief, so not everything needs a gate"
     },
     {
       "key": "0.6.0",
-      "title": "0.6.0",
+      "title": "0.7.0",
+      "interim_title": "0.7.0 (renumbering)",
       "state": "open",
       "description": "Roles: people, their identities and the roles they hold; gates and escalations reach a role, for selective approval"
     },
     {
       "key": "0.7.0",
-      "title": "0.7.0",
+      "title": "0.8.0",
+      "interim_title": "0.8.0 (renumbering)",
       "state": "open",
       "description": "In parallel: flows fork into tasks that run at once, and join again"
     },
     {
       "key": "0.8.0",
-      "title": "0.8.0",
+      "title": "0.9.0",
+      "interim_title": "0.9.0 (renumbering)",
       "state": "open",
       "description": "Notes: what a run teaches feeds into the next"
     },
     {
       "key": "0.9.0",
-      "title": "0.9.0",
+      "title": "0.10.0",
+      "interim_title": "0.10.0 (renumbering)",
       "state": "open",
       "description": "The house: runs outlive the terminal that started them, with live status"
     },
     {
       "key": "0.10.0",
-      "title": "0.10.0",
+      "title": "0.11.0",
+      "interim_title": "0.11.0 (renumbering)",
       "state": "open",
       "description": "The web UI: non-technical users run workflows in a browser, installed without the command line"
     },
     {
       "key": "0.11.0",
-      "title": "0.11.0",
+      "title": "0.12.0",
+      "interim_title": "0.12.0 (renumbering)",
       "state": "open",
       "description": "Loops: part of a flow repeats until a condition holds, such as a gate passing"
     },
     {
       "key": "0.12.0",
-      "title": "0.12.0",
+      "title": "0.13.0",
+      "interim_title": "0.13.0 (renumbering)",
       "state": "open",
       "description": "Swarms: many actors work on one task, and their results are compared or combined"
     },
     {
       "key": "0.13.0",
-      "title": "0.13.0",
+      "title": "0.14.0",
+      "interim_title": "0.14.0 (renumbering)",
       "state": "open",
       "description": "Contained: a Docker stage enforces each actor's declared effects"
     },
     {
       "key": "0.14.0",
-      "title": "0.14.0",
+      "title": "0.2.0",
+      "interim_title": "0.2.0 (renumbering)",
       "state": "open",
-      "description": "Another runner: an actor runs on a model on your own machine"
+      "description": "Other runners: an actor runs on a local model through its engine's own API, or on any OpenAI-style API, without Claude Code"
     },
     {
       "key": "0.15.0",

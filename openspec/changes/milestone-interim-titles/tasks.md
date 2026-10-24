@@ -34,12 +34,14 @@
 
 ## 3. The declaration
 
-- [ ] 3.1 Write #128's titles, interim titles and new description into `tofu/milestones.json` (design D5). Verify
+- [x] 3.1 Write #128's titles, interim titles and new description into `tofu/milestones.json` (design D5). Verify
   `uv run scripts/check.py` passes.
-- [ ] 3.2 Check the website reads it: in a website checkout on `main`, run `npm run build` with `TROUPE_MILESTONES` set
-  to this worktree, and change nothing there. Verify the generated `src/generated/roadmap.json` lists 0.1.0, then 0.2.0 "Other runners", then 0.3.0 "Config by hand", up
-  to 0.14.0 "Contained", then 0.15.0 to 1.0.0 unchanged.
-- [ ] 3.3 Run a local plan against current state. Verify it shows 52 updates in place, 13 in each of troupe,
+- [x] 3.2 Check the website reads it: in a website checkout on `main`, with `TROUPE_MILESTONES` set to this worktree,
+  call `readMilestones` and `readRoadmap` from `scripts/roadmap-lib.mjs`, the functions the build uses, without
+  writing anything there. Verify the releases list 0.1.0, then 0.2.0 "Other runners", then 0.3.0 "Config by hand", up
+  to 0.14.0 "Contained", then 0.15.0 to 1.0.0 unchanged. (Done this way, not with `npm run build`, so the website
+  checkout stays untouched. The page itself is checked after #128, in its design D3.)
+- [x] 3.3 Run a local plan against current state. Verify it shows 52 updates in place, 13 in each of troupe,
   infrastructure, website and `.github`, the 4 of key `0.14.0` with the new description too, and nothing created,
   destroyed or replaced.
 
