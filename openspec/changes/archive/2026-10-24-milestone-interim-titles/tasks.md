@@ -47,7 +47,7 @@
 
 ## 4. Pull request and apply
 
-- [ ] 4.1 Open the pull request with `Closes #129` and a link to #128, using `--body-file`. Verify the CI plan comment
+- [x] 4.1 Open the pull request with `Closes #129` and a link to #128, using `--body-file`. Verify the CI plan comment
   shows the same counts as 3.3.
 
 ## Workflow follow-up
