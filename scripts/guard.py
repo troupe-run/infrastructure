@@ -3064,10 +3064,19 @@ def openspec_strict(
     root: Path,
     scope: OpenSpecScope,
     run: Callable[[Path], OpenSpecRun] = run_openspec,
+    notes: list[str] | None = None,
 ) -> Decision:
     """The openspec-strict rule. With no openspec/ root or nothing in scope, OpenSpec isn't run;
-    otherwise a run that can't be had or read fails, and never passes (design D2)."""
-    if not (root / "openspec").is_dir() or scope.empty:
+    otherwise a run that can't be had or read fails, and never passes (design D2). ``notes``
+    gets one line saying what was judged, so a passing run's log shows it."""
+    said = notes if notes is not None else []
+    if not (root / "openspec").is_dir():
+        said.append("guard: openspec-strict: no openspec/ root, so OpenSpec wasn't run.")
+        return ALLOW
+    if scope.empty:
+        said.append(
+            "guard: openspec-strict: no spec or active change in scope, so OpenSpec wasn't run."
+        )
         return ALLOW
     try:
         result = run(root)
@@ -3085,9 +3094,13 @@ def openspec_strict(
             "version; if OpenSpec's report has changed shape, the guard's reading of it needs "
             "changing in troupe-run/infrastructure.",
         )
-    return openspec_refusal(
-        root, (item for item in items if scope.covers(item.kind, item.name)), result.version
+    judged = [item for item in items if scope.covers(item.kind, item.name)]
+    which = "every spec and active change" if scope.everything else "what the range touches"
+    said.append(
+        f"guard: openspec-strict: OpenSpec {result.version} validated {len(judged)} of "
+        f"{len(items)} item(s), {which}."
     )
+    return openspec_refusal(root, judged, result.version)
 
 
 # --- entry points ----------------------------------------------------------------------------
@@ -3207,7 +3220,10 @@ def run_ci_entry(
         title is not None,
         lambda path: (root / path).is_dir(),
     )
-    strict = openspec_strict(root, scope)
+    notes: list[str] = []
+    strict = openspec_strict(root, scope, notes=notes)
+    for note in notes:
+        print(note)
     if strict.refused:
         refusals.append(strict)
     for refusal in refusals:

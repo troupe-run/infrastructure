@@ -254,6 +254,20 @@ def test_everything_passing_passes() -> None:
     assert guard.openspec_strict(PASS, EVERYTHING, running(captured("pass"))) == guard.ALLOW
 
 
+def test_each_run_says_what_it_judged() -> None:
+    notes: list[str] = []
+    touched = guard.OpenSpecScope(specs=frozenset({"runs"}))
+    guard.openspec_strict(FAIL, touched, running(captured("fail")), notes)
+    guard.openspec_strict(PASS, EVERYTHING, running(captured("pass")), notes)
+    guard.openspec_strict(FAIL, guard.OpenSpecScope(), never, notes)
+    assert notes == [
+        "guard: openspec-strict: OpenSpec 1.14.3 validated 0 of 2 item(s), what the range touches.",
+        "guard: openspec-strict: OpenSpec 1.14.3 validated 1 of 1 item(s), every spec and active "
+        "change.",
+        "guard: openspec-strict: no spec or active change in scope, so OpenSpec wasn't run.",
+    ]
+
+
 # Running OpenSpec (design D1, D2)
 
 
@@ -406,6 +420,7 @@ def test_the_ci_entry_passes_a_pull_request_that_touches_no_spec(
     bin_dir = stub_openspec(tmp_path / "bin", captured("fail"))
     result = run_ci(repo, base, bin_dir, "--branch", "add-thing", "--title", "docs: add notes")
     assert result.returncode == 0, result.stderr
+    assert "no spec or active change in scope, so OpenSpec wasn't run" in result.stdout
     assert not (bin_dir / "calls.jsonl").exists()
 
 
