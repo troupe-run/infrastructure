@@ -14,7 +14,7 @@
   passes and `git diff` changes only those lines.
 - [x] 2.2 Run a local plan. Verify it shows 52 updates in place, 13 in each of the four repositories, each changing
   only the title from `<version> (renumbering)` to `<version>`, and nothing created, destroyed or replaced.
-- [ ] 2.3 Open the pull request with `Closes #128`, using `--body-file`. Verify the CI plan comment shows the same
+- [x] 2.3 Open the pull request with `Closes #128`, using `--body-file`. Verify the CI plan comment shows the same
   counts as 2.2.
 
 ## Workflow follow-up
