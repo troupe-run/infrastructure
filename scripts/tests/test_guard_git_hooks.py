@@ -4,6 +4,7 @@ import json
 import shutil
 import subprocess
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from conftest import FAILING_CHECK, Repo, clean_env, git
@@ -331,3 +332,42 @@ def test_commit_a_of_a_delivered_file_edit_is_refused_naming_it(
     assert "guard: delivered-file:" in result.stderr
     assert "b.txt" in result.stderr
     assert repo.head() == before
+
+
+def test_the_committing_index_is_resolved_against_the_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GIT_INDEX_FILE", ".git/index")
+    assert guard._committing_env(tmp_path)["GIT_INDEX_FILE"] == str(tmp_path / ".git" / "index")
+
+
+def test_an_absolute_committing_index_is_kept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lock = tmp_path / "elsewhere" / "index.lock"
+    monkeypatch.setenv("GIT_INDEX_FILE", str(lock))
+    assert guard._committing_env(tmp_path / "repo")["GIT_INDEX_FILE"] == str(lock)
+
+
+def test_with_no_committing_index_nothing_is_added(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("GIT_INDEX_FILE", raising=False)
+    assert "GIT_INDEX_FILE" not in guard._committing_env(tmp_path)
+
+
+def test_the_check_is_started_without_the_committing_index(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = make_repo()
+    repo.write("a.txt", "a\n")
+    repo.hooks_on(
+        check_script='import os\nprint("check: index", os.environ.get("GIT_INDEX_FILE"))\n'
+    )
+    repo.change("add-thing")
+    repo.switch("add-thing")
+    assert repo.commit("docs(openspec): propose add-thing").returncode == 0
+    repo.write("a.txt", "a, changed\n")
+    result = commit_all(repo, "fix: change a")
+    assert result.returncode == 0, result.stderr
+    assert "check: index None" in result.stderr
