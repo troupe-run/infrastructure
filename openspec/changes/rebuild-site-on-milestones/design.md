@@ -116,6 +116,9 @@ list `website` only. Findings go here, under this decision, with the run IDs.
   `board.tf` names its second set. The file's header names both users.
 - `oob/README.md`, "The docs App": the second secret command and its check by name, and rotation runs both.
 - `README.md`: the `tofu/docs.tf` row says both repositories; a row for the new workflow.
+- `README.md` and `oob/README.md`: every documented `op read` into `gh secret set` reads the value into a variable
+  first, and runs `gh` only if the read succeeded (owner, 2026-10-25). Piped, a failed read still ran `gh` and set
+  an empty secret, which happened on the probe (D5).
 - `openspec/specs/docs-build-credentials/spec.md`: its Purpose says the key is held on troupe and infrastructure (a
   Purpose isn't carried by a delta).
 

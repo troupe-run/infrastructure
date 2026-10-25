@@ -28,6 +28,10 @@
       --env docs -R troupe-run/infrastructure` command fed by `op read -n`, its check by name, and rotation running both
       commands. Update `openspec/specs/docs-build-credentials/spec.md`'s Purpose to say troupe and infrastructure, and
       README.md's `tofu/docs.tf` row. Verify `uv run scripts/check.py` passes
+- [x] 1.5 Added during the probe (owner, 2026-10-25): make every documented `op read` into `gh secret set` set
+      nothing when the read fails, in `oob/README.md` (release, board, docs) and README.md (the tofu workflow's four
+      secrets). Piped, a timed-out 1Password approval still ran `gh` and set an empty secret on the probe. Verify each
+      command reads into a variable joined to `gh` by `&&`, and `uv run scripts/check.py` passes. Done: b9a75ed
 
 ## 2. The notice workflow
 
