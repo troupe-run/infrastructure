@@ -40,11 +40,11 @@
 
 ## 3. Verify
 
-- [ ] 3.1 Run `uv run scripts/tofu.py plan` on the branch, fast-forwarded onto `origin/main`, and verify it shows no
+- [x] 3.1 Run `uv run scripts/tofu.py plan` on the branch, fast-forwarded onto `origin/main`, and verify it shows no
       change to website's `dependencies` or `javascript`, `github_actions` created on website, `dependencies`,
       `python:uv` and `github_actions` created on troupe and infrastructure (or the names section 1 settled on), and
       nothing else created, changed or deleted. Keep its output for the pull request
-- [ ] 3.2 Run `openspec validate declare-dependabot-labels --strict` and verify it passes
+- [x] 3.2 Run `openspec validate declare-dependabot-labels --strict` and verify it passes
 
 ## Workflow follow-up
 
