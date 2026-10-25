@@ -107,7 +107,22 @@ target repository changed:
 3. A push to another branch that changes `tofu/milestones.json` starts no notice.
 
 Afterwards the App is removed from the probe, the repository is deleted, and the docs App's installation is checked to
-list `website` only. Findings go here, under this decision, with the run IDs.
+list `website` only.
+
+**Findings (2026-10-25, `troupe-run/infra-probe-milestones-notice`).** The workflow was this change's, with only
+`repositories:` and `-R` pointed at the probe.
+
+0. The first push, which added the workflows and no `tofu/milestones.json` (`e104c8d`), started no run.
+1. Yes. The push to `main` that added `tofu/milestones.json` (`8e02078`) started `milestones-notice` run 40150224439.
+   Its first two attempts got the key from the `docs` environment and failed minting the token with 404, "get a
+   repository installation", because the probe wasn't yet in the App's installation. Once the owner added it, the
+   re-run succeeded and dispatched stub Deploy run 40154329474: event `workflow_dispatch`, on `main`, triggering
+   actor `troupe-run-docs[bot]`, success.
+2. Yes. A push to `main` that changed only `other.txt` (`d38ce06`) started no run.
+3. Yes. A push to the branch `probe-branch` that changed `tofu/milestones.json` (`d1c5de9`) started no run.
+
+Setting the probe's key showed a gap in the documented commands: piped, `op read` timed out and `gh secret set` still
+ran, setting an empty secret. D6 records the fix.
 
 ### D6. Where the declarations go
 

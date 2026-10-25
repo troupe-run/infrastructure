@@ -47,14 +47,14 @@
 
 ## 3. Probe the path filter (design D5)
 
-- [ ] 3.1 Create `troupe-run/infra-probe-milestones-notice` with a stub `deploy.yml` (`on: workflow_dispatch`, one
+- [x] 3.1 Create `troupe-run/infra-probe-milestones-notice` with a stub `deploy.yml` (`on: workflow_dispatch`, one
       job that echoes), a `tofu/milestones.json`, a `docs` environment limited to `main` with `DOCS_APP_PRIVATE_KEY`
       set from 1Password (printing nothing) and `DOCS_APP_CLIENT_ID` set, the docs App added to the probe for the
       probe, and this change's workflow with only the target repository changed. Verify the environment's secret
       lists by name and the App's installation includes the probe
-- [ ] 3.2 Push to `main` a change to `tofu/milestones.json`. Verify the notice run succeeds and a stub deploy run
+- [x] 3.2 Push to `main` a change to `tofu/milestones.json`. Verify the notice run succeeds and a stub deploy run
       starts on `main` with event `workflow_dispatch`
-- [ ] 3.3 Push to `main` a change to another file, and push to a branch a change to `tofu/milestones.json`. Verify
+- [x] 3.3 Push to `main` a change to another file, and push to a branch a change to `tofu/milestones.json`. Verify
       neither starts a notice run (`gh run list -R troupe-run/infra-probe-milestones-notice -w milestones-notice.yml`)
 - [ ] 3.4 Record the findings with run IDs under design D5, then remove the probe from the App's installation and
       delete the repository. Verify the repository is gone and the docs App's installation lists `website` only
