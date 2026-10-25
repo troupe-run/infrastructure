@@ -2,23 +2,23 @@
 
 ## 1. The check
 
-- [ ] 1.1 Before changing the check, verify `uv run pytest scripts/tests/test_milestones.py` passes on the branch as it
+- [x] 1.1 Before changing the check, verify `uv run pytest scripts/tests/test_milestones.py` passes on the branch as it
   is, so every existing rule is known to hold before the new one is added.
-- [ ] 1.2 In `scripts/tests/test_milestones.py`, add tests for the new rule (design D2), each named for what it asserts:
+- [x] 1.2 In `scripts/tests/test_milestones.py`, add tests for the new rule (design D2), each named for what it asserts:
   a straight apostrophe is named with ’ and ‘; a straight double quote is named with “ and ”; a description with both
   gets one message for each; a description with ’, ‘, “ and ” is valid. Verify they fail before 1.3, for the right
   reason.
-- [ ] 1.3 Add the description rule to `declaration_problems`, with a comment naming this change's design D2, and
+- [x] 1.3 Add the description rule to `declaration_problems`, with a comment naming this change's design D2, and
   update its docstring. Verify the tests from 1.2 and every existing test pass, and that
   `test_the_declared_milestones_are_well_formed` now fails, naming the four milestones (0.2.0, 0.3.0, 0.6.0, 0.14.0)
   and nothing else.
 
 ## 2. The descriptions
 
-- [ ] 2.1 In `tofu/milestones.json`, replace the straight apostrophe in each of the four descriptions (keys `0.14.0`,
+- [x] 2.1 In `tofu/milestones.json`, replace the straight apostrophe in each of the four descriptions (keys `0.14.0`,
   `0.2.0`, `0.5.0`, `0.13.0`) with the raw character ’ (design D1). Verify `git diff` changes only those four lines,
   one character each, and that the file has no `’` escape.
-- [ ] 2.2 Verify `uv run scripts/check.py` passes, including `test_the_declared_milestones_are_well_formed`.
+- [x] 2.2 Verify `uv run scripts/check.py` passes, including `test_the_declared_milestones_are_well_formed`.
 - [ ] 2.3 Fast-forward onto `origin/main` and run a local plan. Verify it shows 16 updates in place, four in each of
   troupe, infrastructure, website and `.github`, each changing only `description`, and nothing created, destroyed or
   replaced.

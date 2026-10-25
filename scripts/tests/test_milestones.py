@@ -18,6 +18,15 @@ TOFU = REPO / "tofu"
 MILESTONES = TOFU / "milestones.json"
 REPOSITORIES_TF = TOFU / "repositories.tf"
 STATES = ("open", "closed")
+# The typographic quotes a description uses instead of straight ones. They're named because ruff
+# (RUF001) rightly flags the characters themselves as easy to mistake
+# (typographic-milestone-quotes design D2).
+RSQUO = "\N{RIGHT SINGLE QUOTATION MARK}"
+LSQUO = "\N{LEFT SINGLE QUOTATION MARK}"
+LDQUO = "\N{LEFT DOUBLE QUOTATION MARK}"
+RDQUO = "\N{RIGHT DOUBLE QUOTATION MARK}"
+APOSTROPHE_FIX = f"use {RSQUO} for an apostrophe or closing quote and {LSQUO} for an opening one"
+DOUBLE_QUOTE_FIX = f"use {LDQUO} and {RDQUO}"
 
 
 def managed_repositories(repositories_tf: str) -> set[str]:
@@ -48,8 +57,8 @@ def repository_problems(listed: list[str], managed: set[str]) -> list[str]:
 
 
 def declaration_problems(milestones: list[dict[str, Any]]) -> list[str]:
-    """Each key or title declared twice, each state that isn't open or closed, and each interim
-    title that's malformed or already taken."""
+    """Each key or title declared twice, each state that isn't open or closed, each interim title
+    that's malformed or already taken, and each straight quote in a description."""
     found: list[str] = []
     for field in ("key", "title"):
         seen: set[str] = set()
@@ -84,6 +93,20 @@ def declaration_problems(milestones: list[dict[str, Any]]) -> list[str]:
             )
         else:
             taken.add(interim)
+    # troupe.run/status/ shows each description verbatim, and the rest of the site uses
+    # typographic quotes (typographic-milestone-quotes design D2). Which one a straight quote
+    # should be depends on the sentence, so the message names the choices and fixes nothing.
+    for milestone in milestones:
+        description = milestone["description"]
+        if "'" in description:
+            found.append(
+                f"{milestone['title']}: description has a straight apostrophe ('); {APOSTROPHE_FIX}"
+            )
+        if '"' in description:
+            found.append(
+                f"{milestone['title']}: description has a straight double quote "
+                f'("); {DOUBLE_QUOTE_FIX}'
+            )
     return found
 
 
@@ -183,6 +206,41 @@ def test_an_interim_title_that_is_not_a_non_empty_string_is_named(value: object)
     assert declaration_problems([milestone("0.2.0", interim_title=value)]) == [
         f"0.2.0: interim title is {value!r}; an interim title must be a non-empty string"
     ]
+
+
+def test_a_straight_apostrophe_in_a_description_is_named_with_the_typographic_ones() -> None:
+    found = declaration_problems([milestone("0.6.0", description="an actor that can't decide")])
+    assert found == [
+        "0.6.0: description has a straight apostrophe ('); "
+        "use \N{RIGHT SINGLE QUOTATION MARK} for an apostrophe or closing quote "
+        "and \N{LEFT SINGLE QUOTATION MARK} for an opening one"
+    ]
+
+
+def test_a_straight_double_quote_in_a_description_is_named_with_the_typographic_ones() -> None:
+    found = declaration_problems([milestone("0.6.0", description='a "gate" by hand')])
+    assert found == [
+        '0.6.0: description has a straight double quote ("); '
+        "use \N{LEFT DOUBLE QUOTATION MARK} and \N{RIGHT DOUBLE QUOTATION MARK}"
+    ]
+
+
+def test_a_description_with_both_straight_quotes_gets_a_message_for_each() -> None:
+    found = declaration_problems([milestone("0.6.0", description='it\'s a "gate"')])
+    assert found == [
+        "0.6.0: description has a straight apostrophe ('); "
+        "use \N{RIGHT SINGLE QUOTATION MARK} for an apostrophe or closing quote "
+        "and \N{LEFT SINGLE QUOTATION MARK} for an opening one",
+        '0.6.0: description has a straight double quote ("); '
+        "use \N{LEFT DOUBLE QUOTATION MARK} and \N{RIGHT DOUBLE QUOTATION MARK}",
+    ]
+
+
+def test_a_description_with_typographic_quotes_is_valid() -> None:
+    found = declaration_problems(
+        [milestone("0.6.0", description=f"it{RSQUO}s a {LSQUO}gate{RSQUO}, a {LDQUO}gate{RDQUO}")]
+    )
+    assert found == []
 
 
 def test_a_unique_interim_title_is_valid() -> None:
