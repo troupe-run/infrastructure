@@ -3176,6 +3176,17 @@ def _event_payload() -> dict[str, object]:
     return {}
 
 
+def _has_commit(root: Path, sha: str) -> bool:
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
+        cwd=root,
+        capture_output=True,
+        check=False,
+        env=_git_env(),
+    )
+    return result.returncode == 0
+
+
 def github_ci_inputs(
     root: Path,
 ) -> tuple[str | None, str, str | None, str | None, str | None]:
@@ -3198,6 +3209,16 @@ def github_ci_inputs(
     branch = os.environ.get("GITHUB_REF_NAME")
     if not isinstance(before, str) or not before or _is_null(before):
         before = git(root, "merge-base", "origin/main", head, check=False) or None
+    elif not _has_commit(root, before):
+        # A force push replaced it, and the clone holds only what a ref reaches, so judge the
+        # branch from where it left main, as for a first push (minor-corrections design D3).
+        base = git(root, "merge-base", "origin/main", head, check=False) or None
+        if base is not None:
+            print(
+                f"guard: the push's previous tip {before[:7]} isn't in this clone (a force "
+                f"push?), so the range starts where the branch left main ({base[:7]})."
+            )
+        before = base
     return before, head, branch, None, os.environ.get("GITHUB_REPOSITORY") or None
 
 

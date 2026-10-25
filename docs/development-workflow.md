@@ -28,7 +28,8 @@ commit-message ruleset is accepted, but not enforced, on Free (`troupe-run`) and
 private repositories), although Team did enforce a branch-deletion rule in the same repository. Metadata rules need
 GitHub Enterprise, so moving the project or upgrading to Team wouldn't help. So a bad message can still
 reach a branch. The `guard` check goes red within a minute of the push, and a pull request can't merge while it's
-red. Fix it before anyone builds on the branch.
+red. Fix it before anyone builds on the branch. After a force push, the check's clone doesn't hold the tip the push
+replaced, so it judges the branch from where it left `main`, as for a first push, and says so.
 
 Every refusal names its rule and its fix:
 

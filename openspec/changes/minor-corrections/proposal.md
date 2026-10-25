@@ -44,7 +44,7 @@ None.
   `github_ci_inputs`. Tests go in `scripts/tests/test_guard_git_hooks.py`, `test_guard_commit_rules.py` and
   `test_guard_push_and_ci.py`.
 - `docs/development-workflow.md`: the #101 gap. The `commit-checks`, `delivered-file` and archived-tasks rows say
-  `git commit -a` and `git commit <path>` are judged on what they commit. The CI prose about a force push changes too.
+  `git commit -a` and `git commit <path>` are judged on what they commit. Where the docs say the `guard` check runs on a push, they say how a force push is judged.
 - `README.md` and `.github/workflows/schedules.yml`: wording only.
 - **Delivery**: `scripts/guard.py` is a delivered file. After merge, the owner-approved apply delivers it to
   **troupe and website** (`guard_targets`), so the plan shows it updated in place in both. Nothing else is delivered.

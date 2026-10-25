@@ -71,7 +71,8 @@ that function, and only CI knows that `origin/main` is the base to use. The comm
 Use the wording suggested in #103's comments, adjusted to the lines as they are now (`docs/development-workflow.md:327`,
 `README.md:84-85`, `.github/workflows/schedules.yml:17-18`). The docs rows for `commit-checks`, `delivered-file` and
 archived tasks say they judge what `git commit -a` and `git commit <path>` commit, as the `schema-commit-type` row
-does. The CI prose at line 151 no longer implies that a force push loses the range.
+does. Where the docs say the `guard` check runs on a push, they say how a force push is judged. The CI prose at
+line 151 is about `ci.yml`'s check-scope job, whose full-check fallback on a force push is still right, so it stays.
 
 ## Risks / Trade-offs
 
