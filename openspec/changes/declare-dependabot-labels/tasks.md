@@ -2,24 +2,24 @@
 
 ## 1. Confirm the labels on a probe repository
 
-- [ ] 1.1 Run `uv run scripts/tofu.py plan` on the branch, fast-forwarded onto `origin/main`, and verify its only
+- [x] 1.1 Run `uv run scripts/tofu.py plan` on the branch, fast-forwarded onto `origin/main`, and verify its only
       label changes are website's `dependencies` and `javascript` being deleted. If there's more, stop and report it
       on #138
-- [ ] 1.2 Create `troupe-run/infra-probe-dependabot-labels` (public) holding the files in design D2: `pyproject.toml`
+- [x] 1.2 Create `troupe-run/infra-probe-dependabot-labels` (public) holding the files in design D2: `pyproject.toml`
       and `uv.lock` with one dependency that has a known advisory and one that's only out of date, a
       `workflow_dispatch`-only workflow on an old major version of an action, and a `.github/dependabot.yml` for `uv`
       and `github-actions` version updates. Turn on Dependabot security updates. Verify with
       `gh api repos/troupe-run/infra-probe-dependabot-labels/automated-security-fixes` that they're enabled
-- [ ] 1.3 Wait for Dependabot's pull requests: a uv security update, a uv version update and a GitHub Actions
+- [x] 1.3 Wait for Dependabot's pull requests: a uv security update, a uv version update and a GitHub Actions
       version update. Record each one's labels (`gh pr list --json number,title,labels`) and the repository's labels
       (`gh label list --json name,color,description`) in the PR description draft, and compare them with the
       source's values in design Context. If a pull request doesn't come within a day, record that and use the
       source's values for that ecosystem (design D2)
-- [ ] 1.4 If the probe differs from design D1 or the spec delta's scenarios (a different name, colour or
+- [x] 1.4 If the probe differs from design D1 or the spec delta's scenarios (a different name, colour or
       description, a separate name for security updates, or a `security` label), update design D1/D2 and the spec
       delta to the observed values before going on, and verify `openspec validate declare-dependabot-labels --strict`
       passes
-- [ ] 1.5 Delete the probe repository and verify `gh repo view troupe-run/infra-probe-dependabot-labels` fails with
+- [x] 1.5 Delete the probe repository and verify `gh repo view troupe-run/infra-probe-dependabot-labels` fails with
       not found
 
 ## 2. Declare the labels
