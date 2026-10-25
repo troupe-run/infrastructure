@@ -123,8 +123,8 @@ list `website` only. Findings go here, under this decision, with the run IDs.
 
 The website's `build-and-deploy` spec and `deploy.yml` header name troupe's release workflow as the deploy's only
 dispatcher. The owner decided they should also name this repository's milestones notice, as documentation only: the
-deploy already takes any dispatch on `main` with no inputs, so nothing in its code changes. A website issue tracks it,
-because a product repository's files change only through its own pull requests.
+deploy already takes any dispatch on `main` with no inputs, so nothing in its code changes. troupe-run/website#47 tracks
+it, because a product repository's files change only through its own pull requests.
 
 ## Risks / Trade-offs
 
