@@ -34,7 +34,7 @@
       four modules' `labels`, after the kinds of work, with a comment saying what the set is for and citing the spec
       and this change's design (D1, D3). Verify `tofu fmt` and `tofu validate` are clean and
       `uv run scripts/check.py` passes
-- [ ] 2.4 Add `dependabot.json` to `README.md`'s row for `tofu/labels/`, saying it holds the labels Dependabot
+- [x] 2.4 Add `dependabot.json` to `README.md`'s row for `tofu/labels/`, saying it holds the labels Dependabot
       applies and each repository's ecosystems. Verify the row renders as one table row and `uv run scripts/check.py`
       passes
 
