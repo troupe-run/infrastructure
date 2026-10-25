@@ -5,7 +5,7 @@
 - [x] 1.1 Before changing the check, verify `uv run pytest scripts/tests/test_milestones.py` passes on the branch as it
   is, so every existing rule is known to hold before the new ones are added.
 - [x] 1.2 In `scripts/tests/test_milestones.py`, add tests for the new rules (spec: milestones, "The milestone
-  declaration is well formed"; design D1, D3), each named for what its body asserts:
+  declaration is one troupe.run can build from"; design D1, D3), each named for what its body asserts:
   - shape: a top-level array, an object with no `milestones`, and a `milestones` that isn't an array each give the one
     shape problem;
   - an entry that isn't an object (a string, `null`, an array) is named by position and no other rule reports on it;

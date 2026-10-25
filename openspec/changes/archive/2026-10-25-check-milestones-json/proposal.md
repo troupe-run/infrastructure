@@ -50,9 +50,10 @@ None.
 
 ### Modified Capabilities
 
-- `milestones`: "The milestone declaration is well formed" also fails when the file isn't an object with a
-  `milestones` array, when a milestone isn't an object, when a title isn't `MAJOR.MINOR.PATCH`, and when a description
-  isn't a string with something in it besides whitespace.
+- `milestones`: a new requirement, "The milestone declaration is one troupe.run can build from", fails when the file
+  isn't an object with a `milestones` array, when a milestone isn't an object, when a title isn't `MAJOR.MINOR.PATCH`,
+  and when a description isn't a string with something in it besides whitespace. "The milestone declaration is well
+  formed" is unchanged.
 
 ## Impact
 
