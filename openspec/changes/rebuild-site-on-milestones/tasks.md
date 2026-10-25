@@ -56,8 +56,11 @@
       starts on `main` with event `workflow_dispatch`
 - [x] 3.3 Push to `main` a change to another file, and push to a branch a change to `tofu/milestones.json`. Verify
       neither starts a notice run (`gh run list -R troupe-run/infra-probe-milestones-notice -w milestones-notice.yml`)
-- [ ] 3.4 Record the findings with run IDs under design D5, then remove the probe from the App's installation and
-      delete the repository. Verify the repository is gone and the docs App's installation lists `website` only
+- [x] 3.4 Record the findings with run IDs under design D5, then remove the probe from the App's installation and
+      delete the repository. Verify the repository is gone and the docs App's installation lists `website` only.
+      Done: findings under D5. The repository returns 404, and deleting it removed it from the installation, which
+      keeps `actions: write`, `metadata: read` and selected repositories. Neither token can list an installation's
+      repositories, so the owner was asked to check it lists `website` only, and said "go ahead" (2026-10-25)
 
 ## 4. The pull request
 
