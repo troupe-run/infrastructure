@@ -14,8 +14,9 @@ name: schedules
 #   board   env board (main only)          adds the issue to the troupe roadmap board with the
 #                                          board App's token, when watch opened or commented
 #
-# This file is paused too if infrastructure goes 60 days without activity; its state commits keep
-# it active. `gh workflow enable schedules.yml` turns it back on.
+# This file is paused too if infrastructure goes 60 days without activity. GitHub doesn't define
+# activity; commits, including the App's state commits, are assumed to count.
+# `gh workflow enable schedules.yml` turns it back on.
 on:
   schedule:
     - cron: "0 12 * * *"

@@ -2,10 +2,10 @@
 
 ## 1. Wording (#103 comments 1 and 2; design D4)
 
-- [ ] 1.1 In `docs/development-workflow.md`'s "Known gaps" (line 327), replace the #101 sentence with "Giving agents
+- [x] 1.1 In `docs/development-workflow.md`'s "Known gaps" (line 327), replace the #101 sentence with "Giving agents
   a GitHub login of their own, which GitHub would then hold to its rules, was parked in #101: troupe will decide
   actors' credentials (troupe-run/troupe#11)." Verify `uv run pytest scripts/tests/test_guard_docs.py` passes
-- [ ] 1.2 In `README.md` (lines 84-85) and `.github/workflows/schedules.yml` (lines 17-18), use #103's suggested
+- [x] 1.2 In `README.md` (lines 84-85) and `.github/workflows/schedules.yml` (lines 17-18), use #103's suggested
   wording: GitHub doesn't define activity, and commits (merges, and the App's state commits) are assumed to count.
   Verify by reading both against the comment, and verify `uv run scripts/check.py` passes (workflow lint included)
 
