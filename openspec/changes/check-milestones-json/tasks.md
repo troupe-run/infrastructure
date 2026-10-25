@@ -44,7 +44,7 @@
 
 - [x] 3.1 Verify `uv run scripts/check.py` passes in full, and `uv run scripts/check.py --scope milestones` passes too,
   since that's what the `check` job runs for a pull request that changes only `tofu/milestones.json`.
-- [ ] 3.2 Open the pull request with `Closes #125`, using `--body-file`, with 2.1's comparison in the body. Verify the
+- [x] 3.2 Open the pull request with `Closes #125`, using `--body-file`, with 2.1's comparison in the body. Verify the
   required checks pass, and that the `tofu` workflow decides no plan is needed (the change touches only
   `scripts/tests/` and `openspec/`).
 
