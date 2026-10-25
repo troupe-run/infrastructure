@@ -51,11 +51,13 @@
   (`git reflog expire` and `git gc --prune=now`, or a fresh clone), and a push event names that tip. `guard.py ci`
   must then fail under `commit-message`, naming the commit. Verify the pinned cases pass and the new one **fails** on
   the unchanged guard. Commit it `xfail(strict=True, reason="#103")`
-- [ ] 4.2 In `github_ci_inputs`, keep a push's `before` only when `git cat-file -e <before>^{commit}` succeeds, and
+- [x] 4.2 In `github_ci_inputs`, keep a push's `before` only when `git cat-file -e <before>^{commit}` succeeds, and
   otherwise use the merge-base with `origin/main` and print D3's note. Verify by removing the `xfail`: 4.1's test
   passes, its output contains the note, and every other test in the file passes
-- [ ] 4.3 In `docs/development-workflow.md` (around line 151), say that a push whose previous tip isn't in the clone
-  is judged from where the branch left `main`. Verify by reading it against `github_ci_inputs`
+- [x] 4.3 In `docs/development-workflow.md`, say that a push whose previous tip isn't in the clone is judged from
+  where the branch left `main`. Verify by reading it against `github_ci_inputs`. Found doing it: line 151 is about
+  `ci.yml`'s check-scope job, whose full-check fallback on a force push is right, so the sentence went where the
+  docs say the `guard` check runs on a push (line 30), and design D4 says so
 
 ## 5. Integration
 

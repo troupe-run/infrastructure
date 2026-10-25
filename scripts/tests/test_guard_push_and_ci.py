@@ -688,7 +688,6 @@ def test_a_push_whose_previous_tip_is_in_the_clone_starts_its_range_there(
     assert "isn't in this clone" not in capsys.readouterr().out
 
 
-@pytest.mark.xfail(strict=True, reason="#103")
 def test_a_force_pushed_branch_with_a_bad_message_fails_naming_the_commit(
     make_repo: Callable[[], Repo],
     tmp_path: Path,
@@ -703,7 +702,6 @@ def test_a_force_pushed_branch_with_a_bad_message_fails_naming_the_commit(
     assert rebased[:7] in captured.err
 
 
-@pytest.mark.xfail(strict=True, reason="#103")
 def test_a_force_pushed_branch_s_run_says_where_its_range_starts(
     make_repo: Callable[[], Repo],
     tmp_path: Path,
