@@ -31,15 +31,18 @@
 
 ## 2. The rules, checked against the website
 
-- [ ] 2.1 Run the website's `readRoadmap` (troupe-run/website `origin/main`, `scripts/roadmap-lib.mjs`) with `node`
+- [x] 2.1 Run the website's `readRoadmap` (troupe-run/website `origin/main`, `scripts/roadmap-lib.mjs`) with `node`
   on each case from 1.2 and 1.4, each wrapped in a minimal file, and compare its verdict (accept or refuse) with this
   check's (design D1). Keep the script in the scratchpad, not in the repository. Verify every case agrees, except the
   `\x1c`–`\x1f`/`\x85` description that design D1 accepts as stricter here; record the result in this task's note.
   Any other disagreement is either a fix to 1.3 or, if the website is wrong, a question for the owner before going on.
+  Done 2026-10-25 against website `f693662`, Node 26.12.1: 49 cases (1.2's and 1.4's, plus `00.1.0`, `1.0.0-rc1`,
+  descriptions of U+00A0, U+2028 and U+3000, invalid JSON and a leading BOM). 47 agree. The two that differ are the
+  descriptions `\x1c` and `\x85`, which the website accepts and this check refuses, as design D1 expects.
 
 ## 3. Integration
 
-- [ ] 3.1 Verify `uv run scripts/check.py` passes in full, and `uv run scripts/check.py --scope milestones` passes too,
+- [x] 3.1 Verify `uv run scripts/check.py` passes in full, and `uv run scripts/check.py --scope milestones` passes too,
   since that's what the `check` job runs for a pull request that changes only `tofu/milestones.json`.
 - [ ] 3.2 Open the pull request with `Closes #125`, using `--body-file`, with 2.1's comparison in the body. Verify the
   required checks pass, and that the `tofu` workflow decides no plan is needed (the change touches only
