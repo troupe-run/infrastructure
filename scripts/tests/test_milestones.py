@@ -2,12 +2,14 @@
 release-milestones design D4).
 
 The plan can't tell a repository that's missing from the list, and GitHub refuses a bad state only
-when the plan is applied, after the merge. So both are checked here, offline, on every pull request.
+when the plan is applied, after the merge. troupe.run's build reads the file from main and refuses
+it on rules of its own, which stops every deploy of the site (check-milestones-json). So all of
+these are checked here, offline, on every pull request.
 """
 
 import json
 import re
-from typing import Any
+from typing import Any, TypeGuard
 
 import pytest
 from conftest import REPO
@@ -27,6 +29,24 @@ LDQUO = "\N{LEFT DOUBLE QUOTATION MARK}"
 RDQUO = "\N{RIGHT DOUBLE QUOTATION MARK}"
 APOSTROPHE_FIX = f"use {RSQUO} for an apostrophe or closing quote and {LSQUO} for an opening one"
 DOUBLE_QUOTE_FIX = f"use {LDQUO} and {RDQUO}"
+# The website's title rule and its messages' fixes (check-milestones-json design D1, D3).
+VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
+BOM = "\N{ZERO WIDTH NO-BREAK SPACE}"
+TITLE_FIX = 'title it MAJOR.MINOR.PATCH, with no leading zeros or "v", as in "0.3.0"'
+DESCRIPTION_FIX = "describe what the milestone adds for a user"
+
+
+def refuse_constant(constant: str) -> object:
+    raise ValueError(
+        f"tofu/milestones.json: {constant} isn't JSON, and troupe.run's build refuses it; "
+        "use a number or a string"
+    )
+
+
+def read_declaration(text: str) -> object:
+    """The file, parsed as strictly as JSON.parse: Python's json would accept NaN, Infinity and
+    -Infinity, which the website's build refuses (check-milestones-json design D1)."""
+    return json.loads(text, parse_constant=refuse_constant)
 
 
 def managed_repositories(repositories_tf: str) -> set[str]:
@@ -56,57 +76,110 @@ def repository_problems(listed: list[str], managed: set[str]) -> list[str]:
     return found
 
 
-def declaration_problems(milestones: list[dict[str, Any]]) -> list[str]:
-    """Each key or title declared twice, each state that isn't open or closed, each interim title
-    that's malformed or already taken, and each straight quote in a description."""
+def shape_problems(declared: object) -> list[str]:
+    """The one problem with a file whose top level isn't an object with a milestones array, or none.
+
+    With a shape problem, no other rule runs (check-milestones-json design D3)."""
+    if isinstance(declared, dict) and isinstance(declared.get("milestones"), list):
+        return []
+    return [
+        "tofu/milestones.json: isn't an object with a milestones array; "
+        "give it a top-level object whose milestones is an array of milestones"
+    ]
+
+
+def is_version(title: object) -> TypeGuard[str]:
+    """MAJOR.MINOR.PATCH, ASCII digits only, with no leading zeros and nothing before or after.
+
+    The website's regex is ASCII-only and anchored at the very end; Python's \\d and $ aren't, so
+    this uses [0-9] and fullmatch (check-milestones-json design D1)."""
+    return isinstance(title, str) and VERSION.fullmatch(title) is not None
+
+
+def is_blank(text: str) -> bool:
+    """Empty, or only whitespace by Python's reckoning or JavaScript's trim(), which also strips
+    U+FEFF (check-milestones-json design D1)."""
+    return all(char.isspace() or char == BOM for char in text)
+
+
+def declaration_problems(milestones: list[Any]) -> list[str]:
+    """Each entry that isn't an object, each title that isn't a version, each description that's
+    empty, each key or title declared twice, each state that isn't open or closed, each interim
+    title that's malformed or already taken, and each straight quote in a description.
+
+    A field that's missing or the wrong type is reported by the rule that owns it, and skipped by
+    the others, so one bad milestone never crashes the check or hides another's problems."""
     found: list[str] = []
+    entries: list[tuple[str, dict[str, Any]]] = []
+    for position, entry in enumerate(milestones, start=1):
+        if isinstance(entry, dict):
+            title = entry.get("title")
+            entries.append((title if is_version(title) else f"milestone {position}", entry))
+        else:
+            found.append(
+                f"milestone {position}: isn't an object; "
+                "each milestone must be an object with a title and a description"
+            )
+    # The rules troupe.run's build enforces: readRoadmap in troupe-run/website's
+    # scripts/roadmap-lib.mjs (its status-roadmap-releases design D4). A rule changed here must
+    # change there too, and the other way round (check-milestones-json design D4).
+    for name, entry in entries:
+        if "title" not in entry:
+            found.append(f"{name}: has no title; {TITLE_FIX}")
+        elif not is_version(entry["title"]):
+            found.append(f"{name}: title {entry['title']!r} isn't a version; {TITLE_FIX}")
+        if "description" not in entry:
+            found.append(f"{name}: has no description; {DESCRIPTION_FIX}")
+        elif not isinstance(entry["description"], str):
+            found.append(
+                f"{name}: description is {entry['description']!r}, not text; {DESCRIPTION_FIX}"
+            )
+        elif is_blank(entry["description"]):
+            found.append(f"{name}: description is empty; {DESCRIPTION_FIX}")
     for field in ("key", "title"):
         seen: set[str] = set()
-        for milestone in milestones:
-            value = milestone[field]
+        for _, entry in entries:
+            value = entry.get(field)
+            if not isinstance(value, str):
+                continue
             if value in seen:
                 found.append(f"{value}: {field} is declared twice in tofu/milestones.json")
             seen.add(value)
-    for milestone in milestones:
-        if milestone["state"] not in STATES:
+    for name, entry in entries:
+        if "state" in entry and entry["state"] not in STATES:
             found.append(
-                f"{milestone['title']}: state is {milestone['state']!r}; "
-                f"valid states are {', '.join(STATES)}"
+                f"{name}: state is {entry['state']!r}; valid states are {', '.join(STATES)}"
             )
     # Titles and interim titles share GitHub's one namespace per repository
     # (milestone-interim-titles design D3). An interim title that's present but malformed is an
     # error, not "use the title".
-    taken = {milestone["title"] for milestone in milestones}
-    for milestone in milestones:
-        if "interim_title" not in milestone:
+    taken = {entry["title"] for _, entry in entries if isinstance(entry.get("title"), str)}
+    for name, entry in entries:
+        if "interim_title" not in entry:
             continue
-        interim = milestone["interim_title"]
+        interim = entry["interim_title"]
         if not isinstance(interim, str) or not interim.strip():
             found.append(
-                f"{milestone['title']}: interim title is {interim!r}; "
-                "an interim title must be a non-empty string"
+                f"{name}: interim title is {interim!r}; an interim title must be a non-empty string"
             )
         elif interim in taken:
             found.append(
-                f"{milestone['title']}: interim title {interim!r} is already a title or interim "
-                "title in tofu/milestones.json; an interim title must be one no milestone has"
+                f"{name}: interim title {interim!r} is already a title or interim title in "
+                "tofu/milestones.json; an interim title must be one no milestone has"
             )
         else:
             taken.add(interim)
     # troupe.run/status/ shows each description verbatim, and the rest of the site uses
     # typographic quotes (typographic-milestone-quotes design D2). Which one a straight quote
     # should be depends on the sentence, so the message names the choices and fixes nothing.
-    for milestone in milestones:
-        description = milestone["description"]
+    for name, entry in entries:
+        description = entry.get("description")
+        if not isinstance(description, str):
+            continue
         if "'" in description:
-            found.append(
-                f"{milestone['title']}: description has a straight apostrophe ('); {APOSTROPHE_FIX}"
-            )
+            found.append(f"{name}: description has a straight apostrophe ('); {APOSTROPHE_FIX}")
         if '"' in description:
-            found.append(
-                f"{milestone['title']}: description has a straight double quote "
-                f'("); {DOUBLE_QUOTE_FIX}'
-            )
+            found.append(f'{name}: description has a straight double quote ("); {DOUBLE_QUOTE_FIX}')
     return found
 
 
@@ -140,7 +213,9 @@ def test_a_listed_repository_that_is_not_managed_is_named() -> None:
 
 
 def test_the_declared_milestones_are_well_formed() -> None:
-    declared = json.loads(MILESTONES.read_text(encoding="utf-8"))
+    declared = read_declaration(MILESTONES.read_text(encoding="utf-8"))
+    assert shape_problems(declared) == []
+    assert isinstance(declared, dict)
     assert declared["milestones"], "tofu/milestones.json declares no milestones"
     assert declaration_problems(declared["milestones"]) == []
 
@@ -152,7 +227,7 @@ def test_a_duplicate_title_is_named() -> None:
 
 
 def test_a_duplicate_key_is_named() -> None:
-    assert declaration_problems([milestone("0.1.0", "x"), milestone("0.1.0", "y")]) == [
+    assert declaration_problems([milestone("0.1.0", "0.2.0"), milestone("0.1.0", "0.3.0")]) == [
         "0.1.0: key is declared twice in tofu/milestones.json"
     ]
 
@@ -251,3 +326,132 @@ def test_a_unique_interim_title_is_valid() -> None:
         ]
     )
     assert found == []
+
+
+# check-milestones-json design D1, D3: every rule troupe.run's build enforces on the file, copied
+# from troupe-run/website's scripts/roadmap-lib.mjs. A milestone with a valid version for a title
+# is named by it; any other by its position, counting from 1.
+
+
+@pytest.mark.parametrize("declared", [[], {"repositories": []}, {"milestones": {}}, None, "x"])
+def test_a_file_without_a_milestones_array_gives_the_one_shape_problem(declared: object) -> None:
+    assert shape_problems(declared) == [
+        "tofu/milestones.json: isn't an object with a milestones array; "
+        "give it a top-level object whose milestones is an array of milestones"
+    ]
+
+
+def test_an_object_with_a_milestones_array_has_no_shape_problem() -> None:
+    assert shape_problems({"milestones": [], "repositories": []}) == []
+
+
+@pytest.mark.parametrize("entry", ["0.3.0", None, [], 3])
+def test_a_milestone_that_is_not_an_object_is_named_by_position_and_nothing_else(
+    entry: object,
+) -> None:
+    assert declaration_problems([milestone("0.1.0"), entry, milestone("0.2.0")]) == [
+        "milestone 2: isn't an object; "
+        "each milestone must be an object with a title and a description"
+    ]
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "v0.3.0",
+        "0.3",
+        "0.03.0",
+        "0.3.0.0",
+        "0.3.0 ",
+        " 0.3.0",
+        "0.3.0\n",
+        "\N{ARABIC-INDIC DIGIT THREE}.0.0",
+        "",
+    ],
+)
+def test_a_title_that_is_not_a_version_is_named_by_position_with_the_title(title: str) -> None:
+    entry = {**milestone("k"), "title": title}
+    assert declaration_problems([milestone("0.1.0"), entry]) == [
+        f"milestone 2: title {title!r} isn't a version; {TITLE_FIX}"
+    ]
+
+
+@pytest.mark.parametrize("title", [3, None, 0.3])
+def test_a_title_that_is_not_a_string_is_named_by_position(title: object) -> None:
+    entry = {**milestone("k"), "title": title}
+    assert declaration_problems([milestone("0.1.0"), entry]) == [
+        f"milestone 2: title {title!r} isn't a version; {TITLE_FIX}"
+    ]
+
+
+def test_a_missing_title_is_named_by_position() -> None:
+    entry = milestone("k")
+    del entry["title"]
+    assert declaration_problems([milestone("0.1.0"), entry]) == [
+        f"milestone 2: has no title; {TITLE_FIX}"
+    ]
+
+
+@pytest.mark.parametrize("title", ["0.0.0", "0.3.0", "10.20.30"])
+def test_a_version_title_is_valid(title: str) -> None:
+    assert declaration_problems([milestone("k", title)]) == []
+
+
+@pytest.mark.parametrize("description", ["", "   ", "\N{ZERO WIDTH NO-BREAK SPACE}", "\t\n"])
+def test_an_empty_description_is_named_with_the_fix(description: str) -> None:
+    assert declaration_problems([milestone("0.4.0", description=description)]) == [
+        f"0.4.0: description is empty; {DESCRIPTION_FIX}"
+    ]
+
+
+@pytest.mark.parametrize("description", [3, None, ["words"]])
+def test_a_description_that_is_not_a_string_is_named_with_the_fix(description: object) -> None:
+    assert declaration_problems([milestone("0.4.0", description=description)]) == [
+        f"0.4.0: description is {description!r}, not text; {DESCRIPTION_FIX}"
+    ]
+
+
+def test_a_missing_description_is_named_with_the_fix() -> None:
+    entry = milestone("0.4.0")
+    del entry["description"]
+    assert declaration_problems([entry]) == [f"0.4.0: has no description; {DESCRIPTION_FIX}"]
+
+
+def test_a_bad_title_and_an_empty_description_each_get_a_message() -> None:
+    assert declaration_problems([milestone("k", "v1", description=" ")]) == [
+        f"milestone 1: title 'v1' isn't a version; {TITLE_FIX}",
+        f"milestone 1: description is empty; {DESCRIPTION_FIX}",
+    ]
+
+
+def test_one_bad_milestone_does_not_hide_another() -> None:
+    found = declaration_problems(
+        [milestone("a", "0.1"), "not a milestone", milestone("0.3.0", description="")]
+    )
+    assert found == [
+        "milestone 2: isn't an object; "
+        "each milestone must be an object with a title and a description",
+        f"milestone 1: title '0.1' isn't a version; {TITLE_FIX}",
+        f"0.3.0: description is empty; {DESCRIPTION_FIX}",
+    ]
+
+
+@pytest.mark.parametrize("field", ["key", "state"])
+def test_a_missing_key_or_state_does_not_crash_the_check(field: str) -> None:
+    entry = milestone("0.1.0")
+    del entry[field]
+    assert declaration_problems([entry, milestone("0.2.0")]) == []
+
+
+def test_unhashable_titles_and_keys_do_not_crash_the_duplicate_check() -> None:
+    entry = {**milestone("0.1.0"), "key": ["k"], "title": ["t"]}
+    assert declaration_problems([entry, entry]) == [
+        f"milestone 1: title ['t'] isn't a version; {TITLE_FIX}",
+        f"milestone 2: title ['t'] isn't a version; {TITLE_FIX}",
+    ]
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_a_constant_json_parse_refuses_is_refused_naming_the_file(constant: str) -> None:
+    with pytest.raises(ValueError, match=rf"^tofu/milestones.json: {constant} isn't JSON"):
+        read_declaration(f'{{"milestones": [], "x": {constant}}}')
