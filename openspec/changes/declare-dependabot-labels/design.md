@@ -56,9 +56,9 @@ table.
 {
   "dependencies": { "name": "dependencies", "color": "0366d6", "description": "Pull requests that update a dependency file" },
   "ecosystems": {
-    "github-actions": { "name": "github_actions", "color": "000000", "description": "…" },
+    "github-actions": { "name": "github_actions", "color": "000000", "description": "Pull requests that update GitHub Actions code" },
     "npm": { "name": "javascript", "color": "168700", "description": "Pull requests that update javascript code" },
-    "uv": { "name": "python:uv", "color": "2b67c6", "description": "…" }
+    "uv": { "name": "python:uv", "color": "2b67c6", "description": "Pull requests that update python:uv code" }
   },
   "repositories": {
     ".github": [],
@@ -112,6 +112,15 @@ name from its version update, both are declared for the `uv` ecosystem (the file
 and the spec scenario's names are updated to match. If the probe gets a `security` label, it's declared with
 `dependencies`, since then every repository would get it. If the probe can't get a pull request for an ecosystem
 within a day, the source's values are declared and the PR says so.
+
+**What the probe found (2026-10-25).** Dependabot opened a GitHub Actions version update and two uv version updates.
+It created `dependencies` (`0366d6`), `github_actions` (`000000`, "Pull requests that update GitHub Actions code")
+and `python:uv` (`2b67c6`, "Pull requests that update python:uv code"). The names and colours match the source. The
+`python:uv` description doesn't: hosted Dependabot writes the name as it is, not capitalised, just as it did for
+website's `javascript`. No `security` label was created. `requests`'s advisories opened six alerts, but its version
+update already fixed them, so no separate uv security update was opened. The security path's labels are therefore the
+ones website#44, #45 and #46 show: `dependencies` and the ecosystem's label, with no `security`. D1 holds the observed
+values.
 
 ### D3. Ecosystems come from the dependency graph, not from guessing
 
