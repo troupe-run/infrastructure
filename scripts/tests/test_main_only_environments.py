@@ -6,9 +6,9 @@ prevent_destroy goes with its block: deleting an environment's declaration plans
 nothing refuses, and the next job that names the environment makes GitHub recreate it with no
 branch rule and no reviewer (#61). So this test reads the declarations as text and fails when one
 of these environments is no longer declared, no longer limited to main, or open to an admin bypass.
-Removing one means changing MAIN_ONLY below, in the same diff the owner reviews. `board` is in two
-repositories (watch-website-link-check design D5), so an environment is named with its repository
-wherever its name alone would be ambiguous.
+Removing one means changing MAIN_ONLY below, in the same diff the owner reviews. `board` and `docs`
+are each in two repositories (watch-website-link-check design D5, rebuild-site-on-milestones design
+D1), so an environment is named with its repository wherever its name alone would be ambiguous.
 """
 
 import re
@@ -38,6 +38,7 @@ MAIN_ONLY = {
     ("repo_website", "board"): False,
     ("repo_infrastructure", "board"): False,
     ("repo_troupe", "docs"): False,
+    ("repo_infrastructure", "docs"): False,
 }
 
 

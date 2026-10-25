@@ -5,25 +5,26 @@
 - [x] 0.1 Owner: confirm design D1 (reuse `troupe-run-docs`, or a new App) and record it in design.md as
       "(owner, <date>)". Verify that D1's heading no longer says "the owner confirms". Done: option A, reuse
       `troupe-run-docs` (owner, 2026-10-25), and D1's heading says so
-- [ ] 0.2 Open a troupe-run/website issue to name infrastructure's milestones notice as a second sender in its
+- [x] 0.2 Open a troupe-run/website issue to name infrastructure's milestones notice as a second sender in its
       `build-and-deploy` spec and `deploy.yml` header, documentation only (design D7), on the roadmap board. Verify
-      with `gh issue view <n> -R troupe-run/website --json projectItems`, and link it from D7
+      with `gh issue view <n> -R troupe-run/website --json projectItems`, and link it from D7. Done: website#47, on
+      the board as Todo, linked from D7
 
 ## 1. infrastructure's `docs` environment
 
-- [ ] 1.1 Add `("repo_infrastructure", "docs"): False` to `MAIN_ONLY` in
+- [x] 1.1 Add `("repo_infrastructure", "docs"): False` to `MAIN_ONLY` in
       `scripts/tests/test_main_only_environments.py` (design D4). Verify that
       `uv run pytest scripts/tests/test_main_only_environments.py` fails, naming `docs on repo_infrastructure` as not
       declared, before 1.2
-- [ ] 1.2 In `tofu/docs.tf`, declare `docs_infrastructure` on `module.repo_infrastructure` (`can_admins_bypass =
+- [x] 1.2 In `tofu/docs.tf`, declare `docs_infrastructure` on `module.repo_infrastructure` (`can_admins_bypass =
       false`, `prevent_self_review = false`, no reviewers, custom branch policies), its `main`-only policy
       `docs_infrastructure_main_only`, and `docs_app_client_id_infrastructure`, from `local.docs_app_client_id`, and
       name both users in the header (design D6). Verify that the test from 1.1 passes and `uv run scripts/check.py`
       passes (tofu fmt, validate)
-- [ ] 1.3 Check the test catches weakening on infrastructure, not only troupe: on a scratch copy, set the new
+- [x] 1.3 Check the test catches weakening on infrastructure, not only troupe: on a scratch copy, set the new
       environment's `can_admins_bypass = true`, and separately its policy's `branch_pattern` to `*`. Verify the test
       fails each time, naming `docs on repo_infrastructure` and what changed, then restore the file
-- [ ] 1.4 Update `oob/README.md`'s docs App section: the key's second home, the `gh secret set DOCS_APP_PRIVATE_KEY
+- [x] 1.4 Update `oob/README.md`'s docs App section: the key's second home, the `gh secret set DOCS_APP_PRIVATE_KEY
       --env docs -R troupe-run/infrastructure` command fed by `op read -n`, its check by name, and rotation running both
       commands. Update `openspec/specs/docs-build-credentials/spec.md`'s Purpose to say troupe and infrastructure, and
       README.md's `tofu/docs.tf` row. Verify `uv run scripts/check.py` passes

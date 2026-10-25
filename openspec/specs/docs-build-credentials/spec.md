@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Declares the credential troupe's workflows use to start the website's docs build, and where it may be read: the docs
-App's installation on troupe-run/website, the `docs` environment on troupe that holds its key, and the variable that
-names the App.
+Declares the credential the org's workflows use to start the website's build (troupe's release workflow, and
+infrastructure's milestones notice), and where it may be read: the docs App's installation on troupe-run/website, the
+`docs` environments on troupe and infrastructure that hold its key, and the variable that names the App.
 
 ## Requirements
 

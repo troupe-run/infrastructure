@@ -157,6 +157,10 @@ mints the `troupe-run-docs` App's token, which can start a `workflow_dispatch` r
 these steps are the owner's. The App's IDs are recorded on #109. `tofu/docs.tf` declares a `docs` environment and the
 client-ID variable on troupe. The sending step and the website's side are troupe-run/website#23's.
 
+The same App's token also rebuilds the site when `tofu/milestones.json` changes on infrastructure's `main`
+(`.github/workflows/milestones-notice.yml`, spec: milestones, #124). So `tofu/docs.tf` declares the same environment
+and variable on infrastructure, and the key is set there too (rebuild-site-on-milestones design D1).
+
 **Creating it** (done 2026-10-19). In the org's settings, under GitHub Apps, create a new App:
 - name `troupe-run-docs`, installable only on this account, webhook off;
 - repository permission "Actions: read and write", and nothing else: no organisation or account permissions. GitHub
@@ -168,22 +172,26 @@ Its installation is checked by `oob.py` against `app-installations.json`. Its cl
 
 **Its key.** Generate a private key in the App's settings. Store it in 1Password as an SSH Key item named
 `troupe-run-docs` in vault `troupe.run`, by importing the downloaded `.pem`, then delete the file. Once the `docs`
-environment exists on troupe (after the apply that creates it), set the secret there. Nothing is printed:
+environment exists on troupe and on infrastructure (after the apply that creates each), set the secret in both.
+Nothing is printed:
 
 ```sh
 export OP_ACCOUNT=l-a-u.1password.com
 op read -n "op://troupe.run/troupe-run-docs/private key" \
   | gh secret set DOCS_APP_PRIVATE_KEY --env docs -R troupe-run/troupe
+op read -n "op://troupe.run/troupe-run-docs/private key" \
+  | gh secret set DOCS_APP_PRIVATE_KEY --env docs -R troupe-run/infrastructure
 ```
 
-Check it by name, never by value:
+Check each by name, never by value:
 
 ```sh
 gh api repos/troupe-run/troupe/environments/docs/secrets --jq '.secrets[].name'
+gh api repos/troupe-run/infrastructure/environments/docs/secrets --jq '.secrets[].name'
 ```
 
-**Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run the
-command above again. Then delete the old key in the App's settings. A run between the two steps still works, because
+**Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run both
+commands above again. Then delete the old key in the App's settings. A run between the two steps still works, because
 both keys are valid until the old one is deleted.
 
 ## troupe.run's DNS (set up by hand)
