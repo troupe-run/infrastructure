@@ -35,10 +35,10 @@
   is then refused by `commit-checks` (the left-out schema is in the working tree), so rework it to call the
   commit-msg entry with a `next-index` lock as git builds it, as its siblings do. Verify by removing the `xfail` marks
   from 2.2: every test in group 2 and the reworked schema test pass, and the path-commit refusal names the new fix
-- [ ] 3.3 Add a test that `_committing_env` resolves a relative `GIT_INDEX_FILE` against the root, leaves an absolute
+- [x] 3.3 Add a test that `_committing_env` resolves a relative `GIT_INDEX_FILE` against the root, leaves an absolute
   one alone, and adds nothing when it's unset, and that `scripts/check.py` is still started without it. Verify they
   pass, and that the relative case fails if the resolution is removed (check by hand, then restore)
-- [ ] 3.4 In `docs/development-workflow.md`, make the `commit-checks`, `delivered-file` and archived-tasks rows say
+- [x] 3.4 In `docs/development-workflow.md`, make the `commit-checks`, `delivered-file` and archived-tasks rows say
   they judge what the commit contains, including with `git commit -a` or `git commit <path>`, and update the
   `commit-checks` fix text. Verify `uv run pytest scripts/tests/test_guard_docs.py` passes, and read the rows
   against `run_pre_commit`
