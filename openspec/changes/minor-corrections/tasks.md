@@ -28,9 +28,9 @@
 
 ## 3. The pre-commit hook reads the committing index (design D1, D2)
 
-- [ ] 3.1 In `scripts/guard.py`, add `_committing_env(root)` and rebuild `committing_paths` on it. Verify the
+- [x] 3.1 In `scripts/guard.py`, add `_committing_env(root)` and rebuild `committing_paths` on it. Verify the
   existing commit-msg tests in `test_guard_git_hooks.py` still pass unchanged
-- [ ] 3.2 Make `ReadStaged`, `commit_checks`' two diffs and `run_pre_commit`'s staged list use it, and add D2's
+- [x] 3.2 Make `ReadStaged`, `commit_checks`' two diffs and `run_pre_commit`'s staged list use it, and add D2's
   path-commit wording to the `commit-checks` fix. `test_a_staged_schema_left_out_of_a_pathspec_commit_doesn_t_count`
   is then refused by `commit-checks` (the left-out schema is in the working tree), so rework it to call the
   commit-msg entry with a `next-index` lock as git builds it, as its siblings do. Verify by removing the `xfail` marks

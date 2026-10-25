@@ -132,23 +132,19 @@ def test_a_docs_commit_changing_a_schema_is_refused_and_leaves_no_commit(
 
 
 def test_a_staged_schema_left_out_of_a_pathspec_commit_doesn_t_count(
-    make_repo: Callable[[], Repo],
+    make_repo: Callable[[], Repo], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo = schema_repo(make_repo)
     repo.write(SCHEMA, '{"type": "object", "description": "A."}\n')
     repo.write("protocol/README.md", "The protocol, explained.\n")
     git(repo.path, "add", SCHEMA, "protocol/README.md")
-    result = git(
-        repo.path,
-        "commit",
-        "-q",
-        "-m",
-        "docs(protocol): explain",
-        "protocol/README.md",
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr
-    assert git(repo.path, "diff", "--cached", "--name-only").stdout.split() == [SCHEMA]
+    # As `git commit protocol/README.md` does: the index it commits is HEAD plus the named path.
+    # End to end, commit-checks refuses first, since the left-out schema is in the working tree.
+    lock = repo.path / ".git" / "next-index-1.lock"
+    env = {**clean_env(), "GIT_INDEX_FILE": str(lock)}
+    subprocess.run(["git", "read-tree", "HEAD"], cwd=repo.path, env=env, check=True)
+    subprocess.run(["git", "add", "protocol/README.md"], cwd=repo.path, env=env, check=True)
+    assert commit_msg_with_index(repo, "docs(protocol): explain", str(lock), monkeypatch) == 0
 
 
 def commit_msg_with_index(
@@ -242,7 +238,6 @@ def test_a_path_commit_leaving_out_an_unstaged_edit_is_refused_naming_it(
     assert repo.head() == before
 
 
-@pytest.mark.xfail(strict=True, reason="#103")
 def test_a_path_commit_names_only_the_edits_it_leaves_out(make_repo: Callable[[], Repo]) -> None:
     repo = change_repo(make_repo)
     repo.write("a.txt", "a, changed\n")
@@ -251,7 +246,6 @@ def test_a_path_commit_names_only_the_edits_it_leaves_out(make_repo: Callable[[]
     assert "guard: commit-checks: tracked files have unstaged changes (b.txt)" in result.stderr
 
 
-@pytest.mark.xfail(strict=True, reason="#103")
 def test_a_path_commit_leaving_out_a_staged_edit_is_refused_naming_it(
     make_repo: Callable[[], Repo],
 ) -> None:
@@ -263,6 +257,7 @@ def test_a_path_commit_leaving_out_a_staged_edit_is_refused_naming_it(
     result = git(repo.path, "commit", "-q", "-m", "fix: change a", "a.txt", check=False)
     assert result.returncode != 0
     assert "guard: commit-checks: tracked files have unstaged changes (b.txt)" in result.stderr
+    assert "With `git commit <path>`, name them too, or commit without paths." in result.stderr
     assert repo.head() == before
 
 
@@ -270,7 +265,6 @@ def commit_all(repo: Repo, message: str) -> subprocess.CompletedProcess[str]:
     return git(repo.path, "commit", "-q", "-a", "-m", message, check=False)
 
 
-@pytest.mark.xfail(strict=True, reason="#103")
 def test_commit_a_with_an_unstaged_tracked_edit_runs_the_check_and_is_made(
     make_repo: Callable[[], Repo],
 ) -> None:
@@ -283,7 +277,6 @@ def test_commit_a_with_an_unstaged_tracked_edit_runs_the_check_and_is_made(
     assert repo.head() != before
 
 
-@pytest.mark.xfail(strict=True, reason="#103")
 def test_commit_a_of_a_declaration_edit_runs_the_full_check(
     make_repo: Callable[[], Repo],
 ) -> None:
@@ -294,7 +287,6 @@ def test_commit_a_of_a_declaration_edit_runs_the_full_check(
     assert "guard: running scripts/check.py, the same check CI runs" in result.stderr
 
 
-@pytest.mark.xfail(strict=True, reason="#103")
 def test_commit_a_of_a_malformed_declaration_is_refused_for_the_declaration(
     make_repo: Callable[[], Repo],
 ) -> None:
@@ -309,7 +301,6 @@ def test_commit_a_of_a_malformed_declaration_is_refused_for_the_declaration(
     assert repo.head() == before
 
 
-@pytest.mark.xfail(strict=True, reason="#103")
 def test_commit_a_leaving_an_archived_task_unticked_is_refused_naming_it(
     make_repo: Callable[[], Repo],
 ) -> None:
@@ -325,7 +316,6 @@ def test_commit_a_leaving_an_archived_task_unticked_is_refused_naming_it(
     assert repo.head() == before
 
 
-@pytest.mark.xfail(strict=True, reason="#103")
 def test_commit_a_of_a_delivered_file_edit_is_refused_naming_it(
     make_repo: Callable[[], Repo],
 ) -> None:
