@@ -14,11 +14,12 @@ locals {
 
   # The labels Dependabot applies: dependencies, and one for each ecosystem a repository's
   # dependency graph lists. Dependabot finds a label by name, so it uses these rather than creating
-  # its own, which the next apply would delete (spec: labels; declare-dependabot-labels D1, D3).
+  # its own, which the next apply would delete. A repository with no ecosystem gets none of them,
+  # not even dependencies (spec: labels; declare-dependabot-labels D1, D3).
   dependabot = jsondecode(file("${path.module}/labels/dependabot.json"))
   dependabot_labels = {
     for repo, ecosystems in local.dependabot.repositories : repo => concat(
-      [local.dependabot.dependencies],
+      length(ecosystems) > 0 ? [local.dependabot.dependencies] : [],
       [for ecosystem in ecosystems : local.dependabot.ecosystems[ecosystem]],
     )
   }
