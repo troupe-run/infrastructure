@@ -86,19 +86,20 @@ The check runs in two layers:
    `milestone <n>: …`, and no other rule reads it. For each object, the title and description rules run, and the
    existing rules read each field with `.get` and skip a field that's missing or isn't a string, rather than crash.
 
-A milestone is named by its title when its title is a string, or `milestone <n>` (counting from 1, as the website
-does) when it isn't. Messages follow the existing style: `<name>: <what's wrong>; <fix>`. For example:
+A milestone is named by its title when its title is a valid version, or `milestone <n>` (counting from 1, as the
+website does) when it isn't, with the bad title shown quoted in the message. A malformed title such as `""` or
+`"0.3.0\n"` would make a confusing name. Messages follow the existing style: `<name>: <what's wrong>; <fix>`. For example:
 
 ```
 milestone 3: isn't an object; each milestone must be an object with a title and a description
-v0.3.0: title 'v0.3.0' isn't a version; title it MAJOR.MINOR.PATCH, with no leading zeros or "v", as in "0.3.0"
+milestone 2: title 'v0.3.0' isn't a version; title it MAJOR.MINOR.PATCH, with no leading zeros or "v", as in "0.3.0"
 milestone 2: title 3 isn't a version; title it MAJOR.MINOR.PATCH, with no leading zeros or "v", as in "0.3.0"
 0.4.0: description is empty; describe what the milestone adds for a user
 ```
 
 - **Why:** a person reading the check's output should see what to change, not a traceback, and one bad milestone
   shouldn't hide the problems in the others. Naming by title matches every existing message. Positions are only for
-  milestones that have no usable title.
+  milestones whose title isn't a valid version.
 - **What doesn't change:** missing `key` and `state` aren't reported by name. The website doesn't read them, the plan
   already fails on them, and #125 doesn't ask for it.
 

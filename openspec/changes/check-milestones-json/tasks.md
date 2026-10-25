@@ -2,15 +2,15 @@
 
 ## 1. The rules, tested on this side
 
-- [ ] 1.1 Before changing the check, verify `uv run pytest scripts/tests/test_milestones.py` passes on the branch as it
+- [x] 1.1 Before changing the check, verify `uv run pytest scripts/tests/test_milestones.py` passes on the branch as it
   is, so every existing rule is known to hold before the new ones are added.
-- [ ] 1.2 In `scripts/tests/test_milestones.py`, add tests for the new rules (spec: milestones, "The milestone
+- [x] 1.2 In `scripts/tests/test_milestones.py`, add tests for the new rules (spec: milestones, "The milestone
   declaration is well formed"; design D1, D3), each named for what its body asserts:
   - shape: a top-level array, an object with no `milestones`, and a `milestones` that isn't an array each give the one
     shape problem;
   - an entry that isn't an object (a string, `null`, an array) is named by position and no other rule reports on it;
   - titles `v0.3.0`, `0.3`, `0.03.0`, `0.3.0.0`, `0.3.0 `, ` 0.3.0`, `0.3.0\n`, `٣.0.0` and `""` are each named by
-    title with the fix; a title that's a number, `null` or missing is named by position;
+    position with the title quoted and the fix; a title that's a number, `null` or missing is named by position;
   - titles `0.0.0`, `0.3.0` and `10.20.30` are valid;
   - descriptions that are `""`, `"   "`, `"﻿"`, a number, `null` or missing are each named with the fix; a
     description with words is valid;
@@ -19,11 +19,11 @@
   - the existing rules don't crash on a milestone with a missing or non-string field.
 
   Verify they fail before 1.3 for the right reason: a missing problem or a crash, not a typo in the test.
-- [ ] 1.3 Add the shape function and the new rules to `declaration_problems`, and make the existing rules skip a
+- [x] 1.3 Add the shape function and the new rules to `declaration_problems`, and make the existing rules skip a
   missing or non-string field (design D3). Add the comment pointing at the website's `readRoadmap` and its design D4,
   saying a rule changed here must change there too (design D4), and update the module and function docstrings. Verify
   the tests from 1.2 and every existing test pass.
-- [ ] 1.4 Make the test that reads the real file check its shape first and parse it with a `parse_constant` that
+- [x] 1.4 Make the test that reads the real file check its shape first and parse it with a `parse_constant` that
   refuses `NaN`, `Infinity` and `-Infinity` (design D1, D3), and add a test that a file with `NaN` fails naming
   `tofu/milestones.json`. Verify `test_the_declared_milestones_are_well_formed` passes on today's file, and fails,
   naming the milestone, when a title in a scratch copy is changed to `v0.3.0` (run it against the copy, then discard

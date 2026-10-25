@@ -8,8 +8,8 @@ description has a straight apostrophe (`'`) or a straight double quote (`"`), na
 characters to use instead. It SHALL also fail on everything troupe.run's build refuses in the file: a top level that
 isn't an object with a `milestones` array, a milestone that isn't an object, a title that isn't `MAJOR.MINOR.PATCH`
 (ASCII digits, no leading zeros, no `v`, nothing before or after), and a description that isn't a string with
-something in it besides whitespace. Each failure SHALL name the milestone, by its title when the title is a string and
-by its position otherwise, and say how to fix it.
+something in it besides whitespace. Each failure SHALL name the milestone, by its title when the title is a valid
+version and by its position otherwise, and say how to fix it.
 
 #### Scenario: A duplicate title
 - **WHEN** two declared milestones are both titled `0.2.0`
@@ -50,8 +50,8 @@ by its position otherwise, and say how to fix it.
 
 #### Scenario: A title that isn't a version
 - **WHEN** a declared milestone is titled `v0.3.0`, `0.3`, `0.03.0` or `0.3.0 ` (with a trailing space)
-- **THEN** `scripts/check.py` fails, naming the milestone and the title, and saying to title it `MAJOR.MINOR.PATCH`
-  with no leading zeros or `v`, as in `0.3.0`
+- **THEN** `scripts/check.py` fails, naming the milestone by its position, showing the title, and saying to title it
+  `MAJOR.MINOR.PATCH` with no leading zeros or `v`, as in `0.3.0`
 
 #### Scenario: A title that isn't a string
 - **WHEN** the second milestone's title is the number `3`, or the milestone has no title
