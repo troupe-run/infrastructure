@@ -90,8 +90,10 @@ Its installation is checked by `oob.py` against `app-installations.json`. Its cl
 
 ```sh
 export OP_ACCOUNT=l-a-u.1password.com
-op read -n "op://troupe.run/troupe-run-release/private key" \
-  | gh secret set RELEASE_APP_PRIVATE_KEY --env release -R troupe-run/troupe
+# gh runs only once op has read the key, so a failed read can't set an empty secret.
+key=$(op read -n "op://troupe.run/troupe-run-release/private key") &&
+  printf '%s' "$key" | gh secret set RELEASE_APP_PRIVATE_KEY --env release -R troupe-run/troupe
+unset key
 ```
 
 Check it by name, never by value:
@@ -131,10 +133,11 @@ environment exists in a repository (after the apply that creates it), set the se
 
 ```sh
 export OP_ACCOUNT=l-a-u.1password.com
-op read -n "op://troupe.run/troupe-run-board/private key" \
-  | gh secret set BOARD_APP_PRIVATE_KEY --env board -R troupe-run/website
-op read -n "op://troupe.run/troupe-run-board/private key" \
-  | gh secret set BOARD_APP_PRIVATE_KEY --env board -R troupe-run/infrastructure
+# gh runs only once op has read the key, so a failed read can't set an empty secret.
+key=$(op read -n "op://troupe.run/troupe-run-board/private key") &&
+  printf '%s' "$key" | gh secret set BOARD_APP_PRIVATE_KEY --env board -R troupe-run/website &&
+  printf '%s' "$key" | gh secret set BOARD_APP_PRIVATE_KEY --env board -R troupe-run/infrastructure
+unset key
 ```
 
 Check each by name, never by value:
@@ -177,10 +180,11 @@ Nothing is printed:
 
 ```sh
 export OP_ACCOUNT=l-a-u.1password.com
-op read -n "op://troupe.run/troupe-run-docs/private key" \
-  | gh secret set DOCS_APP_PRIVATE_KEY --env docs -R troupe-run/troupe
-op read -n "op://troupe.run/troupe-run-docs/private key" \
-  | gh secret set DOCS_APP_PRIVATE_KEY --env docs -R troupe-run/infrastructure
+# gh runs only once op has read the key, so a failed read can't set an empty secret.
+key=$(op read -n "op://troupe.run/troupe-run-docs/private key") &&
+  printf '%s' "$key" | gh secret set DOCS_APP_PRIVATE_KEY --env docs -R troupe-run/troupe &&
+  printf '%s' "$key" | gh secret set DOCS_APP_PRIVATE_KEY --env docs -R troupe-run/infrastructure
+unset key
 ```
 
 Check each by name, never by value:
