@@ -81,9 +81,10 @@ without activity in it. `gh workflow enable tofu.yml` turns the daily plan and t
 
 The schedule watch (`schedules.yml`, daily at 12:00 UTC) notices when that happens to a watched workflow in another
 repository, such as website's weekly link check: it opens an issue here, on the board, that names the workflow and the
-command that turns it back on. It can't notice this repository going quiet, since it's paused with it; the state
-commits after each apply keep this repository active. Run `uv run scripts/watch_schedules.py` to see what it would
-report; outside CI it changes nothing.
+command that turns it back on. It can't notice this repository going quiet, since it's paused with it. GitHub doesn't
+say what counts as activity; commits are assumed to, so merges and the state commits after each apply should keep
+this repository active. Run `uv run scripts/watch_schedules.py` to see what it would report; outside CI it changes
+nothing.
 
 ## Changing the org
 

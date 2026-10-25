@@ -323,8 +323,9 @@ troupe's release ruleset, is different: getting past it takes the App's key (#47
 - **The guard reads the command line, not the programs it runs.** A script the agent writes and then runs, a
   program that runs `git` or `gh` itself (`make`, Python's `subprocess`, a git alias starting with `!`), and a name
   hidden on purpose (`$'\x67h'`) aren't seen. A command built at run time from a variable (`$X`, `sh -c "$X"`,
-  `& $c`) is refused when its text mentions `git` or `gh`, and isn't seen when it doesn't. Whether agents should get a
-  GitHub login of their own, which GitHub would then hold to its rules, is #101.
+  `& $c`) is refused when its text mentions `git` or `gh`, and isn't seen when it doesn't. Giving agents a GitHub login
+  of their own, which GitHub would then hold to its rules, was parked in #101: troupe will decide actors'
+  credentials (troupe-run/troupe#11).
 - **A throwaway repository is a naming convention.** An agent can create `troupe-run/spike-x` and do anything there;
   that's confined to a repository nothing depends on.
 - **Pull requests opened through `gh api`** aren't checked for a closing reference. They're refused anyway, as
