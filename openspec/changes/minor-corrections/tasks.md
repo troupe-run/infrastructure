@@ -45,7 +45,7 @@
 
 ## 4. A force-pushed branch is judged on GitHub (design D3)
 
-- [ ] 4.1 In `scripts/tests/test_guard_push_and_ci.py`, pin the unchanged cases: a push whose `before` is in the
+- [x] 4.1 In `scripts/tests/test_guard_push_and_ci.py`, pin the unchanged cases: a push whose `before` is in the
   clone gives `before` as the base, and the existing release-branch force-push test still passes. Add the failing
   case: a branch with a non-conventional commit is rebased onto a newer `main`, its old tip is dropped from the clone
   (`git reflog expire` and `git gc --prune=now`, or a fresh clone), and a push event names that tip. `guard.py ci`

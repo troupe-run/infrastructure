@@ -646,3 +646,74 @@ def test_a_dependabot_branch_in_a_governed_repository_fails_the_branch_rule(
     commit_as(repo, DEPENDABOT_BOT, DEPENDABOT_MESSAGE, "requirements.txt")
     [refusal] = guard.run_ci(repo.path, base, repo.head(), DEPENDABOT_BRANCH, repository=repository)
     assert refusal.rule == "commit-branch-change"
+
+
+# minor-corrections (#103): a force-pushed branch is still judged on GitHub (design D3).
+
+
+def force_pushed_clone(
+    make_repo: Callable[[], Repo], tmp_path: Path, message: str
+) -> tuple[Path, str, str]:
+    """A branch carrying a commit with ``message`` is pushed, rebased onto a newer main and
+    force-pushed. Returns a clone made as actions/checkout makes one, which holds only what a ref
+    reaches, so not the replaced tip; that tip; and the rebased commit."""
+    repo, _ = pr_repo(make_repo, tmp_path)
+    remote = repo.path.parent / f"{repo.path.name}-remote.git"
+    commit_without_hooks(repo, message, "a.txt")
+    git(repo.path, "push", "-q", "origin", "add-thing")
+    old_tip = repo.head()
+    git(repo.path, "switch", "-q", "main")
+    commit_without_hooks(repo, "feat: someone else's work on main", "b.txt")
+    git(repo.path, "push", "-q", "origin", "main")
+    git(repo.path, "switch", "-q", "add-thing")
+    git(repo.path, "rebase", "-q", "main")
+    git(repo.path, "push", "-q", "--force", "origin", "add-thing")
+    rebased = repo.head()
+    clone = tmp_path / "checkout"
+    # --no-local: a local clone copies every object, unreachable ones included.
+    git(tmp_path, "clone", "-q", "--no-local", "--branch", "add-thing", str(remote), str(clone))
+    assert git(clone, "cat-file", "-e", f"{old_tip}^{{commit}}", check=False).returncode != 0
+    return clone, old_tip, rebased
+
+
+def test_a_push_whose_previous_tip_is_in_the_clone_starts_its_range_there(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo, before = pr_repo(make_repo, tmp_path)
+    push_event(repo, tmp_path, monkeypatch, before, "add-thing")
+    assert guard.github_ci_inputs(repo.path)[0] == before
+    assert "isn't in this clone" not in capsys.readouterr().out
+
+
+@pytest.mark.xfail(strict=True, reason="#103")
+def test_a_force_pushed_branch_with_a_bad_message_fails_naming_the_commit(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    clone, old_tip, rebased = force_pushed_clone(make_repo, tmp_path, "Add a thing")
+    push_event(Repo(clone), tmp_path, monkeypatch, old_tip, "add-thing")
+    assert guard.run_ci_entry(clone, None, None, None) == 1
+    captured = capsys.readouterr()
+    assert "guard: commit-message:" in captured.err
+    assert rebased[:7] in captured.err
+
+
+@pytest.mark.xfail(strict=True, reason="#103")
+def test_a_force_pushed_branch_s_run_says_where_its_range_starts(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    clone, old_tip, _ = force_pushed_clone(make_repo, tmp_path, "feat: add a thing")
+    push_event(Repo(clone), tmp_path, monkeypatch, old_tip, "add-thing")
+    base = git(clone, "merge-base", "origin/main", "HEAD").stdout.strip()
+    assert guard.github_ci_inputs(clone)[0] == base
+    out = capsys.readouterr().out
+    assert f"the push's previous tip {old_tip[:7]} isn't in this clone" in out
+    assert f"where the branch left main ({base[:7]})" in out
