@@ -61,10 +61,10 @@
 
 ## 5. Integration
 
-- [ ] 5.1 In a scratch clone of troupe at `origin/main` with the new `scripts/guard.py` and its hooks on, verify:
+- [x] 5.1 In a scratch clone of troupe at `origin/main` with the new `scripts/guard.py` and its hooks on, verify:
   `git commit -a` of a tracked edit runs the check and commits; `git commit <path>` with another edit left out is
   refused naming it. Record both in the pull request
-- [ ] 5.2 Run `uv run scripts/check.py` and `openspec validate minor-corrections --strict`, and verify both pass
+- [x] 5.2 Run `uv run scripts/check.py` and `openspec validate minor-corrections --strict`, and verify both pass
 - [ ] 5.3 After rebasing onto `origin/main`, run `uv run scripts/tofu.py plan`, and verify it shows only
   `scripts/guard.py` updated in place in troupe and website. Keep it for the pull request
 
