@@ -19,10 +19,13 @@
   `0.2.0`, `0.5.0`, `0.13.0`) with the raw character ’ (design D1). Verify `git diff` changes only those four lines,
   one character each, and that the file has no `’` escape.
 - [x] 2.2 Verify `uv run scripts/check.py` passes, including `test_the_declared_milestones_are_well_formed`.
-- [ ] 2.3 Fast-forward onto `origin/main` and run a local plan. Verify it shows 16 updates in place, four in each of
+- [x] 2.3 Fast-forward onto `origin/main` and run a local plan. Verify it shows 16 updates in place, four in each of
   troupe, infrastructure, website and `.github`, each changing only `description`, and nothing created, destroyed or
   replaced.
-- [ ] 2.4 Open the pull request with `Closes #127`, using `--body-file`. Verify the CI plan comment shows the same
+  Verified on PR #140's CI plan for b7ac961 instead, with the owner's agreement (2026-10-25): the local plan's
+  1Password approval timed out with the owner on remote control. The branch was level with `origin/main`. The plan
+  showed 0 to add, 16 to change, 0 to destroy, and every changed attribute was `description`.
+- [x] 2.4 Open the pull request with `Closes #127`, using `--body-file`. Verify the CI plan comment shows the same
   counts as 2.3 and prints ’ in the description diffs.
 
 ## Workflow follow-up
