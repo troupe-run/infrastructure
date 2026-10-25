@@ -12,6 +12,17 @@ locals {
   # stands in for one. Every repository gets them (spec: labels; label-troupe-specs D4).
   kind_labels = jsondecode(file("${path.module}/labels/kinds.json"))
 
+  # The labels Dependabot applies: dependencies, and one for each ecosystem a repository's
+  # dependency graph lists. Dependabot finds a label by name, so it uses these rather than creating
+  # its own, which the next apply would delete (spec: labels; declare-dependabot-labels D1, D3).
+  dependabot = jsondecode(file("${path.module}/labels/dependabot.json"))
+  dependabot_labels = {
+    for repo, ecosystems in local.dependabot.repositories : repo => concat(
+      [local.dependabot.dependencies],
+      [for ecosystem in ecosystems : local.dependabot.ecosystems[ecosystem]],
+    )
+  }
+
   # How troupe is described: the org's description and troupe's repository description are the
   # tagline then the sentence. The org profile is held to the same file by a test, and website's
   # brand guide is the reference across repositories, which troupe's README and the website follow
@@ -54,6 +65,7 @@ module "repo_troupe" {
     local.github_default_labels,
     local.workflow_labels,
     local.kind_labels,
+    local.dependabot_labels["troupe"],
     jsondecode(file("${path.module}/labels/troupe.json")),
     jsondecode(file("${path.module}/labels/release.json")),
   )
@@ -73,7 +85,12 @@ module "repo_github" {
   main_ruleset  = "app-only"
   app_bypass_id = local.infrastructure_app_id
   description   = "Org-wide defaults for troupe-run repositories: DCO config, contributing, security policy, org profile"
-  labels        = concat(local.github_default_labels, local.workflow_labels, local.kind_labels)
+  labels = concat(
+    local.github_default_labels,
+    local.workflow_labels,
+    local.kind_labels,
+    local.dependabot_labels[".github"],
+  )
 }
 
 module "repo_infrastructure" {
@@ -82,7 +99,12 @@ module "repo_infrastructure" {
   homepage_url = "https://troupe.run"
   description  = "How the troupe-run org builds software: the org as code (OpenTofu), the development workflow and its guardrails"
   topics       = ["infrastructure-as-code", "openspec", "opentofu"]
-  labels       = concat(local.github_default_labels, local.workflow_labels, local.kind_labels)
+  labels = concat(
+    local.github_default_labels,
+    local.workflow_labels,
+    local.kind_labels,
+    local.dependabot_labels["infrastructure"],
+  )
   # CI commits the state here after an apply (spec: ci-apply, design D4).
   app_bypass_id   = local.infrastructure_app_id
   required_checks = local.checks_for["infrastructure"]
@@ -95,7 +117,12 @@ module "repo_website" {
   topics      = ["astro", "website"]
   # Set by the owner on GitHub after rename-website, and declared here (required-checks).
   homepage_url = "https://troupe.run/"
-  labels       = concat(local.github_default_labels, local.workflow_labels, local.kind_labels)
+  labels = concat(
+    local.github_default_labels,
+    local.workflow_labels,
+    local.kind_labels,
+    local.dependabot_labels["website"],
+  )
   # The org's roadmap (project 1) is linked here too, and turning projects off would hide it from
   # the repository (govern-website D4).
   has_projects = true

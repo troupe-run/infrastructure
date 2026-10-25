@@ -24,13 +24,13 @@
 
 ## 2. Declare the labels
 
-- [ ] 2.1 In `scripts/tests/test_labels.py`, write the tests in design D4: every declared Dependabot label's
+- [x] 2.1 In `scripts/tests/test_labels.py`, write the tests in design D4: every declared Dependabot label's
       description is within the limit, an over-limit one is named with its length, an undeclared ecosystem is named
       with its repository, and the file's repositories are exactly the `module "repo_*"` names in
       `tofu/repositories.tf`. Run them and verify they fail because `tofu/labels/dependabot.json` doesn't exist yet
-- [ ] 2.2 Create `tofu/labels/dependabot.json` as in design D1, with the values from section 1, website's two
+- [x] 2.2 Create `tofu/labels/dependabot.json` as in design D1, with the values from section 1, website's two
       matching `gh label list -R troupe-run/website` exactly. Verify 2.1's tests pass
-- [ ] 2.3 In `tofu/repositories.tf`, build each repository's Dependabot labels from the file and add them to all
+- [x] 2.3 In `tofu/repositories.tf`, build each repository's Dependabot labels from the file and add them to all
       four modules' `labels`, after the kinds of work, with a comment saying what the set is for and citing the spec
       and this change's design (D1, D3). Verify `tofu fmt` and `tofu validate` are clean and
       `uv run scripts/check.py` passes
