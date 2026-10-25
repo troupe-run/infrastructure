@@ -16,7 +16,7 @@
       "key": "0.2.0",
       "title": "0.3.0",
       "state": "open",
-      "description": "Config by hand: edits made to troupe's files by hand are read back into config, and entities can be renamed"
+      "description": "Config by hand: edits made to troupe’s files by hand are read back into config, and entities can be renamed"
     },
     {
       "key": "0.3.0",
@@ -34,7 +34,7 @@
       "key": "0.5.0",
       "title": "0.6.0",
       "state": "open",
-      "description": "Escalations: an actor that can't decide researches, then asks with a brief, so not everything needs a gate"
+      "description": "Escalations: an actor that can’t decide researches, then asks with a brief, so not everything needs a gate"
     },
     {
       "key": "0.6.0",
@@ -82,13 +82,13 @@
       "key": "0.13.0",
       "title": "0.14.0",
       "state": "open",
-      "description": "Contained: a Docker stage enforces each actor's declared effects"
+      "description": "Contained: a Docker stage enforces each actor’s declared effects"
     },
     {
       "key": "0.14.0",
       "title": "0.2.0",
       "state": "open",
-      "description": "Other runners: an actor runs on a local model through its engine's own API, or on any OpenAI-style API, without Claude Code"
+      "description": "Other runners: an actor runs on a local model through its engine’s own API, or on any OpenAI-style API, without Claude Code"
     },
     {
       "key": "0.15.0",
