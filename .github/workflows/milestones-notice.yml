@@ -1,0 +1,47 @@
+name: milestones-notice
+
+# Rebuilds troupe.run when the release milestones change, so /status/ lists them as declared (spec:
+# milestones; #124; openspec/changes/rebuild-site-on-milestones/design.md). The website's build
+# reads tofu/milestones.json from this repository's main, not the milestones on GitHub, so the file
+# reaching main is the trigger, not the apply (design D2). The state commit after an apply doesn't
+# touch it, so it sends nothing.
+#
+#   notify   env docs (main only)   dispatches website's deploy.yml on main, with no inputs, with
+#                                   the troupe-run-docs App's token
+#
+# It's the notice troupe's release workflow sends after every push to its main (design D3; website
+# spec build-and-deploy). The token can start the website's workflows and write nothing there
+# (spec: docs-build-credentials). To rebuild the site by hand, dispatch the website's deploy.
+on:
+  push:
+    branches: [main]
+    paths: [tofu/milestones.json]
+
+permissions: {}
+
+jobs:
+  notify:
+    name: notify troupe.run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Limited to main, and holds only the troupe-run-docs App's key (tofu/docs.tf).
+    environment:
+      name: docs
+      deployment: false
+    # Nothing is checked out and no code from this repository runs: the token's one use is the
+    # dispatch.
+    permissions: {}
+    steps:
+      - name: Mint the troupe-run-docs App's token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.DOCS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DOCS_APP_PRIVATE_KEY }}
+          owner: troupe-run
+          repositories: website
+          permission-actions: write
+      - name: Dispatch troupe.run's deploy
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: gh workflow run deploy.yml -R troupe-run/website --ref main

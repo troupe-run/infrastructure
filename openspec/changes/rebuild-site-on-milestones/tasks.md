@@ -31,14 +31,14 @@
 
 ## 2. The notice workflow
 
-- [ ] 2.1 Write `scripts/tests/test_milestones_notice_workflow.py` (design D4): `problems()` over the loaded workflow,
+- [x] 2.1 Write `scripts/tests/test_milestones_notice_workflow.py` (design D4): `problems()` over the loaded workflow,
       a test that the real file has none, and a parametrised test that each weakening listed in D4 is named. Verify
       that `uv run pytest scripts/tests/test_milestones_notice_workflow.py` fails because the workflow doesn't exist,
       before 2.2
-- [ ] 2.2 Add `.github/workflows/milestones-notice.yml` (design D2, D3), with a header comment naming the spec
+- [x] 2.2 Add `.github/workflows/milestones-notice.yml` (design D2, D3), with a header comment naming the spec
       (milestones, docs-build-credentials) and #124. Verify the tests from 2.1 pass, and that each mutation in the
       parametrised test is reported by a `problems()` message that names it
-- [ ] 2.3 Add the workflow to README.md's layout table. Verify `uv run scripts/check.py` passes, including
+- [x] 2.3 Add the workflow to README.md's layout table. Verify `uv run scripts/check.py` passes, including
       `test_required_checks.py` unchanged
 
 ## 3. Probe the path filter (design D5)
