@@ -121,16 +121,19 @@ values: the owner sets them from 1Password, so no value is printed or passes thr
 
 ```sh
 export OP_ACCOUNT=l-a-u.1password.com
-for env in plan-pr plan-main apply; do
-  op read -n "op://troupe.run/troupe-run-infrastructure/private key" \
-    | gh secret set TF_VAR_github_app_pem --env "$env" -R troupe-run/infrastructure
-  op read -n "op://troupe.run/troupe-run-infrastructure tofu state/password" \
-    | gh secret set TF_VAR_state_passphrase --env "$env" -R troupe-run/infrastructure
-  op read -n "op://troupe.run/troupe-run-infrastructure tofu state/billing email" \
-    | gh secret set TF_VAR_billing_email --env "$env" -R troupe-run/infrastructure
-  op read -n "op://troupe.run/troupe-run-cloudflare-dns/credential" \
-    | gh secret set TF_VAR_cloudflare_api_token --env "$env" -R troupe-run/infrastructure
-done
+# Each value is read once, and gh runs only once all four reads succeed, so a failed read can't set
+# an empty secret.
+pem=$(op read -n "op://troupe.run/troupe-run-infrastructure/private key") &&
+  passphrase=$(op read -n "op://troupe.run/troupe-run-infrastructure tofu state/password") &&
+  email=$(op read -n "op://troupe.run/troupe-run-infrastructure tofu state/billing email") &&
+  cloudflare=$(op read -n "op://troupe.run/troupe-run-cloudflare-dns/credential") &&
+  for env in plan-pr plan-main apply; do
+    printf '%s' "$pem" | gh secret set TF_VAR_github_app_pem --env "$env" -R troupe-run/infrastructure
+    printf '%s' "$passphrase" | gh secret set TF_VAR_state_passphrase --env "$env" -R troupe-run/infrastructure
+    printf '%s' "$email" | gh secret set TF_VAR_billing_email --env "$env" -R troupe-run/infrastructure
+    printf '%s' "$cloudflare" | gh secret set TF_VAR_cloudflare_api_token --env "$env" -R troupe-run/infrastructure
+  done
+unset pem passphrase email cloudflare
 ```
 
 Run it again after rotating any of them.
