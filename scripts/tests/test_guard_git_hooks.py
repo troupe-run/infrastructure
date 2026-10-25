@@ -1,5 +1,6 @@
 """Task 2.4: the git hooks end to end, making real commits in a temporary repository."""
 
+import json
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -183,3 +184,160 @@ def test_a_schema_edit_only_in_the_working_tree_doesn_t_count(
     git(repo.path, "add", "protocol/README.md")
     # git sets it relative to the repository's root for a plain commit.
     assert commit_msg_with_index(repo, "docs: explain", ".git/index", monkeypatch) == 0
+
+
+# minor-corrections (#103): the pre-commit rules judge what the commit contains (design D1, D2).
+
+SKIP_OPENSPEC = 'version = 1\n\n[skip]\npaths = ["openspec/**"]\n'
+
+
+def change_repo(make_repo: Callable[[], Repo]) -> Repo:
+    """A repository with the hooks on, a check-paths declaration skipping openspec/, a tracked
+    `a.txt` and `b.txt`, and a change branch."""
+    repo = make_repo()
+    repo.write(guard.CHECK_PATHS, SKIP_OPENSPEC)
+    repo.write("a.txt", "a\n")
+    repo.write("b.txt", "b\n")
+    repo.hooks_on()
+    repo.change("add-thing")
+    repo.switch("add-thing")
+    assert repo.commit("docs(openspec): propose add-thing").returncode == 0
+    return repo
+
+
+def test_a_plain_commit_with_an_unstaged_tracked_edit_is_refused_naming_it(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = change_repo(make_repo)
+    before = repo.head()
+    repo.write("a.txt", "a, changed\n")
+    repo.write("b.txt", "b, changed\n")
+    result = repo.commit("fix: change a", "a.txt")
+    assert result.returncode != 0
+    assert "guard: commit-checks: tracked files have unstaged changes (b.txt)" in result.stderr
+    assert repo.head() == before
+
+
+def test_a_plain_commit_of_only_skipped_paths_skips_the_check(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = change_repo(make_repo)
+    repo.write("openspec/changes/add-thing/proposal.md", "# Proposal\n")
+    result = repo.commit("docs(openspec): add the proposal")
+    assert result.returncode == 0, result.stderr
+    assert "the check is skipped" in result.stderr
+
+
+def test_a_path_commit_leaving_out_an_unstaged_edit_is_refused_naming_it(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = change_repo(make_repo)
+    before = repo.head()
+    repo.write("a.txt", "a, changed\n")
+    repo.write("b.txt", "b, changed\n")
+    result = git(repo.path, "commit", "-q", "-m", "fix: change a", "a.txt", check=False)
+    assert result.returncode != 0
+    assert "guard: commit-checks: tracked files have unstaged changes (" in result.stderr
+    assert "b.txt" in result.stderr
+    assert repo.head() == before
+
+
+@pytest.mark.xfail(strict=True, reason="#103")
+def test_a_path_commit_names_only_the_edits_it_leaves_out(make_repo: Callable[[], Repo]) -> None:
+    repo = change_repo(make_repo)
+    repo.write("a.txt", "a, changed\n")
+    repo.write("b.txt", "b, changed\n")
+    result = git(repo.path, "commit", "-q", "-m", "fix: change a", "a.txt", check=False)
+    assert "guard: commit-checks: tracked files have unstaged changes (b.txt)" in result.stderr
+
+
+@pytest.mark.xfail(strict=True, reason="#103")
+def test_a_path_commit_leaving_out_a_staged_edit_is_refused_naming_it(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = change_repo(make_repo)
+    before = repo.head()
+    repo.write("a.txt", "a, changed\n")
+    repo.write("b.txt", "b, changed\n")
+    git(repo.path, "add", "a.txt", "b.txt")
+    result = git(repo.path, "commit", "-q", "-m", "fix: change a", "a.txt", check=False)
+    assert result.returncode != 0
+    assert "guard: commit-checks: tracked files have unstaged changes (b.txt)" in result.stderr
+    assert repo.head() == before
+
+
+def commit_all(repo: Repo, message: str) -> subprocess.CompletedProcess[str]:
+    return git(repo.path, "commit", "-q", "-a", "-m", message, check=False)
+
+
+@pytest.mark.xfail(strict=True, reason="#103")
+def test_commit_a_with_an_unstaged_tracked_edit_runs_the_check_and_is_made(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = change_repo(make_repo)
+    before = repo.head()
+    repo.write("a.txt", "a, changed\n")
+    result = commit_all(repo, "fix: change a")
+    assert result.returncode == 0, result.stderr
+    assert "guard: running scripts/check.py" in result.stderr
+    assert repo.head() != before
+
+
+@pytest.mark.xfail(strict=True, reason="#103")
+def test_commit_a_of_a_declaration_edit_runs_the_full_check(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = change_repo(make_repo)
+    repo.write(guard.CHECK_PATHS, SKIP_OPENSPEC + "\n# Nothing else is skipped.\n")
+    result = commit_all(repo, "chore: explain the declaration")
+    assert result.returncode == 0, result.stderr
+    assert "guard: running scripts/check.py, the same check CI runs" in result.stderr
+
+
+@pytest.mark.xfail(strict=True, reason="#103")
+def test_commit_a_of_a_malformed_declaration_is_refused_for_the_declaration(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = change_repo(make_repo)
+    before = repo.head()
+    repo.write(guard.CHECK_PATHS, "version = 2\n")
+    result = commit_all(repo, "chore: break the declaration")
+    assert result.returncode != 0
+    assert "guard: commit-checks:" in result.stderr
+    assert guard.CHECK_PATHS in result.stderr
+    assert "unstaged" not in result.stderr
+    assert repo.head() == before
+
+
+@pytest.mark.xfail(strict=True, reason="#103")
+def test_commit_a_leaving_an_archived_task_unticked_is_refused_naming_it(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = change_repo(make_repo)
+    tasks = repo.change("add-thing", archived_on="2026-10-25") / "tasks.md"
+    assert repo.commit("docs(openspec): archive add-thing").returncode == 0
+    before = repo.head()
+    tasks.write_text("- [x] 1.1 done\n- [ ] 1.2 not yet\n", encoding="utf-8")
+    result = commit_all(repo, "docs(openspec): add a task")
+    assert result.returncode != 0
+    assert "guard: archive-incomplete:" in result.stderr
+    assert "1.2 not yet" in result.stderr
+    assert repo.head() == before
+
+
+@pytest.mark.xfail(strict=True, reason="#103")
+def test_commit_a_of_a_delivered_file_edit_is_refused_naming_it(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = change_repo(make_repo)
+    listing = {"source": guard.SOURCE_REPOSITORY, "files": ["b.txt", guard.DELIVERY_LIST]}
+    repo.write(guard.DELIVERY_LIST, json.dumps(listing))
+    git(repo.path, "add", "-A")
+    git(repo.path, "commit", "-q", "--no-verify", "-m", "chore(guard): deliver the list")
+    before = repo.head()
+    repo.write("b.txt", "b, changed\n")
+    result = commit_all(repo, "fix: change b")
+    assert result.returncode != 0
+    assert "guard: delivered-file:" in result.stderr
+    assert "b.txt" in result.stderr
+    assert repo.head() == before
