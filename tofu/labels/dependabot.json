@@ -1,0 +1,30 @@
+{
+  "dependencies": {
+    "name": "dependencies",
+    "color": "0366d6",
+    "description": "Pull requests that update a dependency file"
+  },
+  "ecosystems": {
+    "github-actions": {
+      "name": "github_actions",
+      "color": "000000",
+      "description": "Pull requests that update GitHub Actions code"
+    },
+    "npm": {
+      "name": "javascript",
+      "color": "168700",
+      "description": "Pull requests that update javascript code"
+    },
+    "uv": {
+      "name": "python:uv",
+      "color": "2b67c6",
+      "description": "Pull requests that update python:uv code"
+    }
+  },
+  "repositories": {
+    ".github": [],
+    "infrastructure": ["github-actions", "uv"],
+    "troupe": ["github-actions", "uv"],
+    "website": ["github-actions", "npm"]
+  }
+}

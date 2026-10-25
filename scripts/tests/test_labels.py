@@ -5,6 +5,7 @@ the merge. So the declared descriptions are checked here, offline, on every pull
 """
 
 import json
+import re
 from typing import Any
 
 import pytest
@@ -101,3 +102,60 @@ def test_a_kind_label_over_the_limit_is_named_with_its_length() -> None:
     assert over_the_limit([{"name": "speed", "color": "FBCA04", "description": "x" * 101}]) == [
         "speed: description is 101 characters, over 100"
     ]
+
+
+# The labels Dependabot applies, which it creates when a repository doesn't have them, and the
+# ecosystems each repository's dependency graph lists (spec: labels; declare-dependabot-labels
+# design D1, D4). Dependabot finds a label by its name, so a declared one is used, not recreated.
+DEPENDABOT_LABELS = REPO / "tofu" / "labels" / "dependabot.json"
+REPOSITORIES_TF = REPO / "tofu" / "repositories.tf"
+
+
+def undeclared_ecosystems(dependabot: dict[str, Any]) -> list[str]:
+    """Each repository's ecosystem that the set doesn't declare a label for."""
+    return [
+        f"{repo}: ecosystem {ecosystem!r} isn't declared in tofu/labels/dependabot.json"
+        for repo, ecosystems in dependabot["repositories"].items()
+        for ecosystem in ecosystems
+        if ecosystem not in dependabot["ecosystems"]
+    ]
+
+
+def managed_repositories(tf: str) -> set[str]:
+    """The name of each module "repo_*" block in repositories.tf."""
+    return set(re.findall(r'module "repo_\w+" \{.*?\n  name\s+= "([^"]+)"', tf, re.DOTALL))
+
+
+def test_every_declared_dependabot_label_is_within_the_limit() -> None:
+    dependabot = json.loads(DEPENDABOT_LABELS.read_text(encoding="utf-8"))
+    labels = [dependabot["dependencies"], *dependabot["ecosystems"].values()]
+    assert over_the_limit(labels) == []
+
+
+def test_every_repositorys_ecosystems_are_declared() -> None:
+    dependabot = json.loads(DEPENDABOT_LABELS.read_text(encoding="utf-8"))
+    assert undeclared_ecosystems(dependabot) == []
+
+
+def test_an_undeclared_ecosystem_is_named_with_its_repository() -> None:
+    dependabot = {"ecosystems": {"npm": {}}, "repositories": {"website": ["npm", "cargo"]}}
+    assert undeclared_ecosystems(dependabot) == [
+        "website: ecosystem 'cargo' isn't declared in tofu/labels/dependabot.json"
+    ]
+
+
+@pytest.mark.tofu
+def test_the_set_names_exactly_the_managed_repositories() -> None:
+    dependabot = json.loads(DEPENDABOT_LABELS.read_text(encoding="utf-8"))
+    managed = managed_repositories(REPOSITORIES_TF.read_text(encoding="utf-8"))
+    assert managed, 'found no module "repo_*" in tofu/repositories.tf'
+    assert set(dependabot["repositories"]) == managed
+
+
+def test_managed_repositories_reads_each_modules_name() -> None:
+    tf = (
+        'module "repo_a" {\n  source = "./x"\n  name   = "a"\n}\n'
+        'module "repo_b" {\n  source       = "./x"\n  name         = ".b"\n}\n'
+        'module "other" {\n  name = "c"\n}\n'
+    )
+    assert managed_repositories(tf) == {"a", ".b"}
