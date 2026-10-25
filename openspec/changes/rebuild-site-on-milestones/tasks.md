@@ -64,9 +64,12 @@
 
 ## 4. The pull request
 
-- [ ] 4.1 Open the pull request with `Closes #124`, the decisions from group 0, the website issue from 0.2 and the
+- [x] 4.1 Open the pull request with `Closes #124`, the decisions from group 0, the website issue from 0.2 and the
       probe's findings. Verify CI's plan on it shows only infrastructure's `docs` environment, its deployment policy
-      and `DOCS_APP_CLIENT_ID` being created, and nothing changed or destroyed
+      and `DOCS_APP_CLIENT_ID` being created, and nothing changed or destroyed. Done: #137. Its plan for 5a472ce
+      created exactly the three, and also updated website's labels, deleting `dependencies` and `javascript`, which
+      Dependabot had created. That wasn't from this change: #138 declared them and merged first (owner, 2026-10-25),
+      and this branch is rebased onto its state commit, 7c1ac7a
 
 ## Workflow follow-up
 
