@@ -65,8 +65,11 @@
   `git commit -a` of a tracked edit runs the check and commits; `git commit <path>` with another edit left out is
   refused naming it. Record both in the pull request
 - [x] 5.2 Run `uv run scripts/check.py` and `openspec validate minor-corrections --strict`, and verify both pass
-- [ ] 5.3 After rebasing onto `origin/main`, run `uv run scripts/tofu.py plan`, and verify it shows only
-  `scripts/guard.py` updated in place in troupe and website. Keep it for the pull request
+- [x] 5.3 After rebasing onto `origin/main`, run `uv run scripts/tofu.py plan`, and verify it shows only
+  `scripts/guard.py` updated in place in troupe and website. Keep it for the pull request. The local plan timed out
+  on 1Password authorization (owner away), so this is PR #142's `plan (pull request)` for 2cba3d9: 0 to add, 2 to
+  change, 0 to destroy, `github_repository_file.guard` for `troupe:scripts/guard.py` and `website:scripts/guard.py`,
+  in place
 
 ## Workflow follow-up
 
