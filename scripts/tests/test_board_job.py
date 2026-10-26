@@ -66,6 +66,13 @@ def plan_problems(workflow: dict[str, Any]) -> list[str]:
     if f"[ -f {PLAN_FILE} ]" not in str(board["run"]):
         found.append(f"the board step reads {PLAN_FILE} without checking it was written")
     token = step(job, id="board-token")
+    # They run exactly when OpenTofu is planned, so a change to that condition can't leave them off.
+    planned = condition((step(job, name="Plan") or {}).get("if"))
+    for name, part in (("board token", token), ("board plan", board)):
+        if condition((part or {}).get("if")) != planned:
+            found.append(
+                f"the {name} step runs on {condition((part or {}).get('if'))!r}, not {planned!r}"
+            )
     if token is not None and token.get("continue-on-error") is not True:
         found.append("a failed board token fails the plan; it should continue on error")
     if granted(token) != {"permission-organization-projects": "read"}:
@@ -208,6 +215,16 @@ def test_each_way_the_board_job_can_go_wrong_is_named(change: Any, named: str) -
             "without --ci",
         ),
         (lambda jobs: plan_token(jobs).pop("continue-on-error"), "continue on error"),
+        (
+            lambda jobs: plan_token(jobs).update({"if": "steps.skip.outputs.skip == 'false'"}),
+            "the board token step runs on",
+        ),
+        (
+            lambda jobs: step(jobs["plan"], run="board_options.py plan").update(  # type: ignore[union-attr]
+                {"if": "always()"}
+            ),
+            "the board plan step runs on",
+        ),
         (
             lambda jobs: step(jobs["plan"], name="Keep the saved plan")["with"].update(  # type: ignore[index]
                 {"path": "tofu/main.tfplan"}
