@@ -2,17 +2,19 @@
 
 ## 1. Inventory (design D1, D3 step 1)
 
-- [ ] 1.1 Fast-forward onto `origin/main` if only a state commit is ahead. Read troupe's `main` specs with
+- [x] 1.1 Fast-forward onto `origin/main` if only a state commit is ahead. Read troupe's `main` specs with
   `oob.py`'s `spec_documents` and `capability_labels`, and print the labels each of the 12 folded labels' specs
-  names. Verify it matches design's first table, and record any difference here (the read wins).
-- [ ] 1.2 List every troupe-run/troupe issue and pull request, open and closed, with its labels (`gh issue list
+  names. Verify it matches design's first table, and record any difference here (the read wins). Result: `main` was current. All 12 match the table, with no difference
+- [x] 1.2 List every troupe-run/troupe issue and pull request, open and closed, with its labels (`gh issue list
   --state all` and `gh pr list --state all`, with a limit above the repository's count). Compute, per D2, the
   removals (each folded label an issue or PR carries) and the additions (the union of its specs' labels, less what it
   already carries). Write `relabel.md` in this change: each affected issue with its labels before, its additions and
   its removals, and the exact add and remove commands grouped by label. Verify the totals (59 removals, 43 additions
   on 36 issues, no pull requests, `cap:lifecycle` on nothing, as of 2026-10-26), and that every label to add is
   declared in `tofu/labels/troupe.json` and exists on troupe-run/troupe (`gh label list`). Record any difference from
-  design's tables here and in `relabel.md`. Commit `relabel.md` before any edit.
+  design's tables here and in `relabel.md`. Commit `relabel.md` before any edit. Result: read 120 issues and 47 pull requests. 43 issues
+  (14 open), no pull request; 59 removals, 43 additions on 36 issues; `cap:lifecycle` on nothing. All 10 labels to add
+  are declared and on GitHub. No difference from design
 
 ## 2. Relabel troupe's issues (design D2, D3 steps 2-5)
 
