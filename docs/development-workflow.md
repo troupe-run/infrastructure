@@ -318,6 +318,10 @@ reverted by the next apply everywhere. Version updates leave out the workflows t
 here, and the next apply delivers them. Their pull requests are titled `chore(deps): …` and carry only declared
 labels, and they take the same path as security updates below.
 
+OpenTofu's providers here (`tofu/.terraform.lock.hcl`) get no version updates: Dependabot's `opentofu` updates
+proposed nothing for a `registry.opentofu.org` lockfile when probed (deliver-dependabot design D6). Update them by
+hand with `tofu init -upgrade` in a change of their own. Its plan and apply need the owner's approval as usual.
+
 - **In a governed repository** (troupe, infrastructure, website), Dependabot's pull request is an alert that comes
   with a fix.
   It can't merge as it is: its `dependabot/...` branch matches no OpenSpec change, and its description closes no

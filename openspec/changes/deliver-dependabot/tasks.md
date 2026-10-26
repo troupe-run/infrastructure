@@ -2,7 +2,7 @@
 
 ## 1. Probe what Dependabot supports (design D3, D6)
 
-- [ ] 1.1 Create `troupe-run/infra-probe-dependabot` (public), holding:
+- [x] 1.1 Create `troupe-run/infra-probe-dependabot` (private: a public one was refused by the permission check), holding:
   - a `tofu/` directory requiring `integrations/github` at an old version, with the `.terraform.lock.hcl` that
     `tofu init` writes (providers from `registry.opentofu.org`);
   - two workflows pinning an old `actions/checkout`, one of them listed in `exclude-paths`;
@@ -12,13 +12,13 @@
   pull request's diff:
   - whether an `opentofu` pull request changes the lockfile's version and hashes;
   - whether the `github-actions` pull request leaves the excluded workflow alone.
-- [ ] 1.2 Record both outcomes, with the pull requests' evidence, in design.md D3 and D6. If `exclude-paths` isn't
+- [x] 1.2 Record both outcomes, with the pull requests' evidence, in design.md D3 and D6. If `exclude-paths` isn't
   honoured, record the `ignore` fallback as the mechanism, and adjust 2.3. Then delete the probe repository, and
   verify `gh repo view troupe-run/infra-probe-dependabot` fails.
 
 ## 2. The policy and the generator (design D1–D3)
 
-- [ ] 2.1 Add `tofu/dependabot.json` (D1). If 1.2 found `opentofu` works, also give it a directory, add `opentofu` to
+- [x] 2.1 Add `tofu/dependabot.json` (D1). If 1.2 found `opentofu` works, also give it a directory, add `opentofu` to
   infrastructure's `repositories` and declare its label in `tofu/labels/dependabot.json`. Add the test that every
   repository's declared ecosystem has a directory, and the test that a missing one is named with its repository.
   Verify both pass, and the existing label tests still pass.
@@ -57,7 +57,7 @@
 
 ## 4. Docs
 
-- [ ] 4.1 Update `docs/development-workflow.md`'s "Dependabot pull requests" section:
+- [x] 4.1 Update `docs/development-workflow.md`'s "Dependabot pull requests" section:
   - version updates run weekly from the delivered configuration, which is changed in `tofu/dependabot.json`;
   - their pull requests take security-scanning D5's manual path until the exemption lands (#174);
   - if 1.2 found `opentofu` unsupported, provider updates are made by hand with `tofu init -upgrade`.
