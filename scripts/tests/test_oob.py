@@ -58,7 +58,10 @@ MILESTONES = {
 DECLARED_MILESTONES = ["0.1.0", "0.2.0"]
 BOARD: dict[str, Any] = {
     "__typename": "ProjectV2SingleSelectField",
-    "options": [{"name": "cli"}, {"name": "cues"}],
+    "options": [
+        {"name": "cli", "description": "Capability: cli"},
+        {"name": "cues", "description": "Capability: cues"},
+    ],
 }
 
 
@@ -844,8 +847,10 @@ def test_a_hand_run_writes_no_annotations_and_no_summary(
 # the declared cap: labels, which the owner changes in the field's settings.
 
 
-def board(*names: str) -> dict[str, Any]:
-    return {**BOARD, "options": [{"name": n} for n in names]}
+def board(*names: str, **descriptions: str) -> dict[str, Any]:
+    """The field with these options, each described as its label is unless given otherwise."""
+    options = [{"name": n, "description": descriptions.get(n, f"Capability: {n}")} for n in names]
+    return {**BOARD, "options": options}
 
 
 def test_a_declared_label_with_no_board_option_is_reported(oob_dir: Path) -> None:
@@ -896,3 +901,36 @@ def test_a_board_that_can_t_be_read_is_unreadable_not_a_difference(oob_dir: Path
     assert len(report.unreadable) == 1
     assert report.unreadable[0].startswith("board capabilities:")
     assert "Resource not accessible by integration" in report.unreadable[0]
+
+
+# board-capability-descriptions design D8: each option's description is its label's.
+
+
+def test_an_option_whose_description_differs_from_its_label_s_is_reported(oob_dir: Path) -> None:
+    stale = board("cli", "cues", cues="Open requests")
+    assert RUN(fake_github(TYPES, PROJECTS, [], board=stale), oob_dir) == [
+        "board capabilities: the troupe roadmap board's Capability option 'cues' has the "
+        "description 'Open requests', but cap:cues's is 'Capability: cues'; the next approved "
+        "apply of main sets it"
+    ]
+
+
+def test_options_described_as_their_labels_report_no_description_difference(
+    oob_dir: Path,
+) -> None:
+    assert RUN(fake_github(TYPES, PROJECTS, [], board=board("cli", "cues")), oob_dir) == []
+
+
+def test_an_option_with_no_label_gets_only_the_no_label_difference(oob_dir: Path) -> None:
+    found = RUN(
+        fake_github(
+            TYPES, PROJECTS, [], board=board("cli", "cues", "lifecycle", lifecycle="anything")
+        ),
+        oob_dir,
+    )
+    assert len(found) == 1
+    assert "has a 'lifecycle' option, but no cap:lifecycle is declared" in found[0]
+
+
+def test_the_board_query_reads_each_option_s_description() -> None:
+    assert "options{name description}" in oob.BOARD_GH_ARGS[3]
