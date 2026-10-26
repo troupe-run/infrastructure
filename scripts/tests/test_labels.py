@@ -4,6 +4,7 @@ GitHub refuses a label description over 100 characters, but only when the plan i
 the merge. So the declared descriptions are checked here, offline, on every pull request.
 """
 
+import itertools
 import json
 import re
 from typing import Any
@@ -35,8 +36,36 @@ def description_problems(labels: list[dict[str, Any]]) -> list[str]:
     return found
 
 
+# A new label is added by hand from docs/standard-changes.md, so the form its steps ask for is
+# checked here rather than trusted (spec: labels; capability-label-standard-change design D3).
+CAPABILITY_COLOUR = "1D76DB"
+CAPABILITY_NAME = re.compile(r"cap:[a-z0-9]+(-[a-z0-9]+)*")
+# Adopted in this colour (fc9157d): it marks the org's own setup, not a troupe capability.
+OTHER_COLOURS = {"cap:infrastructure": "5319E7"}
+
+
+def form_problems(labels: list[dict[str, Any]]) -> list[str]:
+    """Each label out of byte order, with a malformed name, or not in the capability colour."""
+    found: list[str] = []
+    for before, after in itertools.pairwise(labels):
+        if after["name"] < before["name"]:  # code-point order is UTF-8's byte order
+            found.append(
+                f"{after['name']}: comes before {before['name']} in byte order; move it up"
+            )
+    for entry in labels:
+        name, colour = entry["name"], entry["color"]
+        if not CAPABILITY_NAME.fullmatch(name):
+            found.append(
+                f"{name}: a capability label's name is cap: then lowercase letters and digits, "
+                "words joined by single hyphens"
+            )
+        if colour != (expected := OTHER_COLOURS.get(name, CAPABILITY_COLOUR)):
+            found.append(f"{name}: colour is {colour}, not {expected}")
+    return found
+
+
 def label(name: str, description: str) -> dict[str, Any]:
-    return {"name": name, "color": "1D76DB", "description": description}
+    return {"name": name, "color": CAPABILITY_COLOUR, "description": description}
 
 
 def test_every_declared_cap_label_says_what_it_covers_within_the_limit() -> None:
@@ -62,6 +91,43 @@ def test_a_description_that_only_repeats_the_name_is_named() -> None:
 
 def test_tbd_passes_for_a_capability_troupe_has_not_defined() -> None:
     assert description_problems([label("cap:flows", "TBD")]) == []
+
+
+def test_every_declared_cap_label_is_in_one_form() -> None:
+    labels = json.loads(TROUPE_LABELS.read_text(encoding="utf-8"))
+    assert form_problems(labels) == []
+
+
+def test_a_label_out_of_byte_order_is_named_with_its_neighbour() -> None:
+    labels = [label("cap:cli", "x"), label("cap:claude-code-runner", "x")]
+    assert form_problems(labels) == [
+        "cap:claude-code-runner: comes before cap:cli in byte order; move it up"
+    ]
+
+
+def test_byte_order_puts_a_hyphen_before_a_letter() -> None:
+    labels = [label("cap:actor-runners", "x"), label("cap:actors", "x")]
+    assert form_problems(labels) == []
+
+
+@pytest.mark.parametrize(
+    "name", ["cap:Workspaces", "cap:a--b", "cap:-a", "cap:a-", "cap:", "stages"]
+)
+def test_a_malformed_name_is_named_with_the_form(name: str) -> None:
+    assert form_problems([label(name, "x")]) == [
+        f"{name}: a capability label's name is cap: then lowercase letters and digits, "
+        "words joined by single hyphens"
+    ]
+
+
+def test_a_cap_label_in_another_colour_is_named_with_it() -> None:
+    labels = [label("cap:actors", "x"), {**label("cap:stages", "x"), "color": "5319E7"}]
+    assert form_problems(labels) == [f"cap:stages: colour is 5319E7, not {CAPABILITY_COLOUR}"]
+
+
+def test_the_orgs_own_label_keeps_its_adopted_colour() -> None:
+    labels = [{**label("cap:infrastructure", "x"), "color": "5319E7"}]
+    assert form_problems(labels) == []
 
 
 # release-please finds its release pull request by these exact names, so a misspelt declaration
