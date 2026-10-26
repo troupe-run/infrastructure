@@ -67,10 +67,17 @@
 
 ## 5. Integration checks
 
-- [ ] 5.1 Probe the branch's guard on a scratch troupe clone (as in the capability-label change), with
+- [x] 5.1 Probe the branch's guard on a scratch troupe clone (as in the capability-label change), with
   `GITHUB_EVENT_NAME=pull_request`, `GITHUB_REPOSITORY=troupe-run/troupe` and a hand-written event payload: once for
   `release-please--branches--main` with a body closing nothing (passes `pr-closes-issue`), once for a change branch
-  with `Bumps the build.` (fails, naming the rule and fix). Record both outputs here. Nothing is pushed
+  with `Bumps the build.` (fails, naming the rule and fix). Record both outputs here. Nothing is pushed. Result: a
+  fresh clone of troupe (`main` 63259b9) in the scratchpad, this branch's guard at 13fd22b, hand-written payloads
+  with `head.repo.full_name` `troupe-run/troupe`. `release-please--branches--main` (b9d26f8) with release-please's
+  usual body: `every rule passes for release-please--branches--main`, exit 0. A scratch branch `probe-closes`
+  (one commit proposing a change with `skip_specs`) with `Bumps the build.`: exit 1 with only `guard:
+  pr-closes-issue: pull request 'docs(openspec): propose probe-closes' doesn't close an issue: its description has
+  no closing line.` and D2's fix. The same branch with `Closes troupe-run/infrastructure#173` added: `every rule
+  passes for probe-closes`, exit 0. The clone was deleted; nothing was pushed
 - [ ] 5.2 Push the branch and open the pull request with `Closes #173`. Verify this repository's `guard` run on the
   pull request passes with the new rule active (the branch's `guard.py` runs), and that the PR's plan comment
   changes only the delivered `scripts/guard.py` and `.github/workflows/guard.yml`, in troupe and in website.
