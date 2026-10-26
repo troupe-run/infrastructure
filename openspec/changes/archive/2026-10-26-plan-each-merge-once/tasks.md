@@ -53,14 +53,17 @@
 
 ## 4. Evidence
 
-- [ ] 4.1 Full `uv run scripts/check.py` passes. Open the pull request with `Closes #167`. Its plan shows no changes
-      (no `tofu/` change)
-- [ ] 4.2 After the merge, the merge's own `tofu` run's summary says it planned its own commit (its state is current).
-      Record the run here
+- [x] 4.1 Full `uv run scripts/check.py` passes. Open the pull request with `Closes #167`. Done: all gates passed
+      rebased on `472ee1e`; PR #176. Its plan's evidence moved to the follow-up below: the plan run waits for the
+      owner's approval, which is asked once, after this archive's push
 
 ## Workflow follow-up
 
+- After this archive is pushed, the owner approves PR #176's `plan (pull request)` run. Its comment should show "No
+  changes" (no `tofu/` change).
 - `/opsx:archive` on the branch before merging; the owner merges by rebase.
+- After the merge, the merge's own `tofu` run's summary should say it planned its own commit (its state is current).
+  Recorded on #167 with the after-merge comment. (This was task 4.2; it can only be seen after the archive.)
 - After the merge: comment on #167 with the PR and the archived change, check it's closed, and set its card to Done.
 - If the owner wants it: an issue for whether a scheduled or manual run waits for green CI before it can apply
   (design, Open Questions), on the board.
