@@ -2,21 +2,21 @@
 
 ## 1. Pin what must stay the same
 
-- [ ] 1.1 Before changing `scripts/plan_needed.py`, add to `scripts/tests/test_plan_needed.py` the cases that must keep
+- [x] 1.1 Before changing `scripts/plan_needed.py`, add to `scripts/tests/test_plan_needed.py` the cases that must keep
   planning (design D1, D2): `tofu/.terraform.lock.hcl` alone; `tofu/.terraform.lock.hcl` with `uv.lock`;
   `scripts/pyproject.toml`, `tofu/uv.lock` and `uv.lock.bak` (not the root files). Verify they pass on the unchanged
-  script with `uv run pytest scripts/tests/test_plan_needed.py`
+  script with `uv run pytest scripts/tests/test_plan_needed.py`. Result: `test_the_provider_lockfile_plans_alone_or_with_the_python_lockfile` and `test_a_python_tooling_file_outside_the_root_or_renamed_plans` (which also covers `pyproject.toml.orig`). 17 passed on the unchanged script
 
 ## 2. Skip the plan for the Python tooling files (design D1)
 
-- [ ] 2.1 Add a test that `uv.lock` alone, `pyproject.toml` with `uv.lock`, and those with `docs/x.md` don't plan, and
+- [x] 2.1 Add a test that `uv.lock` alone, `pyproject.toml` with `uv.lock`, and those with `docs/x.md` don't plan, and
   add `pyproject.toml` and `uv.lock` to the never-read case in
   `test_a_pull_request_of_only_never_read_files_isn_t_planned`. Verify it fails on the unchanged script, then add the
   two entries to `NEVER_READ` with a comment, and the docstring's reason (the `tofu` workflow runs its scripts without
   the project), and verify every test in `test_plan_needed.py` passes, including
-  `test_every_path_opentofu_reads_is_planned` and 1.1's cases
-- [ ] 2.2 Extend `test_the_script_prints_a_github_output_line` with `uv.lock\npyproject.toml\n` giving `plan=false`
-  and `uv.lock\ntofu/.terraform.lock.hcl\n` giving `plan=true`. Verify it passes
+  `test_every_path_opentofu_reads_is_planned` and 1.1's cases. Result: `test_a_python_tooling_bump_at_the_root_isn_t_planned` and the extended never-read case failed on the unchanged script (4 failed, 16 passed). With the two entries, 20 passed
+- [x] 2.2 Extend `test_the_script_prints_a_github_output_line` with `uv.lock\npyproject.toml\n` giving `plan=false`
+  and `uv.lock\ntofu/.terraform.lock.hcl\n` giving `plan=true`. Verify it passes. Result: 20 passed
 
 ## 3. Pin the --no-project premise (design D3)
 
