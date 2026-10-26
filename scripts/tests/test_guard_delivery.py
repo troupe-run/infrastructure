@@ -9,7 +9,14 @@ from conftest import Repo, git
 
 import guard
 
-DELIVERED = ["scripts/guard.py", ".githooks/pre-commit", ".githooks/commit-msg"]
+# .github/dependabot.yml is delivered beside the guard and named in the same list (spec:
+# dependency-updates).
+DELIVERED = [
+    "scripts/guard.py",
+    ".githooks/pre-commit",
+    ".githooks/commit-msg",
+    ".github/dependabot.yml",
+]
 
 
 def receiving(repo: Repo) -> None:
@@ -65,6 +72,23 @@ def test_committing_a_change_to_a_delivered_file_is_refused_and_leaves_no_commit
     assert result.returncode != 0
     assert "guard: delivered-file:" in result.stderr
     assert ".githooks/commit-msg" in result.stderr
+    assert guard.SOURCE_REPOSITORY in result.stderr
+    assert repo.head() == before
+
+
+def test_committing_a_change_to_the_delivered_dependabot_config_is_refused_naming_the_source(
+    make_repo: Callable[[], Repo],
+) -> None:
+    repo = make_repo()
+    repo.hooks_on()
+    receiving(repo)
+    on_a_change_branch(repo)
+    before = repo.head()
+    repo.write(".github/dependabot.yml", "version: 2\nupdates: []\n")
+    result = repo.commit("chore(deps): stop dependabot")
+    assert result.returncode != 0
+    assert "guard: delivered-file:" in result.stderr
+    assert ".github/dependabot.yml" in result.stderr
     assert guard.SOURCE_REPOSITORY in result.stderr
     assert repo.head() == before
 

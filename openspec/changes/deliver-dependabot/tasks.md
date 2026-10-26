@@ -46,14 +46,14 @@
 
 ## 3. Delivery (design D4, D5)
 
-- [ ] 3.1 Add `tofu/dependabot.tf`: `github_repository_file.dependabot`, one instance per generated file, with
-  `overwrite_on_create = false`, content that isn't sensitive, `depends_on` the three repository modules, and the
+- [x] 3.1 Add `tofu/dependabot.tf`: `github_repository_file.dependabot`, one instance per generated file, with
+  `overwrite_on_create = false`, its content wrapped in `sensitive()` (ci-apply), `depends_on` the three repository modules, and the
   commit message from D4. Verify `tofu fmt -check` and `tofu validate` pass.
-- [ ] 3.2 Add `.github/dependabot.yml` to `guard_list` in `tofu/guard_delivery.tf`. Add a test that the delivered
+- [x] 3.2 Add `.github/dependabot.yml` to `guard_list` in `tofu/guard_delivery.tf`. Add a test that the delivered
   list names it, and a delivered-file rule test that a commit changing a listed `.github/dependabot.yml` is refused,
   naming the source repository. Verify both pass.
-- [ ] 3.3 Add `.github/dependabot.yml` to `ci.yml`'s `paths-ignore` on `push` (D5), with the comment saying why.
-  Extend `test_ci_workflow.py` to pin it. Verify the test passes.
+- [x] 3.3 Leave `ci.yml` alone, so the delivery commit to infrastructure's `main` is tested like any push (D5;
+  ci-apply). Verify `test_required_checks.py` passes, since it pins `paths-ignore` to the state file.
 
 ## 4. Docs
 

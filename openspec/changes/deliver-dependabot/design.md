@@ -144,24 +144,26 @@ Entries are in the labels file's order for that repository, and keys are in a fi
   have, so an existing file fails the apply rather than being replaced. None exists today.
 - **The commit message is `chore(dependabot): deliver .github/dependabot.yml <sha256[:12]> from
   troupe-run/infrastructure`.** It changes exactly when the content does (guard-delivery D3).
-- **The content isn't `sensitive()`.** The file is a few dozen lines, so the plan can show it. The guard's files are
-  sensitive only because they're long enough to truncate the plan (truncate-long-plans D7). A new resource has no
-  sensitivity to switch, which on an existing resource plans an in-place update of every instance (#100).
+- **The content is `sensitive()`, like every file OpenTofu writes.** The ci-apply spec has a plan show a delivered
+  file's hash, never its content, and `test_file_content_sensitive.py` holds every `github_repository_file` to it.
+  The YAML is reviewed in the pull request's diff of `tofu/dependabot/`. The first draft left it unwrapped so the plan
+  could show the YAML, and that test refused it (apply, 3.1).
 - **`depends_on` the three repository modules**, so the App's bypass exists before the commit (guard-delivery D5).
 - **The delivered list.** `guard_delivery.tf`'s `guard_list` gains `.github/dependabot.yml` for the guard targets.
   The path is the same in both targets, so the list stays one value. That turns on the delivered-file rule for it in
   troupe and website, with no guard change: the rule reads the list.
 - **infrastructure gets its file but no delivered list** (owner, 2026-10-26: the App delivers it too).
 
-### D5. infrastructure's delivery commit doesn't start another CI run
+### D5. infrastructure's delivery commit is tested like any other push to `main`
 
-The App's commit of `.github/dependabot.yml` to infrastructure's `main` is a push to `main`. `ci.yml` would run, and
-then `tofu.yml`'s plan of `main` would run after it, for a file OpenTofu has just written. `ci.yml`'s `paths-ignore`
-already skips `tofu/terraform.tfstate` for the same reason. `.github/dependabot.yml` joins it. The daily plan still
-reads the file, so drift still shows within a day.
+The App's commit of `.github/dependabot.yml` to infrastructure's `main` is a push to `main`, so `ci.yml` runs, and
+then `tofu.yml`'s plan of `main`, which shows no change. The ci-apply spec has CI test every push to `main` that
+changes more than the state file, and `test_required_checks.py` pins `paths-ignore` to the state file alone. So the
+delivery commit gets no skip.
 
-- *Alternative:* let it run. The plan would show no change, but each delivery would add a CI run and a plan to
-  approve or read.
+- *Rejected during apply:* adding `.github/dependabot.yml` to `ci.yml`'s `paths-ignore`. It would have saved one CI
+  run and one no-change plan for each delivery, but it contradicts the spec and the test. The cost is small: a
+  delivery happens only when the policy, an ecosystem or a label changes.
 
 ### D6. OpenTofu providers: probe first, then add or record
 
