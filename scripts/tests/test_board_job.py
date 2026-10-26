@@ -60,7 +60,14 @@ def plan_problems(workflow: dict[str, Any]) -> list[str]:
         found.append(f"board_options.py plan's step id is {board.get('id')!r}, not board")
     if PLAN_FILE not in str(board["run"]):
         found.append(f"board_options.py plan doesn't write {PLAN_FILE}")
+    # A board that can't be read never fails the plan (design D9).
+    if "board_options.py plan --ci" not in str(board["run"]):
+        found.append("board_options.py plan runs without --ci, so an unread board fails the plan")
+    if f"[ -f {PLAN_FILE} ]" not in str(board["run"]):
+        found.append(f"the board step reads {PLAN_FILE} without checking it was written")
     token = step(job, id="board-token")
+    if token is not None and token.get("continue-on-error") is not True:
+        found.append("a failed board token fails the plan; it should continue on error")
     if granted(token) != {"permission-organization-projects": "read"}:
         found.append(f"the plan's board token asks for {granted(token)}, not projects: read")
     if board.get("env", {}).get("GH_TOKEN") != token_ref(token):
@@ -194,6 +201,13 @@ def test_each_way_the_board_job_can_go_wrong_is_named(change: Any, named: str) -
             "doesn't count the board's changes",
         ),
         (lambda jobs: jobs["plan"]["outputs"].pop("board_changes"), "board_changes"),
+        (
+            lambda jobs: step(jobs["plan"], run="board_options.py plan").update(  # type: ignore[union-attr]
+                {"run": "uv run scripts/board_options.py plan --out tofu/board-plan.json"}
+            ),
+            "without --ci",
+        ),
+        (lambda jobs: plan_token(jobs).pop("continue-on-error"), "continue on error"),
         (
             lambda jobs: step(jobs["plan"], name="Keep the saved plan")["with"].update(  # type: ignore[index]
                 {"path": "tofu/main.tfplan"}

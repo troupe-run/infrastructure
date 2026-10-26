@@ -246,3 +246,51 @@ def test_main_reports_a_refusal_and_exits_1(
     path.write_text(json.dumps(plan_for(OPTIONS, project=board_options.PROJECT)))
     assert board_options.main(["apply", "--board-plan", str(path)], FakeBoard(OPTIONS)) == 1
     assert "board_options: " in capsys.readouterr().err
+
+
+# --- a board that can't be read (design D9) ----------------------------------------------------
+
+
+def unreadable(_: dict[str, Any]) -> Any:  # noqa: ANN401
+    raise subprocess.CalledProcessError(1, ["gh"], "", "gh: Resource not accessible by integration")
+
+
+def plan_argv(tmp_path: Path, *extra: str) -> list[str]:
+    out, summary = tmp_path / "plan.json", tmp_path / "board.md"
+    labels = tmp_path / "labels.json"
+    if not labels.exists():
+        labels.write_text(json.dumps([{"name": "cap:runs", "description": LABELS["runs"]}]))
+    return ["plan", "--out", str(out), "--summary", str(summary), "--labels", str(labels), *extra]
+
+
+def test_in_ci_a_board_that_can_t_be_read_is_reported_and_writes_no_plan(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stale = tmp_path / "plan.json"
+    stale.write_text("{}")
+    assert board_options.main(plan_argv(tmp_path, "--ci"), unreadable) == 0
+    assert not stale.exists()
+    summary = (tmp_path / "board.md").read_text()
+    assert "Couldn't be read, so none are planned" in summary
+    assert "Resource not accessible by integration" in summary
+    printed = capsys.readouterr().out
+    assert printed.startswith("::error title=board descriptions::couldn't read the troupe roadmap")
+
+
+def test_outside_ci_a_board_that_can_t_be_read_exits_1_naming_why(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert board_options.main(plan_argv(tmp_path), unreadable) == 1
+    assert "Resource not accessible by integration" in capsys.readouterr().err
+    assert not (tmp_path / "plan.json").exists()
+
+
+def test_in_ci_a_broken_labels_file_is_still_an_error(tmp_path: Path) -> None:
+    labels = tmp_path / "labels.json"
+    labels.write_text("not json")
+    with pytest.raises(json.JSONDecodeError):
+        board_options.main(plan_argv(tmp_path, "--ci", "--labels", str(labels)), FakeBoard(OPTIONS))
+
+
+def test_an_annotation_can_t_be_split_by_a_newline_in_the_reason() -> None:
+    assert board_options.annotation("a\nb") == "::error title=board descriptions::a%0Ab"

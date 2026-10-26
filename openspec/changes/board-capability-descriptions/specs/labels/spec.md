@@ -22,6 +22,11 @@ identity, name, colour or order. An option with no label SHALL keep its descript
 - **WHEN** every option with a label already has its label's description
 - **THEN** the plan lists no description to set, and nothing is sent to the board
 
+#### Scenario: A board that can't be read doesn't hold up the apply
+- **WHEN** `main` is planned and the `Capability` field can't be read
+- **THEN** the plan's summary says the board's descriptions couldn't be read and names why, OpenTofu's changes are
+  planned and applied as usual, nothing is sent to the board, and the drift check reports the board as unreadable
+
 #### Scenario: An option with no label is left alone
 - **WHEN** the field has a `lifecycle` option and no `cap:lifecycle` is declared
 - **THEN** the apply sends `lifecycle` back unchanged, and the drift check reports it as an option with no label
