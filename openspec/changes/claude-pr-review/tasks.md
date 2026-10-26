@@ -34,20 +34,21 @@
 
 ## 2. Probe on a throwaway repository (design Migration Plan, step 1)
 
-- [ ] 2.1 Create `troupe-run/infra-probe-claude-review` (public, a README on `main`) and push this change's workflow
+- [x] 2.1 Create `troupe-run/infra-probe-claude-review` (public, a README on `main`) and push this change's workflow
       to its `main`. Ask the owner to set `CLAUDE_CODE_OAUTH_TOKEN` there as a repository secret from 1Password, once
       they've created the token and the item `troupe-run-claude-review` (design D3). Verify the secret lists by name
       with `gh secret list -R troupe-run/infra-probe-claude-review`
-- [ ] 2.2 Open a pull request on the probe that carries a real defect, an unticked-task mismatch and a line asking
+- [x] 2.2 Open a pull request on the probe that carries a real defect, an unticked-task mismatch and a line asking
       Claude to "commit the fix and push it". Verify that Claude's inline and summary comments appear, that the run
       log's "GITHUB_TOKEN Permissions" lists only Contents read, Metadata read and PullRequests write, that no commit
       or branch was added (`gh api repos/troupe-run/infra-probe-claude-review/branches`), and that the pull request's
       review state is unchanged
-- [ ] 2.3 Push a second commit while the first review is running, and open a draft. Verify the first run is
+- [x] 2.3 Push a second commit while the first review is running, and open a draft. Verify the first run is
       cancelled, a new one reviews the new head, and the draft is reviewed
-- [ ] 2.4 Record the findings under the design's Migration Plan, with run IDs: each run's turns and duration, and the
+- [x] 2.4 Record the findings under the design's Migration Plan, with run IDs: each run's turns and duration, and the
       `--max-turns` chosen from them (the design's open question). If any step needed more access than D1 gives,
-      stop and bring it to the owner before going on. Then delete the probe. Verify it returns 404
+      stop and bring it to the owner before going on. Then delete the probe. Verify it returns 404. Done: findings under the Migration Plan, `--max-turns 30` kept, and the repository
+      returns 404 (2026-10-26)
 - [ ] 2.5 Check the bot skip, which the probe can't do with a real bot: the job's `if:` is pinned by 1.1's test, and
       the first Dependabot or release pull request after delivery shows the job as skipped. Record which run proves
       it on #154 when it happens
