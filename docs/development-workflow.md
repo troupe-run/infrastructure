@@ -16,6 +16,11 @@ drift apart:
 | Claude Code hooks (`.claude/settings.json`) | before an agent's tool call | the Claude rules below, including refusing `--no-verify` | no, for an agent following `CLAUDE.md` |
 | The `guard` GitHub check (`.github/workflows/guard.yml`) | on every push to every branch, and every pull request, re-run when its title is edited | commit messages, schema changes' commit types, a pull request's title, the branch-change match, archived tasks, and OpenSpec's strict validation (`openspec-strict`) | no: it's a required check, so a pull request can't merge while it's red (`tofu/required-checks.json`) |
 
+**Claude's review isn't one of them.** `.github/workflows/claude-review.yml` posts Claude's findings on each member's
+pull request, but it enforces nothing: it isn't a required check, it can't approve or request changes, and its run can
+only read the code and comment (spec: pr-review). A failed or skipped review never stops a merge. Bots' and forks'
+pull requests aren't reviewed.
+
 **The git hooks are on by default.** Git never runs hooks from a fresh clone, so the repository's own tooling turns
 them on: running `uv run scripts/check.py` does it, and so does starting a Claude Code session. Each says so when it
 does. You can also run `git config core.hooksPath .githooks` yourself. Git only runs a hook that is executable, so

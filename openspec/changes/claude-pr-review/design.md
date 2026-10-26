@@ -67,8 +67,11 @@ Pass `github_token: ${{ secrets.GITHUB_TOKEN }}`, set the job's permissions to e
 
 - Events: `opened`, `synchronize`, `reopened` and `ready_for_review`. Drafts are reviewed (owner, 2026-10-26).
   `ready_for_review` re-reviews on that transition, which costs one extra run per draft.
-- Job condition: `github.event.pull_request.user.type != 'Bot'`. This skips Dependabot, `troupe-run-release[bot]`
-  and any App's pull request, and a skipped job doesn't fail the run. The owner chose to skip release pull requests
+- Job condition: `github.event.pull_request.user.type != 'Bot'`, and the head is this repository
+  (`head.repo.full_name == github.repository`). This skips Dependabot, `troupe-run-release[bot]`, any App's pull
+  request and any fork's, and a skipped job doesn't fail the run. Without the fork half, a fork's run would start
+  with no secret and fail on authentication, which reads as a broken review rather than an accepted gap (added in
+  apply, 2026-10-26). The owner chose to skip release pull requests
   as well. Without the skip they'd fail anyway: the action refuses bot actors, and Dependabot's runs get no Actions
   secrets.
 - `concurrency: claude-review-${{ github.event.pull_request.number }}` with `cancel-in-progress: true`, so a quick

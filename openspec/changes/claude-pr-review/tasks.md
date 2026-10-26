@@ -6,15 +6,15 @@
       (owner, 2026-10-26): org secret `CLAUDE_CODE_OAUTH_TOKEN`, `.github` left out, bot-opened pull requests skipped
       (release ones included), drafts reviewed. On D1 the owner asked for the simplest route if it breaks nothing,
       and `GITHUB_TOKEN` is that route (D1's reasoning)
-- [ ] 0.2 Comment on #154 with D1 (no Claude App: why, and what its by-hand step becomes) and its revised "Done when"
+- [x] 0.2 Comment on #154 with D1 (no Claude App: why, and what its by-hand step becomes) and its revised "Done when"
       (troupe, infrastructure and website; no `.github`), and on #136 that the review doesn't need Actions on
       `.github`. Verify both comments are visible with `gh issue view <n> -R troupe-run/infrastructure --comments`
-- [ ] 0.3 Set #154's card to In Progress if it isn't. Verify with
+- [x] 0.3 Set #154's card to In Progress if it isn't. Verify with
       `gh issue view 154 -R troupe-run/infrastructure --json projectItems`
 
 ## 1. The review workflow
 
-- [ ] 1.1 Write `scripts/tests/test_claude_review_workflow.py` on the pattern of `test_milestones_notice_workflow.py`:
+- [x] 1.1 Write `scripts/tests/test_claude_review_workflow.py` on the pattern of `test_milestones_notice_workflow.py`:
       a `problems()` over the loaded workflow, a test that the real file has none, and a parametrised test that names
       each weakening in the spec's "The workflow is weakened" scenario. That covers the events (exactly `pull_request`
       with opened, synchronize, reopened, ready_for_review), the job's bot-skip condition, the permissions (exactly
@@ -24,11 +24,11 @@
       (no Edit, Write, git or `gh pr review`), per-PR concurrency with cancel-in-progress, a timeout, and every
       `uses:` pinned to a 40-hex SHA. Verify `uv run pytest scripts/tests/test_claude_review_workflow.py` fails
       because the workflow doesn't exist, before 1.2
-- [ ] 1.2 Add `.github/workflows/claude-review.yml` (design D2 to D5, D7): the delivered-file source line first, a
+- [x] 1.2 Add `.github/workflows/claude-review.yml` (design D2 to D5, D7): the delivered-file source line first, a
       header naming the spec (`pr-review`) and #154, `anthropics/claude-code-action` pinned to v1.0.262's commit SHA
       (`gh api repos/anthropics/claude-code-action/git/ref/tags/v1.0.262`), and the prompt from D5. Verify the tests
       from 1.1 pass, and each parametrised mutation is reported by a message that names it
-- [ ] 1.3 Add the workflow to README.md's layout table, and a row to `docs/development-workflow.md` that says it's an
+- [x] 1.3 Add the workflow to README.md's layout table, and a row to `docs/development-workflow.md` that says it's an
       advisory review, not a guard rule, with what it can and can't write. Verify `uv run scripts/check.py` passes,
       with `tofu/required-checks.json` unchanged
 
