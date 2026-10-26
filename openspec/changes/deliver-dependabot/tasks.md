@@ -68,16 +68,27 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Fast-forward onto `origin/main`, then run a local plan. Verify it shows exactly these changes and nothing
+- [x] 5.1 Fast-forward onto `origin/main`, then run a local plan. Verify it shows exactly these changes and nothing
   else:
   - three `github_repository_file.dependabot` creations, with their content;
   - `.github/guard-delivery.json` updated in troupe and website.
-- [ ] 5.2 Verify `uv run scripts/check.py` passes in full. Then open the pull request with `Closes #171`, and verify
-  the `plan (pull request)` comment matches 5.1 once the owner approves its run.
+
+  Done 2026-10-27, on `origin/main` at the latest state commit: "3 to add, 2 to change, 0 to destroy".
+  - The three creations write `.github/dependabot.yml` to `main` in infrastructure, troupe and website, with content
+    hidden and `overwrite_on_create = false`. Their commit-message hashes (`cb556d8408b9`, `6a665362b588`,
+    `ee3199a6d198`) are the sha256 of `tofu/dependabot/{infrastructure,troupe,website}.yml`.
+  - The two updates are each target's `.github/guard-delivery.json`.
+
+  An earlier plan from a stale base also showed `guard.py` and `guard.yml` reverting in both targets. Rebasing onto
+  #173's merge cleared it.
+- [x] 5.2 Verify `uv run scripts/check.py` passes in full. Opening the pull request moves to the follow-up below, after
+  the archive, so the owner approves `plan (pull request)` once, on the final branch.
 
 ## Workflow follow-up
 
-- `/opsx:archive` on the branch before merge, rebased onto main's latest state commit, then one plan approval.
+- `/opsx:archive` on the branch, rebased onto main's latest state commit.
+- Open the pull request with `Closes #171`. Once the owner approves its one `plan (pull request)` run, check its
+  plan comment matches 5.1.
 - After the owner merges and approves the apply:
   - check each of troupe, website and infrastructure has `.github/dependabot.yml` on `main` with the generated
     content;
