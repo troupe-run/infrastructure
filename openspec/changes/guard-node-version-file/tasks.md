@@ -24,14 +24,14 @@
 
 ## 2. Take Node from .nvmrc (design D1, D2)
 
-- [ ] 2.1 In `.github/workflows/guard.yml`, add `NODE_VERSION: 22.23.4` to the job's `env` with D2's comment, add
+- [x] 2.1 In `.github/workflows/guard.yml`, add `NODE_VERSION: 22.23.4` to the job's `env` with D2's comment, add
   the "Choose the Node version" step before `setup-node`, and change `setup-node` to `node-version-file: .nvmrc`.
   Update the file's header comment if it describes the steps. Verify by removing 1.3's `xfail` mark: the test passes
-- [ ] 2.2 Add to `test_guard_workflow.py`: the choosing step comes before the first `setup-node` step; run with bash
+- [x] 2.2 Add to `test_guard_workflow.py`: the choosing step comes before the first `setup-node` step; run with bash
   in a temporary directory, it writes `NODE_VERSION` and a newline when there's no `.nvmrc`, and leaves an existing
   `.nvmrc` byte for byte unchanged. Skip the run cases where bash isn't found. Verify they pass, and that the
   "unchanged" case fails if the step's `-e` test is removed (check by hand, then restore)
-- [ ] 2.3 In `docs/development-workflow.md`, "Where the guard comes from" (next to "Moving the OpenSpec version"),
+- [x] 2.3 In `docs/development-workflow.md`, "Where the guard comes from" (next to "Moving the OpenSpec version"),
   say that the `guard` check's Node comes from the repository's `.nvmrc`, or from `NODE_VERSION` in `guard.yml` where
   there's none, and that the workflow never names a Node version as a step input, because website's test refuses one
   (troupe-run/website#4). Verify `uv run pytest scripts/tests/test_guard_docs.py` passes, and `uv run
@@ -39,8 +39,9 @@
 
 ## 3. Integration checks
 
-- [ ] 3.1 Rerun 1.2's command against the new `guard.yml`. Verify website's test passes unchanged, and record both
-  results (old fails, new passes) in the pull request
+- [x] 3.1 Rerun 1.2's command against the new `guard.yml`. Verify website's test passes unchanged, and record both
+  results (old fails, new passes) in the pull request. Result: 8 of 8 pass on the new `guard.yml`, with website's test
+  unchanged. website's own checkout still has the old `guard.yml`, so the run read the scratch copy
 - [ ] 3.2 Push the branch and open the pull request (`Closes #155`). Verify this repository's `guard` run on it
   passes and its log says `No .nvmrc here, so Node 22.23.4, the guard's pin`, and that the PR's plan comment shows
   only `guard.yml`'s content changing, for troupe and website
