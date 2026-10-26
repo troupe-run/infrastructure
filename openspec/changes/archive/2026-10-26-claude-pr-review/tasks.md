@@ -23,7 +23,8 @@
       `anthropic_api_key` or federation inputs, `allowed_bots` unset, the allowed-tools list exactly as design D4
       (no Edit, Write, git or `gh pr review`), per-PR concurrency with cancel-in-progress, a timeout, and every
       `uses:` pinned to a 40-hex SHA. Verify `uv run pytest scripts/tests/test_claude_review_workflow.py` fails
-      because the workflow doesn't exist, before 1.2
+      because the workflow doesn't exist, before 1.2. Its token part was superseded by 6.3: the action's `github_token` now comes from the review
+      App, and the job's own token has `contents: read` only
 - [x] 1.2 Add `.github/workflows/claude-review.yml` (design D2 to D5, D7): the delivered-file source line first, a
       header naming the spec (`pr-review`) and #154, `anthropics/claude-code-action` pinned to v1.0.262's commit SHA
       (`gh api repos/anthropics/claude-code-action/git/ref/tags/v1.0.262`), and the prompt from D5. Verify the tests
@@ -67,12 +68,14 @@
       comment to "the files every governed repository runs from here". Verify `uv run scripts/check.py` passes
       (tofu fmt, validate, `test_guard_delivery.py`), and that `test_needs_guard_tests.py` passes with the workflow
       added to `scripts/guard_tests_needed.py`'s `DEPENDS_ON` (design D6)
-- [ ] 4.2 Fast-forward onto origin/main, then run a local plan, or read CI's plan on the pull request. Verify it shows
+- [x] 4.2 Fast-forward onto origin/main, then run a local plan, or read CI's plan on the pull request. Verify it shows
       exactly four changes: `claude-review.yml` created, and `.github/guard-delivery.json` updated, in each of troupe
       and website. Nothing for `.github`, and nothing destroyed. Read each target's current
       `.github/guard-delivery.json` with `gh api repos/troupe-run/<repo>/contents/.github/guard-delivery.json` and
       check it parses. The branch is on main's state commit after #156 (801fbee); rebase again if main has
-      moved
+      moved. Done: #157's plan for adbc733 was 2 to add, 2 to change, 0 to destroy: `claude-review.yml`
+      created and `.github/guard-delivery.json` updated in troupe and in website, nothing for `.github`. Each target's
+      list parses. The archive push's plan is checked against the same four
 - [x] 4.3 Run each target's own checks over the workflow before it's delivered (design D6, #155). In a scratch
       clone of website, copy `claude-review.yml` into `.github/workflows/` and run
       `npx vitest run tests/unit/workflow-node-version.test.ts`. In a scratch clone of troupe, copy it in and run
@@ -83,9 +86,10 @@
 
 ## 5. The pull request and live checks
 
-- [ ] 5.1 Open the pull request with `Closes #154`, D1's decision and the probe's findings. Verify that this pull
+- [x] 5.1 Open the pull request with `Closes #154`, D1's decision and the probe's findings. Verify that this pull
       request's own run of `claude-review` posts a review from its head (the first live review, in infrastructure),
-      that its log shows only read access to contents, and that the plan on it matches 4.2
+      that its log shows only read access to contents, and that the plan on it matches 4.2. Done: #157. Its runs are the first live reviews (40287328446 onwards, as
+      `troupe-run-review` from 40291768742), each log at read-only contents
 - [x] 5.2 Fix the empty review on #157 (design D8, owner, 2026-10-26): pass `--setting-sources user`, pinned by
       `test_claude_review_workflow.py` with mutations for no sources, `user,project` and `project`, and record it in
       the workflow's comment, the spec and `docs/development-workflow.md`. Verify the tests pass, and that #157's
@@ -115,9 +119,10 @@
       Purposes changed since main's 04:13 drift run, not this change
 - [x] 6.5 Owner: set `REVIEW_APP_PRIVATE_KEY` with that command. Verify by name that its repositories are exactly
       troupe, infrastructure and website. Done: `infrastructure`, `troupe`, `website`
-- [ ] 6.6 On #157, verify the review run for the new head mints the App's token and posts its comments as
+- [x] 6.6 On #157, verify the review run for the new head mints the App's token and posts its comments as
       `troupe-run-review[bot]`, with the run's `GITHUB_TOKEN` at `Contents: read` and `Metadata: read` only, and no
-      permission denial
+      permission denial. Done: run 40291768742 (201f097) posted its summary as `troupe-run-review`, with
+      `GITHUB_TOKEN` at Contents read and Metadata read only, 10 turns and 0 permission denials
 
 ## Workflow follow-up
 
