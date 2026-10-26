@@ -55,9 +55,11 @@
   approval can't be given, the PR's CI plan stands in for it, as on #160. Result: the branch was 4 ahead and 0 behind
   `origin/main`. Local plan: `Plan: 0 to add, 1 to change, 0 to destroy.`, `module.repo_troupe.github_issue_labels.this`
   updated in place, with 13 `label` blocks removed (the 13 names), none added or changed, and 54 unchanged
-- [ ] 4.2 Re-run 2.2's check for the 13 labels just before opening the pull request. Push and open it (`Closes
+- [x] 4.2 Re-run 2.2's check for the 13 labels just before opening the pull request. Push and open it (`Closes
   #151`), its description listing for each of the 13 labels the troupe issues and pull requests that carry it, read
-  then: none. Verify CI passes and the plan comment matches 4.1.
+  then: none. Verify CI passes and the plan comment matches 4.1. Result: PR #162. The 13 labels were on 0 issues and 0 pull requests when it
+  was opened. Every check passes, and the plan comment for d131045 matches 4.1: `Plan: 0 to add, 1 to change, 0 to
+  destroy.`, the same 13 `label` blocks removed, none added or changed, 54 unchanged
 
 ## Workflow follow-up
 
