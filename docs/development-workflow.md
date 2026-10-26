@@ -20,7 +20,9 @@ drift apart:
 pull request, but it enforces nothing: it isn't a required check, it can't approve or request changes, and its run can
 only read the code and comment (spec: pr-review). A failed or skipped review never stops a merge. Bots' and forks'
 pull requests aren't reviewed. It doesn't load the repository's Claude Code settings, so the guard's hooks don't run
-in it: they're written for an agent in your terminal, and would widen what the review can do (spec: pr-review).
+in it: they're written for an agent in your terminal, and would widen what the review can do (spec: pr-review). Its
+session's output stays hidden. Only a tool call Claude was refused is named in the run's log, as a warning, so the
+cause can be traced (spec: pr-review, #161).
 
 **The git hooks are on by default.** Git never runs hooks from a fresh clone, so the repository's own tooling turns
 them on: running `uv run scripts/check.py` does it, and so does starting a Claude Code session. Each says so when it
