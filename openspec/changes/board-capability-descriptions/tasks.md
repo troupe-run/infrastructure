@@ -34,11 +34,20 @@
 
 ## 2. The probe (the owner, on a throwaway project)
 
-- [ ] 2.1 Ask the owner to run design D6's probe in their own terminal, giving them the exact commands and a probe
+- [x] 2.1 Ask the owner to run design D6's probe in their own terminal, giving them the exact commands and a probe
       labels file in the scratchpad. Read back with `gh api graphql` and record here: each option kept its id and got
       its description (the longest label description, so GitHub's length limit is tested), both draft items kept
       their values, and the second run refused naming `effects`. The owner deletes the project afterwards. If an item
       lost its value, stop and take it to the owner before any further task
+      Done 2026-10-26 on project 5, `infra-probe-board-options`, which the owner made with `gh` (field `Capability`,
+      options `runs` 2782f0b1 and `cues` 87280e50, draft items "probe runs" set to `runs` and "probe cues" to `cues`).
+      I planned it with `--project 5` and a probe labels file giving both options the longest label description (98
+      characters); the owner ran `apply`: "set 2 description(s) on project 5". Read back: both options kept their ids,
+      names and colour `GRAY` and had the description, and both items' values compared equal before and after. Then a
+      second plan (other descriptions); the owner added `effects` in the field's settings and ran `apply`, which
+      refused: "the Capability field changed since the plan ('effects' was added); nothing was sent". Read back: the
+      descriptions were still the first probe's and the items unchanged. The owner deleted project 5; the org's
+      project list no longer has it
 
 ## 3. The drift check compares descriptions
 
