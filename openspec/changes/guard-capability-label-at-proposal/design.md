@@ -90,7 +90,8 @@ Why GitHub rather than a delivered copy (#153's first question):
 The token is the run's own `GITHUB_TOKEN`, passed to the step in `guard.yml`. It needs no new permission: the file is
 in a public repository. Without the token the request is unauthenticated, which works but shares the runner's
 address's 60-an-hour limit, so the workflow always passes it. An absent token falls through to an unauthenticated read;
-that's an absent input, not a wrong one.
+that's an absent input, not a wrong one. The guard removes the token from the environment it runs the OpenSpec CLI in, so
+only the labels request has it (from Claude's review of #168).
 
 Rejected: `raw.githubusercontent.com`, which caches for about five minutes, so a label merged a minute ago could read
 as missing. Rejected: `gh api`, which adds a program the guard otherwise doesn't need on CI.
