@@ -2,15 +2,21 @@
 
 ## 1. Pin the failure before the fix
 
-- [ ] 1.1 Re-confirm D1's premise on the branch's `scripts/guard.py` (checked before apply, 2026-10-26; this catches
+- [x] 1.1 Re-confirm D1's premise on the branch's `scripts/guard.py` (checked before apply, 2026-10-26; this catches
   a later change to `main`): the `ci` path reads the working tree only under `openspec/`, and never reads
-  `git status` or untracked files. Verify by reading `run_ci_entry` and what it calls, and note the result here
-- [ ] 1.2 Run website's `tests/unit/workflow-node-version.test.ts`, unchanged, against this branch's current
+  `git status` or untracked files. Verify by reading `run_ci_entry` and what it calls, and note the result here.
+  Result: `scripts/guard.py` is identical to `origin/main` (e45f7ed), which is what D1 was checked against. Its only
+  `status` strings are `gh` subcommands (`pr status`, `issue status`, `auth status`), and it has no `--porcelain`,
+  `--others` or untracked-file read
+- [x] 1.2 Run website's `tests/unit/workflow-node-version.test.ts`, unchanged, against this branch's current
   `guard.yml`. Copy website's `.github/workflows/` into a scratch directory, put this repository's `guard.yml` in it,
   and run website's vitest on that test with the scratch directory as the working directory. Verify it fails with
   exactly #155's two messages (`must have node-version-file: .nvmrc`, `must not have node-version (found
-  "22.23.4")`), and record the command here for 3.1
-- [ ] 1.3 Add `scripts/tests/test_guard_workflow.py` (design D3): the website-rule check on `guard.yml`, naming each
+  "22.23.4")`), and record the command here for 3.1. Result: with website at `origin/main` (f9fe63e, its test and
+  workflows unchanged), `cd <scratch> && <website>/node_modules/.bin/vitest run --root <website>
+  tests/unit/workflow-node-version.test.ts` fails 1 of 8, with exactly those two messages for `guard.yml`, job
+  "guard", step 3
+- [x] 1.3 Add `scripts/tests/test_guard_workflow.py` (design D3): the website-rule check on `guard.yml`, naming each
   problem's job and step and ignoring `if:`, plus fixture cases (a pinned `setup-node`, a `setup-node` behind `if:`,
   a `node-version` input on another step) that it refuses. Verify the fixture cases pass and the `guard.yml` case
   **fails** on the unchanged workflow with the same two problems as 1.2, and commit it marked
