@@ -84,11 +84,18 @@
   `cap:workspaces` ``: exit 1, `capability-label: 1 problem(s) with the capability labels specs name: change
   `probe-workspaces`: spec `workspaces` names `cap:workspaces`, which troupe-run/infrastructure doesn't declare
   on main.`, with the standard change's link in the fix. Nothing was pushed
-- [ ] 4.2 Just before asking for the plan's approval, re-run 4.1's `main` case against troupe's latest `main`, so the
-  delivery can't turn it red. Record the commit and the result here
-- [ ] 4.3 Push the branch and open the pull request (`Closes #153`). Verify this repository's `guard` runs pass and log
+- [x] 4.2 Just before asking for the plan's approval, re-run 4.1's `main` case against troupe's latest `main`, so the
+  delivery can't turn it red. Record the commit and the result here. Result: troupe `main` e998824, with this
+  branch's guard at 820d288: `capability-label: judged 25 spec(s), every spec, against 36 declared label(s)`,
+  `openspec-strict` validated 25 of 25, every rule passes, exit 0
+- [x] 4.3 Push the branch and open the pull request (`Closes #153`). Verify this repository's `guard` runs pass and log
   that `capability-label` wasn't run here (not troupe), and that the PR's plan comment changes only the delivered
-  `scripts/guard.py` and `.github/workflows/guard.yml`, in troupe and in website
+  `scripts/guard.py` and `.github/workflows/guard.yml`, in troupe and in website. Result: PR #168. Both `guard`
+  runs on fcfd4f5 pass and log `capability-label: troupe-run/infrastructure names no capability labels, so it
+  wasn't checked.`; all 20 checks pass. The plan for fcfd4f5 is 0 to add, 4 to change, 0 to destroy:
+  `github_repository_file.guard` for `scripts/guard.py` and `.github/workflows/guard.yml`, in troupe and website,
+  content and commit message in place, with no modes to set. 3.4 changes `scripts/guard.py` again, so the plan is
+  re-made on the next push, for the same four files
 
 ## Workflow follow-up
 
