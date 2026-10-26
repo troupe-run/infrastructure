@@ -1,5 +1,5 @@
 """claude-review.yml reviews each member's pull request and can't change the repository (spec:
-pr-review; claude-pr-review design D1 to D4, D7).
+pr-review; claude-pr-review design D1 to D4, D7, D8).
 
 GitHub evaluates the workflow, so these tests pin what it's given: when it runs and what it
 skips, what its token may do, which credentials reach the action, and which tools Claude has."""
@@ -15,9 +15,21 @@ from conftest import REPO
 
 REVIEW = REPO / ".github" / "workflows" / "claude-review.yml"
 EVENTS = ["opened", "synchronize", "reopened", "ready_for_review"]
-# A run may read the code and comment on the pull request, and nothing else (design D1). No
-# id-token: without it the action can't swap OIDC for a Claude App token that writes contents.
-PERMISSIONS = {"contents": "read", "pull-requests": "write"}
+# The run's own token only checks out the code (design D1). No id-token: without it the action can't
+# swap OIDC for a Claude App token that writes contents.
+PERMISSIONS = {"contents": "read"}
+# Every write is made with the review App's token, minted for this repository with exactly these.
+MINTER = "actions/create-github-app-token"
+# The review App's client ID, written in the workflow: it isn't a secret (minting also needs the
+# key), and a variable set by an apply wouldn't exist for a pull request's run before its merge.
+REVIEW_APP_CLIENT_ID = re.compile(r"^Iv[0-9A-Za-z]{16,}$")
+TOKEN_INPUTS = {
+    "private-key": "${{ secrets.REVIEW_APP_PRIVATE_KEY }}",
+    "owner": "${{ github.repository_owner }}",
+    "repositories": "${{ github.event.repository.name }}",
+    "permission-contents": "read",
+    "permission-pull-requests": "write",
+}
 # Bots' pull requests and forks' are skipped, not failed (design D2).
 SKIP = (
     "github.event.pull_request.user.type != 'Bot' && "
@@ -28,9 +40,10 @@ CONCURRENCY = {
     "cancel-in-progress": True,
 }
 ACTION = "anthropics/claude-code-action"
-# What reaches the action: the run's own token for GitHub, the org secret for Claude (design D3).
+# What reaches the action: the review App's token for GitHub, the org secret for Claude (design
+# D1, D3).
 CREDENTIALS = {
-    "github_token": "${{ secrets.GITHUB_TOKEN }}",
+    "github_token": "${{ steps.app-token.outputs.token }}",
     "claude_code_oauth_token": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}",
 }
 # Inputs that would widen what the action does or who can start it, or print what it saw.
@@ -138,7 +151,22 @@ def problems(workflow: dict[str, Any]) -> list[str]:
             found.append(
                 f"review runs a command of its own ({step['run']!r}); only the action runs"
             )
+    tokens = [step for step in steps if str(step.get("uses", "")).startswith(f"{MINTER}@")]
     actions = [step for step in steps if str(step.get("uses", "")).startswith(f"{ACTION}@")]
+    if len(tokens) != 1:
+        found.append(f"review mints {len(tokens)} App tokens, not the review App's one")
+    else:
+        token = tokens[0]
+        if token.get("id") != "app-token":
+            found.append(f"the token step's id is {token.get('id')!r}, not app-token")
+        given = dict(token.get("with") or {})
+        client_id = str(given.pop("client-id", ""))
+        if not REVIEW_APP_CLIENT_ID.match(client_id):
+            found.append(f"the review App's client ID is {client_id!r}, not one written here")
+        if given != TOKEN_INPUTS:
+            found.append(f"the review App's token is minted with {given!r}, not {TOKEN_INPUTS!r}")
+        if actions and steps.index(token) > steps.index(actions[0]):
+            found.append("the review App's token is minted after the action runs")
     if len(actions) != 1:
         return [*found, f"review uses {ACTION} {len(actions)} times, not once"]
     inputs = actions[0].get("with") or {}
@@ -182,6 +210,11 @@ def action(w: dict[str, Any]) -> dict[str, Any]:
     return step["with"]  # type: ignore[no-any-return]
 
 
+def token(w: dict[str, Any]) -> dict[str, Any]:
+    step = next(s for s in job(w)["steps"] if str(s.get("uses", "")).startswith(MINTER))
+    return step  # type: ignore[no-any-return]
+
+
 def tools(w: dict[str, Any], change: str) -> None:
     action(w)["claude_args"] = str(action(w)["claude_args"]).replace("Bash(gh pr view:*)", change)
 
@@ -215,6 +248,41 @@ def sources(w: dict[str, Any], change: str) -> None:
             lambda w: job(w)["permissions"].update({"contents": "write"}),
             "review's GITHUB_TOKEN permissions",
         ),
+        (
+            lambda w: job(w)["permissions"].update({"pull-requests": "write"}),
+            "review's GITHUB_TOKEN permissions",
+        ),
+        (
+            lambda w: token(w)["with"].update({"permission-contents": "write"}),
+            "the review App's token is minted with",
+        ),
+        (
+            lambda w: token(w)["with"].update({"permission-issues": "write"}),
+            "the review App's token is minted with",
+        ),
+        (
+            lambda w: token(w)["with"].pop("repositories"),
+            "the review App's token is minted with",
+        ),
+        (
+            lambda w: token(w)["with"].update(
+                {"private-key": "${{ secrets.DOCS_APP_PRIVATE_KEY }}"}
+            ),
+            "the review App's token is minted with",
+        ),
+        (lambda w: token(w).update({"id": "token"}), "not app-token"),
+        (
+            lambda w: token(w)["with"].update({"client-id": "${{ vars.REVIEW_APP_CLIENT_ID }}"}),
+            "client ID is",
+        ),
+        (
+            lambda w: job(w)["steps"].remove(token(w)),
+            "review mints 0 App tokens",
+        ),
+        (
+            lambda w: job(w)["steps"].append(job(w)["steps"].pop(job(w)["steps"].index(token(w)))),
+            "minted after the action runs",
+        ),
         (lambda w: job(w).pop("permissions"), "review's GITHUB_TOKEN permissions"),
         (lambda w: job(w).update({"environment": "plan-pr"}), "it needs none"),
         (lambda w: w.pop("concurrency"), "one run per pull request"),
@@ -236,6 +304,10 @@ def sources(w: dict[str, Any], change: str) -> None:
         (lambda w: action(w).pop("github_token"), "github_token"),
         (
             lambda w: action(w).update({"github_token": "${{ secrets.SOME_PAT }}"}),
+            "github_token",
+        ),
+        (
+            lambda w: action(w).update({"github_token": "${{ secrets.GITHUB_TOKEN }}"}),
             "github_token",
         ),
         (lambda w: action(w).pop("claude_code_oauth_token"), "claude_code_oauth_token"),

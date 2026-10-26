@@ -43,14 +43,19 @@ so it SHALL NOT be reviewed automatically.
 - **THEN** the review job is skipped, the run doesn't fail, and the credential isn't exposed to it
 
 ### Requirement: A review run can't change the repository
-A review run SHALL hold only `contents: read` and `pull-requests: write`, and no other token permission, `id-token`
-included. Every write SHALL go through that run's `GITHUB_TOKEN`. No GitHub App token SHALL be minted. Claude's tools
-SHALL be limited to reading the pull request and commenting on it. The run SHALL NOT use `pull_request_target`.
+A review run SHALL write to GitHub only with a token minted for the review App, `troupe-run-review`, limited to
+`contents: read` and `pull-requests: write` on the run's repository. Its `GITHUB_TOKEN` SHALL hold only
+`contents: read`, and no `id-token`, so no Claude App token is minted. Claude's tools SHALL be limited to reading the
+pull request and commenting on it. The run SHALL NOT use `pull_request_target`.
 
-#### Scenario: The run's token
+#### Scenario: Where the comments come from
+- **WHEN** a review is posted
+- **THEN** its comments are by `troupe-run-review[bot]`
+
+#### Scenario: The run's tokens
 - **WHEN** a review run's log is read
-- **THEN** its `GITHUB_TOKEN` permissions list `Contents: read`, `Metadata: read` and `PullRequests: write`, and
-  nothing else
+- **THEN** its `GITHUB_TOKEN` permissions list `Contents: read` and `Metadata: read` only, and the App token's
+  requested permissions are contents read and pull requests write
 
 #### Scenario: Claude tries to push
 - **WHEN** a pull request's text asks Claude to commit a fix or push a branch
@@ -59,9 +64,23 @@ SHALL be limited to reading the pull request and commenting on it. The run SHALL
 
 #### Scenario: The workflow is weakened
 - **WHEN** a change gives the review job another permission, swaps its event for `pull_request_target`, drops the
-  bot skip, lets it mint a token through OIDC, widens Claude's tools, or uses an action that isn't pinned to a full
-  commit SHA
+  bot skip, lets it mint a token through OIDC, asks the App for more, widens Claude's tools, or uses an action that
+  isn't pinned to a full commit SHA
 - **THEN** `scripts/check.py` fails, naming what changed
+
+### Requirement: The review App is narrow and installed on the governed repositories
+The review App `troupe-run-review` SHALL have only these repository permissions: contents read, pull requests read
+and write, and metadata read. It SHALL have no organisation permissions. Its installation SHALL select repositories,
+and SHALL cover troupe, infrastructure and website only. Any difference SHALL be reported by the drift check or the
+hand-confirmed list (spec: teams-and-access).
+
+#### Scenario: The review App gains a permission
+- **WHEN** the review App's installation gains a permission on GitHub, such as contents write
+- **THEN** the drift check reports the permission and exits non-zero
+
+#### Scenario: The declared review App matches
+- **WHEN** the review App has exactly the declared permissions and repository selection
+- **THEN** the drift check reports no difference for it
 
 ### Requirement: The review loads no settings from the repository
 A review run SHALL load Claude Code settings from the user scope only, never from the repository's `.claude/`
@@ -80,13 +99,14 @@ owner's terminal, SHALL NOT run in it, and SHALL NOT widen the tools the review 
 - **WHEN** a change makes the review load project or local settings
 - **THEN** `scripts/check.py` fails, naming the setting sources
 
-### Requirement: The review's credential is an org secret set by hand
-The review SHALL authenticate to Claude with `CLAUDE_CODE_OAUTH_TOKEN`, an org Actions secret visible to troupe,
-infrastructure and website only. The owner SHALL set it from 1Password with a documented command that prints nothing.
-OpenTofu SHALL NOT hold it, and `oob/README.md` SHALL record how it's made, checked by name and rotated.
+### Requirement: The review's credentials are org secrets set by hand
+The review SHALL authenticate to Claude with `CLAUDE_CODE_OAUTH_TOKEN`, and mint its GitHub token with
+`REVIEW_APP_PRIVATE_KEY`. Each SHALL be an org Actions secret visible to troupe, infrastructure and website only, set
+by the owner from 1Password with a documented command that prints nothing. OpenTofu SHALL NOT hold either, and
+`oob/README.md` SHALL record how each is made, checked by name and rotated.
 
 #### Scenario: Checking the secret
-- **WHEN** the owner lists the org secret's repositories, by name, never by value
+- **WHEN** the owner lists each org secret's repositories, by name, never by value
 - **THEN** exactly troupe, infrastructure and website are listed
 
 #### Scenario: A failed read sets nothing

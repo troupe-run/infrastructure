@@ -52,5 +52,14 @@
       "pull_requests": "write"
     },
     "repository_selection": "selected"
+  },
+  {
+    "app_slug": "troupe-run-review",
+    "permissions": {
+      "contents": "read",
+      "metadata": "read",
+      "pull_requests": "write"
+    },
+    "repository_selection": "selected"
   }
 ]
