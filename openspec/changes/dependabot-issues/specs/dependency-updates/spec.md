@@ -1,0 +1,164 @@
+# Spec Delta
+
+## ADDED Requirements
+
+### Requirement: Every Dependabot pull request has its issue
+Every open pull request by `dependabot[bot]` in troupe, website or infrastructure SHALL have an issue, opened in the
+same repository by the Dependabot issues App. The issue SHALL be of type Task, carry the `dependencies` label, have
+the release in progress as its milestone, and be on the troupe roadmap board. One issue SHALL serve one pull request
+at a time.
+
+#### Scenario: A new Dependabot pull request
+- **WHEN** Dependabot opens a pull request in website and the next run of `dependabot-issues` ends
+- **THEN** website has an open issue for it, of type Task, labelled `dependencies`, in the release in progress, and on
+  the troupe roadmap board
+
+#### Scenario: A run finds nothing new
+- **WHEN** every open Dependabot pull request already has its issue and its closing line
+- **THEN** the run opens, edits and comments on nothing
+
+#### Scenario: Pull requests open before the workflow
+- **WHEN** the first run happens while website #44, #45 and #46 are open
+- **THEN** each of the three gets its own issue in website
+
+### Requirement: A Dependabot pull request closes its issue
+Each open Dependabot pull request's description SHALL contain the line `Closes #<n>`, where `#<n>` is its issue. A run
+that finds the line missing, whether never added or removed when Dependabot rewrote the description, SHALL add it
+and leave the rest of the description as it was.
+
+#### Scenario: The line is added
+- **WHEN** a run opens an issue for a Dependabot pull request
+- **THEN** the pull request's description ends with `Closes #<n>` for that issue, and the `guard` check runs again on
+  the edit
+
+#### Scenario: Dependabot rewrites the description
+- **WHEN** Dependabot rebases or updates its pull request and its new description has no closing line
+- **THEN** the next run puts `Closes #<n>` back, naming the same issue
+
+#### Scenario: Merging closes the issue
+- **WHEN** a Dependabot pull request with its closing line is merged into `main`
+- **THEN** GitHub closes its issue as completed
+
+### Requirement: The issue says what the update is
+The issue's title SHALL name the dependency and the versions it moves between. Its body SHALL link the pull request,
+whose description carries Dependabot's release notes, and give the update type: patch, minor, major, or unknown when
+the versions can't be read. For a major or unknown update, the body SHALL say the update needs an OpenSpec change.
+
+#### Scenario: A patch update
+- **WHEN** a run opens the issue for website's `chore(deps): Bump zod from 4.6.5 to 4.6.7`
+- **THEN** its title names zod, 4.6.5 and 4.6.7, and its body links the pull request and says the update is a patch
+
+#### Scenario: A major update
+- **WHEN** a run opens the issue for `chore(deps-dev): Bump typescript from 6.0.3 to 7.0.2`
+- **THEN** its body says the update is major and needs an OpenSpec change before it can merge
+
+#### Scenario: Versions that can't be read
+- **WHEN** a Dependabot pull request's title doesn't give a version it moves from and one it moves to
+- **THEN** its issue is still opened, titled from the pull request's title, and its body says the update type is
+  unknown and needs an OpenSpec change
+
+### Requirement: The release in progress is the lowest open milestone
+The release in progress SHALL be the open milestone in `tofu/milestones.json` on infrastructure's `main` whose title
+is the lowest version. It SHALL be found in each repository by that title. Where it isn't found, the run SHALL open
+no issue in that repository, and SHALL fail, naming the repository and the title.
+
+#### Scenario: Today's milestones
+- **WHEN** a run opens an issue while `0.1.0` is the lowest open milestone declared
+- **THEN** the issue's milestone is `0.1.0`
+
+#### Scenario: The milestone is missing in a repository
+- **WHEN** the declared title isn't a milestone in troupe
+- **THEN** the run opens no issue in troupe, still handles website and infrastructure, and fails naming troupe and
+  the title
+
+### Requirement: A superseded update reuses its issue
+When Dependabot opens a pull request for a dependency, in the same repository, ecosystem and directory, whose issue is
+still open, the run SHALL relink that issue instead of opening another. It SHALL point the issue at the new pull
+request, retitle it with the new versions, and comment naming both pull requests.
+
+#### Scenario: Dependabot supersedes an update
+- **WHEN** Dependabot closes website #44 (zod 4.6.5 → 4.6.7) and opens a pull request for zod 4.6.5 → 4.6.8
+- **THEN** the issue opened for #44 is retitled for 4.6.8, links the new pull request, has a comment naming both, and
+  the new pull request's description closes it; no second zod issue is opened
+
+#### Scenario: The same name in another ecosystem
+- **WHEN** an open issue is for an `npm` dependency and Dependabot opens a `github-actions` pull request with the same
+  name
+- **THEN** the run opens a new issue for it
+
+### Requirement: An update closed without merging closes its issue as not planned
+When a Dependabot pull request linked to an open issue is closed without merging, and an hour later no open
+Dependabot pull request for the same dependency exists, the run SHALL close the issue as not planned with a comment
+naming the pull request. A reopened pull request SHALL reopen its issue.
+
+#### Scenario: Dependabot gives up on an update
+- **WHEN** a Dependabot pull request is closed without merging, and no successor opens within the hour
+- **THEN** the next run after the hour closes its issue as not planned, with a comment naming the pull request
+
+#### Scenario: Waiting for a successor
+- **WHEN** a run happens less than an hour after a Dependabot pull request closed without merging
+- **THEN** its issue stays open
+
+#### Scenario: A pull request is reopened
+- **WHEN** a Dependabot pull request whose issue was closed as not planned is reopened
+- **THEN** the next run reopens the issue, and the pull request's description closes it
+
+#### Scenario: Merged while the issue stays open
+- **WHEN** a Dependabot pull request is merged and its issue is still open
+- **THEN** the next run closes the issue as completed, with a comment naming the pull request
+
+### Requirement: Only Dependabot's pull requests and the App's own issues are trusted
+A run SHALL act only on pull requests whose author is `dependabot[bot]`, whatever their branch is named. It SHALL
+treat as a pull request's issue only an issue the Dependabot issues App opened. An issue or line written by anyone else
+SHALL neither be reused nor closed.
+
+#### Scenario: A person's branch named like Dependabot's
+- **WHEN** a person opens a pull request from a branch named `dependabot/npm_and_yarn/zod-4.6.8`
+- **THEN** the run opens no issue for it and doesn't edit it
+
+#### Scenario: An issue someone else wrote
+- **WHEN** a person opens an issue labelled `dependencies` titled for the same dependency as a Dependabot pull request
+  without one
+- **THEN** the run opens the App's own issue for the pull request and leaves the person's issue as it is
+
+#### Scenario: A closing line to someone else's issue
+- **WHEN** a Dependabot pull request's description closes an issue the App didn't open
+- **THEN** the run still opens the App's issue for it and adds its own closing line
+
+### Requirement: The workflow never runs the pull requests' code
+`dependabot-issues` SHALL run from infrastructure's `main` only, on a schedule every 10 minutes and by hand. It SHALL
+check out only infrastructure's `main`, and read the pull requests through the API: their author, number, branch,
+title, state and description. It SHALL NOT check out, fetch or run any file of a pull request.
+
+#### Scenario: What the workflow checks out
+- **WHEN** the workflow file is read
+- **THEN** its only checkout is of the repository it runs in, at the default ref, and no step fetches a pull
+  request's head
+
+#### Scenario: Started by hand from a branch
+- **WHEN** someone starts `dependabot-issues` by hand on a branch other than `main`
+- **THEN** GitHub refuses its environment, and the run writes nothing
+
+#### Scenario: Pull request text is data
+- **WHEN** a Dependabot pull request's title or description contains shell or workflow-expression syntax
+- **THEN** the run treats it as text, and no step evaluates it
+
+### Requirement: A run that can't read what it needs fails without guessing
+A run SHALL fail, naming what it couldn't read, when a pull request list, an issue, the milestone declaration or a
+response is missing or malformed. It SHALL act on nothing that depended on what it couldn't read.
+
+#### Scenario: A repository's pull requests can't be listed
+- **WHEN** listing website's pull requests fails
+- **THEN** the run changes nothing in website, still handles troupe and infrastructure, and fails naming website
+
+#### Scenario: A malformed milestone declaration
+- **WHEN** `tofu/milestones.json` has no open milestone
+- **THEN** the run opens no issue anywhere and fails, saying there is no release in progress
+
+### Requirement: Outside GitHub Actions the run only reads
+Run anywhere but GitHub Actions, the script SHALL read the same pull requests and issues and print what it would do,
+and SHALL open, edit, comment on and close nothing.
+
+#### Scenario: Run on a laptop
+- **WHEN** the owner runs the script locally while a Dependabot pull request has no issue
+- **THEN** it prints that it would open an issue for that pull request, and nothing changes on GitHub
