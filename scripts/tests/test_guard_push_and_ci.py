@@ -489,7 +489,12 @@ def test_the_github_inputs_of_a_pull_request_carry_its_title(
     make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo, base = pr_repo(make_repo, tmp_path)
-    pull_request_event(repo, tmp_path, monkeypatch, {"pull_request": {"title": "Release main"}})
+    pull_request_event(
+        repo,
+        tmp_path,
+        monkeypatch,
+        {"pull_request": {"title": "Release main", "body": "Closes #22"}},
+    )
     assert guard.github_ci_inputs(repo.path)[:4] == (base, repo.head(), "add-thing", "Release main")
 
 
@@ -500,7 +505,9 @@ def test_a_pull_request_event_with_no_title_fails_saying_it_couldn_t_read_it(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     repo, _ = pr_repo(make_repo, tmp_path)
-    pull_request_event(repo, tmp_path, monkeypatch, {"pull_request": {"title": None}})
+    pull_request_event(
+        repo, tmp_path, monkeypatch, {"pull_request": {"title": None, "body": "Closes #22"}}
+    )
     assert guard.run_ci_entry(repo.path, None, None, None) == 1
     assert "couldn't read the pull request's title" in capsys.readouterr().err
 
@@ -538,7 +545,7 @@ def test_the_github_inputs_of_a_push_name_the_run_s_repository(
     repo, base = pr_repo(make_repo, tmp_path)
     push_event(repo, tmp_path, monkeypatch, base, "add-thing")
     monkeypatch.setenv("GITHUB_REPOSITORY", TROUPE)
-    assert guard.github_ci_inputs(repo.path) == (base, repo.head(), "add-thing", None, TROUPE)
+    assert guard.github_ci_inputs(repo.path) == (base, repo.head(), "add-thing", None, TROUPE, None)
 
 
 def test_the_github_inputs_of_a_push_with_no_repository_name_none(
@@ -554,7 +561,7 @@ def test_the_github_inputs_of_a_pull_request_name_its_head_repository_not_the_ru
     make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo, _ = pr_repo(make_repo, tmp_path)
-    payload = {"pull_request": {"title": "chore: release main",
+    payload = {"pull_request": {"title": "chore: release main", "body": "Closes #22",
                                 "head": {"repo": {"full_name": "someone/troupe"}}}}  # fmt: skip
     pull_request_event(repo, tmp_path, monkeypatch, payload)
     monkeypatch.setenv("GITHUB_REPOSITORY", TROUPE)
@@ -565,7 +572,13 @@ def test_the_github_inputs_of_a_pull_request_from_a_deleted_fork_name_none(
     make_repo: Callable[[], Repo], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo, _ = pr_repo(make_repo, tmp_path)
-    payload = {"pull_request": {"title": "chore: release main", "head": {"repo": None}}}
+    payload = {
+        "pull_request": {
+            "title": "chore: release main",
+            "body": "Closes #22",
+            "head": {"repo": None},
+        }
+    }
     pull_request_event(repo, tmp_path, monkeypatch, payload)
     monkeypatch.setenv("GITHUB_REPOSITORY", TROUPE)
     assert guard.github_ci_inputs(repo.path)[4] is None
@@ -580,7 +593,13 @@ def test_a_pull_request_whose_head_repository_can_t_be_read_fails_saying_so(
     head_repo: object,
 ) -> None:
     repo, _ = pr_repo(make_repo, tmp_path)
-    payload = {"pull_request": {"title": "chore: release main", "head": {"repo": head_repo}}}
+    payload = {
+        "pull_request": {
+            "title": "chore: release main",
+            "body": "Closes #22",
+            "head": {"repo": head_repo},
+        }
+    }
     pull_request_event(repo, tmp_path, monkeypatch, payload)
     assert guard.run_ci_entry(repo.path, None, None, None) == 1
     err = capsys.readouterr().err
