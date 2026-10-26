@@ -40,7 +40,7 @@ so it SHALL NOT be reviewed automatically.
 
 #### Scenario: A fork's pull request
 - **WHEN** an outside contributor opens a pull request from a fork
-- **THEN** no review is posted, and the credential isn't exposed to the run
+- **THEN** the review job is skipped, the run doesn't fail, and the credential isn't exposed to it
 
 ### Requirement: A review run can't change the repository
 A review run SHALL hold only `contents: read` and `pull-requests: write`, and no other token permission, `id-token`
