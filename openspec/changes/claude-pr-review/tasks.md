@@ -73,11 +73,13 @@
       `.github/guard-delivery.json` with `gh api repos/troupe-run/<repo>/contents/.github/guard-delivery.json` and
       check it parses.The branch is on main's state commit after #156 (801fbee); rebase again if main has
       moved
-- [ ] 4.3 Run each target's own checks over the workflow before it's delivered (design D6, #155). In a scratch
+- [x] 4.3 Run each target's own checks over the workflow before it's delivered (design D6, #155). In a scratch
       clone of website, copy `claude-review.yml` into `.github/workflows/` and run
       `npx vitest run tests/unit/workflow-node-version.test.ts`. In a scratch clone of troupe, copy it in and run
-      `uv run scripts/check.py`. Verify that both pass with the review workflow in place, and add a line to the workflow's header naming this check as the step
-      to repeat when it changes
+      `uv run scripts/check.py`. Verify that both pass with the review workflow in place, and add a line to the
+      workflow's header naming this check as the step to repeat when it changes. Done (2026-10-26, dca132a's
+      workflow): website at 32042b3, `workflow-node-version.test.ts` 8 passed; troupe at 1168599, `scripts/check.py`
+      all gates passed (2822 passed, 14 skipped). The header names the check
 
 ## 5. The pull request and live checks
 
