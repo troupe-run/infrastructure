@@ -4,9 +4,12 @@ name: tofu
 #
 #   pull request          changes   no environment                 does it touch what OpenTofu reads?
 #                         pr-plan   env plan-pr (owner approves)   plan posted on the PR, unless not
-#   CI green on main  --> plan      env plan-main (main only)      plan in the run summary
-#   or a manual run       apply     env apply (owner approves)     apply that saved plan, then commit
-#   or daily at 06:00 UTC                                          the state to main as the App
+#   CI green on main  --> plan      env plan-main (main only)      plan in the run summary, with the
+#   or a manual run                                                board's descriptions to set
+#   or daily at 06:00 UTC apply     env apply (owner approves)     apply that saved plan, then commit
+#                                                                  the state to main as the App
+#                         board     env board (main only)          after the apply, set the board's
+#                                                                  descriptions the plan listed
 #
 # The daily run finds drift in anything OpenTofu manages, a file delivered to troupe included,
 # within a day (spec: ci-apply). Beside each plan of main, the oob job checks what OpenTofu can't
@@ -16,7 +19,9 @@ name: tofu
 # another run already applied isn't planned again (scripts/plan_target.py; #167).
 #
 # Every job authenticates as the troupe-run-infrastructure App, through scripts/tofu.py, with the
-# secrets of its environment. The owner sets them from 1Password (README); none is in this file.
+# secrets of its environment, but the board job, which uses the troupe-run-board App's (spec:
+# labels; board-capability-descriptions design D1). The owner sets them from 1Password (README,
+# oob/README.md); none is in this file.
 on:
   pull_request:
   workflow_run:
@@ -192,10 +197,11 @@ jobs:
       name: plan-main
       deployment: false
     outputs:
-      # OpenTofu's changes, or a delivered file's mode to set: either waits for approval
-      # (executable-hooks design D3).
-      changes: ${{ steps.plan.outputs.changes == 'true' || steps.modes.outputs.changes == 'true' }}
+      # OpenTofu's changes, a delivered file's mode to set, or a board description to set: any waits
+      # for approval (executable-hooks design D3; board-capability-descriptions design D1).
+      changes: ${{ steps.plan.outputs.changes == 'true' || steps.modes.outputs.changes == 'true' || steps.board.outputs.changes == 'true' }}
       mode_repositories: ${{ steps.modes.outputs.repositories }}
+      board_changes: ${{ steps.board.outputs.changes }}
       sha: ${{ steps.target.outputs.sha }}
     env:
       TF_VAR_github_app_pem: ${{ secrets.TF_VAR_github_app_pem }}
@@ -304,6 +310,32 @@ jobs:
           else
             echo "changes=false" >> "$GITHUB_OUTPUT"
           fi
+      # The board's Capability options whose description isn't their label's (spec: labels;
+      # board-capability-descriptions design D1). OpenTofu can't manage a Projects v2 field, so this
+      # is a plan of its own. It only reads, with a token that can only read projects; the board job
+      # sets them after the apply.
+      - name: A read-only token for the board
+        id: board-token
+        if: steps.target.outputs.plan == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: 5272634
+          private-key: ${{ secrets.TF_VAR_github_app_pem }}
+          owner: troupe-run
+          permission-organization-projects: read
+      - name: Board descriptions to set after the apply
+        id: board
+        if: steps.target.outputs.plan == 'true'
+        env:
+          GH_TOKEN: ${{ steps.board-token.outputs.token }}
+        run: |
+          uv run --no-project scripts/board_options.py plan --out tofu/board-plan.json \
+            --summary "$RUNNER_TEMP/board.md"
+          if [ "$(jq '.changes | length' tofu/board-plan.json)" != "0" ]; then
+            echo "changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changes=false" >> "$GITHUB_OUTPUT"
+          fi
       # As in pr-plan: a failed check block becomes an annotation and a line in the summary.
       - name: Check warnings
         if: steps.target.outputs.plan == 'true'
@@ -315,6 +347,7 @@ jobs:
         env:
           CHANGES: ${{ steps.plan.outputs.changes }}
           MODE_CHANGES: ${{ steps.modes.outputs.changes }}
+          BOARD_CHANGES: ${{ steps.board.outputs.changes }}
           SHA: ${{ steps.target.outputs.sha }}
           PLAN_URL: ${{ steps.full-plan.outputs.artifact-url }}
         run: |
@@ -324,8 +357,8 @@ jobs:
             echo
             if [ "$CHANGES" = "true" ]; then
               echo "**$(grep -E '^Plan:' "$RUNNER_TEMP/plan.txt" | head -1)** The apply job waits for the owner's approval (Review deployments)."
-            elif [ "$MODE_CHANGES" = "true" ]; then
-              echo "**No OpenTofu changes, but modes to set (below).** The apply job waits for the owner's approval (Review deployments)."
+            elif [ "$MODE_CHANGES" = "true" ] || [ "$BOARD_CHANGES" = "true" ]; then
+              echo "**No OpenTofu changes, but modes or board descriptions to set (below).** The apply job waits for the owner's approval (Review deployments)."
             else
               echo "No changes. Nothing to approve."
             fi
@@ -334,21 +367,25 @@ jobs:
             echo
             cat "$RUNNER_TEMP/modes.md"
             echo
+            cat "$RUNNER_TEMP/board.md"
+            echo
           } > "$head"
           # Whole if it fits in a step summary, otherwise cut as on a pull request (truncate-long-plans D1-D4).
           uv run --no-project scripts/plan_comment.py --target summary --head "$head" \
             --plan "$RUNNER_TEMP/plan.txt" --plan-url "$PLAN_URL" --out "$RUNNER_TEMP/summary.md"
           cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Keep the saved plan for the apply job
-        if: steps.plan.outputs.changes == 'true' || steps.modes.outputs.changes == 'true'
+        if: steps.plan.outputs.changes == 'true' || steps.modes.outputs.changes == 'true' || steps.board.outputs.changes == 'true'
         # Encrypted with the state passphrase, and it holds no key (design D3). The mode plan holds
-        # only paths, modes and blob ids.
+        # only paths, modes and blob ids; the board plan only the board's options as read and the
+        # descriptions to set.
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: main-tfplan
           path: |
             tofu/main.tfplan
             tofu/mode-plan.json
+            tofu/board-plan.json
           retention-days: 1
           if-no-files-found: error
 
@@ -485,3 +522,43 @@ jobs:
         run: >-
           uv run --no-project scripts/commit_state.py --repo "$GITHUB_REPOSITORY" --branch main
           --path tofu/terraform.tfstate --planned "$SHA" --run-url "$RUN_URL"
+
+  # The board's descriptions the approved plan listed, set with the troupe-run-board App's token,
+  # whose key only infrastructure's main-only board environment holds (spec: labels, board-credentials;
+  # board-capability-descriptions design D1). The owner approved them with the plan; this job asks
+  # nothing more. Only after an apply that succeeded, as the modes are (executable-hooks design D4).
+  # board_options.py refuses a field that changed since the plan, and an option without its id.
+  board:
+    name: board descriptions (main)
+    needs: [plan, apply]
+    if: needs.apply.result == 'success' && needs.plan.outputs.board_changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: board
+      deployment: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: main-tfplan
+          path: tofu
+      - name: Token for the board
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.BOARD_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BOARD_APP_PRIVATE_KEY }}
+          owner: troupe-run
+          permission-organization-projects: write
+      - name: Set the board's descriptions as the board App
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+        run: uv run --no-project scripts/board_options.py apply --board-plan tofu/board-plan.json

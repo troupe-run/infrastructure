@@ -62,7 +62,7 @@
 
 ## 4. The workflow
 
-- [ ] 4.1 In `.github/workflows/tofu.yml` (design D1): the `plan` job mints a read-only infrastructure App token
+- [x] 4.1 In `.github/workflows/tofu.yml` (design D1): the `plan` job mints a read-only infrastructure App token
       (`permission-organization-projects: read`) and runs `board_options.py plan` into `tofu/board-plan.json`, adds
       its summary under the OpenTofu plan, counts its changes in the `changes` output and the approval line, and
       carries the file in `main-tfplan`. A new `board` job, `needs: [plan, apply]`, runs only when the apply succeeded
@@ -70,9 +70,15 @@
       (`permission-organization-projects: write`), and runs `board_options.py apply`. Update the header diagram.
       Verify with workflow tests beside the existing ones for `tofu.yml` (the `board` job's environment, condition,
       token permission and `needs`; the plan token is read only), then `uv run scripts/check.py` passes
-- [ ] 4.2 Update `docs/standard-changes.md`'s capability-label steps (design D5): step 6 has the owner add the option
+      Done 2026-10-26: the plan job's `board-token` (infrastructure App, projects: read) and `board` steps, the
+      summary, `changes`/`board_changes` outputs and the artifact; the `board` job as designed. `test_board_job.py`
+      checks both parts and names each of 14 ways of breaking them; 16 passed, the existing `tofu.yml` tests pass,
+      and `actionlint` is clean. The header diagram has the `board` row
+- [x] 4.2 Update `docs/standard-changes.md`'s capability-label steps (design D5): step 6 has the owner add the option
       with its label's description, and step 7 checks the next apply's `board` job left nothing for the drift check.
       Verify the checklist at the end of the section says the same
+      Done 2026-10-26: step 6 adds the option with the label's description and says the `board` job sets it
+      otherwise; step 7 checks the drift check reports nothing about the board; checklist items 6 and 7 say the same
 
 ## Workflow follow-up
 
