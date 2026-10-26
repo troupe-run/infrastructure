@@ -11,6 +11,11 @@ tofu/, org-profile/ and every file the guard delivers, and a list of those would
 each new delivery. So a path nobody thought about plans, and a mistake costs one approval rather
 than a pull request merged without its plan. An empty list plans too.
 
+The Python tooling's `pyproject.toml` and `uv.lock` are on the list because the tofu workflow runs
+every script with `uv run --no-project`, which reads neither, so they can't change what a plan or
+an apply runs (skip-plan-python-tooling, design D1 and D3). The provider lockfile,
+tofu/.terraform.lock.hcl, is read by OpenTofu and plans.
+
 Standard library only: the job runs it with the runner's python3, before anything is installed.
 """
 
@@ -25,6 +30,10 @@ NEVER_READ = (
     "scripts/tests/",
     "README.md",
     "CLAUDE.md",
+    # The Python tooling's dependencies, at the root only: no step of the tofu workflow runs in
+    # the project's environment (a test in test_plan_needed.py checks it).
+    "pyproject.toml",
+    "uv.lock",
 )
 
 

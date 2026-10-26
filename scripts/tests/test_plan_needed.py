@@ -56,7 +56,17 @@ def test_a_pull_request_of_only_never_read_files_isn_t_planned() -> None:
         "scripts/tests/test_x.py",
         "README.md",
         "CLAUDE.md",
+        "pyproject.toml",
+        "uv.lock",
     ]
+    assert not plan_needed.plan_needed(changed)
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [["uv.lock"], ["pyproject.toml", "uv.lock"], ["pyproject.toml", "uv.lock", "docs/x.md"]],
+)
+def test_a_python_tooling_bump_at_the_root_isn_t_planned(changed: list[str]) -> None:
     assert not plan_needed.plan_needed(changed)
 
 
@@ -77,6 +87,21 @@ def test_a_path_is_matched_by_prefix_or_whole_name_not_substring(path: str) -> N
     assert plan_needed.plan_needed([path])
 
 
+@pytest.mark.parametrize(
+    "changed",
+    [["tofu/.terraform.lock.hcl"], ["tofu/.terraform.lock.hcl", "uv.lock"]],
+)
+def test_the_provider_lockfile_plans_alone_or_with_the_python_lockfile(changed: list[str]) -> None:
+    assert plan_needed.plan_needed(changed)
+
+
+@pytest.mark.parametrize(
+    "path", ["scripts/pyproject.toml", "tofu/uv.lock", "uv.lock.bak", "pyproject.toml.orig"]
+)
+def test_a_python_tooling_file_outside_the_root_or_renamed_plans(path: str) -> None:
+    assert plan_needed.plan_needed([path])
+
+
 def test_a_new_top_level_directory_plans() -> None:
     assert plan_needed.plan_needed(["infra2/main.tf"])
 
@@ -93,3 +118,5 @@ def test_the_script_prints_a_github_output_line() -> None:
 
     assert run("docs/a.md\nREADME.md\n") == "plan=false\n"
     assert run("docs/a.md\ntofu/org.tf\n") == "plan=true\n"
+    assert run("uv.lock\npyproject.toml\n") == "plan=false\n"
+    assert run("uv.lock\ntofu/.terraform.lock.hcl\n") == "plan=true\n"
