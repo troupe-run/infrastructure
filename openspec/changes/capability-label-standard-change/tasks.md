@@ -43,11 +43,11 @@
 
 ## 5. After #151, before the merge
 
-- [ ] 5.1 Once #151 has merged and its apply has run, rebase onto `origin/main` and run `uv run scripts/oob.py`.
+- [x] 5.1 Once #151 has merged and its apply has run, rebase onto `origin/main` and run `uv run scripts/oob.py`.
       Verify it reports only board options, and list them on the pull request for the owner to fix in the board's
       field settings. After the owner has, verify `oob.py` reports nothing for the board's capabilities, and that the
       21 cards that set the field keep their values (`gh project item-list 1 --owner troupe-run`)
-- [ ] 5.2 Run `openspec validate capability-label-standard-change --strict` and `uv run scripts/check.py` on the
+- [x] 5.2 Run `openspec validate capability-label-standard-change --strict` and `uv run scripts/check.py` on the
       rebased branch, and verify both pass
 
 ## Workflow follow-up
