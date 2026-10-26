@@ -1,5 +1,6 @@
-# The guard's files in the repositories it governs, whose source is this repository (spec:
-# guard-delivery, design D2). The App commits them straight to main.
+# The files every governed repository runs from here: the guard's, and Claude's review workflow
+# (spec: pr-review; claude-pr-review design D6). Their source is this repository (spec:
+# guard-delivery, design D2), and the App commits them straight to main.
 
 locals {
   # Each governed repository other than this one, which is the source. A repository joins only
@@ -15,6 +16,8 @@ locals {
     ".githooks/pre-push",
     ".claude/settings.json",
     ".github/workflows/guard.yml",
+    # Claude's pull request review (spec: pr-review).
+    ".github/workflows/claude-review.yml",
   ])
 
   # The list a receiving repository holds (spec: guard-delivery). Generated from guard_files, so it

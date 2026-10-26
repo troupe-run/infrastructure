@@ -128,8 +128,10 @@ post inline comments for specific lines and one top-level summary, and to say pl
 ### D6. Delivered with the guard's files
 
 Add `.github/workflows/claude-review.yml` to `guard_files`. Delivery, the delivered list, drift and the delivered-file
-rule then all apply without new code. The file starts with the delivered-file source line, as `guard.yml` does. It
-isn't added to `DEPENDS_ON` in `scripts/guard_tests_needed.py`, because the guard's tests don't read it. `guard_files`'
+rule then all apply without new code. The file starts with the delivered-file source line, as `guard.yml` does. It's
+added to `DEPENDS_ON` in `scripts/guard_tests_needed.py` too, although the guard's tests don't read it:
+`test_every_file_the_guard_delivers_needs_them` requires every delivered file there, so that a change to one runs every
+leg before it's delivered. The design first left it out, and that test caught it in apply (2026-10-26). `guard_files`'
 comment widens from "the guard's files" to "the files every governed repository runs from here". The
 `guard-delivery` spec's requirements already speak of "each delivered file", so no requirement changes.
 
