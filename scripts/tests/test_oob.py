@@ -56,6 +56,10 @@ MILESTONES = {
     ],
 }
 DECLARED_MILESTONES = ["0.1.0", "0.2.0"]
+BOARD: dict[str, Any] = {
+    "__typename": "ProjectV2SingleSelectField",
+    "options": [{"name": "cli"}, {"name": "cues"}],
+}
 
 
 @pytest.fixture
@@ -92,6 +96,7 @@ def fake_github(
     graphs: dict[str, BaseException] | None = None,
     milestones: dict[str, Any] | None = None,
     failures: dict[str, BaseException] | None = None,
+    board: dict[str, Any] | BaseException = BOARD,
 ) -> oob.Fetch:
     """GitHub as declared. attachments maps a repository to its attachment (None: 204, nothing
     attached); graphs maps a repository to what reading its dependency graph raises; failures
@@ -107,6 +112,10 @@ def fake_github(
         for piece, failure in (failures or {}).items():
             if piece in args[1]:
                 raise failure
+        if args[1] == "graphql" and "projectV2(number:" in " ".join(args):
+            if isinstance(board, BaseException):
+                raise board
+            return board
         if "/milestones?" in args[1]:
             found = milestone_titles.get(args[1].split("/")[2], DECLARED_MILESTONES)
             if isinstance(found, BaseException):
@@ -443,6 +452,7 @@ def test_every_github_call_is_a_read() -> None:
         ("attachment", oob.attachment_gh_args("troupe")),
         ("sbom", oob.sbom_gh_args("troupe")),
         ("milestones", oob.milestones_gh_args("troupe")),
+        ("board", oob.BOARD_GH_ARGS),
     ]:
         assert args[0] == "api"
         assert not write_flags & set(args), name
@@ -644,9 +654,9 @@ def test_a_projects_read_gh_fails_for_a_graphql_error_is_unreadable(oob_dir: Pat
     error = refused("gh: Resource not accessible by integration")
     report = REPORT(fake_github(TYPES, PROJECTS, [], failures={"graphql": error}), oob_dir)
     assert report.differences == []
-    assert len(report.unreadable) == 1
-    assert report.unreadable[0].startswith("projects:")
-    assert "Resource not accessible by integration" in report.unreadable[0]
+    # The board's Capability field is read through GraphQL too, so it is unreadable alongside.
+    assert [line.split(":")[0] for line in report.unreadable] == ["projects", "board capabilities"]
+    assert all("Resource not accessible by integration" in line for line in report.unreadable)
 
 
 def test_two_factor_hidden_from_the_token_is_unreadable_not_a_difference(oob_dir: Path) -> None:
@@ -728,6 +738,7 @@ EVERY_CHECK = [
     "troupe label descriptions",
     "code security",
     "milestones",
+    "board capabilities",
 ]
 
 
@@ -827,3 +838,61 @@ def test_a_hand_run_writes_no_annotations_and_no_summary(
     assert code == 1
     assert "::error" not in capsys.readouterr().out
     assert not summary.exists()
+
+
+# capability-label-standard-change design D4: the board's Capability options, both ways against
+# the declared cap: labels, which the owner changes in the field's settings.
+
+
+def board(*names: str) -> dict[str, Any]:
+    return {**BOARD, "options": [{"name": n} for n in names]}
+
+
+def test_a_declared_label_with_no_board_option_is_reported(oob_dir: Path) -> None:
+    assert RUN(fake_github(TYPES, PROJECTS, [], board=board("cli")), oob_dir) == [
+        "board capabilities: cap:cues has no 'cues' option in the troupe roadmap board's "
+        "Capability field; the owner adds it in the field's settings"
+    ]
+
+
+def test_a_board_option_with_no_declared_label_is_reported(oob_dir: Path) -> None:
+    found = RUN(fake_github(TYPES, PROJECTS, [], board=board("cli", "cues", "lifecycle")), oob_dir)
+    assert found == [
+        "board capabilities: the troupe roadmap board's Capability field has a 'lifecycle' "
+        "option, but no cap:lifecycle is declared in tofu/labels/troupe.json; the owner removes "
+        "it in the field's settings, or the label is declared"
+    ]
+
+
+def test_board_options_matching_the_labels_report_nothing(oob_dir: Path) -> None:
+    calls: list[list[str]] = []
+    assert RUN(fake_github(TYPES, PROJECTS, calls, board=board("cues", "cli")), oob_dir) == []
+    assert oob.BOARD_GH_ARGS in calls
+
+
+def test_a_board_with_no_capability_field_is_a_difference_naming_it(oob_dir: Path) -> None:
+    # What gh prints when the board has no field of that name (checked on 2026-10-26).
+    missing = refused(
+        "gh: Could not resolve to a Unions::ProjectV2FieldConfiguration with the name Capability"
+    )
+    assert RUN(fake_github(TYPES, PROJECTS, [], board=missing), oob_dir) == [
+        "board capabilities: the troupe roadmap board has no 'Capability' field; "
+        "the owner adds it as a single select whose options are the cap: labels' names"
+    ]
+
+
+def test_a_capability_field_that_isn_t_a_single_select_is_a_difference(oob_dir: Path) -> None:
+    text = {"__typename": "ProjectV2Field"}
+    assert RUN(fake_github(TYPES, PROJECTS, [], board=text), oob_dir) == [
+        "board capabilities: the troupe roadmap board's 'Capability' field is a ProjectV2Field, "
+        "not a single select"
+    ]
+
+
+def test_a_board_that_can_t_be_read_is_unreadable_not_a_difference(oob_dir: Path) -> None:
+    error = refused("gh: Resource not accessible by integration")
+    report = REPORT(fake_github(TYPES, PROJECTS, [], board=error), oob_dir)
+    assert report.differences == []
+    assert len(report.unreadable) == 1
+    assert report.unreadable[0].startswith("board capabilities:")
+    assert "Resource not accessible by integration" in report.unreadable[0]

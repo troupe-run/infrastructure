@@ -422,6 +422,58 @@ def undeclared_milestones(fetch: Fetch, root: Path) -> list[str]:
     return found
 
 
+# The troupe roadmap board's Capability field holds troupe's capabilities a second time, so its
+# options are checked both ways against the declared cap: labels (spec: labels;
+# capability-label-standard-change design D4). OpenTofu can't manage a Projects v2 field, and
+# changing its options is the owner's, in the field's settings.
+BOARD = "troupe roadmap"
+BOARD_FIELD = "Capability"
+BOARD_GH_ARGS = [
+    "api",
+    "graphql",
+    "-f",
+    f'query={{organization(login:"{ORG}"){{projectV2(number:1){{field(name:"{BOARD_FIELD}")'
+    "{__typename ... on ProjectV2SingleSelectField{options{name}}}}}}",
+    "--jq",
+    ".data.organization.projectV2.field",
+]
+# What gh prints when the board has no field of that name: a GraphQL NOT_FOUND, so gh exits 1.
+NO_SUCH_FIELD = "Could not resolve to a Unions::ProjectV2FieldConfiguration"
+
+
+def board_capabilities(fetch: Fetch, root: Path) -> list[str]:
+    """Each declared cap: label with no option on the board, and each option with no label."""
+    try:
+        field = fetch(BOARD_GH_ARGS)
+    except subprocess.CalledProcessError as error:
+        if NO_SUCH_FIELD not in str(error.stderr):
+            raise
+        return [
+            f"board capabilities: the {BOARD} board has no {BOARD_FIELD!r} field; the owner adds "
+            "it as a single select whose options are the cap: labels' names"
+        ]
+    if field.get("__typename") != "ProjectV2SingleSelectField":
+        return [
+            f"board capabilities: the {BOARD} board's {BOARD_FIELD!r} field is a "
+            f"{field.get('__typename')}, not a single select"
+        ]
+    labels = json.loads((root / TROUPE_LABELS).read_text())
+    declared = {label["name"].removeprefix("cap:") for label in labels}
+    options = {option["name"] for option in field["options"]}
+    found = [
+        f"board capabilities: cap:{name} has no {name!r} option in the {BOARD} board's "
+        f"{BOARD_FIELD} field; the owner adds it in the field's settings"
+        for name in sorted(declared - options)
+    ]
+    found += [
+        f"board capabilities: the {BOARD} board's {BOARD_FIELD} field has a {name!r} option, "
+        f"but no cap:{name} is declared in {TROUPE_LABELS}; the owner removes it in the field's "
+        "settings, or the label is declared"
+        for name in sorted(options - declared)
+    ]
+    return found
+
+
 def differences(name: str, key: str, declared: list[Record], actual: list[Record]) -> list[str]:
     """Every item missing, extra or changed, in a stable order."""
     want = {item[key]: item for item in declared}
@@ -528,6 +580,7 @@ def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT) -> Report:
         )
     report.attempt("code security", lambda: code_security(fetch, oob_dir))
     report.attempt("milestones", lambda: undeclared_milestones(fetch, root))
+    report.attempt("board capabilities", lambda: board_capabilities(fetch, root))
     return report
 
 
