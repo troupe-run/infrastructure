@@ -116,10 +116,13 @@ does, or what it shows instead.
 
 ### 6. The board's option, then the merge (the owner)
 
-Just before merging, the owner adds `<name>` to the `Capability` field in the troupe roadmap board's settings.
-Changing a field's options is owner-only, and done in the settings rather than through the API, which replaces the
-whole option list. It comes before the merge because the drift check runs straight after it and compares the field
-with the declared labels: added later, that run would go red and hide any other drift (#132).
+Just before merging, the owner adds `<name>` to the `Capability` field in the troupe roadmap board's settings, with
+the label's description, copied from the pull request. Adding or removing a field's options is owner-only, and done
+in the settings rather than through the API, which replaces the whole option list. It comes before the merge because
+the drift check runs straight after it and compares the field's options and their descriptions with the declared
+labels: added later, or without the description, that run would go red and hide any other drift (#132). If the
+description is left out or differs, the plan made at the merge lists it, and the apply's `board` job sets it from
+the label (spec: labels).
 
 Then the owner merges by rebase, reads the `plan (main)` plan, and approves the apply.
 
@@ -133,7 +136,8 @@ gh issue view <n> -R troupe-run/<repo> --json labels
 ```
 
 The first shows the label exists, the second names the needing issue, and the last shows it carries the label beside
-its others. Then check the sub-issue is closed (`gh issue close <sub> -R troupe-run/infrastructure` if the merge
+its others. The `drift (out of band)` job of that run, or `uv run scripts/oob.py`, should report nothing about the
+board: the option is there with the label's description, set by the owner in step 6 or by the `board` job. Then check the sub-issue is closed (`gh issue close <sub> -R troupe-run/infrastructure` if the merge
 didn't), and its card says Done:
 
 ```sh
@@ -159,6 +163,6 @@ Needed by troupe-run/<repo>#<n>. Made from docs/standard-changes.md ("A capabili
 - [ ] 3. Worktree and branch `add-cap-<name>-label`; card In Progress
 - [ ] 4. Change `add-cap-<name>-label` proposed, applied and archived; `check.py` and `oob.py` clean but for the board option
 - [ ] 5. Pull request opened after the archive; its plan shows only the label added
-- [ ] 6. Owner: `<name>` added to the board's Capability field, then merged and applied
-- [ ] 7. Label on troupe-run/<repo>#<n>; this issue closed and Done; comment with the pull request and the archived change
+- [ ] 6. Owner: `<name>` added to the board's Capability field with the label's description, then merged and applied
+- [ ] 7. Label on troupe-run/<repo>#<n>; the drift check reports nothing about the board; this issue closed and Done; comment with the pull request and the archived change
 ```
