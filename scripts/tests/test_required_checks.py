@@ -19,6 +19,8 @@ import pytest
 import yaml
 from conftest import REPO
 
+import plan_target
+
 pytestmark = pytest.mark.tofu
 
 CHECKS = REPO / "tofu" / "required-checks.json"
@@ -286,13 +288,14 @@ def ci_trigger_problems(ci: dict[Any, Any], tofu: dict[Any, Any]) -> list[str]:
         problems.append(f"push runs on {push.get('branches')!r}, not ['main']")
     if push.get("paths-ignore") != [STATE_FILE]:
         problems.append(f"push ignores {push.get('paths-ignore')!r}, not [{STATE_FILE!r}]")
-    skip = [
+    # The skip lives in scripts/plan_target.py (plan-each-merge-once design D2).
+    runs_target = [
         step
         for step in tofu["jobs"]["plan"]["steps"]
-        if step.get("name") == "Skip the App's own state commit"
+        if "scripts/plan_target.py" in step.get("run", "")
     ]
-    if not skip or STATE_FILE not in skip[0]["run"]:
-        problems.append(f"tofu.yml's state-commit skip doesn't read {STATE_FILE}")
+    if not runs_target or plan_target.STATE_PATH != STATE_FILE:
+        problems.append(f"tofu.yml's state-commit skip (plan_target.py) doesn't read {STATE_FILE}")
     return problems
 
 
@@ -340,6 +343,23 @@ def test_a_state_path_that_tofu_yml_doesn_t_skip_is_named() -> None:
     events(workflows["ci.yml"])["push"]["paths-ignore"] = ["tofu/state.tfstate"]
     assert ci_trigger_problems(workflows["ci.yml"], workflows["tofu.yml"]) == [
         "push ignores ['tofu/state.tfstate'], not ['tofu/terraform.tfstate']"
+    ]
+
+
+def test_a_state_path_the_plan_target_doesnt_skip_is_named(monkeypatch: pytest.MonkeyPatch) -> None:
+    workflows = real_workflows()
+    monkeypatch.setattr(plan_target, "STATE_PATH", "tofu/state.tfstate")
+    assert ci_trigger_problems(workflows["ci.yml"], workflows["tofu.yml"]) == [
+        "tofu.yml's state-commit skip (plan_target.py) doesn't read tofu/terraform.tfstate"
+    ]
+
+
+def test_a_plan_job_without_the_plan_target_is_named() -> None:
+    workflows = real_workflows()
+    steps = workflows["tofu.yml"]["jobs"]["plan"]["steps"]
+    steps[:] = [step for step in steps if "plan_target.py" not in step.get("run", "")]
+    assert ci_trigger_problems(workflows["ci.yml"], workflows["tofu.yml"]) == [
+        "tofu.yml's state-commit skip (plan_target.py) doesn't read tofu/terraform.tfstate"
     ]
 
 

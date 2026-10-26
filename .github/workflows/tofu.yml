@@ -12,6 +12,9 @@ name: tofu
 # within a day (spec: ci-apply). Beside each plan of main, the oob job checks what OpenTofu can't
 # manage (scripts/oob.py, oob/README.md), and fails on any difference.
 #
+# Each plan of main reads main's current state, whichever commit started the run, so a merge
+# another run already applied isn't planned again (scripts/plan_target.py; #167).
+#
 # Every job authenticates as the troupe-run-infrastructure App, through scripts/tofu.py, with the
 # secrets of its environment. The owner sets them from 1Password (README); none is in this file.
 on:
@@ -193,45 +196,46 @@ jobs:
       # (executable-hooks design D3).
       changes: ${{ steps.plan.outputs.changes == 'true' || steps.modes.outputs.changes == 'true' }}
       mode_repositories: ${{ steps.modes.outputs.repositories }}
-      sha: ${{ steps.sha.outputs.sha }}
+      sha: ${{ steps.target.outputs.sha }}
     env:
       TF_VAR_github_app_pem: ${{ secrets.TF_VAR_github_app_pem }}
       TF_VAR_state_passphrase: ${{ secrets.TF_VAR_state_passphrase }}
       TF_VAR_billing_email: ${{ secrets.TF_VAR_billing_email }}
       TF_VAR_cloudflare_api_token: ${{ secrets.TF_VAR_cloudflare_api_token }}
     steps:
-      - name: The commit to plan
-        id: sha
-        env:
-          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: echo "sha=${RUN_SHA:-$GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      # main as it is now, not when the run was triggered, with its history: a plan reads the state
+      # file of the commit it checks out, and that must be main's current state (spec: ci-apply).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.sha.outputs.sha }}
-          fetch-depth: 2
-      # Only after CI on a merge. A daily or manual run plans whatever main's head is: after an
-      # apply that is usually this very commit, and skipping it would leave drift unplanned.
-      - name: Skip the App's own state commit
-        id: skip
+          ref: main
+          fetch-depth: 0
+      # The commit with this run's declaration and main's current state, or none (#167): main's
+      # head for a daily or manual run; after CI, the merge or the App's state commit after it. It
+      # never plans the App's own state commit after CI, and says in the summary what it chose and
+      # why (scripts/plan_target.py; plan-each-merge-once design D1-D3).
+      - name: The commit to plan
+        id: target
         env:
           EVENT: ${{ github.event_name }}
-        run: |
-          author=$(git log -1 --format=%ae)
-          files=$(git diff-tree --no-commit-id --name-only -r HEAD)
-          if [ "$EVENT" = "workflow_run" ] && [ "$author" = "$STATE_AUTHOR" ] && [ "$files" = "tofu/terraform.tfstate" ]; then
-            echo "::notice::This commit is the App's state commit after an apply; nothing to plan."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
+          COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: >-
+          python3 scripts/plan_target.py --event "$EVENT" --commit "$COMMIT"
+          --state-author "$STATE_AUTHOR" --main origin/main --summary "$GITHUB_STEP_SUMMARY"
+          >> "$GITHUB_OUTPUT"
+      - name: Check out that commit
+        if: steps.target.outputs.plan == 'true'
+        env:
+          SHA: ${{ steps.target.outputs.sha }}
+        run: git checkout -q --detach "$SHA"
       - name: Wait for the guard check on this commit
-        if: steps.skip.outputs.skip == 'false'
+        if: steps.target.outputs.plan == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          SHA: ${{ steps.sha.outputs.sha }}
+          SHA: ${{ steps.target.outputs.sha }}
         run: |
-          # CI has passed (this run follows it); the guard is a separate workflow, delivered to troupe
-          # as it is, so it is checked here. An apply follows green CI and guard (design D1).
+          # After a merge, CI has passed (this run follows it); the guard is a separate workflow,
+          # delivered to troupe as it is, so it is checked here. It runs on the App's state commit's
+          # push too, which plan_target.py may name. An apply follows green CI and guard (design D1).
           for _ in $(seq 1 60); do
             result=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow guard.yml --commit "$SHA" \
               --event push --json status,conclusion --jq '.[0] | "\(.status) \(.conclusion)"')
@@ -244,17 +248,17 @@ jobs:
           echo "::error::guard didn't finish on $SHA within 10 minutes."
           exit 1
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-        if: steps.skip.outputs.skip == 'false'
+        if: steps.target.outputs.plan == 'true'
         with:
           python-version: "3.12"
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
-        if: steps.skip.outputs.skip == 'false'
+        if: steps.target.outputs.plan == 'true'
         with:
           tofu_version: ${{ env.OPENTOFU_VERSION }}
           tofu_wrapper: false
       - name: Plan
         id: plan
-        if: steps.skip.outputs.skip == 'false'
+        if: steps.target.outputs.plan == 'true'
         run: |
           uv run --no-project scripts/tofu.py init -input=false -no-color
           set +e
@@ -270,14 +274,14 @@ jobs:
       # No rendering of the plan holds a key: the App's, the DNS token or the state passphrase
       # (spec: state-and-apply; ephemeral-state-passphrase D2). Before anything else reads plan.json.
       - name: The plan holds no key
-        if: steps.skip.outputs.skip == 'false'
+        if: steps.target.outputs.plan == 'true'
         run: |
           uv run --no-project scripts/tofu.py show -json main.tfplan > "$RUNNER_TEMP/plan.json"
           uv run --no-project scripts/plan_secrets.py "$RUNNER_TEMP/plan.txt" "$RUNNER_TEMP/plan.json"
       # As in pr-plan: the whole plan, linked from the summary when it's too long to show.
       - name: Keep the full plan
         id: full-plan
-        if: steps.skip.outputs.skip == 'false'
+        if: steps.target.outputs.plan == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           path: ${{ runner.temp }}/plan.txt
@@ -287,7 +291,7 @@ jobs:
       # guard-delivery; executable-hooks design D1-D3). It only reads; the apply job sets them.
       - name: Modes to set after the apply
         id: modes
-        if: steps.skip.outputs.skip == 'false'
+        if: steps.target.outputs.plan == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -302,16 +306,16 @@ jobs:
           fi
       # As in pr-plan: a failed check block becomes an annotation and a line in the summary.
       - name: Check warnings
-        if: steps.skip.outputs.skip == 'false'
+        if: steps.target.outputs.plan == 'true'
         run: |
           uv run --no-project scripts/plan_checks.py --plan-json "$RUNNER_TEMP/plan.json" \
             --summary "$RUNNER_TEMP/checks.md"
       - name: Show the plan for approval
-        if: steps.skip.outputs.skip == 'false'
+        if: steps.target.outputs.plan == 'true'
         env:
           CHANGES: ${{ steps.plan.outputs.changes }}
           MODE_CHANGES: ${{ steps.modes.outputs.changes }}
-          SHA: ${{ steps.sha.outputs.sha }}
+          SHA: ${{ steps.target.outputs.sha }}
           PLAN_URL: ${{ steps.full-plan.outputs.artifact-url }}
         run: |
           head="$RUNNER_TEMP/head.md"
