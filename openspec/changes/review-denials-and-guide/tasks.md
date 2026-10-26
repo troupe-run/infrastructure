@@ -82,4 +82,6 @@
 - After the merge: the owner approves the apply. Check that `.github/workflows/claude-review.yml` in troupe and website
   matches the source (sha256), and that each delivery commit's checks pass.
 - Comment on #161 with the PR and the archived change, close it if the PR didn't, and set its card to Done.
-- #159 stays open. Its first reviews in troupe and website check this version, and its denial is named by it.
+- #159 stays open. Its first reviews in troupe and website check this version. Its denial item is done when they each
+  print `No tool call was refused.`, or any denial they name is explained there (owner, 2026-10-26). #157's denial
+  itself can't be recovered, and the guide's checkout may remove its likeliest cause, so it may never be named.
