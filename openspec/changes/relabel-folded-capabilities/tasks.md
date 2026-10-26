@@ -18,14 +18,16 @@
 
 ## 2. Relabel troupe's issues (design D2, D3 steps 2-5)
 
-- [ ] 2.1 Run the add commands from `relabel.md`, one `gh issue edit <n>... -R troupe-run/troupe --add-label
+- [x] 2.1 Run the add commands from `relabel.md`, one `gh issue edit <n>... -R troupe-run/troupe --add-label
   <label>` per label, in the shell. Verify against GitHub, re-reading every issue that carries a folded label, that
-  each carries every label its folded labels' specs name. Stop and record here if any doesn't.
-- [ ] 2.2 Run the remove commands from `relabel.md`, one `gh issue edit <n>... -R troupe-run/troupe --remove-label
+  each carries every label its folded labels' specs name. Stop and record here if any doesn't. Result: the 8 commands ran;
+  re-read from GitHub, no issue was missing a label
+- [x] 2.2 Run the remove commands from `relabel.md`, one `gh issue edit <n>... -R troupe-run/troupe --remove-label
   <folded>` per folded label. Verify that `gh issue list` and `gh pr list` with `--state all --label <l>` return
   nothing for each of the 13 labels, and that each edited issue's labels now equal its "before" labels minus its
   folded labels plus its additions (a script comparing GitHub with `relabel.md`). Record the result in `relabel.md`
-  and here, and commit it.
+  and here, and commit it. Result: the 12 commands ran (59 removals).
+  Each of the 13 labels is on 0 issues and 0 pull requests, and all 43 issues match `relabel.md`, with none wrong
 
 ## 3. Remove the 13 labels from the declaration (design D4, D5)
 

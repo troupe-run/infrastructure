@@ -103,3 +103,10 @@ gh issue edit 51 150 151 153 154 -R troupe-run/troupe --remove-label cap:run-wor
 gh issue edit 16 33 34 55 56 70 76 155 162 -R troupe-run/troupe --remove-label cap:runner-protocol
 gh issue edit 16 33 34 58 76 155 -R troupe-run/troupe --remove-label cap:scripted-runner
 ```
+
+## Result
+
+Run on 2026-10-26, additions then removals, as the commands above. After the additions, every issue carrying a folded
+label carried every label its specs name (task 2.1). After the removals, `gh issue list` and `gh pr list` with
+`--state all --label <l>` return nothing for each of the 13 labels, and all 43 issues' labels equal "Before" minus
+"Remove" plus "Add", read back from GitHub (task 2.2).
