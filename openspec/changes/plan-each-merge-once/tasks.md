@@ -6,7 +6,8 @@
       shows In Progress (2026-10-26)
 - [ ] 0.2 Owner: accept the one case that still plans nothing (design D1, Risks: state committed after a later merge,
       from an apply whose plan predates the earlier merge), and the deviation from #167's "plans nothing" (proposal).
-      Record the answer here before 2.1
+      Record the answer here before the pull request. (It was "before 2.1"; the answer changes only that one case
+      in the script, not the workflow's wiring, so 2.x went ahead.)
 
 ## 1. The decision script (design D1, D2)
 
@@ -27,18 +28,21 @@
 
 ## 2. The workflow (design D3)
 
-- [ ] 2.1 In `tofu.yml`'s `plan` job, replace "The commit to plan" and "Skip the App's own state commit" with: checkout
+- [x] 2.1 In `tofu.yml`'s `plan` job, replace "The commit to plan" and "Skip the App's own state commit" with: checkout
       of `main` (`fetch-depth: 0`), a step running `plan_target.py` (id `target`, passing `STATE_AUTHOR` and the
       event's commit), and `git checkout --detach` of its `sha` when `plan` is true. Point the job's `sha` output, the
       guard wait, the plan heading and every later step's `if` at the `target` step. Update the header comment and the
-      comment on the guard wait. Verify with `uv run scripts/check.py`
-- [ ] 2.2 Add a workflow test (in `test_plan_display_workflow.py`'s style, or a new `test_plan_target_workflow.py`):
+      comment on the guard wait. Verify with `uv run scripts/check.py`. Done: all gates passed. The script runs with
+      the runner's `python3`, as `plan_needed.py` does, since uv isn't set up yet
+- [x] 2.2 Add a workflow test (in `test_plan_display_workflow.py`'s style, or a new `test_plan_target_workflow.py`):
       the script runs before the checkout of its commit; every later step in `plan` is gated on its `plan` output; the
       `sha` output, the guard wait and the apply's checkout read its `sha`; no step reads
       `github.event.workflow_run.head_sha` but the script's. Parametrised mutations break each link and expect a named
-      problem. Verify the test passes, and that each mutation fails it
-- [ ] 2.3 Move `test_required_checks.py`'s state-commit check from the removed step to `plan_target.py`'s state-path
-      constant, still compared with CI's `paths-ignore`. Verify it passes, and fails when the constant changes
+      problem. Verify the test passes, and that each mutation fails it. Done: `test_plan_target_workflow.py`, 1 pass on
+      the real workflow and 13 mutations each caught
+- [x] 2.3 Move `test_required_checks.py`'s state-commit check from the removed step to `plan_target.py`'s state-path
+      constant, still compared with CI's `paths-ignore`. Verify it passes, and fails when the constant changes. Done:
+      22 passed, including a changed constant and a plan job without the script, each named
 
 ## 3. Docs
 

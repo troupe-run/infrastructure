@@ -1,8 +1,9 @@
 """Decide which commit a run on main plans, so every plan reads main's current state.
 
 Usage (in .github/workflows/tofu.yml's `plan` job, after a checkout of main with full history):
-    uv run --no-project scripts/plan_target.py --event "$EVENT" --commit "$COMMIT" \
-        --state-author "$STATE_AUTHOR" --summary "$GITHUB_STEP_SUMMARY" >> "$GITHUB_OUTPUT"
+    python3 scripts/plan_target.py --event "$EVENT" --commit "$COMMIT" \
+        --state-author "$STATE_AUTHOR" --main origin/main --summary "$GITHUB_STEP_SUMMARY" \
+        >> "$GITHUB_OUTPUT"
 
 Prints `sha=<commit>` and `plan=true`, or `sha=` and `plan=false`, and adds one line saying why to
 the summary. Spec: ci-apply ("A plan of main reads main's current state"); plan-each-merge-once
@@ -19,7 +20,7 @@ changes again (#167). So:
 - The App's own state commit is never planned after CI; CI doesn't run on it anyway.
 An unknown event, a commit that isn't a full sha, or one main doesn't contain, is refused.
 
-Standard library and git only.
+Standard library and git only: the job runs it with the runner's python3, before uv is set up.
 """
 
 import argparse
