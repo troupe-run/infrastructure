@@ -130,12 +130,11 @@ Entries are in the labels file's order for that repository, and keys are in a fi
   is then excluded on the next generation, and the freshness test fails until it's regenerated (spec).
 - **infrastructure has no `exclude-paths`.** It's the source, so its Dependabot bumps the actions these workflows pin.
   The next apply delivers the bump (#170, 5b).
-- **Unconfirmed: whether `github-actions` honours `exclude-paths`** (Context). Task 1.2 checks it on a throwaway
-  repository first, before anything depends on it. If it doesn't, the fallback is an `ignore` entry for each action
-  the delivered workflows pin, read from their `uses:` lines. Its cost is that troupe's and website's own workflows
-  then get no bump for those actions either: they'd be bumped by hand, or follow infrastructure's. The spec's
-  scenarios hold either way. Only the mechanism and the generator change, and design.md would record which one is
-  used.
+- **Confirmed on 2026-10-27: `github-actions` honours `exclude-paths`.** The probe (D6) had two workflows pinning
+  `actions/checkout@v3`, and `.github/workflows/delivered.yml` was listed in `exclude-paths`. Dependabot's only pull
+  request there (#1, `chore(deps): bump actions/checkout from 3 to 7`) changed `.github/workflows/own.yml` alone. So
+  `exclude-paths` is the mechanism, and the `ignore` fallback (an entry for each action the delivered workflows pin,
+  which would have stopped troupe's and website's own workflows getting those bumps too) isn't needed.
 
 ### D4. One resource delivers all three, and the delivered lists gain the path
 
@@ -167,22 +166,30 @@ delivery commit gets no skip.
 
 ### D6. OpenTofu providers: probe first, then add or record
 
-The probe runs on a throwaway repository, `troupe-run/infra-probe-dependabot-opentofu`. It holds:
-- a `.tf` file requiring `integrations/github` at an old version;
-- a `.terraform.lock.hcl` written by `tofu init`, with `registry.opentofu.org` providers;
-- a `dependabot.yml` with an `opentofu` entry.
+The probe ran on a throwaway private repository, `troupe-run/infra-probe-dependabot`, on 2026-10-26 and 27. It held:
+- `tofu/versions.tf` requiring `integrations/github`;
+- the `tofu/.terraform.lock.hcl` that `tofu init` writes, locking `registry.opentofu.org/integrations/github` at
+  6.2.0 (6.13.0 is current);
+- a `dependabot.yml` with an `opentofu` entry for `/tofu`, beside D3's `github-actions` check.
 
-Then trigger a run by enabling version updates, or from the Dependency graph's "Check for updates". Two outcomes:
+There were two outcomes to tell apart:
 
-- **It opens a pull request that changes the lockfile's hashes for the new version.** infrastructure's
-  `repositories` gains `opentofu`, with a declared `opentofu` label (`labels` spec; name, colour and description
-  chosen here, since Dependabot has no default for it), and the policy gets `"opentofu": "/tofu"`. Its pull requests
-  change `tofu/.terraform.lock.hcl`, so they keep the plan and apply approvals (#170, 5a).
-- **It doesn't**, or the lockfile's hashes are wrong or missing. No entry. `docs/development-workflow.md` says
-  provider updates are made by hand with `tofu init -upgrade`.
+- **A pull request that changes the lockfile's version and hashes:** infrastructure would get an `opentofu` entry,
+  with a declared label.
+- **No such pull request:** no entry, and the docs say provider updates are made by hand.
 
-The same probe repository checks D3's `exclude-paths` for `github-actions`: two workflows pinning an old
-`actions/checkout`, one of them excluded. It's deleted afterwards.
+**Result: no `opentofu` pull request, so no entry.**
+
+- **First run:** the constraint was `~> 6.2` with 6.2.0 locked. `github-actions` opened its pull request within 20
+  minutes, and `opentofu` opened none.
+- **Second run:** the constraint was pinned exactly to `6.2.0`, in both files, so an update had to change the
+  requirement. Changing the schedule to daily started another run, and after 15 minutes there was still no
+  `opentofu` pull request.
+
+Dependabot's job log is only on the repository's web page, which wasn't read, so why it proposed nothing is
+unknown. The spec's rule is "shown to update", and it wasn't. infrastructure's `repositories` keeps `github-actions`
+and `uv`, and `docs/development-workflow.md` says provider updates are made by hand with `tofu init -upgrade`. Such a
+change takes the full path, plan and apply approvals included (#170, 5a). The probe repository was deleted afterwards.
 
 ## Risks / Trade-offs
 
