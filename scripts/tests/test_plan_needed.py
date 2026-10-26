@@ -1,17 +1,22 @@
 """scripts/plan_needed.py plans every pull request that changes something OpenTofu reads (spec:
 ci-apply; required-checks design D2)."""
 
+import copy
 import re
 import subprocess
 import sys
+from typing import Any
 
 import pytest
+import yaml
 from conftest import REPO, SCRIPTS
 
 import plan_needed
 
 TOFU = REPO / "tofu"
 FILE_CALL = re.compile(r'file(?:set)?\("\$\{path\.module\}/([^"]*)"')
+TOFU_WORKFLOW = REPO / ".github" / "workflows" / "tofu.yml"
+UV_RUN = re.compile(r"\buv\s+run\b(.*)")
 
 
 def paths_opentofu_reads() -> set[str]:
@@ -120,3 +125,47 @@ def test_the_script_prints_a_github_output_line() -> None:
     assert run("docs/a.md\ntofu/org.tf\n") == "plan=true\n"
     assert run("uv.lock\npyproject.toml\n") == "plan=false\n"
     assert run("uv.lock\ntofu/.terraform.lock.hcl\n") == "plan=true\n"
+
+
+def tofu_workflow() -> dict[str, Any]:
+    loaded = yaml.safe_load(TOFU_WORKFLOW.read_text(encoding="utf-8"))
+    assert isinstance(loaded, dict)
+    return loaded
+
+
+def uv_runs(workflow: dict[str, Any]) -> list[tuple[str, str, bool]]:
+    """Each `uv run` in a step's `run` text, as (job, step, whether it passes --no-project).
+    Shell comment lines are left out. uv started another way (`uvx`, `uv tool run`) isn't seen."""
+    found = []
+    for job_id, job in workflow["jobs"].items():
+        for step in job.get("steps", []):
+            for line in str(step.get("run", "")).splitlines():
+                match = UV_RUN.search(line)
+                if match and not line.lstrip().startswith("#"):
+                    name = str(step.get("name", step.get("id", "?")))
+                    found.append((job_id, name, "--no-project" in match.group(1).split()))
+    return found
+
+
+def test_every_uv_run_in_the_tofu_workflow_passes_no_project() -> None:
+    """pyproject.toml and uv.lock are skipped only because no plan or apply step runs in the
+    project's environment (skip-plan-python-tooling design D3)."""
+    runs = uv_runs(tofu_workflow())
+    assert {job for job, _, _ in runs} >= {"pr-plan", "plan", "oob", "apply"}
+    in_project = [f"{job}: {step}" for job, step, no_project in runs if not no_project]
+    assert not in_project, (
+        f"tofu.yml runs uv in the project's environment ({', '.join(in_project)}), so uv.lock "
+        "would change what a plan or an apply runs. Pass --no-project to that step, or take "
+        "pyproject.toml and uv.lock out of NEVER_READ in scripts/plan_needed.py."
+    )
+
+
+def test_a_uv_run_without_no_project_is_reported_naming_its_job_and_step() -> None:
+    workflow = copy.deepcopy(tofu_workflow())
+    step = next(
+        s for s in workflow["jobs"]["apply"]["steps"] if "--no-project" in str(s.get("run"))
+    )
+    step["run"] = step["run"].replace("--no-project ", "", 1)
+    step["run"] += "\n# uv run scripts/x.py, a comment\n"
+    in_project = [(job, name) for job, name, no_project in uv_runs(workflow) if not no_project]
+    assert in_project == [("apply", str(step.get("name", step.get("id"))))]

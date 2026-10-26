@@ -20,18 +20,18 @@
 
 ## 3. Pin the --no-project premise (design D3)
 
-- [ ] 3.1 Add a test to `test_plan_needed.py` that parses `.github/workflows/tofu.yml` with PyYAML and checks that
+- [x] 3.1 Add a test to `test_plan_needed.py` that parses `.github/workflows/tofu.yml` with PyYAML and checks that
   every `uv run` in each step's `run` text passes `--no-project`, failing with the job, the step's name and D3's two
   ways out. Its docstring names the limit (`uvx`, `uv tool run` aren't caught). Verify it passes, that it finds at
   least one `uv run` in each of the `pr-plan`, `main-plan` and `apply` jobs (so it can't pass by finding none), and
   that deleting `--no-project` from one step in a scratch copy of the workflow makes it fail naming that step (check
-  by hand, then restore)
+  by hand, then restore). Result: `test_every_uv_run_in_the_tofu_workflow_passes_no_project` (21 `uv run`s, in `pr-plan`, `plan`, `oob` and `apply`: the main plan's job id is `plan`, not `main-plan`). The failure case is also a permanent test, `test_a_uv_run_without_no_project_is_reported_naming_its_job_and_step`, which also checks a commented-out `uv run` isn't counted. By hand: a scratch copy of `tofu.yml` with `--no-project` removed from the apply step reported `('apply', 'Apply the approved plan', False)`. 22 passed
 
 ## 4. Documentation
 
-- [ ] 4.1 Add `pyproject.toml` and `uv.lock` to README's list of files that skip the plan ("Open a pull request"),
+- [x] 4.1 Add `pyproject.toml` and `uv.lock` to README's list of files that skip the plan ("Open a pull request"),
   saying the provider lockfile is still planned. Verify `git grep -n "scripts/tests/\`, \`README.md\`" README.md`
-  shows the updated list and `uv run scripts/check.py` passes
+  shows the updated list and `uv run scripts/check.py` passes. Result: README.md:103 lists both; check: all gates passed
 
 ## 5. Verify on GitHub
 

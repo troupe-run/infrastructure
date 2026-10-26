@@ -106,8 +106,9 @@ is two approvals:
 
    The plan is a required check: the pull request can't merge until you've approved the run and the plan has
    succeeded. A pull request that changes only files OpenTofu never reads (`openspec/`, `docs/`, `oob/`,
-   `scripts/tests/`, `README.md`, `CLAUDE.md`; the list is in `scripts/plan_needed.py`) skips the plan, which counts
-   as passed and asks you for nothing. Anything else is planned, including a file the list doesn't know about.
+   `scripts/tests/`, `README.md`, `CLAUDE.md`, and the Python tooling's `pyproject.toml` and `uv.lock`; the list is
+   in `scripts/plan_needed.py`) skips the plan, which counts as passed and asks you for nothing. Anything else is
+   planned, including a file the list doesn't know about and the provider lockfile, `tofu/.terraform.lock.hcl`.
 2. **Merge.** Once CI and `guard` pass on `main`, the `plan (main)` job plans unattended and shows the plan in the
    run's summary, with any delivered file's mode to set below it ("Delivering the guard"). A plan with neither ends
    there.
