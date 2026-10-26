@@ -20,14 +20,14 @@
 
 ## 3. The board check
 
-- [ ] 3.1 In `scripts/oob.py`, add the "board capabilities" check (design D4), with tests in
+- [x] 3.1 In `scripts/oob.py`, add the "board capabilities" check (design D4), with tests in
       `scripts/tests/test_oob.py` that fake the GraphQL answer: a declared label with no option and an option with no
       label each give a difference naming it and saying the owner changes the options; matching lists give none; a
       missing field or a non-single-select field is a difference naming the field; a failed read is unreadable, not a
       difference. Verify the tests pass, `uv run scripts/check.py` passes, and `uv run scripts/oob.py` on today's
       `main` lists `runs`, `user-docs` and the 12 spec-level labels as having no option, and nothing else for the
       board
-- [ ] 3.2 Add the board check's row to `oob/README.md`'s table: what it declares (derived from `troupe.json`), why
+- [x] 3.2 Add the board check's row to `oob/README.md`'s table: what it declares (derived from `troupe.json`), why
       OpenTofu can't manage it, how to read it, and that the owner changes options in the board's field settings.
       Verify `uv run scripts/check.py` passes
 
