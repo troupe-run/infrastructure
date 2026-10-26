@@ -57,6 +57,11 @@ TOOLS = {
     "Grep",
     "Glob",
 }
+# Settings from the user scope only, which the action writes itself: none from the repository, so
+# the guard's Claude Code hooks in .claude/settings.json don't load. They're written for an agent
+# in the owner's terminal, and they grant gh writes the review mustn't have (owner, 2026-10-26;
+# design D8).
+SETTING_SOURCES = "user"
 PINNED = re.compile(r"^[\w.-]+/[\w.-]+@[0-9a-f]{40}$")
 
 
@@ -68,10 +73,11 @@ def review() -> dict[str, Any]:
     return loaded
 
 
-def claude_args(inputs: dict[str, Any]) -> tuple[set[str], list[str]]:
-    """The allowed tools, and every other flag, in the action's claude_args."""
+def claude_args(inputs: dict[str, Any]) -> tuple[set[str], str | None, list[str]]:
+    """The allowed tools, the setting sources, and every other flag, in the action's claude_args."""
     words = shlex.split(str(inputs.get("claude_args", "")))
     tools: set[str] = set()
+    sources = None
     others = []
     i = 0
     while i < len(words):
@@ -80,10 +86,13 @@ def claude_args(inputs: dict[str, Any]) -> tuple[set[str], list[str]]:
             i += 2
         elif words[i] == "--max-turns" and i + 1 < len(words) and words[i + 1].isdigit():
             i += 2
+        elif words[i] == "--setting-sources" and i + 1 < len(words):
+            sources = words[i + 1]
+            i += 2
         else:
             others.append(words[i])
             i += 1
-    return tools, others
+    return tools, sources, others
 
 
 def problems(workflow: dict[str, Any]) -> list[str]:
@@ -141,11 +150,15 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         found.append(f"the action is given {name}")
     if not str(inputs.get("prompt", "")).strip():
         found.append("the action has no prompt, so nothing says what the review checks")
-    tools, others = claude_args(inputs)
+    tools, sources, others = claude_args(inputs)
+    if sources != SETTING_SOURCES:
+        found.append(f"Claude loads settings from {sources!r}, not {SETTING_SOURCES!r} only")
     if tools != TOOLS:
         found.append(f"Claude's tools add {sorted(tools - TOOLS)} and drop {sorted(TOOLS - tools)}")
     if others:
-        found.append(f"claude_args has {others!r} besides --allowedTools and --max-turns")
+        found.append(
+            f"claude_args has {others!r} besides --allowedTools, --max-turns and --setting-sources"
+        )
     if "--max-turns" not in str(inputs.get("claude_args", "")):
         found.append("claude_args has no --max-turns")
     return found
@@ -171,6 +184,12 @@ def action(w: dict[str, Any]) -> dict[str, Any]:
 
 def tools(w: dict[str, Any], change: str) -> None:
     action(w)["claude_args"] = str(action(w)["claude_args"]).replace("Bash(gh pr view:*)", change)
+
+
+def sources(w: dict[str, Any], change: str) -> None:
+    action(w)["claude_args"] = str(action(w)["claude_args"]).replace(
+        "--setting-sources user", change
+    )
 
 
 @pytest.mark.parametrize(
@@ -250,6 +269,9 @@ def tools(w: dict[str, Any], change: str) -> None:
             ),
             "no --max-turns",
         ),
+        (lambda w: sources(w, ""), "from None"),
+        (lambda w: sources(w, "--setting-sources user,project"), "from 'user,project'"),
+        (lambda w: sources(w, "--setting-sources project"), "from 'project'"),
     ],
 )
 def test_each_way_the_workflow_can_go_wrong_is_named(change: Any, named: str) -> None:  # noqa: ANN401

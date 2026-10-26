@@ -63,6 +63,23 @@ SHALL be limited to reading the pull request and commenting on it. The run SHALL
   commit SHA
 - **THEN** `scripts/check.py` fails, naming what changed
 
+### Requirement: The review loads no settings from the repository
+A review run SHALL load Claude Code settings from the user scope only, never from the repository's `.claude/`
+directory or a local settings file. So the guard's Claude Code hooks, which are written for an agent working in the
+owner's terminal, SHALL NOT run in it, and SHALL NOT widen the tools the review allows (owner, 2026-10-26).
+
+#### Scenario: The repository holds the guard's hooks
+- **WHEN** a pull request is reviewed in a repository whose `.claude/settings.json` holds the guard's hooks
+- **THEN** the review reads the diff and posts its comments, and none of the guard's hooks runs
+
+#### Scenario: A hook would grant a write
+- **WHEN** the review is asked to close or retitle the pull request
+- **THEN** it can't: no repository setting grants `gh pr close` or `gh pr edit`, and its tool list doesn't allow them
+
+#### Scenario: The settings are widened
+- **WHEN** a change makes the review load project or local settings
+- **THEN** `scripts/check.py` fails, naming the setting sources
+
 ### Requirement: The review's credential is an org secret set by hand
 The review SHALL authenticate to Claude with `CLAUDE_CODE_OAUTH_TOKEN`, an org Actions secret visible to troupe,
 infrastructure and website only. The owner SHALL set it from 1Password with a documented command that prints nothing.
