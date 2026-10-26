@@ -80,6 +80,12 @@ plan of `main`, the `drift (out of band)` job runs `scripts/oob.py --ci`, and fa
 can't manage ([oob/README.md](oob/README.md)). GitHub pauses a public repository's scheduled workflows after 60 days
 without activity in it. `gh workflow enable tofu.yml` turns the daily plan and that check back on.
 
+A merge is applied by its own run, the one that starts when CI passes on it. Every plan of `main` reads `main`'s
+current state, not the state of the commit that started the run (`scripts/plan_target.py`). So when another run gets
+there first, such as a daily run while CI is still going, the merge's own run plans the state that apply left. It
+shows no changes and asks for nothing. When state has been committed after a later merge, the earlier merge's run
+plans nothing, and the later one's run plans both. Each run's summary names the commit it planned and why.
+
 The schedule watch (`schedules.yml`, daily at 12:00 UTC) notices when that happens to a watched workflow in another
 repository, such as website's weekly link check: it opens an issue here, on the board, that names the workflow and the
 command that turns it back on. It can't notice this repository going quiet, since it's paused with it. GitHub doesn't

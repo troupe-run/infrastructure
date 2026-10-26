@@ -46,9 +46,10 @@
 
 ## 3. Docs
 
-- [ ] 3.1 README "Running a plan": which run applies a merge (its own run after CI, planning with `main`'s current
+- [x] 3.1 README "Running a plan": which run applies a merge (its own run after CI, planning with `main`'s current
       state; a scheduled run that got there first leaves it nothing to approve), and that a run's summary names the
-      commit it planned. Verify `uv run scripts/check.py --scope docs` passes, and the paragraph matches D1
+      commit it planned. Verify `uv run scripts/check.py --scope docs` passes, and the paragraph matches D1. Done:
+      the docs check passed
 
 ## 4. Evidence
 
