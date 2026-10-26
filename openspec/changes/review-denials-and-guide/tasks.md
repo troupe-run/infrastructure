@@ -92,4 +92,5 @@
 - Comment on #161 with the PR and the archived change, close it if the PR didn't, and set its card to Done.
 - #159 stays open. Its first reviews in troupe and website check this version. Its denial item is done when they each
   print `No tool call was refused.`, or any denial they name is explained there (owner, 2026-10-26). #157's denial
-  itself can't be recovered, and the guide's checkout may remove its likeliest cause, so it may never be named.
+  itself can't be recovered, and its cause is unknown: the guide's URL, which the checkout removes, or a command the
+  review isn't allowed, as both of #165's denials were. A refused attempt to run tests counts as explained.
