@@ -20,6 +20,8 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from board_options import description_changes
+
 # The Capability: line's reading is the guard's, so its shape lives in one place
 # (guard-capability-label-at-proposal design D6). capability_labels is re-exported for oob's tests.
 from guard import (
@@ -393,7 +395,9 @@ def undeclared_milestones(fetch: Fetch, root: Path) -> list[str]:
 # The troupe roadmap board's Capability field holds troupe's capabilities a second time, so its
 # options are checked both ways against the declared cap: labels (spec: labels;
 # capability-label-standard-change design D4). OpenTofu can't manage a Projects v2 field, and
-# changing its options is the owner's, in the field's settings.
+# adding or removing its options is the owner's, in the field's settings. Their descriptions are
+# the labels', set by the tofu workflow's board job after an approved apply
+# (scripts/board_options.py; board-capability-descriptions design D8).
 BOARD = "troupe roadmap"
 BOARD_FIELD = "Capability"
 BOARD_GH_ARGS = [
@@ -401,7 +405,7 @@ BOARD_GH_ARGS = [
     "graphql",
     "-f",
     f'query={{organization(login:"{ORG}"){{projectV2(number:1){{field(name:"{BOARD_FIELD}")'
-    "{__typename ... on ProjectV2SingleSelectField{options{name}}}}}}",
+    "{__typename ... on ProjectV2SingleSelectField{options{name description}}}}}}",
     "--jq",
     ".data.organization.projectV2.field",
 ]
@@ -410,7 +414,8 @@ NO_SUCH_FIELD = "Could not resolve to a Unions::ProjectV2FieldConfiguration"
 
 
 def board_capabilities(fetch: Fetch, root: Path) -> list[str]:
-    """Each declared cap: label with no option on the board, and each option with no label."""
+    """Each declared cap: label with no option on the board, each option with no label, and each
+    option whose description isn't its label's."""
     try:
         field = fetch(BOARD_GH_ARGS)
     except subprocess.CalledProcessError as error:
@@ -426,18 +431,24 @@ def board_capabilities(fetch: Fetch, root: Path) -> list[str]:
             f"{field.get('__typename')}, not a single select"
         ]
     labels = json.loads((root / TROUPE_LABELS).read_text())
-    declared = {label["name"].removeprefix("cap:") for label in labels}
+    declared = {label["name"].removeprefix("cap:"): label["description"] for label in labels}
     options = {option["name"] for option in field["options"]}
     found = [
         f"board capabilities: cap:{name} has no {name!r} option in the {BOARD} board's "
         f"{BOARD_FIELD} field; the owner adds it in the field's settings"
-        for name in sorted(declared - options)
+        for name in sorted(declared.keys() - options)
     ]
     found += [
         f"board capabilities: the {BOARD} board's {BOARD_FIELD} field has a {name!r} option, "
         f"but no cap:{name} is declared in {TROUPE_LABELS}; the owner removes it in the field's "
         "settings, or the label is declared"
-        for name in sorted(options - declared)
+        for name in sorted(options - declared.keys())
+    ]
+    found += [
+        f"board capabilities: the {BOARD} board's {BOARD_FIELD} option {change.name!r} has the "
+        f"description {change.before!r}, but cap:{change.name}'s is {change.after!r}; the next "
+        "approved apply of main sets it"
+        for change in description_changes(field["options"], declared)
     ]
     return found
 

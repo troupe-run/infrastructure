@@ -42,16 +42,23 @@
 
 ## 3. The drift check compares descriptions
 
-- [ ] 3.1 In `scripts/oob.py`, read `options{name description}` and report each option whose description differs from
+- [x] 3.1 In `scripts/oob.py`, read `options{name description}` and report each option whose description differs from
       its label's, using the same comparison as `board_options.py` (design D4, D8). Verify with tests in
       `scripts/tests/test_oob.py`: a stale description is reported naming the option and the board; matching
       descriptions report nothing; an option with no label gets only the existing "no label" difference. Then
       `uv run scripts/check.py` passes
-- [ ] 3.2 Run `uv run scripts/oob.py` locally. Verify it reports the 36 differing descriptions as differences and nothing
+      Done 2026-10-26: `oob.py` imports `description_changes` from `board_options.py`, so the two compare alike. The
+      test fixture's options now carry their labels' descriptions. Four tests added (stale reported naming the option
+      and board, matching reports nothing, no-label option gets only its existing difference, the query reads
+      `description`); `test_oob.py` 85 passed, ruff and `mypy --strict` clean
+- [x] 3.2 Run `uv run scripts/oob.py` locally. Verify it reports the 36 differing descriptions as differences and nothing
       else new about the board, and record the count here
-- [ ] 3.3 Update `oob/README.md`'s board row: descriptions are compared too, and set by the `tofu` workflow's `board`
+      Done 2026-10-26 with the owner's login: 36 differences, all "board capabilities: … option '<name>' has the
+      description …", one per option (35 blank, `infrastructure`'s longer text), and nothing else
+- [x] 3.3 Update `oob/README.md`'s board row: descriptions are compared too, and set by the `tofu` workflow's `board`
       job after an approved apply; options are still added and removed by the owner. Verify the row names the script
       and the spec
+      Done 2026-10-26: the row names `scripts/board_options.py`, the plan and the `board` job, and `spec: labels`
 
 ## 4. The workflow
 
