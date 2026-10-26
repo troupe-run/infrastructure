@@ -20,7 +20,9 @@ Checked against provider `integrations/github` 6.13.0 with `tofu providers schem
 | `tofu/labels/troupe.json` (derived) | the troupe roadmap board's `Capability` field: a single select whose options are exactly the declared `cap:*` names without the prefix. Both ways: a label with no option, and an option with no label, are each reported. The owner changes the options in the field's settings on GitHub, not through the API, which replaces the whole option list (spec: labels) | the provider supports only classic Projects, and changing a field's options is owner-only in the guard | `gh api graphql` (`projectV2(number: 1)`, `field(name: "Capability")`) |
 | `troupe-spec-purposes.json` | for each troupe spec, by its folder name, its Purpose without the `Capability:` line, verbatim. The descriptions of the labels it names were written from it. A Purpose that has changed, a spec with nothing recorded, and a record with no spec are each reported, naming the spec's labels. A change to the `Capability:` line alone isn't (spec: labels) | OpenTofu manages the descriptions but can't read troupe's specs to tell when one is out of date | the same `spec.md` reads as the row above |
 
-**A new capability's label** gets a description of 100 characters or fewer that says what the capability covers
+**A new capability's label** is added by the steps in
+[docs/standard-changes.md](../docs/standard-changes.md#a-capability-label), as a standard change. It gets a
+description of 100 characters or fewer that says what the capability covers
 (`scripts/tests/test_labels.py` refuses one that only repeats the name). A label's description covers every troupe
 spec that names it, so write it from those specs' Purposes. If nothing in troupe defines it yet, the description is
 `TBD`. **A new troupe spec** gets its Purpose recorded here by its folder name, without the `Capability:` line and with

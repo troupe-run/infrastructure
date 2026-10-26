@@ -296,6 +296,12 @@ other org-wide files (specs: `development-workflow`, `org-profile`).
   `scripts/tests/test_org_profile.py` checks each form's `type:` against `oob/issue-types.json`, and its labels
   against `tofu/labels/workflow.json`, which every managed repository gets.
 
+## Standard changes
+
+Some routine changes, such as a new troupe capability label, have their steps written once in
+[standard-changes.md](standard-changes.md), so they go the same way every time. They follow this workflow like any
+other change; what they add is the exact commands, and checks that refuse a wrong value.
+
 ## Dependabot pull requests
 
 Every managed repository has Dependabot alerts and security updates on (spec: `repositories`). When an alert has a
