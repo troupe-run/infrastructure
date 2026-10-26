@@ -124,6 +124,14 @@
       permission denial. Done: run 40291768742 (201f097) posted its summary as `troupe-run-review`, with
       `GITHUB_TOKEN` at Contents read and Metadata read only, 10 turns and 0 permission denials
 
+## 7. Reads stay inside the checkout (design D9)
+
+- [x] 7.1 Scope `Read`, `Grep` and `Glob` to `./**` and set `persist-credentials: false` on the checkout, pinned by
+      `test_claude_review_workflow.py` (mutations: bare `Read`, bare `Grep`, no `persist-credentials`, `true`). Verify
+      the scope locally (inside read, outside refused; bare `Read` reads outside), and that the tests and website's and
+      troupe's checks pass. Done (2026-10-26): the probe in D9; 55 tests pass; website's workflow test 8 passed, troupe's
+      check all gates passed. #157's review of this commit is checked for no permission denial before the merge
+
 ## Workflow follow-up
 
 These happen only after the merge and the apply, so they're bullets, not tasks: the change is archived before it
