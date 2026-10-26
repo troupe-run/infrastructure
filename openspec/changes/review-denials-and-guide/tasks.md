@@ -70,8 +70,10 @@
       report step printed `No tool call was refused.` or one warning per denial matching `permission_denials_count`,
       that it shows no other session output, and that the review's comments are by `troupe-run-review[bot]`. Record
       the run ID and what each check showed
-- [ ] 4.3 Run `tofu.py plan` against current state (fast-forward onto `origin/main` first). Verify it shows exactly
-      `.github/workflows/claude-review.yml` changing in troupe and in website, and nothing else
+- [x] 4.3 Run `tofu.py plan` against current state (fast-forward onto `origin/main` first). Verify it shows exactly
+      `.github/workflows/claude-review.yml` changing in troupe and in website, and nothing else. Done (2026-10-26,
+      rebased onto acb1af3, after the relabel's apply): 0 to add, 2 to change, 0 to destroy, both
+      `github_repository_file.guard["<repo>:.github/workflows/claude-review.yml"]`, sha `b2e1cc30b8fb` → `b115174636c1`
 
 ## Workflow follow-up
 
