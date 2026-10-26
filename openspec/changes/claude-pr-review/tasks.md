@@ -54,19 +54,19 @@
 
 ## 3. The credential (design D3)
 
-- [ ] 3.1 Add "The Claude review token (set up by hand)" to `oob/README.md`. It says: how to make it with
+- [x] 3.1 Add "The Claude review token (set up by hand)" to `oob/README.md`. It says: how to make it with
       `claude setup-token`, the 1Password item, D3's set command (read into a variable, then `&&`), the check by name
-      of the secret's repositories, the expiry date, rotation, and that no App is installed and why (design D1).
+      of the secret's repositories, that it lasts a year, rotation, and that no App is installed and why (design D1).
       Verify the commands match D3 exactly, and `uv run scripts/check.py` passes
-- [ ] 3.2 Owner: set the org secret with D3's command, before the pull request opens. Verify by name that its
-      repositories are exactly troupe, infrastructure and website
+- [ ] 3.2 Owner: set the org secret with D3's command, before the pull request opens, and note the token's expiry
+      date on #154. Verify by name that its repositories are exactly troupe, infrastructure and website
 
 ## 4. Delivery (design D6)
 
-- [ ] 4.1 Add `.github/workflows/claude-review.yml` to `guard_files` in `tofu/guard_delivery.tf`, and widen its
+- [x] 4.1 Add `.github/workflows/claude-review.yml` to `guard_files` in `tofu/guard_delivery.tf`, and widen its
       comment to "the files every governed repository runs from here". Verify `uv run scripts/check.py` passes
-      (tofu fmt, validate, `test_guard_delivery.py`), and that `scripts/guard_tests_needed.py`'s `DEPENDS_ON` is
-      unchanged
+      (tofu fmt, validate, `test_guard_delivery.py`), and that `test_needs_guard_tests.py` passes with the workflow
+      added to `scripts/guard_tests_needed.py`'s `DEPENDS_ON` (design D6)
 - [ ] 4.2 Fast-forward onto origin/main, then run a local plan, or read CI's plan on the pull request. Verify it shows
       exactly four changes: `claude-review.yml` created, and `.github/guard-delivery.json` updated, in each of troupe
       and website. Nothing for `.github`, and nothing destroyed. Read each target's current

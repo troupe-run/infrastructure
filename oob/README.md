@@ -198,6 +198,39 @@ gh api repos/troupe-run/infrastructure/environments/docs/secrets --jq '.secrets[
 commands above again. Then delete the old key in the App's settings. A run between the two steps still works, because
 both keys are valid until the old one is deleted.
 
+## The Claude review token (set up by hand)
+
+`.github/workflows/claude-review.yml` reviews each member's pull request in troupe, infrastructure and website with
+Claude (spec: pr-review, #154). It writes to GitHub only through the run's own `GITHUB_TOKEN`, so **no App is
+installed for it**, and `app-installations.json` has no entry. The Claude GitHub App's route would mint a token with
+"Contents: write" whatever the workflow's permissions say (claude-pr-review design D1). The one credential is
+Claude's own, `CLAUDE_CODE_OAUTH_TOKEN`. OpenTofu never holds a secret, so these steps are the owner's.
+
+**Creating it.** Run `claude setup-token` and sign in as the account the reviews are billed to. It prints a token
+that lasts a year. Store it in 1Password as an API Credential item named `troupe-run-claude-review`, field
+`credential`, in vault `troupe.run`. It's billed to that account's subscription and shares its usage limits.
+
+**Setting it.** It's one org Actions secret, visible to the three repositories only. It isn't in an environment,
+because the pull request runs that need it aren't on `main`. Nothing is printed:
+
+```sh
+export OP_ACCOUNT=l-a-u.1password.com
+# gh runs only once op has read the token, so a failed read can't set an empty secret.
+token=$(op read -n "op://troupe.run/troupe-run-claude-review/credential") &&
+  printf '%s' "$token" | gh secret set CLAUDE_CODE_OAUTH_TOKEN --org troupe-run \
+    --visibility selected --repos troupe,infrastructure,website
+unset token
+```
+
+Check it by name, never by value. It should list exactly `troupe`, `infrastructure` and `website`:
+
+```sh
+gh api orgs/troupe-run/actions/secrets/CLAUDE_CODE_OAUTH_TOKEN/repositories --jq '.repositories[].name'
+```
+
+**Rotating it.** Before it expires, run `claude setup-token` again, replace the 1Password item's credential, and run
+the set command above. An expired or missing token fails only the review, which isn't a required check.
+
 ## troupe.run's DNS (set up by hand)
 
 troupe.run is registered at Gandi and served by Cloudflare. `tofu/dns.tf` manages its records (spec: dns). The zone,

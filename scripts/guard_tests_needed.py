@@ -31,6 +31,9 @@ DEPENDS_ON = (
     ".githooks/",
     ".claude/settings.json",
     ".github/workflows/guard.yml",
+    # Delivered with the guard, so a change to it runs every leg before it's delivered (spec:
+    # pr-review), though the guard's tests don't read it.
+    ".github/workflows/claude-review.yml",
     # Its tests, what they share, and what they run with.
     "scripts/tests/test_guard_",
     "scripts/tests/conftest.py",
