@@ -5,7 +5,8 @@
 ### Requirement: A new capability label is a standard change
 A new troupe capability label SHALL be added by the standard steps written once in this repository, from a
 sub-issue that carries them as its checklist, so each label goes through the same steps. They SHALL leave to the
-owner only approving the pull request's plan, merging it, approving the apply, and adding the board's option.
+owner only approving the pull request's plan, adding the board's option just before merging, merging, and approving
+the apply.
 
 #### Scenario: The steps a label goes through
 - **WHEN** someone adds `cap:workspaces`, which troupe-run/troupe#42 needs
@@ -21,10 +22,15 @@ owner only approving the pull request's plan, merging it, approving the apply, a
 - **WHEN** the label is already declared on `main`, or an open issue or pull request already adds it
 - **THEN** the steps' first check finds it, and nothing is made
 
+#### Scenario: The board's option comes with the merge
+- **WHEN** the owner has approved the pull request's plan and is about to merge it
+- **THEN** the steps have the owner add `workspaces` to the board's `Capability` field first, so the drift check that
+  runs after the merge finds the label and the option both there
+
 #### Scenario: After the apply
 - **WHEN** the apply has created `cap:workspaces`
-- **THEN** troupe-run/troupe#42 gets the label with its other labels unchanged, the board's `Capability` field gets
-  the option, and the sub-issue is closed with its card Done and a comment naming the pull request and the change
+- **THEN** troupe-run/troupe#42 gets the label with its other labels unchanged, and the sub-issue is closed with its
+  card Done and a comment naming the pull request and the change
 
 ### Requirement: troupe's capability labels are declared in one form
 troupe's declared labels SHALL be in byte order by name, each `cap:*` name SHALL be `cap:` followed by lowercase
