@@ -26,11 +26,12 @@ CAP_LABELS = [
     {"name": "cap:cues", "color": "1D76DB", "description": "Capability: cues"},
 ]
 SPECS = ["cli"]
+# As troupe's specs carry it on main (troupe#170 design D2).
 CLI_SPEC = (
-    "# cli Specification\n\n## Purpose\n\nThe command line, a thin\nclient over the core.\n\n"
-    "## Requirements\n"
+    "# cli Specification\n\n## Purpose\n\nCapability: `cap:cli`\n\nThe command line, a thin\n"
+    "client over the core.\n\n## Requirements\n"
 )
-PURPOSES = {"cap:cli": "The command line, a thin client over the core."}
+PURPOSES = {"cli": "The command line, a thin client over the core."}
 BASELINE = {"name": "baseline", "enforcement": "unenforced", "dependency_graph": "enabled"}
 DEFAULTS = [{"name": "baseline", "default_for_new_repos": "public"}]
 ATTACHED = {"status": "attached", "configuration": "baseline"}
@@ -232,77 +233,183 @@ def test_an_app_installed_on_all_repos_is_reported(oob_dir: Path) -> None:
     ]
 
 
-def test_a_troupe_spec_with_no_cap_label_is_reported(oob_dir: Path) -> None:
-    found = RUN(fake_github(TYPES, PROJECTS, [], specs=["cli", "artifact-store"]), oob_dir)
-    assert found == [
-        "troupe specs: 'artifact-store' has no cap:artifact-store label; "
-        "add it to tofu/labels/troupe.json by pull request"
+# spec-capability-label-check design D1, D2: each spec names its labels in its Capability: line.
+
+
+def spec(*capability: str, purpose: str = "The command line, a thin client over the core.") -> str:
+    """A spec.md whose Purpose starts with the given lines, then the Purpose text."""
+    lines = "\n".join(capability)
+    return f"# x Specification\n\n## Purpose\n\n{lines}\n\n{purpose}\n\n## Requirements\n"
+
+
+def test_a_spec_without_a_label_is_reported(oob_dir: Path) -> None:
+    docs = {"cli": spec()}
+    assert RUN(fake_github(TYPES, PROJECTS, [], spec_docs=docs), oob_dir) == [
+        "troupe specs: 'cli' names no capability label; add a Capability: line as the first "
+        "line of its Purpose in troupe-run/troupe",
     ]
 
 
+def test_a_spec_naming_an_undeclared_label_is_reported(oob_dir: Path) -> None:
+    docs = {"cli": spec("Capability: `cap:cli`, `cap:development`")}
+    assert RUN(fake_github(TYPES, PROJECTS, [], spec_docs=docs), oob_dir) == [
+        "troupe specs: 'cli' names 'cap:development', which isn't declared; add it to "
+        "tofu/labels/troupe.json by pull request, or correct the spec in troupe-run/troupe"
+    ]
+
+
+def test_a_spec_naming_two_declared_labels_reports_nothing(oob_dir: Path) -> None:
+    docs = {"cli": spec("Capability: `cap:cli`, `cap:cues`")}
+    assert RUN(fake_github(TYPES, PROJECTS, [], spec_docs=docs), oob_dir) == []
+
+
 def test_a_cap_label_ahead_of_its_spec_is_not_reported(oob_dir: Path) -> None:
-    """cap:cues is declared and troupe has no cues spec: a label can come before its spec."""
-    assert RUN(fake_github(TYPES, PROJECTS, [], specs=["cli"]), oob_dir) == []
+    """cap:cues is declared and no spec names it: a label can come before its spec."""
+    assert RUN(fake_github(TYPES, PROJECTS, []), oob_dir) == []
 
 
-def test_troupe_specs_all_labelled_report_nothing(oob_dir: Path) -> None:
+def test_a_folder_without_a_label_of_its_own_name_reports_nothing(oob_dir: Path) -> None:
     (oob_dir / "troupe-spec-purposes.json").write_text(
-        json.dumps({**PURPOSES, "cap:cues": "Open requests."})
+        json.dumps({**PURPOSES, "artifact-store": "Run artifacts."})
     )
-    docs = {"cli": CLI_SPEC, "cues": "## Purpose\n\nOpen requests.\n"}
-    found = RUN(fake_github(TYPES, PROJECTS, [], specs=["cli", "cues"], spec_docs=docs), oob_dir)
-    assert found == []
+    docs = {
+        "cli": CLI_SPEC,
+        "artifact-store": spec("Capability: `cap:cues`", purpose="Run artifacts."),
+    }
+    fetch = fake_github(TYPES, PROJECTS, [], specs=["cli", "artifact-store"], spec_docs=docs)
+    assert RUN(fetch, oob_dir) == []
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Capability: cap:cli",
+        "Capability: `cap:cli` (and the server)",
+        "Capability: `cap:cli`; `cap:cues`",
+        "Capability: `cap:cli`, `cap:cli`",
+        "Capabilities: `cap:cli`",
+        "capability: `cap:cli`",
+        "Capability:",
+    ],
+)
+def test_a_malformed_capability_line_is_reported_quoting_it(oob_dir: Path, line: str) -> None:
+    docs = {"cli": spec(line)}
+    assert RUN(fake_github(TYPES, PROJECTS, [], spec_docs=docs), oob_dir) == [
+        f"troupe specs: 'cli' Capability: line is malformed: {line!r}; "
+        "write it as Capability: `cap:<name>`, `cap:<name>`"
+    ]
+
+
+def test_a_malformed_line_s_labels_are_not_checked(oob_dir: Path) -> None:
+    """`cap:nope` isn't declared, but the line is malformed, so it isn't read as naming it."""
+    docs = {"cli": spec("Capability: `cap:nope` (and git)")}
+    found = RUN(fake_github(TYPES, PROJECTS, [], spec_docs=docs), oob_dir)
+    assert len(found) == 1
+    assert "malformed" in found[0]
+
+
+def test_a_failed_spec_read_is_unreadable_naming_the_spec(oob_dir: Path) -> None:
+    failures: dict[str, BaseException] = {"cli/spec.md": refused("gh: Bad Gateway (HTTP 502)")}
+    report = REPORT(fake_github(TYPES, PROJECTS, [], failures=failures), oob_dir)
+    assert report.differences == []
+    assert report.unreadable == [
+        "troupe specs: couldn't read 'cli''s spec.md (gh: Bad Gateway (HTTP 502))",
+        "troupe label descriptions: not checked, since troupe's specs couldn't be read",
+    ]
+
+
+def test_each_spec_md_is_read_once_for_both_checks(oob_dir: Path) -> None:
+    (oob_dir / "troupe-spec-purposes.json").write_text(
+        json.dumps({**PURPOSES, "cues": "Open requests."})
+    )
+    calls: list[list[str]] = []
+    docs = {"cli": CLI_SPEC, "cues": spec("Capability: `cap:cues`", purpose="Open requests.")}
+    assert (
+        RUN(fake_github(TYPES, PROJECTS, calls, specs=["cli", "cues"], spec_docs=docs), oob_dir)
+        == []
+    )
+    read = [c[1].split("/")[-2] for c in calls if c[1].endswith("/spec.md")]
+    assert read == ["cli", "cues"]
+
+
+@pytest.mark.parametrize(
+    ("spec_md", "labels"),
+    [
+        (CLI_SPEC, ["cap:cli"]),
+        (
+            spec("Capability: `cap:actor-runners`, `cap:protocol`"),
+            ["cap:actor-runners", "cap:protocol"],
+        ),
+        ("## Purpose\nCapability: `cap:cli`\nThe command line.\n", ["cap:cli"]),
+        ("## Purpose\n\n\n  Capability: `cap:cli`  \n", ["cap:cli"]),
+        ("# cli\n\n## Requirements\n\nCapability: `cap:cli`\n", []),
+        (spec("The command line names `cap:cli` in prose."), []),
+    ],
+    ids=["one", "two", "no-blank-line", "blank-lines-and-spaces", "no-purpose", "prose-first"],
+)
+def test_capability_labels_reads_the_first_non_blank_purpose_line(
+    spec_md: str, labels: list[str]
+) -> None:
+    assert oob.capability_labels(spec_md) == labels
+
+
+# spec-capability-label-check design D3: the Purpose record is keyed by spec, without the line.
+
+
+def test_every_spec_recorded_and_unchanged_reports_nothing(oob_dir: Path) -> None:
+    assert RUN(fake_github(TYPES, PROJECTS, []), oob_dir) == []
 
 
 def test_a_labelled_spec_with_no_recorded_purpose_is_reported(oob_dir: Path) -> None:
     (oob_dir / "troupe-spec-purposes.json").write_text("{}")
     assert RUN(fake_github(TYPES, PROJECTS, []), oob_dir) == [
-        "troupe labels: 'cap:cli' description hasn't been checked against its spec's Purpose; "
-        "record the Purpose in oob/troupe-spec-purposes.json"
+        "troupe labels: 'cli' spec's Purpose isn't recorded; check the descriptions of 'cap:cli' "
+        "against it and record it in oob/troupe-spec-purposes.json"
     ]
 
 
-CLI_PURPOSE_CHANGED = [
-    "troupe labels: 'cap:cli' spec's Purpose has changed; review its description in "
-    "tofu/labels/troupe.json and update oob/troupe-spec-purposes.json"
-]
-
-
-def test_a_changed_purpose_is_reported_naming_the_label_and_both_files(oob_dir: Path) -> None:
-    docs = {"cli": "## Purpose\n\nThe command line, and a server too.\n"}
-    found = RUN(fake_github(TYPES, PROJECTS, [], spec_docs=docs), oob_dir)
-    assert found == CLI_PURPOSE_CHANGED
+def test_a_changed_purpose_is_reported_naming_every_label_it_names(oob_dir: Path) -> None:
+    docs = {"cli": spec("Capability: `cap:cli`, `cap:cues`", purpose="And a server too.")}
+    assert RUN(fake_github(TYPES, PROJECTS, [], spec_docs=docs), oob_dir) == [
+        "troupe labels: 'cli' spec's Purpose has changed; review the descriptions of 'cap:cli', "
+        "'cap:cues' in tofu/labels/troupe.json and update oob/troupe-spec-purposes.json"
+    ]
 
 
 def test_a_purpose_only_rewrapped_or_respaced_is_not_reported(oob_dir: Path) -> None:
     docs = {
-        "cli": "## Purpose\n\n  The command\nline,   a thin client\n\nover the core.  \n## Other\n"
+        "cli": "## Purpose\nCapability: `cap:cli`\n  The command\nline,   a thin client\n\n"
+        "over the core.  \n## Other\n"
     }
     assert RUN(fake_github(TYPES, PROJECTS, [], spec_docs=docs), oob_dir) == []
 
 
-def test_a_spec_with_no_purpose_section_is_reported_as_changed(oob_dir: Path) -> None:
+def test_a_change_to_the_capability_line_alone_is_not_a_changed_purpose(oob_dir: Path) -> None:
+    docs = {"cli": spec("Capability: `cap:cues`, `cap:cli`")}
+    assert RUN(fake_github(TYPES, PROJECTS, [], spec_docs=docs), oob_dir) == []
+
+
+def test_a_spec_with_no_purpose_section_is_reported_as_changed_and_unlabelled(
+    oob_dir: Path,
+) -> None:
     docs = {"cli": "# cli Specification\n\n## Requirements\n\nThe command line.\n"}
     found = RUN(fake_github(TYPES, PROJECTS, [], spec_docs=docs), oob_dir)
-    assert found == CLI_PURPOSE_CHANGED
+    assert found == [
+        "troupe specs: 'cli' names no capability label; add a Capability: line as the first "
+        "line of its Purpose in troupe-run/troupe",
+        "troupe labels: 'cli' spec's Purpose has changed; review the descriptions of the labels "
+        "it names in tofu/labels/troupe.json and update oob/troupe-spec-purposes.json",
+    ]
 
 
 def test_a_recorded_purpose_with_no_spec_is_reported(oob_dir: Path) -> None:
     (oob_dir / "troupe-spec-purposes.json").write_text(
-        json.dumps({**PURPOSES, "cap:cues": "Open requests."})
+        json.dumps({**PURPOSES, "cues": "Open requests."})
     )
     assert RUN(fake_github(TYPES, PROJECTS, []), oob_dir) == [
-        "troupe labels: 'cap:cues' has a recorded Purpose but troupe has no cues spec; "
+        "troupe labels: 'cues' has a recorded Purpose but troupe has no cues spec; "
         "remove it from oob/troupe-spec-purposes.json"
     ]
-
-
-def test_an_unlabelled_spec_is_reported_once_and_its_spec_not_read(oob_dir: Path) -> None:
-    calls: list[list[str]] = []
-    found = RUN(fake_github(TYPES, PROJECTS, calls, specs=["cli", "artifact-store"]), oob_dir)
-    assert len(found) == 1
-    assert "'artifact-store' has no cap:artifact-store label" in found[0]
-    assert not any("artifact-store/spec.md" in c[1] for c in calls)
 
 
 def test_main_exits_non_zero_on_a_difference(
@@ -330,7 +437,7 @@ def test_every_github_call_is_a_read() -> None:
     for name, args in [
         *((c.name, c.gh_args) for c in oob.CHECKS),
         ("specs", oob.SPECS_GH_ARGS),
-        ("purpose", oob.purpose_gh_args("runs")),
+        ("spec.md", oob.spec_md_gh_args("runs")),
         ("configurations", oob.CONFIGURATIONS_GH_ARGS),
         ("defaults", oob.DEFAULTS_GH_ARGS),
         ("attachment", oob.attachment_gh_args("troupe")),
@@ -550,6 +657,22 @@ def test_two_factor_hidden_from_the_token_is_unreadable_not_a_difference(oob_dir
     assert "org settings" in report.unreadable[0]
     assert "two_factor_requirement_enabled" in report.unreadable[0]
     assert "value" in report.unreadable[0]
+
+
+def test_a_failed_spec_list_read_is_unreadable_and_purposes_not_checked(oob_dir: Path) -> None:
+    github = fake_github(TYPES, PROJECTS, [])
+
+    def fetch(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
+        if args[1].endswith("/contents/openspec/specs"):
+            raise refused("gh: Bad Gateway (HTTP 502)")
+        return github(args)
+
+    report = REPORT(fetch, oob_dir)
+    assert report.differences == []
+    assert report.unreadable == [
+        "troupe specs: couldn't read it (gh: Bad Gateway (HTTP 502))",
+        "troupe label descriptions: not checked, since troupe's specs couldn't be read",
+    ]
 
 
 def test_a_project_short_description_declared_null_and_read_null_matches(oob_dir: Path) -> None:

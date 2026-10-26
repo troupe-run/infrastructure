@@ -73,7 +73,7 @@ SHALL NOT count as a change.
 ## ADDED Requirements
 
 ### Requirement: A malformed Capability line is reported
-A first Purpose line that begins with `Capability` but isn't `Capability: ` followed by one or more distinct labels,
+A first Purpose line that begins with `Capability` or `Capabilities`, in any case, but isn't `Capability: ` followed by one or more distinct labels,
 each in backticks and separated by `, `, with nothing after the last, SHALL be reported by the out-of-band drift
 check as malformed. The report SHALL name the spec, quote the line and give the expected shape. It SHALL never be
 read as naming no label, or as naming the labels it seems to.
