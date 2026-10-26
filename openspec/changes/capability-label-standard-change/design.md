@@ -64,8 +64,16 @@ Alternative: an issue form for the sub-issue. Rejected for now: forms are org de
 5. **The pull request,** opened after the archive with `Closes #<sub>` through `--body-file`, so the owner approves
    one `plan-pr` run. Its plan should show the labels resource changed in place with one `+ label` block and nothing
    else; read it and say so on the pull request.
-6. **After the merge and the apply:** the label on the needing issue with `gh issue edit --add-label`, the board's
-   option (the owner's, D4), the sub-issue closed if the merge didn't, its card Done, and the comment.
+6. **Just before the merge,** once the plan is approved: the owner adds `<name>` to the board's `Capability` field
+   (D4), then merges.
+7. **After the merge and the apply:** the label on the needing issue with `gh issue edit --add-label`, the sub-issue
+   closed if the merge didn't, its card Done, and the comment.
+
+Step 6 sits before the merge because the board check reads the declared labels, not GitHub's: the `drift (out of
+band)` job runs straight after each merge, and an option added only after it would leave that run red, hiding any
+other drift (#132). Added just before the merge, the option is ahead of `main` only for the minutes until the merge,
+when a scheduled run is unlikely; the check would report it then as an option with no label, which the merge clears.
+(Raised by a side agent during apply, 2026-10-26.)
 
 Probed on 2026-10-26 (task 1.1) with two private throwaway repositories, `troupe-run/infra-probe-20261026-a` (the
 label's repository, with milestone `0.1.0`) and `-b` (the needing issue's), deleted afterwards. Auto mode refused
@@ -80,7 +88,7 @@ gh issue edit 2 -R troupe-run/infra-probe-20261026-b --add-blocked-by <a#1 url>
 ```
 
 Read back: `a#1` is a Task in `0.1.0` with parent `b#1`; `b#2`'s `dependencies/blocked_by` lists `a#1`, and `a#1`'s
-`dependencies/blocking` lists `b#2`. So step 6 finds the needing issue from the sub-issue with
+`dependencies/blocking` lists `b#2`. So step 7 finds the needing issue from the sub-issue with
 `gh api repos/troupe-run/infrastructure/issues/<sub>/dependencies/blocking`.
 
 Step 4's `oob.py` run is where anything else a label needs shows up, such as a record #151 leaves in place. The
