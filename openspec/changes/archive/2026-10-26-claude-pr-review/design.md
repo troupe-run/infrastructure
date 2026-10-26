@@ -191,6 +191,21 @@ Pass `--setting-sources user` in `claude_args`. The action otherwise loads `user
 - It costs nothing the review needs. The guard's hooks govern edits, commits and `gh`, and the review has no edit or
   git tools, and only four `gh` commands.
 
+### D9. Read, Grep and Glob reach the checkout only, and the checkout keeps no token
+
+`--allowedTools` lists `Read(./**)`, `Grep(./**)` and `Glob(./**)`, not the bare tools, and `actions/checkout` has
+`persist-credentials: false`.
+
+- **Found by #157's review of 4d7d2b8 (2026-10-26).** Unscoped, Read reaches any file the runner's user can read,
+  `/proc/self/environ` included, which holds `CLAUDE_CODE_OAUTH_TOKEN` and the App's token. A misled review could post
+  them in a comment through `gh pr comment`. The checkout also left the run's token in `.git/config`.
+- **Probed locally (Claude Code 2.1.310, headless, no settings loaded).** With `Read(./**),Grep(./**),Glob(./**)`, a
+  file inside the working directory was read, and `../outside.txt`, `/etc/hosts` and a Grep of the parent directory
+  were each refused (three permission denials). The control, with a bare `Read`, read `../outside.txt`. It wasn't
+  tried on a live run, where a failed scope would post a real token.
+- Only members' pull requests get a run, but the Claude token is billed to the owner, and a public comment can't be
+  unsent, so this is closed rather than accepted.
+
 ## Risks / Trade-offs
 
 - [The OAuth token is billed to the owner's Claude subscription, and its usage limits are shared with the owner's

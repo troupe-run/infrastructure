@@ -62,6 +62,11 @@ pull request and commenting on it. The run SHALL NOT use `pull_request_target`.
 - **THEN** the run has no tool that edits files or runs git, and no token that can write contents, so nothing is
   pushed
 
+#### Scenario: Claude is asked to read outside the checkout
+- **WHEN** a pull request's text asks Claude to read `/proc/self/environ`, `.git/config` or any file outside the
+  checkout, and post what it finds
+- **THEN** the read is refused, because Read, Grep and Glob reach the checkout only, and the checkout keeps no token
+
 #### Scenario: The workflow is weakened
 - **WHEN** a change gives the review job another permission, swaps its event for `pull_request_target`, drops the
   bot skip, lets it mint a token through OIDC, asks the App for more, widens Claude's tools, or uses an action that

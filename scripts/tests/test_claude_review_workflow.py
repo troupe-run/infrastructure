@@ -66,9 +66,11 @@ TOOLS = {
     "Bash(gh pr diff:*)",
     "Bash(gh pr view:*)",
     "Bash(gh issue view:*)",
-    "Read",
-    "Grep",
-    "Glob",
+    # Inside the checkout only: unscoped, Read reaches /proc/self/environ, which holds the Claude
+    # token, and a misled review could post it (probed: Read outside ./ is denied only when scoped).
+    "Read(./**)",
+    "Grep(./**)",
+    "Glob(./**)",
 }
 # Settings from the user scope only, which the action writes itself: none from the repository, so
 # the guard's Claude Code hooks in .claude/settings.json don't load. They're written for an agent
@@ -150,6 +152,12 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         if "run" in step:
             found.append(
                 f"review runs a command of its own ({step['run']!r}); only the action runs"
+            )
+    checkouts = [s for s in steps if str(s.get("uses", "")).startswith("actions/checkout@")]
+    for step in checkouts:
+        if (step.get("with") or {}).get("persist-credentials") is not False:
+            found.append(
+                "the checkout leaves its token in .git/config (persist-credentials isn't false)"
             )
     tokens = [step for step in steps if str(step.get("uses", "")).startswith(f"{MINTER}@")]
     actions = [step for step in steps if str(step.get("uses", "")).startswith(f"{ACTION}@")]
@@ -334,6 +342,21 @@ def sources(w: dict[str, Any], change: str) -> None:
             "add ['Bash(gh pr review:*)']",
         ),
         (lambda w: tools(w, "Bash(gh:*)"), "add ['Bash(gh:*)']"),
+        (lambda w: tools(w, "Bash(gh pr view:*),Read"), "add ['Read']"),
+        (
+            lambda w: action(w).update(
+                {"claude_args": str(action(w)["claude_args"]).replace("Grep(./**)", "Grep")}
+            ),
+            "add ['Grep']",
+        ),
+        (
+            lambda w: job(w)["steps"][0]["with"].pop("persist-credentials"),
+            "persist-credentials isn't false",
+        ),
+        (
+            lambda w: job(w)["steps"][0]["with"].update({"persist-credentials": True}),
+            "persist-credentials isn't false",
+        ),
         (lambda w: tools(w, 'Bash(gh pr view:*)" --dangerously-skip-permissions "'), "besides"),
         (
             lambda w: action(w).update(
