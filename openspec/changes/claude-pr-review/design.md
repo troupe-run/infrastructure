@@ -45,23 +45,32 @@ See proposal.md for why. What shapes the approach:
 
 ## Decisions
 
-### D1. Write through the run's `GITHUB_TOKEN`; don't install the Claude App
+### D1. Write through our own review App's token, read-only on contents
 
-Pass `github_token: ${{ secrets.GITHUB_TOKEN }}`, set the job's permissions to exactly `contents: read` and
-`pull-requests: write`, and grant no `id-token`, so the OIDC exchange can't happen even by accident.
+The job mints a token for a new App, `troupe-run-review`, with `actions/create-github-app-token`, asking for exactly
+`contents: read` and `pull-requests: write` on the run's own repository. It passes that token as `github_token`.
+The job's `GITHUB_TOKEN` keeps `contents: read` only, for the checkout, and gets no `id-token`, so the action can't
+exchange OIDC for a Claude App token even by accident. The App itself has only those repository permissions, so no
+token minted for it can push, whatever a step asks for.
 
-- **Why:** #154's "Done when" needs a run with only read access to contents. The Claude App route can't give that,
-  because its token is minted with `contents: write` (Context). With `GITHUB_TOKEN`, the log's "GITHUB_TOKEN
-  Permissions" block shows the whole of what the run can do. It's also the simpler route: nothing to install, no
-  `oob/app-installations.json` entry, and no new drift.
-- **Owner, 2026-10-26:** asked whether either route changes the commit signing or other checks the org enforces.
-  Neither does. The rulesets don't require signed commits. Sign-off and Conventional Commits are enforced by the DCO
-  and `guard` checks, which would still catch a commit from either identity. The difference is only whether a run
-  *can* push, so the owner's "simplest option" is this one.
-- **Alternative:** the Claude App, with `additional_permissions` narrowing its token. `parseAdditionalPermissions`
-  only *adds* to `DEFAULT_PERMISSIONS`, so `contents` stays `write`. Rejected.
-- **Cost of the choice:** comments come from `github-actions[bot]`, not `claude[bot]`. They're labelled as Claude's
-  review in their text.
+- **Owner, 2026-10-26:** "I don't really like the way this is working with GitHub Actions owning all of the comments …
+  it blurs where it's coming from, and having 'Claude's review' is a workaround." Comments now come from
+  `troupe-run-review[bot]`.
+- **The official Claude App (rejected).** Its comments would come from `claude[bot]`. But the action asks Anthropic
+  for a Claude App token with `contents: write`, `issues: write` and `pull_requests: write` (`src/github/token.ts`,
+  `DEFAULT_PERMISSIONS`). `additional_permissions` can only add to that (`parseAdditionalPermissions`), so the run
+  would hold a token that can push, and only Claude's tool list (D4) and D8 would stop it. #154 asks for a run with
+  only read access to contents.
+- **The run's own `GITHUB_TOKEN` (the first choice, superseded).** Read-only and nothing to set up, but every comment
+  came from `github-actions[bot]`, and only a "Claude's review" heading said whose it was. Probed and live-tested that
+  way first (Migration Plan; #157's runs up to adbc733).
+- **What our own App costs.** It's set up by hand, like the release, board and docs Apps. Its installation is
+  declared in `oob/app-installations.json`, so the drift check covers it. Its key is an org secret that any member's
+  pull request run can reach (D3), which gives contents read and pull request write on three public repositories.
+  Unlike `GITHUB_TOKEN`, the org's "Actions can't approve pull requests" setting doesn't cover an App. But the
+  rulesets require no approvals (`required_approving_review_count = 0`), and Claude has no tool that approves (D4).
+- Commit signing, sign-off and the DCO and `guard` checks are unaffected by any of these choices (owner's question,
+  2026-10-26): the rulesets don't require signed commits, and the checks would catch a bad commit from any identity.
 
 ### D2. `pull_request` with a bot skip, cancelling an earlier run for the same pull request
 
@@ -81,7 +90,15 @@ Pass `github_token: ${{ secrets.GITHUB_TOKEN }}`, set the job's permissions to e
   workflow runs from the pull request's head anyway, so checking out the head adds no exposure. The prompt reads the
   diff through `gh pr diff`.
 
-### D3. `CLAUDE_CODE_OAUTH_TOKEN` as an org secret with selected repositories, set by hand
+### D3. Two org secrets with selected repositories, set by hand
+
+The review App's key, `REVIEW_APP_PRIVATE_KEY`, joins `CLAUDE_CODE_OAUTH_TOKEN` below, set the same way from the
+1Password item `troupe-run-review` (an SSH Key item, read as PKCS#1, as the other App keys are). Its client ID isn't
+secret, and it's written in the workflow, not set as a variable from OpenTofu as the other Apps' are. A variable is
+set only by the apply after a merge, so the pull request that adds or changes the review couldn't mint a token in its
+own run. The workflow is delivered, so it's still one place.
+
+#### `CLAUDE_CODE_OAUTH_TOKEN`
 
 - One org Actions secret, visibility "selected repositories": troupe, infrastructure and website. Owner, 2026-10-26.
   It isn't in an environment: a `main`-only environment would hide it from the pull request runs that need it, and

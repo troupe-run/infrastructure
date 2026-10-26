@@ -94,6 +94,31 @@
       comments. One said `--setting-sources user` may stop `CLAUDE.md` loading, so the prompt now says to Read it
       first
 
+## 6. Our own review App (owner, 2026-10-26, design D1, D3)
+
+- [x] 6.1 Rewrite D1 and D3, the `pr-review` spec and the proposal for the review App. Verify
+      `openspec validate claude-pr-review --strict` passes
+- [x] 6.2 Owner: create `troupe-run-review` with "Contents: read" and "Pull requests: read and write" only, install it
+      on troupe, infrastructure and website, store its key in 1Password, and give the client ID. Verify with
+      `gh api orgs/troupe-run/installations` that its permissions and selection match the declaration, and record the
+      App's IDs on #154. Done: App ID 5476894, client ID `Iv23liIWLSHXQlYupT89`, installation 175381606: contents read,
+      metadata read, pull requests write, selected repositories
+- [x] 6.3 Pin the App's token in `test_claude_review_workflow.py`: one `create-github-app-token` step, id `app-token`,
+      before the action, with a literal client ID, `secrets.REVIEW_APP_PRIVATE_KEY`, this repository only and exactly
+      contents read and pull requests write; the action's `github_token` from it; the job's own token
+      `contents: read` only. Mutations for each. Then mint it in `claude-review.yml` with the App's client ID. Verify
+      the tests pass, and that website's workflow test and troupe's check pass with it in place. Done: 51 tests pass; website's workflow test 8 passed, troupe's check all gates passed
+- [x] 6.4 Declare the installation in `oob/app-installations.json`, and write `oob/README.md`'s section on the App and
+      the Claude token, with a key command that reads into a variable, refuses a key whose first line isn't PKCS#1 or
+      PKCS#8, and prints nothing. Verify `uv run scripts/oob.py` reports no difference for the App, and
+      `uv run scripts/check.py` passes. Done: `oob.py` reports nothing for the App. Its 25 differences are all troupe `cap:*`
+      Purposes changed since main's 04:13 drift run, not this change
+- [x] 6.5 Owner: set `REVIEW_APP_PRIVATE_KEY` with that command. Verify by name that its repositories are exactly
+      troupe, infrastructure and website. Done: `infrastructure`, `troupe`, `website`
+- [ ] 6.6 On #157, verify the review run for the new head mints the App's token and posts its comments as
+      `troupe-run-review[bot]`, with the run's `GITHUB_TOKEN` at `Contents: read` and `Metadata: read` only, and no
+      permission denial
+
 ## Workflow follow-up
 
 These happen only after the merge and the apply, so they're bullets, not tasks: the change is archived before it

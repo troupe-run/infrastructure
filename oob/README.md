@@ -65,6 +65,7 @@ lists below are checked by hand in each App's settings, by any change that adds,
 | `troupe-run-release` | `troupe` | 2026-10-13, owner |
 | `troupe-run-board` | none | 2026-10-18, by the App's own token (`GET /installation/repositories` returned `[]`) |
 | `troupe-run-docs` | `website` | 2026-10-19, by the App's own token (`GET /installation/repositories` returned `website` only) |
+| `troupe-run-review` | `troupe`, `infrastructure`, `website` | to confirm when it's installed (claude-pr-review) |
 
 A repository the infrastructure App isn't installed on shows only its public view to OpenTofu (merge settings read as
 off, no security settings), so the first plan after adding one will show that it's missing from this list.
@@ -198,20 +199,44 @@ gh api repos/troupe-run/infrastructure/environments/docs/secrets --jq '.secrets[
 commands above again. Then delete the old key in the App's settings. A run between the two steps still works, because
 both keys are valid until the old one is deleted.
 
-## The Claude review token (set up by hand)
+## The review App and the Claude token (set up by hand)
 
 `.github/workflows/claude-review.yml` reviews each member's pull request in troupe, infrastructure and website with
-Claude (spec: pr-review, #154). It writes to GitHub only through the run's own `GITHUB_TOKEN`, so **no App is
-installed for it**, and `app-installations.json` has no entry. The Claude GitHub App's route would mint a token with
-"Contents: write" whatever the workflow's permissions say (claude-pr-review design D1). The one credential is
-Claude's own, `CLAUDE_CODE_OAUTH_TOKEN`. OpenTofu never holds a secret, so these steps are the owner's.
+Claude (spec: pr-review, #154). It needs two credentials, and OpenTofu never holds a secret, so these steps are the
+owner's. Its comments come from `troupe-run-review[bot]`: the run writes only with a token for the `troupe-run-review`
+App, which can read code and write on pull requests and nothing else. It doesn't use Anthropic's Claude GitHub App,
+whose token can write contents whatever the workflow asks for (claude-pr-review design D1).
 
-**Creating it.** Run `claude setup-token` and sign in as the account the reviews are billed to. It prints a token
-that lasts a year. Store it in 1Password as an API Credential item named `troupe-run-claude-review`, field
-`credential`, in vault `troupe.run`. It's billed to that account's subscription and shares its usage limits.
+**Creating the App** (done 2026-10-26). In the org's settings, under GitHub Apps, create a new App:
+- name `troupe-run-review`, installable only on this account, webhook off;
+- repository permissions "Contents: read" and "Pull requests: read and write", and nothing else; GitHub adds
+  "Metadata: read". No organisation or account permissions;
+- install it with "Only select repositories" and select `troupe`, `infrastructure` and `website`, and add its row to
+  the table above.
 
-**Setting it.** It's one org Actions secret, visible to the three repositories only. It isn't in an environment,
-because the pull request runs that need it aren't on `main`. Nothing is printed:
+Its installation is checked by `oob.py` against `app-installations.json`. Its client ID isn't secret, and it's
+written in the workflow (`client-id`), so a pull request's run can use it before its merge (design D3).
+
+**Its key.** Generate a private key in the App's settings. Store it in 1Password as an SSH Key item named
+`troupe-run-review` in vault `troupe.run`, by importing the downloaded `.pem`, then delete the file. It's an org
+secret visible to the three repositories only: not in an environment, because the pull request runs that need it
+aren't on `main`. Any member's pull request run can reach it, which gives contents read and pull request write on
+three public repositories. Nothing is printed:
+
+```sh
+export OP_ACCOUNT=l-a-u.1password.com
+# gh runs only once op has read the key, and only if it's PKCS#1 or PKCS#8 (create-github-app-token refuses OpenSSH).
+key=$(op read -n "op://troupe.run/troupe-run-review/private key") &&
+  case "$key" in "-----BEGIN RSA PRIVATE KEY-----"*|"-----BEGIN PRIVATE KEY-----"*) ;; *) false ;; esac &&
+  printf '%s' "$key" | gh secret set REVIEW_APP_PRIVATE_KEY --org troupe-run \
+    --visibility selected --repos troupe,infrastructure,website
+unset key
+```
+
+**The Claude token.** Run `claude setup-token` and sign in as the account the reviews are billed to. It prints a token
+that lasts a year (the current one expires about 2027-10-26). Store it in 1Password as an API Credential item named
+`troupe-run-claude-review`, field `credential`, in vault `troupe.run`. It's billed to that account's subscription and
+shares its usage limits. Set it the same way:
 
 ```sh
 export OP_ACCOUNT=l-a-u.1password.com
@@ -222,14 +247,17 @@ token=$(op read -n "op://troupe.run/troupe-run-claude-review/credential") &&
 unset token
 ```
 
-Check it by name, never by value. It should list exactly `troupe`, `infrastructure` and `website`:
+Check each by name, never by value. Each should list exactly `infrastructure`, `troupe` and `website`:
 
 ```sh
+gh api orgs/troupe-run/actions/secrets/REVIEW_APP_PRIVATE_KEY/repositories --jq '.repositories[].name'
 gh api orgs/troupe-run/actions/secrets/CLAUDE_CODE_OAUTH_TOKEN/repositories --jq '.repositories[].name'
 ```
 
-**Rotating it.** Before it expires, run `claude setup-token` again, replace the 1Password item's credential, and run
-the set command above. An expired or missing token fails only the review, which isn't a required check.
+**Rotating them.** For the key: generate a new one in the App's settings, replace the 1Password item's key, run its
+set command, then delete the old key in the App's settings. For the token: before it expires, run `claude setup-token`
+again, replace the 1Password item's credential, and run its set command. A missing or expired credential fails only
+the review, which isn't a required check.
 
 ## troupe.run's DNS (set up by hand)
 
