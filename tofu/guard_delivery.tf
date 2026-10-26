@@ -22,10 +22,12 @@ locals {
 
   # The list a receiving repository holds (spec: guard-delivery). Generated from guard_files, so it
   # can't disagree with what is delivered; its presence is what turns on the delivered-file rule.
+  # It names the Dependabot configuration delivered beside the guard too (dependabot.tf; spec:
+  # dependency-updates), so the rule covers that file as well.
   guard_list_path = ".github/guard-delivery.json"
   guard_list = "${jsonencode({
     source = "troupe-run/infrastructure"
-    files  = sort(concat(tolist(local.guard_files), [local.guard_list_path]))
+    files  = sort(concat(tolist(local.guard_files), [local.guard_list_path, local.dependabot_path]))
   })}\n"
 
   guard_contents = merge(

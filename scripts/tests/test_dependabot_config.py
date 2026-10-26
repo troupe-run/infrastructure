@@ -3,6 +3,7 @@
 
 import copy
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ import pytest
 import yaml
 
 import dependabot_config
+import tofu_text
 
 POLICY: dict[str, Any] = {
     "schedule": {"interval": "weekly", "day": "monday", "time": "00:00", "timezone": "UTC"},
@@ -221,3 +223,36 @@ def test_writing_removes_a_file_no_longer_generated(tmp_path: Path) -> None:
     (tmp_path / "gone.yml").write_text("x\n", encoding="utf-8")
     dependabot_config.write(tmp_path, {"troupe.yml": "x\n"})
     assert sorted(p.name for p in tmp_path.iterdir()) == ["troupe.yml"]
+
+
+# The delivery (tofu/dependabot.tf, tofu/guard_delivery.tf; design D4)
+
+DEPENDABOT_TF = dependabot_config.REPO / "tofu" / "dependabot.tf"
+
+
+@pytest.mark.tofu
+def test_opentofu_delivers_each_generated_file_to_dependabot_yml() -> None:
+    tf = DEPENDABOT_TF.read_text(encoding="utf-8")
+    assert 'dependabot_path = ".github/dependabot.yml"' in tf
+    assert 'fileset("${path.module}/dependabot", "*.yml")' in tf
+    assert dependabot_config.OUT == dependabot_config.REPO / "tofu" / "dependabot"
+    assert "overwrite_on_create = false" in tf
+
+
+@pytest.mark.tofu
+def test_the_guard_targets_delivered_list_names_the_dependabot_config() -> None:
+    tf = tofu_text.GUARD_DELIVERY_TF.read_text(encoding="utf-8")
+    listed = re.search(r"files\s+= sort\(concat\((.*?)\)\)\n", tf)
+    assert listed is not None, "guard_list's files isn't sort(concat(...)); update this test"
+    assert "local.dependabot_path" in listed.group(1)
+
+
+@pytest.mark.dependabot
+@pytest.mark.labels
+@pytest.mark.tofu
+def test_every_guard_target_has_a_generated_file() -> None:
+    targets = tofu_text.guard_targets(
+        tofu_text.GUARD_DELIVERY_TF.read_text(encoding="utf-8"),
+        tofu_text.REPOSITORIES_TF.read_text(encoding="utf-8"),
+    )
+    assert {f"{repo}.yml" for repo in targets} <= set(dependabot_config.generated())
