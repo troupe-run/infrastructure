@@ -78,13 +78,20 @@
   pr-closes-issue: pull request 'docs(openspec): propose probe-closes' doesn't close an issue: its description has
   no closing line.` and D2's fix. The same branch with `Closes troupe-run/infrastructure#173` added: `every rule
   passes for probe-closes`, exit 0. The clone was deleted; nothing was pushed
-- [ ] 5.2 Push the branch and open the pull request with `Closes #173`. Verify this repository's `guard` run on the
+- [x] 5.2 Push the branch and open the pull request with `Closes #173`. Verify this repository's `guard` run on the
   pull request passes with the new rule active (the branch's `guard.py` runs), and that the PR's plan comment
   changes only the delivered `scripts/guard.py` and `.github/workflows/guard.yml`, in troupe and in website.
-  Record the PR, the run and the plan
-- [ ] 5.3 Just before asking for the plan's approval, list the open pull requests in troupe, infrastructure and
+  Record the PR, the run and the plan. Result: PR #180. On 24e8833 the pull request's `guard` run
+  (40333676704) logs `every rule passes for guard-closes-issue` with this branch's guard, and the push's run passes
+  too; all 22 checks pass. The plan for 24e8833 (run 40333676506, approved by the owner) is 0 to add, 4 to change,
+  0 to destroy: `github_repository_file.guard` for `scripts/guard.py` and `.github/workflows/guard.yml`, in troupe
+  and website, content and commit message in place, with no modes to set. The archive push re-makes the plan for
+  the same four files
+- [x] 5.3 Just before asking for the plan's approval, list the open pull requests in troupe, infrastructure and
   website and match each description with `CLOSING` (design D5). Fix any that isn't release-please's or
-  Dependabot's, or ask the owner which issue it closes. Record the list and what was done here
+  Dependabot's, or ask the owner which issue it closes. Record the list and what was done here. Result, on 2026-10-27: troupe #89 (`release-please--branches--main`, exempt); infrastructure
+  #179 and #180 (close an issue); website #52 (closes), #44, #45, #46 (Dependabot, no closing line, already red on
+  `commit-branch-change`; #170 section 7). Nothing needed fixing
 
 ## Workflow follow-up
 
