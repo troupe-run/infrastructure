@@ -2,7 +2,7 @@
 
 ## 1. The script: plan and apply
 
-- [ ] 1.1 Add `scripts/board_options.py` with `plan` and `apply` (design D1-D4, D7). Standard library only, calling
+- [x] 1.1 Add `scripts/board_options.py` with `plan` and `apply` (design D1-D4, D7). Standard library only, calling
       GitHub through `gh api graphql` with an injectable fetch, as `oob.py` does. `--project` defaults to 1 and
       `--labels` to `tofu/labels/troupe.json`. Verify with tests in `scripts/tests/test_board_options.py`, each named
       for what it checks:
@@ -20,9 +20,17 @@
       - a plan with no changes writes an empty `changes` and a summary saying so.
 
       Then `uv run scripts/check.py` passes, with ruff and `mypy --strict` clean
-- [ ] 1.2 Run `uv run scripts/board_options.py plan --out <scratchpad>/board-plan.json --summary <scratchpad>/board.md`
+      Done 2026-10-26: `test_board_options.py` covers each case, plus the summary's table (a pipe escaped), only `cap:`
+      labels read, a non-plan file refused, and `main` exiting 1 on a refusal. The GraphQL request goes to `gh api
+      graphql --input -` as a JSON body, so the option list is passed as a variable. 24 passed;
+      `uv run scripts/check.py`: all gates passed (ruff, `mypy --strict`, tests, tofu)
+- [x] 1.2 Run `uv run scripts/board_options.py plan --out <scratchpad>/board-plan.json --summary <scratchpad>/board.md`
       against the live board with a read-only login. Verify and record here: 36 changes, every option's name matches a
       label (`infrastructure`'s current description differs from its label's), and the summary reads correctly
+      Done 2026-10-26 with the owner's login, reading only: field `PVTSSF_lADOE-8w_M4Bmhi5zhlKO1A`, 36 options in
+      `before`, 36 changes, so every option has a label. `infrastructure` goes from "The troupe-run org's own setup
+      (troupe-run/infrastructure), not a troupe capability" to its label's "The troupe-run org's own setup, not a
+      troupe capability"; the other 35 from *(none)*. The summary's table renders each as option, now, after
 
 ## 2. The probe (the owner, on a throwaway project)
 
