@@ -67,6 +67,10 @@
   (workflow lint included), and `scripts/tests/test_guard_workflow.py` still passes. Result: `scripts/check.py`
   passed on 0fd9bda (1909 passed, 14 skipped for no pwsh). It has no separate workflow-lint gate; the workflow tests
   in it (`test_guard_workflow.py`, `test_guard_delivery.py` among them) pass
+- [x] 3.4 Keep the run's token from the OpenSpec CLI: `run_openspec` runs it without `GITHUB_TOKEN` (design D3,
+  from Claude's review of #168). Verify the stub test in `test_guard_openspec.py` records no token when one is set.
+  Result: `test_the_cli_runs_strict_json_validation_at_the_root_with_telemetry_off_and_no_token` passes, and fails
+  when the filter is removed
 
 ## 4. Integration checks
 

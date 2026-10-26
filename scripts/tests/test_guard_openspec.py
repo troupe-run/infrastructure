@@ -298,7 +298,8 @@ log = Path(__file__).with_name("calls.jsonl")
 with log.open("a", encoding="utf-8") as calls:
     calls.write(json.dumps({"args": sys.argv[1:], "cwd": os.getcwd(),
         "telemetry": os.environ.get("OPENSPEC_TELEMETRY"),
-        "dnt": os.environ.get("DO_NOT_TRACK")}) + "\\n")
+        "dnt": os.environ.get("DO_NOT_TRACK"),
+        "token": os.environ.get("GITHUB_TOKEN")}) + "\\n")
 if sys.argv[1:] == ["--version"]:
     print("1.14.3")
     sys.exit(0)
@@ -335,11 +336,12 @@ def stub_calls(directory: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in lines]
 
 
-def test_the_cli_runs_strict_json_validation_at_the_root_with_telemetry_off(
+def test_the_cli_runs_strict_json_validation_at_the_root_with_telemetry_off_and_no_token(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     bin_dir = stub_openspec(tmp_path / "bin", captured("pass"))
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("GITHUB_TOKEN", "t0ken")
     assert guard.openspec_strict(PASS, EVERYTHING) == guard.ALLOW
     calls = stub_calls(bin_dir)
     assert [call["args"] for call in calls] == [
@@ -348,6 +350,7 @@ def test_the_cli_runs_strict_json_validation_at_the_root_with_telemetry_off(
     ]
     assert all(Path(str(call["cwd"])).resolve() == PASS.resolve() for call in calls)
     assert all(call["telemetry"] == "0" and call["dnt"] == "1" for call in calls)
+    assert all(call["token"] is None for call in calls)
 
 
 def test_a_validation_that_outlives_the_timeout_fails(

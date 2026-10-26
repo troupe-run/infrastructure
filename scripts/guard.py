@@ -3074,7 +3074,10 @@ def run_openspec(root: Path) -> OpenSpecRun:
             f"Install it before the guard runs, at the version {OPENSPEC_PIN} pins "
             "(OPENSPEC_VERSION).",
         )
-    env = {**os.environ, "OPENSPEC_TELEMETRY": "0", "DO_NOT_TRACK": "1"}
+    # Without the run's token, which only capability-label's read of the labels needs
+    # (guard-capability-label-at-proposal design D3).
+    env = {k: v for k, v in os.environ.items() if k != "GITHUB_TOKEN"}
+    env |= {"OPENSPEC_TELEMETRY": "0", "DO_NOT_TRACK": "1"}
 
     def call(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
