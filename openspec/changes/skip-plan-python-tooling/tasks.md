@@ -38,10 +38,10 @@
 - [ ] 5.1 Open the pull request (`Closes #175`). Verify the `does it need a plan?` job outputs `plan=true` for it
   (it changes `scripts/plan_needed.py`), and, once the owner approves the `plan-pr` run, that the posted plan shows no
   changes. Record the run links here
-- [ ] 5.2 Check the skip against a real bump: in a scratch clone of this branch, commit `uv lock --upgrade-package
+- [x] 5.2 Check the skip against a real bump: in a scratch clone of this branch, commit `uv lock --upgrade-package
   <one dev dependency>`, and pipe `git diff --name-only HEAD~1...HEAD` to the branch's `scripts/plan_needed.py`, as
   the `changes` job does. Verify it prints `plan=false`, and `plan=true` once `tofu/.terraform.lock.hcl` is touched in
-  the same diff. Record the output here
+  the same diff. Record the output here. Result: in a scratch clone of e5c9480, `uv lock --upgrade-package` took ruff 0.17.0 → 0.17.2 and hypothesis 6.169.0 → 6.170.11 (pytest-xdist was current). The diff `uv.lock` printed `plan=false`; with `tofu/.terraform.lock.hcl` also changed, `plan=true`. The clone is deleted
 
 ## Workflow follow-up
 
