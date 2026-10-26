@@ -60,9 +60,11 @@
 
 ## 4. Before delivery
 
-- [ ] 4.1 Run troupe's `uv run scripts/check.py` and website's `npx vitest run tests/unit/workflow-node-version.test.ts`,
+- [x] 4.1 Run troupe's `uv run scripts/check.py` and website's `npx vitest run tests/unit/workflow-node-version.test.ts`,
       each in a worktree of its repository with the new `claude-review.yml` in place (claude-pr-review D6). Verify both
-      pass, and record the commands and results here
+      pass, and record the commands and results here. Done (2026-10-26, e412dc8's workflow, in scratch clones rather
+      than worktrees, as claude-pr-review did): website at e2af256, `workflow-node-version.test.ts` 8 passed; troupe at
+      2d24fcf, `scripts/check.py` all gates passed (2822 passed, 14 skipped)
 - [ ] 4.2 On this change's pull request, read its `claude review` run (design Migration Plan, step 1). Verify that the
       guide's checkout step holds `.org-guide/CONTRIBUTING.md`, that the review's summary cites the guide, that the
       report step printed `No tool call was refused.` or one warning per denial matching `permission_denials_count`,
