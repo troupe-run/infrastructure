@@ -166,6 +166,9 @@ Pass `--setting-sources user` in `claude_args`. The action otherwise loads `user
   more restricted and controlled and doesn't need that same check." Turning off an agent's guard hooks is the owner's
   to grant, and this is that grant, for this workflow only. In the review, the fence is the token (D1) and the tool
   list (D4), both pinned by `test_claude_review_workflow.py`.
+- Project settings also bring `CLAUDE.md` into Claude's context. Without them, the prompt tells Claude to Read it
+  first, which gets the base branch's copy, since the action restores it before Claude starts. #157's first working
+  review flagged this (run 40287328446).
 - It costs nothing the review needs. The guard's hooks govern edits, commits and `gh`, and the review has no edit or
   git tools, and only four `gh` commands.
 

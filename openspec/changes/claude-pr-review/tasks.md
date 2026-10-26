@@ -71,7 +71,7 @@
       exactly four changes: `claude-review.yml` created, and `.github/guard-delivery.json` updated, in each of troupe
       and website. Nothing for `.github`, and nothing destroyed. Read each target's current
       `.github/guard-delivery.json` with `gh api repos/troupe-run/<repo>/contents/.github/guard-delivery.json` and
-      check it parses.The branch is on main's state commit after #156 (801fbee); rebase again if main has
+      check it parses. The branch is on main's state commit after #156 (801fbee); rebase again if main has
       moved
 - [x] 4.3 Run each target's own checks over the workflow before it's delivered (design D6, #155). In a scratch
       clone of website, copy `claude-review.yml` into `.github/workflows/` and run
@@ -86,10 +86,13 @@
 - [ ] 5.1 Open the pull request with `Closes #154`, D1's decision and the probe's findings. Verify that this pull
       request's own run of `claude-review` posts a review from its head (the first live review, in infrastructure),
       that its log shows only read access to contents, and that the plan on it matches 4.2
-- [ ] 5.2 Fix the empty review on #157 (design D8, owner, 2026-10-26): pass `--setting-sources user`, pinned by
+- [x] 5.2 Fix the empty review on #157 (design D8, owner, 2026-10-26): pass `--setting-sources user`, pinned by
       `test_claude_review_workflow.py` with mutations for no sources, `user,project` and `project`, and record it in
       the workflow's comment, the spec and `docs/development-workflow.md`. Verify the tests pass, and that #157's
-      review run for the new head posts comments, with no permission denial in its log
+      review run for the new head posts comments, with no permission denial in its log. Done: run 40287328446 (4ad32a4)
+      loaded settings from `user` only, took 13 turns with 0 permission denials, and posted a summary and three inline
+      comments. One said `--setting-sources user` may stop `CLAUDE.md` loading, so the prompt now says to Read it
+      first
 
 ## Workflow follow-up
 
