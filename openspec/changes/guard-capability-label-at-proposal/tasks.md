@@ -2,14 +2,21 @@
 
 ## 1. One parser for the Capability: line (design D6)
 
-- [ ] 1.1 Move `purpose_lines`, `capability_line`, `capability_labels`, `MalformedCapabilityLineError`,
+- [x] 1.1 Move `purpose_lines`, `capability_line`, `capability_labels`, `MalformedCapabilityLineError`,
   `CAPABILITY_LINE` and `CAPABILITY_SHAPE` from `scripts/oob.py` into `scripts/guard.py`, unchanged, and import them
   in `oob.py` from `guard`. Verify `uv run pytest scripts/tests/test_oob.py` passes with the test file unchanged, and
-  `uv run scripts/oob.py` on `main` reports the same differences as before the move (record both outputs here)
-- [ ] 1.2 Add tests in the guard's test suite for the moved parser, called from `guard`: a well-formed line with one
+  `uv run scripts/oob.py` on `main` reports the same differences as before the move (record both outputs here).
+  Result: `test_oob.py` unchanged, 81 passed. `oob.py` imports the parser from `guard` and re-exports
+  `capability_labels`, which the test reads as `oob.capability_labels`. `uv run scripts/oob.py` before and after the
+  move both print `oob: no differences (.github files, org settings, App installations, issue types, projects, troupe
+  specs, troupe label descriptions, code security, milestones, board capabilities)` and exit 0. Python sources have
+  no scope in `scripts/check-paths.toml`, so a change to `guard.py` still runs the full check, `test_oob.py`
+  included
+- [x] 1.2 Add tests in the guard's test suite for the moved parser, called from `guard`: a well-formed line with one
   and with two labels, no Purpose, a first line that isn't the line, `Capabilities:` and `capability:` as malformed,
   a repeated label, and a trailing `(and git)`. Tag them as `scripts/check-paths.toml` requires. Verify they pass, and
-  that `guard_pytest` reports no untagged read
+  that `guard_pytest` reports no untagged read. Result: `scripts/tests/test_guard_capability_labels.py`, 10 passed;
+  the tests read no file, so none needs a tag, and `guard_pytest` reported nothing
 
 ## 2. The capability-label rule (design D1, D2, D5)
 
