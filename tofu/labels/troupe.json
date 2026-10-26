@@ -55,6 +55,11 @@
     "description": "Open requests addressed to a role, with a brief, raised by gates and escalations"
   },
   {
+    "name": "cap:development",
+    "color": "1D76DB",
+    "description": "How troupe itself is built, tested and released: the check, flaky tests, Python versions, releases"
+  },
+  {
     "name": "cap:docs-publishing",
     "color": "1D76DB",
     "description": "How a change to troupe reaches troupe.run: which pushes rebuild /docs, what the notice job may do"
@@ -82,7 +87,7 @@
   {
     "name": "cap:flows",
     "color": "1D76DB",
-    "description": "TBD"
+    "description": "How actors are arranged: in sequence, in parallel with fork and join, in loops, and as swarms"
   },
   {
     "name": "cap:gates",
