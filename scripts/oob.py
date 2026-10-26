@@ -12,6 +12,7 @@ import base64
 import dataclasses
 import json
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -122,8 +123,10 @@ CHECKS = [
 ]
 
 
-# troupe's spec folders, each of which needs a cap:<folder> label (spec: labels). The check is one
-# way, unlike CHECKS: a label with no spec isn't reported, since a label can come before its spec.
+# troupe's specs, each of which names its capability labels in a Capability: line, the first
+# non-blank line of its Purpose (spec: labels; spec-capability-label-check design D1, D2; troupe#170
+# design D2). The check is one way, unlike CHECKS: a label no spec names isn't reported, since a
+# label can come before its spec.
 SPECS_GH_ARGS = [
     "api",
     f"repos/{ORG}/troupe/contents/openspec/specs",
@@ -131,25 +134,11 @@ SPECS_GH_ARGS = [
     '[.[] | select(.type == "dir") | .name]',
 ]
 TROUPE_LABELS = "tofu/labels/troupe.json"
+CAPABILITY_SHAPE = "Capability: `cap:<name>`, `cap:<name>`"
+CAPABILITY_LINE = re.compile(r"Capability: (`[^`\s]+`(?:, `[^`\s]+`)*)")
 
 
-def unlabelled_specs(specs: list[str], root: Path) -> list[str]:
-    """Each troupe spec folder with no declared cap:<folder> label."""
-    labels = {label["name"] for label in json.loads((root / TROUPE_LABELS).read_text())}
-    return [
-        f"troupe specs: {spec!r} has no cap:{spec} label; add it to {TROUPE_LABELS} by pull request"
-        for spec in sorted(specs)
-        if f"cap:{spec}" not in labels
-    ]
-
-
-# The Purpose each troupe-spec-based cap: label's description was written from, verbatim with its
-# whitespace collapsed, so a Purpose troupe later rewrites shows up (spec: labels;
-# cap-label-descriptions design D1, D2).
-PURPOSES = "troupe-spec-purposes.json"
-
-
-def purpose_gh_args(spec: str) -> list[str]:
+def spec_md_gh_args(spec: str) -> list[str]:
     return [
         "api",
         f"repos/{ORG}/troupe/contents/openspec/specs/{spec}/spec.md",
@@ -158,8 +147,23 @@ def purpose_gh_args(spec: str) -> list[str]:
     ]
 
 
-def purpose(spec_md: str) -> str:
-    """The text of a spec's `## Purpose` section, whitespace collapsed; "" when there is none."""
+def spec_documents(fetch: Fetch) -> dict[str, str]:
+    """Each troupe spec's spec.md, read once for both troupe checks (design D1). A spec that
+    can't be read makes the whole check unreadable, naming the spec: never "no label"."""
+    documents: dict[str, str] = {}
+    for spec in fetch(SPECS_GH_ARGS):
+        try:
+            content = fetch(spec_md_gh_args(spec))["content"]
+        except Exception as error:
+            raise UnreadableError(
+                f"troupe specs: couldn't read {spec!r}'s spec.md ({reason(error)})"
+            ) from error
+        documents[spec] = base64.b64decode(content).decode()
+    return documents
+
+
+def purpose_lines(spec_md: str) -> list[str]:
+    """The lines of a spec's `## Purpose` section; [] when there is none."""
     lines: list[str] = []
     inside = False
     for line in spec_md.splitlines():
@@ -169,35 +173,103 @@ def purpose(spec_md: str) -> str:
             inside = line.strip() == "## Purpose"
         elif inside:
             lines.append(line)
+    return lines
+
+
+def capability_line(spec_md: str) -> str | None:
+    """The Purpose's first non-blank line when it's meant as the Capability: line, else None.
+    Any spelling of capability or capabilities, in any case, is meant as the line, so a misspelt
+    one is malformed rather than "no label" (design D2)."""
+    first = next((line.strip() for line in purpose_lines(spec_md) if line.strip()), "")
+    return first if first.lower().startswith("capabilit") else None
+
+
+class MalformedCapabilityLineError(Exception):
+    """A Capability: line that isn't in the agreed shape: never read as naming no label, or as
+    naming the labels it seems to (design D2)."""
+
+
+def capability_labels(spec_md: str) -> list[str]:
+    """The labels a spec names in its Capability: line; [] when it has none."""
+    line = capability_line(spec_md)
+    if line is None:
+        return []
+    match = CAPABILITY_LINE.fullmatch(line)
+    labels = [label.strip("`") for label in match.group(1).split(", ")] if match else []
+    if not labels or len(set(labels)) != len(labels):
+        raise MalformedCapabilityLineError(line)
+    return labels
+
+
+def spec_labels(documents: dict[str, str], root: Path) -> list[str]:
+    """Each troupe spec that names no label, has a malformed Capability: line, or names a label
+    that isn't declared."""
+    declared = {label["name"] for label in json.loads((root / TROUPE_LABELS).read_text())}
+    found: list[str] = []
+    for spec in sorted(documents):
+        try:
+            labels = capability_labels(documents[spec])
+        except MalformedCapabilityLineError as error:
+            found.append(
+                f"troupe specs: {spec!r} Capability: line is malformed: {str(error)!r}; "
+                f"write it as {CAPABILITY_SHAPE}"
+            )
+            continue
+        if not labels:
+            found.append(
+                f"troupe specs: {spec!r} names no capability label; add a Capability: line as "
+                "the first line of its Purpose in troupe-run/troupe"
+            )
+        found += [
+            f"troupe specs: {spec!r} names {label!r}, which isn't declared; add it to "
+            f"{TROUPE_LABELS} by pull request, or correct the spec in troupe-run/troupe"
+            for label in labels
+            if label not in declared
+        ]
+    return found
+
+
+# The Purpose of each troupe spec, without its Capability: line, verbatim with its whitespace
+# collapsed. The descriptions of the labels a spec names are written from it, so a Purpose troupe
+# later rewrites shows up (spec: labels; spec-capability-label-check design D3).
+PURPOSES = "troupe-spec-purposes.json"
+
+
+def purpose(spec_md: str) -> str:
+    """The text of a spec's `## Purpose` section without its Capability: line, whitespace
+    collapsed; "" when there is none."""
+    lines = purpose_lines(spec_md)
+    if capability_line(spec_md) is not None:
+        del lines[next(i for i, line in enumerate(lines) if line.strip())]
     return " ".join(" ".join(lines).split())
 
 
-def stale_descriptions(fetch: Fetch, specs: list[str], oob_dir: Path, root: Path) -> list[str]:
-    """Each labelled troupe spec whose Purpose isn't the one its label's description records."""
-    labels = {label["name"] for label in json.loads((root / TROUPE_LABELS).read_text())}
+def stale_descriptions(documents: dict[str, str], oob_dir: Path) -> list[str]:
+    """Each troupe spec whose Purpose isn't the one recorded for it, naming the labels it names,
+    whose descriptions were written from it; and each record with no spec."""
     recorded: dict[str, str] = json.loads((oob_dir / PURPOSES).read_text())
     record = f"oob/{PURPOSES}"
     found: list[str] = []
-    for spec in sorted(specs):
-        label = f"cap:{spec}"
-        if label not in labels:
-            continue  # unlabelled_specs reports it
-        if label not in recorded:
+    for spec in sorted(documents):
+        try:
+            labels = capability_labels(documents[spec])
+        except MalformedCapabilityLineError:
+            labels = []  # spec_labels reports the line
+        named = ", ".join(repr(label) for label in labels) or "the labels it names"
+        if spec not in recorded:
             found.append(
-                f"troupe labels: {label!r} description hasn't been checked against its spec's "
-                f"Purpose; record the Purpose in {record}"
+                f"troupe labels: {spec!r} spec's Purpose isn't recorded; check the descriptions "
+                f"of {named} against it and record it in {record}"
             )
-            continue
-        content = base64.b64decode(fetch(purpose_gh_args(spec))["content"]).decode()
-        if purpose(content) != " ".join(recorded[label].split()):
+        elif purpose(documents[spec]) != " ".join(recorded[spec].split()):
             found.append(
-                f"troupe labels: {label!r} spec's Purpose has changed; review its description in "
-                f"{TROUPE_LABELS} and update {record}"
+                f"troupe labels: {spec!r} spec's Purpose has changed; review the descriptions of "
+                f"{named} in {TROUPE_LABELS} and update {record}"
             )
-    for label in sorted(recorded.keys() - {f"cap:{spec}" for spec in specs}):
+    for spec in sorted(recorded.keys() - documents.keys()):
         found.append(
-            f"troupe labels: {label!r} has a recorded Purpose but troupe has no "
-            f"{label.removeprefix('cap:')} spec; remove it from {record}"
+            f"troupe labels: {spec!r} has a recorded Purpose but troupe has no {spec} spec; "
+            f"remove it from {record}"
         )
     return found
 
@@ -442,19 +514,17 @@ def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT) -> Report:
     report = Report()
     for check in CHECKS:
         report.attempt(check.name, partial(check_declaration, check, fetch, oob_dir, root))
-    specs: list[str] = []
+    documents: dict[str, str] = {}
 
     def labels() -> list[str]:
-        specs.extend(fetch(SPECS_GH_ARGS))
-        return unlabelled_specs(specs, root)
+        documents.update(spec_documents(fetch))
+        return spec_labels(documents, root)
 
     if report.attempt("troupe specs", labels):
-        report.attempt(
-            "troupe label descriptions", lambda: stale_descriptions(fetch, specs, oob_dir, root)
-        )
+        report.attempt("troupe label descriptions", lambda: stale_descriptions(documents, oob_dir))
     else:
         report.unreadable.append(
-            "troupe label descriptions: not checked, since troupe's spec list couldn't be read"
+            "troupe label descriptions: not checked, since troupe's specs couldn't be read"
         )
     report.attempt("code security", lambda: code_security(fetch, oob_dir))
     report.attempt("milestones", lambda: undeclared_milestones(fetch, root))

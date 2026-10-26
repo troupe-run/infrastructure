@@ -57,10 +57,12 @@ twice.
 `capability_labels(spec_md)` returns the labels named, or a finding:
 
 - The `## Purpose` section is found as `purpose()` finds it today. Its first non-blank line is the candidate.
-- **No Purpose section, or a first line that doesn't begin with `Capability`:** the spec names no label.
+- **No Purpose section, or a first line that doesn't begin with `capabilit` in any case:** the spec names no
+  label.
   `troupe specs: 'cli' names no capability label; add a Capability: line as the first line of its Purpose in
   troupe-run/troupe`.
-- **A first line that begins with `Capability`** is the line. Once trailing whitespace is stripped, it must fully
+- **A first line that begins with `capabilit` in any case** (so `Capabilities:` and `capability:` too) is the
+  line. Once trailing whitespace is stripped, it must fully
   match `Capability: ` + `` `label` `` (`, ` + `` `label` ``)\*, where a label has no backtick or whitespace, and no
   label may appear twice. Anything else is malformed: `troupe specs: 'stages' Capability: line is malformed:
   'Capability: cap:stages'; write it as Capability: `cap:<name>`, `cap:<name>` ` (spec: "A malformed Capability
