@@ -49,9 +49,6 @@
       `--max-turns` chosen from them (the design's open question). If any step needed more access than D1 gives,
       stop and bring it to the owner before going on. Then delete the probe. Verify it returns 404. Done: findings under the Migration Plan, `--max-turns 30` kept, and the repository
       returns 404 (2026-10-26)
-- [ ] 2.5 Check the bot skip, which the probe can't do with a real bot: the job's `if:` is pinned by 1.1's test, and
-      the first Dependabot or release pull request after delivery shows the job as skipped. Record which run proves
-      it on #154 when it happens
 
 ## 3. The credential (design D3)
 
@@ -59,8 +56,10 @@
       `claude setup-token`, the 1Password item, D3's set command (read into a variable, then `&&`), the check by name
       of the secret's repositories, that it lasts a year, rotation, and that no App is installed and why (design D1).
       Verify the commands match D3 exactly, and `uv run scripts/check.py` passes
-- [ ] 3.2 Owner: set the org secret with D3's command, before the pull request opens, and note the token's expiry
-      date on #154. Verify by name that its repositories are exactly troupe, infrastructure and website
+- [x] 3.2 Owner: set the org secret with D3's command, before the pull request opens, and note the token's expiry
+      date on #154. Verify by name that its repositories are exactly troupe, infrastructure and website. Done
+      (2026-10-26): visibility `selected`, repositories `infrastructure`, `troupe`, `website`. The token was made
+      that morning with `claude setup-token`, so it expires about 2027-10-26
 
 ## 4. Delivery (design D6)
 
@@ -87,15 +86,20 @@
 - [ ] 5.1 Open the pull request with `Closes #154`, D1's decision and the probe's findings. Verify that this pull
       request's own run of `claude-review` posts a review from its head (the first live review, in infrastructure),
       that its log shows only read access to contents, and that the plan on it matches 4.2
-- [ ] 5.2 After the apply: read `.github/workflows/claude-review.yml` and `.github/guard-delivery.json` in troupe and
-      website. Verify each matches its source and the list names the workflow
-- [ ] 5.3 On the first pull request in troupe and in website after delivery, verify a review is posted and its log
-      shows only read access to contents. Link both runs on #154. If either repository has no pull request within the
-      week, say so on #154 rather than opening one just to test
 
 ## Workflow follow-up
 
+These happen only after the merge and the apply, so they're bullets, not tasks: the change is archived before it
+merges. #154 stays open until they're done.
+
+- Read `.github/workflows/claude-review.yml` and `.github/guard-delivery.json` in troupe and website. Check each
+  matches its source and the list names the workflow.
+- On the first pull request in troupe and in website after delivery, check a review is posted and its log shows only
+  read access to contents. Link both runs on #154. If either repository has no pull request within the week, say so
+  on #154 rather than opening one just to test.
+- On the first Dependabot or release pull request after delivery, check the review job shows as skipped and the run
+  didn't fail. The job's `if:` is pinned by `test_claude_review_workflow.py` until then. Link the run on #154.
 - Archive the change on the branch, rebase onto main's latest state commit, then ask for the plan approval once.
-- After the merge: comment on #154 with the PR, the archived change and the runs from 5.1 and 5.3 (or that 5.3 is
-  still to come, in which case #154 stays open until it's done). Check #154's state and its card.
+- After the merge: comment on #154 with the PR, the archived change and the run from 5.1, and what's still to come
+  from the bullets above. Close #154 only once they're done, then check its card says Done.
 - Delete the worktree and branch once merged and verified.
