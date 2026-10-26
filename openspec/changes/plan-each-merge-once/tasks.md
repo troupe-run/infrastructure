@@ -4,10 +4,10 @@
 
 - [x] 0.1 Set #167's card to In Progress. Done: `gh issue view 167 -R troupe-run/infrastructure --json projectItems`
       shows In Progress (2026-10-26)
-- [ ] 0.2 Owner: accept the one case that still plans nothing (design D1, Risks: state committed after a later merge,
+- [x] 0.2 Owner: accept the one case that still plans nothing (design D1, Risks: state committed after a later merge,
       from an apply whose plan predates the earlier merge), and the deviation from #167's "plans nothing" (proposal).
       Record the answer here before the pull request. (It was "before 2.1"; the answer changes only that one case
-      in the script, not the workflow's wiring, so 2.x went ahead.)
+      in the script, not the workflow's wiring, so 2.x went ahead.) Done (owner, 2026-10-26): both accepted
 
 ## 1. The decision script (design D1, D2)
 
