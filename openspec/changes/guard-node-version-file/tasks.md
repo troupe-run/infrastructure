@@ -42,9 +42,12 @@
 - [x] 3.1 Rerun 1.2's command against the new `guard.yml`. Verify website's test passes unchanged, and record both
   results (old fails, new passes) in the pull request. Result: 8 of 8 pass on the new `guard.yml`, with website's test
   unchanged. website's own checkout still has the old `guard.yml`, so the run read the scratch copy
-- [ ] 3.2 Push the branch and open the pull request (`Closes #155`). Verify this repository's `guard` run on it
+- [x] 3.2 Push the branch and open the pull request (`Closes #155`). Verify this repository's `guard` run on it
   passes and its log says `No .nvmrc here, so Node 22.23.4, the guard's pin`, and that the PR's plan comment shows
-  only `guard.yml`'s content changing, for troupe and website
+  only `guard.yml`'s content changing, for troupe and website. Result: PR #156. Both `guard` runs on 1d3f100 (push
+  and pull request) pass and log that line, then download 22.23.4 from `node-version-file: .nvmrc`. The plan for
+  1d3f100 is 0 to add, 2 to change, 0 to destroy: `github_repository_file.guard` for `.github/workflows/guard.yml`
+  in troupe and website, content and commit message in place. No modes to set
 
 ## Workflow follow-up
 
