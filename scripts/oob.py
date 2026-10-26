@@ -12,7 +12,6 @@ import base64
 import dataclasses
 import json
 import os
-import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -20,6 +19,16 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import Any
+
+# The Capability: line's reading is the guard's, so its shape lives in one place
+# (guard-capability-label-at-proposal design D6). capability_labels is re-exported for oob's tests.
+from guard import (
+    CAPABILITY_SHAPE,
+    MalformedCapabilityLineError,
+    capability_line,
+    purpose_lines,
+)
+from guard import capability_labels as capability_labels
 
 ROOT = Path(__file__).resolve().parent.parent
 OOB = ROOT / "oob"
@@ -134,8 +143,6 @@ SPECS_GH_ARGS = [
     '[.[] | select(.type == "dir") | .name]',
 ]
 TROUPE_LABELS = "tofu/labels/troupe.json"
-CAPABILITY_SHAPE = "Capability: `cap:<name>`, `cap:<name>`"
-CAPABILITY_LINE = re.compile(r"Capability: (`[^`\s]+`(?:, `[^`\s]+`)*)")
 
 
 def spec_md_gh_args(spec: str) -> list[str]:
@@ -160,45 +167,6 @@ def spec_documents(fetch: Fetch) -> dict[str, str]:
             ) from error
         documents[spec] = base64.b64decode(content).decode()
     return documents
-
-
-def purpose_lines(spec_md: str) -> list[str]:
-    """The lines of a spec's `## Purpose` section; [] when there is none."""
-    lines: list[str] = []
-    inside = False
-    for line in spec_md.splitlines():
-        if line.startswith("## "):
-            if inside:
-                break
-            inside = line.strip() == "## Purpose"
-        elif inside:
-            lines.append(line)
-    return lines
-
-
-def capability_line(spec_md: str) -> str | None:
-    """The Purpose's first non-blank line when it's meant as the Capability: line, else None.
-    Any spelling of capability or capabilities, in any case, is meant as the line, so a misspelt
-    one is malformed rather than "no label" (design D2)."""
-    first = next((line.strip() for line in purpose_lines(spec_md) if line.strip()), "")
-    return first if first.lower().startswith("capabilit") else None
-
-
-class MalformedCapabilityLineError(Exception):
-    """A Capability: line that isn't in the agreed shape: never read as naming no label, or as
-    naming the labels it seems to (design D2)."""
-
-
-def capability_labels(spec_md: str) -> list[str]:
-    """The labels a spec names in its Capability: line; [] when it has none."""
-    line = capability_line(spec_md)
-    if line is None:
-        return []
-    match = CAPABILITY_LINE.fullmatch(line)
-    labels = [label.strip("`") for label in match.group(1).split(", ")] if match else []
-    if not labels or len(set(labels)) != len(labels):
-        raise MalformedCapabilityLineError(line)
-    return labels
 
 
 def spec_labels(documents: dict[str, str], root: Path) -> list[str]:
