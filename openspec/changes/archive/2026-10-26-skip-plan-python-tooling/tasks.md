@@ -35,9 +35,9 @@
 
 ## 5. Verify on GitHub
 
-- [ ] 5.1 Open the pull request (`Closes #175`). Verify the `does it need a plan?` job outputs `plan=true` for it
+- [x] 5.1 Open the pull request (`Closes #175`). Verify the `does it need a plan?` job outputs `plan=true` for it
   (it changes `scripts/plan_needed.py`), and, once the owner approves the `plan-pr` run, that the posted plan shows no
-  changes. Record the run links here
+  changes. Record the run links here. Result: #179. In [run 40333492107](https://github.com/troupe-run/infrastructure/actions/runs/40333492107), `does it need a plan?` passed and `plan (pull request)` waited for `plan-pr`, which it does only on `plan=true`. After the owner approved, the [plan for 23dcc7f](https://github.com/troupe-run/infrastructure/pull/179#issuecomment-6417685832) showed no changes and no modes to set. Every other check passed
 - [x] 5.2 Check the skip against a real bump: in a scratch clone of this branch, commit `uv lock --upgrade-package
   <one dev dependency>`, and pipe `git diff --name-only HEAD~1...HEAD` to the branch's `scripts/plan_needed.py`, as
   the `changes` job does. Verify it prints `plan=false`, and `plan=true` once `tofu/.terraform.lock.hcl` is touched in
