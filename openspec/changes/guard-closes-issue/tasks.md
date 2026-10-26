@@ -56,11 +56,14 @@
 
 ## 4. Docs
 
-- [ ] 4.1 In `docs/development-workflow.md`: the `guard` check's row says it checks a pull request's description
+- [x] 4.1 In `docs/development-workflow.md`: the `guard` check's row says it checks a pull request's description
   closes an issue (re-run when edited, release-please's exempt); `pr-closes-issue`'s row says it's also checked on
   GitHub for every pull request, however opened, with the fix `gh pr edit` or editing on GitHub; the "Dependabot
   pull requests" section says their pull requests also fail `pr-closes-issue`. Verify `uv run pytest
-  scripts/tests/test_guard_docs.py` passes, and `uv run scripts/check.py` passes
+  scripts/tests/test_guard_docs.py` passes, and `uv run scripts/check.py` passes. Result: the layer column takes one value
+  (`test_guard_docs.py`'s pattern), so the row stays `Claude` and says in its text that the `guard` check applies
+  it on GitHub, as `commit-message`'s row does for the title. `test_guard_docs.py`: 3 passed; `scripts/check.py`
+  passed in the commit hook
 
 ## 5. Integration checks
 
