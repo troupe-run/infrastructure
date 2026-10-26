@@ -270,6 +270,13 @@ The same delivery takes it to every other governed repository, where it lands on
 stricter version can turn their `main` red at once. Before asking for the delivery plan's approval, run the new version
 over each governed repository's `main` (`openspec validate --all --strict`), and name any failure in the pull request.
 
+### The guard check's Node version
+
+The CLI runs on the Node of the repository's `.nvmrc`, where it has one. That keeps a repository's Node version in one
+place. Where there's no `.nvmrc`, the workflow writes its own pin (`NODE_VERSION`) to one in the run's checkout, and
+never commits it. No step names a Node version as an input, because website's test refuses any workflow that does
+(troupe-run/website#4, #155). `scripts/tests/test_guard_workflow.py` holds `guard.yml` to that rule.
+
 ## Where the templates come from
 
 The pull request template and the Bug, Feature and Decision issue forms are the org's defaults. Their source is
