@@ -65,11 +65,19 @@
       pass, and record the commands and results here. Done (2026-10-26, e412dc8's workflow, in scratch clones rather
       than worktrees, as claude-pr-review did): website at e2af256, `workflow-node-version.test.ts` 8 passed; troupe at
       2d24fcf, `scripts/check.py` all gates passed (2822 passed, 14 skipped)
-- [ ] 4.2 On this change's pull request, read its `claude review` run (design Migration Plan, step 1). Verify that the
+- [x] 4.2 On this change's pull request, read its `claude review` run (design Migration Plan, step 1). Verify that the
       guide's checkout step holds `.org-guide/CONTRIBUTING.md`, that the review's summary cites the guide, that the
       report step printed `No tool call was refused.` or one warning per denial matching `permission_denials_count`,
       that it shows no other session output, and that the review's comments are by `troupe-run-review[bot]`. Record
-      the run ID and what each check showed
+      the run ID and what each check showed. Done: run 40318381487 (2026-10-26), success. `GITHUB_TOKEN`:
+      Contents read and Metadata read only. The guide's checkout ran in non-cone sparse mode (`core.sparseCheckout
+      true`, the pattern in `.git/info/sparse-checkout`) from troupe-run/.github's main; the log lists no files, but no
+      `WebFetch` was tried. `permission_denials_count: 2`, and the report printed two warnings, both `Bash`: the
+      review tried to run `uv run pytest` and a `python3` hash of the report script, which its tools don't allow. So
+      the report names real denials, and they're the review checking our tests, not the guide. The log holds none of
+      the session's messages (no assistant text or tool results; the action's "full output hidden" line is there).
+      The summary is by `troupe-run-review`, cites `CONTRIBUTING.md`, finds nothing to change, and says it couldn't run
+      the tests
 - [x] 4.3 Run `tofu.py plan` against current state (fast-forward onto `origin/main` first). Verify it shows exactly
       `.github/workflows/claude-review.yml` changing in troupe and in website, and nothing else. Done (2026-10-26,
       rebased onto acb1af3, after the relabel's apply): 0 to add, 2 to change, 0 to destroy, both
