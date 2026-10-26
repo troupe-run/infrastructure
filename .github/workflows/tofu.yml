@@ -313,10 +313,13 @@ jobs:
       # The board's Capability options whose description isn't their label's (spec: labels;
       # board-capability-descriptions design D1). OpenTofu can't manage a Projects v2 field, so this
       # is a plan of its own. It only reads, with a token that can only read projects; the board job
-      # sets them after the apply.
+      # sets them after the apply. A board that can't be read, token included, is an error annotation
+      # and a line in the summary, never a failed plan: a board problem doesn't hold up every apply,
+      # and the oob job fails on the same read (design D9).
       - name: A read-only token for the board
         id: board-token
         if: steps.target.outputs.plan == 'true'
+        continue-on-error: true
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: 5272634
@@ -329,9 +332,10 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.board-token.outputs.token }}
         run: |
-          uv run --no-project scripts/board_options.py plan --out tofu/board-plan.json \
+          uv run --no-project scripts/board_options.py plan --ci --out tofu/board-plan.json \
             --summary "$RUNNER_TEMP/board.md"
-          if [ "$(jq '.changes | length' tofu/board-plan.json)" != "0" ]; then
+          # No board plan when the board couldn't be read: nothing to set.
+          if [ -f tofu/board-plan.json ] && [ "$(jq '.changes | length' tofu/board-plan.json)" != "0" ]; then
             echo "changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "changes=false" >> "$GITHUB_OUTPUT"

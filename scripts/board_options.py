@@ -2,7 +2,7 @@
 
 Usage (in .github/workflows/tofu.yml):
     # GH_TOKEN: any token that can read the org's projects
-    uv run --no-project scripts/board_options.py plan --out board-plan.json --summary board.md
+    uv run --no-project scripts/board_options.py plan --ci --out board-plan.json --summary board.md
     # GH_TOKEN: the troupe-run-board App's, with Projects: write
     uv run --no-project scripts/board_options.py apply --board-plan board-plan.json
 
@@ -12,6 +12,9 @@ options are never sent without their identity"); design: board-capability-descri
   approved with the OpenTofu plan (D1).
 - `plan` reads the field and `tofu/labels/troupe.json`, and lists each option whose description
   isn't its `cap:<option>` label's. An option with no label is left alone (D4). It only reads.
+  With --ci, a board it can't read is reported, with an error annotation, and writes no board
+  plan, so the OpenTofu plan goes on without it rather than a board problem holding up every
+  apply (D9).
 - `apply` re-reads the field and refuses if it isn't the one the plan read (D3).
   `updateProjectV2Field` replaces the whole option list, and an option sent without its id loses
   every card's value for it, so it sends every option read, in order, with its id, name and colour,
@@ -143,6 +146,30 @@ def make_plan(graphql: GraphQL, project: int, labels: dict[str, str]) -> dict[st
         "before": options,
         "changes": [asdict(change) for change in description_changes(options, labels)],
     }
+
+
+def unread_summary(reason: str) -> str:
+    """Markdown for the run summary when the field couldn't be read (D9)."""
+    return (
+        f"#### The {BOARD} board's {FIELD} descriptions\n\n"
+        f"**Couldn't be read, so none are planned:** {reason}. The OpenTofu plan goes on without "
+        "them; the drift job reports the board as unreadable, and the next plan of `main` reads "
+        "it again.\n"
+    )
+
+
+def annotation(message: str) -> str:
+    """A GitHub Actions error annotation, escaped so the message can't end or split it."""
+    escaped = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    return f"::error title=board descriptions::{escaped}"
+
+
+def reason(error: BaseException) -> str:
+    """What went wrong with a read, in gh's words where it gave some."""
+    if isinstance(error, subprocess.CalledProcessError):
+        lines = [line for line in str(error.stderr or "").splitlines() if line.strip()]
+        return lines[-1].strip() if lines else f"gh exited {error.returncode}"
+    return str(error) or type(error).__name__
 
 
 def cell(text: str) -> str:
@@ -289,12 +316,31 @@ def main(argv: list[str], graphql: GraphQL = graphql_with_gh) -> int:
     plan.add_argument(
         "--labels", default=LABELS, type=Path, help="default: tofu/labels/troupe.json"
     )
+    plan.add_argument(
+        "--ci",
+        action="store_true",
+        help="for tofu.yml: a board that can't be read is reported, not fatal, and no plan written",
+    )
     apply = sub.add_parser("apply", help="set the descriptions a board plan lists")
     apply.add_argument("--board-plan", required=True, type=Path)
     args = parser.parse_args(argv)
     try:
         if args.command == "plan":
-            made = make_plan(graphql, args.project, label_descriptions(args.labels))
+            # The labels are this checkout's: a broken file is always an error.
+            labels = label_descriptions(args.labels)
+            try:
+                made = make_plan(graphql, args.project, labels)
+            except Exception as error:  # any failed read of the board, and named
+                if not args.ci:
+                    raise BoardError(f"couldn't read the board ({reason(error)})") from error
+                # No board plan, so the board job has nothing to apply (D9).
+                args.out.unlink(missing_ok=True)
+                args.summary.write_text(unread_summary(reason(error)), encoding="utf-8")
+                print(
+                    annotation(f"couldn't read the {BOARD} board's {FIELD} field: {reason(error)}")
+                )
+                print(unread_summary(reason(error)), end="")
+                return 0
             args.out.write_text(json.dumps(made, indent=2) + "\n", encoding="utf-8")
             args.summary.write_text(summary(made), encoding="utf-8")
             print(summary(made), end="")

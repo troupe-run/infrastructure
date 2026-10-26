@@ -79,6 +79,15 @@
       Verify the checklist at the end of the section says the same
       Done 2026-10-26: step 6 adds the option with the label's description and says the `board` job sets it
       otherwise; step 7 checks the drift check reports nothing about the board; checklist items 6 and 7 say the same
+- [x] 4.3 Make a board that can't be read in the plan job of `main` a reported error, not a failed plan (design D9):
+      `board_options.py plan --ci` writes no board plan, an error annotation and an "unread" summary, and exits 0;
+      the plan's board token continues on error; the step counts changes only when the board plan was written.
+      Verify with tests: in CI an unreadable board is reported and leaves no plan (a stale one removed), outside CI it
+      exits 1 naming why, a broken labels file is still an error, and `test_board_job.py` names `plan` run without
+      `--ci` and the token step without `continue-on-error`. Then `uv run scripts/check.py` passes
+      Done 2026-10-26: 4 tests in `test_board_options.py` and 2 more breakings in `test_board_job.py`; 46 passed
+      across both, `actionlint` clean. The spec gained the scenario "A board that can't be read doesn't hold up the
+      apply"
 
 ## Workflow follow-up
 

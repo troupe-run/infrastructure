@@ -126,6 +126,19 @@ boundary (the guard's own stance): the owner's review of the plan is the gate.
 description differs from its label's (D4), naming the option, its description on the board and the label's, and
 saying the next approved apply sets it. The read-only `oob` token can already read it.
 
+### D9. A board that can't be read doesn't hold up an apply
+
+The plan job of `main` plans OpenTofu too, so failing it on a board read would stop every apply, a ruleset or guard
+fix included, for a Projects outage, a renamed field or a token problem. Holding up the org for a description that
+can wait a day is the choice that can lock the owner out. So in CI (`plan --ci`), a failed read of the board, its
+token included (`continue-on-error` on the token step), writes no board plan, an error annotation and a summary line
+naming why, and the step succeeds. With no board plan, `changes` is OpenTofu's and the modes' alone, and the `board`
+job is skipped. The labels file is this checkout's, so a broken one is still an error.
+
+It isn't a silent fall-through: the `oob` job reads the same field, reports it as unreadable and fails the run, which
+is how the owner hears of it, and the plan's summary says it in place of "none to set". Outside CI, a failed read
+exits 1. Raised by a side agent, and decided by the owner (2026-10-26).
+
 ## Risks / Trade-offs
 
 - [The documented id behaviour doesn't hold, and a card loses its value] → The probe (D6) runs first. Before the first
@@ -138,6 +151,8 @@ saying the next approved apply sets it. The read-only `oob` token can already re
 - [Two descriptions for one capability briefly] → Only between a label's merge and its apply, the same window as the
   label itself on GitHub.
 - [`board_options.py apply` run by an agent locally on the live board] → D7.
+- [A board that can't be read hides that descriptions are stale] → D9: the plan's summary and an annotation say so,
+  and the `oob` job fails on the same read.
 
 ## Migration Plan
 
