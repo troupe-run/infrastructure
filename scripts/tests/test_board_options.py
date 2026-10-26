@@ -239,13 +239,28 @@ def test_a_file_that_isn_t_a_board_plan_refuses(tmp_path: Path) -> None:
         board_options.read_plan(path)
 
 
-def test_main_reports_a_refusal_and_exits_1(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def test_main_outside_ci_refuses_the_live_board_and_exits_1(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # Unset, as on a laptop: the tests themselves run in CI, where GitHub sets it.
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     path = tmp_path / "plan.json"
     path.write_text(json.dumps(plan_for(OPTIONS, project=board_options.PROJECT)))
-    assert board_options.main(["apply", "--board-plan", str(path)], FakeBoard(OPTIONS)) == 1
-    assert "board_options: " in capsys.readouterr().err
+    board = FakeBoard(OPTIONS)
+    assert board_options.main(["apply", "--board-plan", str(path)], board) == 1
+    assert "not by a local run" in capsys.readouterr().err
+    assert board.sent == []
+
+
+def test_main_in_github_actions_sets_the_live_board_s_descriptions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    path = tmp_path / "plan.json"
+    path.write_text(json.dumps(plan_for(OPTIONS, project=board_options.PROJECT)))
+    board = FakeBoard(OPTIONS)
+    assert board_options.main(["apply", "--board-plan", str(path)], board) == 0
+    assert len(board.sent) == 1
 
 
 # --- a board that can't be read (design D9) ----------------------------------------------------
