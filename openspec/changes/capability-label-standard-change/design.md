@@ -67,6 +67,22 @@ Alternative: an issue form for the sub-issue. Rejected for now: forms are org de
 6. **After the merge and the apply:** the label on the needing issue with `gh issue edit --add-label`, the board's
    option (the owner's, D4), the sub-issue closed if the merge didn't, its card Done, and the comment.
 
+Probed on 2026-10-26 (task 1.1) with two private throwaway repositories, `troupe-run/infra-probe-20261026-a` (the
+label's repository, with milestone `0.1.0`) and `-b` (the needing issue's), deleted afterwards. Auto mode refused
+creating public ones, and nothing probed depends on visibility. Each command succeeded:
+
+```
+gh issue create -R troupe-run/infra-probe-20261026-b --title "probe epic" --type Epic …            → b#1
+gh issue create -R troupe-run/infra-probe-20261026-b --title "probe needing issue" --type Feature … → b#2
+gh issue create -R troupe-run/infra-probe-20261026-a --title 'Add the `cap:probe` capability label' --type Task --milestone 0.1.0 … → a#1
+gh issue edit 1 -R troupe-run/infra-probe-20261026-b --add-sub-issue <b#2 url>,<a#1 url>
+gh issue edit 2 -R troupe-run/infra-probe-20261026-b --add-blocked-by <a#1 url>
+```
+
+Read back: `a#1` is a Task in `0.1.0` with parent `b#1`; `b#2`'s `dependencies/blocked_by` lists `a#1`, and `a#1`'s
+`dependencies/blocking` lists `b#2`. So step 6 finds the needing issue from the sub-issue with
+`gh api repos/troupe-run/infrastructure/issues/<sub>/dependencies/blocking`.
+
 Step 4's `oob.py` run is where anything else a label needs shows up, such as a record #151 leaves in place. The
 runbook says to follow `oob/README.md` then, and writes nothing about those records itself, since #151 is changing
 them.

@@ -2,7 +2,7 @@
 
 ## 1. Probe what GitHub accepts
 
-- [ ] 1.1 On two throwaway repositories (`troupe-run/infra-probe-<date>-a` and `-b`), with milestone `0.1.0` on `-a`,
+- [x] 1.1 On two throwaway repositories (`troupe-run/infra-probe-<date>-a` and `-b`), with milestone `0.1.0` on `-a`,
       verify that `gh issue create -R …-a --type Task --milestone 0.1.0`, `gh issue edit <b-epic> -R …-b
       --add-sub-issue <a-issue-url>` and `gh issue edit <b-issue> -R …-b --add-blocked-by <a-issue-url>` all succeed,
       and that `gh api repos/…-a/issues/<n>` then shows the parent and `issues/<b>/dependencies/blocked_by` lists the
@@ -11,7 +11,7 @@
 
 ## 2. The label checks
 
-- [ ] 2.1 In `scripts/tests/test_labels.py`, write the byte-order, name-form and colour checks as functions that
+- [x] 2.1 In `scripts/tests/test_labels.py`, write the byte-order, name-form and colour checks as functions that
       return problems, each with tests that fail first on a bad list: `cap:cli` before `cap:claude-code-runner`
       (both named), `cap:Workspaces`, `cap:a--b`, `cap:-a` and `cap:` (each named with the form), a `cap:*` label
       coloured `5319E7` (named with the colour), and `cap:infrastructure` coloured `5319E7` (passes). Then add the
