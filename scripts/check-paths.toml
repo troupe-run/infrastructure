@@ -30,6 +30,11 @@ paths = ["tofu/descriptions.json"]
 [scopes.labels]
 paths = ["tofu/labels/**"]
 
+# The Dependabot policy, the configurations generated from it and their delivery (spec: dependency-updates). The
+# generator also reads tofu/labels/ and tofu/guard_delivery.tf, whose own scopes then run these tests too.
+[scopes.dependabot]
+paths = ["tofu/dependabot.json", "tofu/dependabot/**", "tofu/dependabot.tf"]
+
 # The workflows the schedule watch reads (spec: schedule-watch).
 [scopes.schedules]
 paths = ["scripts/watched-schedules.json"]

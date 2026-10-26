@@ -3,7 +3,6 @@ guard's tests depend on, and only then (spec: ci-apply; run-checks-by-path desig
 
 Named so it isn't one of the guard's own tests (test_guard_*.py), which the matrix runs."""
 
-import re
 import subprocess
 import sys
 
@@ -11,17 +10,14 @@ import pytest
 from conftest import REPO, SCRIPTS
 
 import guard_tests_needed
+import tofu_text
 
 GUARD_DELIVERY_TF = REPO / "tofu" / "guard_delivery.tf"
 
 
 def delivered_files(text: str) -> list[str]:
     """The `guard_files` list in guard_delivery.tf's text."""
-    found = re.search(r"guard_files = toset\(\[(.*?)\]\)", text, re.S)
-    assert found is not None, "guard_files isn't toset([...]); update this test"
-    files = re.findall(r'"([^"]+)"', found.group(1))
-    assert files, "guard_files lists no file; update this test"
-    return files
+    return tofu_text.guard_files(text)
 
 
 def uncovered(files: list[str]) -> list[str]:

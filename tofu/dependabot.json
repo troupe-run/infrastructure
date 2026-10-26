@@ -1,0 +1,12 @@
+{
+  "schedule": { "interval": "weekly", "day": "monday", "time": "00:00", "timezone": "UTC" },
+  "cooldown": {
+    "default-days": 7,
+    "semver-patch-days": 3,
+    "semver-minor-days": 7,
+    "semver-major-days": 14
+  },
+  "semver_cooldown": ["npm", "uv"],
+  "commit-message": { "prefix": "chore", "include": "scope" },
+  "directories": { "github-actions": "/", "npm": "/", "uv": "/" }
+}

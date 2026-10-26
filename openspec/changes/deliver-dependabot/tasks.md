@@ -22,10 +22,10 @@
   infrastructure's `repositories` and declare its label in `tofu/labels/dependabot.json`. Add the test that every
   repository's declared ecosystem has a directory, and the test that a missing one is named with its repository.
   Verify both pass, and the existing label tests still pass.
-- [ ] 2.2 Move the regex that reads `guard_files` from `tofu/guard_delivery.tf` into one helper that also reads
+- [x] 2.2 Move the regex that reads `guard_files` from `tofu/guard_delivery.tf` into one helper that also reads
   `guard_targets`. Use it in `test_needs_guard_tests.py` and `test_plan_needed.py`. Verify both test files pass
   unchanged in what they assert.
-- [ ] 2.3 Write `scripts/dependabot_config.py`, which generates each repository's YAML (D2, D3). Add a test for each
+- [x] 2.3 Write `scripts/dependabot_config.py`, which generates each repository's YAML (D2, D3). Add a test for each
   spec scenario the output can show:
   - each repository's ecosystems and directories, and no file for `.github`;
   - the schedule, with no `groups` or `open-pull-requests-limit`;
@@ -37,10 +37,10 @@
   - a workflow added to a fixture `guard_files` being excluded.
 
   Verify the tests pass under `uv run pytest`, and that mypy `--strict` and ruff are clean.
-- [ ] 2.4 Generate `tofu/dependabot/{troupe,website,infrastructure}.yml`, and add the freshness test. It fails naming
+- [x] 2.4 Generate `tofu/dependabot/{troupe,website,infrastructure}.yml`, and add the freshness test. It fails naming
   the stale file and the command that regenerates it. Verify it passes, then edit one generated file and verify it
   fails with that message, then revert.
-- [ ] 2.5 Add a `dependabot` scope to `scripts/check-paths.toml` for `tofu/dependabot.json`, `tofu/dependabot/**`
+- [x] 2.5 Add a `dependabot` scope to `scripts/check-paths.toml` for `tofu/dependabot.json`, `tofu/dependabot/**`
   and `tofu/dependabot.tf`, and tag the new tests with it. Verify `uv run scripts/check.py` passes with the
   guard_pytest tag check, and that `guard.py check-scope` reports the scope for a change to `tofu/dependabot.json`.
 
