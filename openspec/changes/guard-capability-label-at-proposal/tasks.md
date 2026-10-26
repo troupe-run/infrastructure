@@ -62,17 +62,24 @@
   no `GITHUB_TOKEN`, `uv run --no-project python -c 'import sys; sys.path.insert(0, "scripts"); import guard;
   print(len(guard.declared_labels()))'` prints 36, and the set equals the names in `git show
   origin/main:tofu/labels/troupe.json` Record the command and the count here
-- [ ] 3.3 In `.github/workflows/guard.yml`, add `GITHUB_TOKEN: ${{ github.token }}` to the "Check the workflow rules"
+- [x] 3.3 In `.github/workflows/guard.yml`, add `GITHUB_TOKEN: ${{ github.token }}` to the "Check the workflow rules"
   step's `env`, and mention the labels read in the file's header comment. Verify `uv run scripts/check.py` passes
-  (workflow lint included), and `scripts/tests/test_guard_workflow.py` still passes. Result: see this commit's
-  check run
+  (workflow lint included), and `scripts/tests/test_guard_workflow.py` still passes. Result: `scripts/check.py`
+  passed on 0fd9bda (1909 passed, 14 skipped for no pwsh). It has no separate workflow-lint gate; the workflow tests
+  in it (`test_guard_workflow.py`, `test_guard_delivery.py` among them) pass
 
 ## 4. Integration checks
 
-- [ ] 4.1 Run the rule over a troupe checkout, as CI would, with `GITHUB_REPOSITORY=troupe-run/troupe`: on troupe's
+- [x] 4.1 Run the rule over a troupe checkout, as CI would, with `GITHUB_REPOSITORY=troupe-run/troupe`: on troupe's
   `main` (a push to `main`, so all 25 specs), and on a scratch branch of it with a new spec's delta naming
   `cap:workspaces`. Verify the first passes and the second fails naming the change, the spec and the label, and
-  record both outputs here
+  record both outputs here. Result: in a scratch clone of troupe at `main` e998824, with this branch's
+  `guard.py ci --branch main` and `GITHUB_REPOSITORY=troupe-run/troupe`: `capability-label: judged 25 spec(s),
+  every spec, against 36 declared label(s)` and `every rule passes for main`, exit 0. On a scratch branch adding
+  the change `probe-workspaces`, whose new spec `workspaces` starts its Purpose with ``Capability:
+  `cap:workspaces` ``: exit 1, `capability-label: 1 problem(s) with the capability labels specs name: change
+  `probe-workspaces`: spec `workspaces` names `cap:workspaces`, which troupe-run/infrastructure doesn't declare
+  on main.`, with the standard change's link in the fix. Nothing was pushed
 - [ ] 4.2 Just before asking for the plan's approval, re-run 4.1's `main` case against troupe's latest `main`, so the
   delivery can't turn it red. Record the commit and the result here
 - [ ] 4.3 Push the branch and open the pull request (`Closes #153`). Verify this repository's `guard` runs pass and log
