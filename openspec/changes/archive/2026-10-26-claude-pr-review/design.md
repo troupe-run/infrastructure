@@ -212,6 +212,10 @@ Pass `--setting-sources user` in `claude_args`. The action otherwise loads `user
   it ("Claude loads settings from …"), and the workflow's comment says why it's there (D8).
 - [A future change to the review workflow adds a step a target's check refuses, as `guard.yml` did] → task 4.3's
   check runs again whenever the workflow changes; it's written into the workflow's header as the step to repeat.
+- [`Bash(gh pr comment:*)` is a prefix match, so it also allows `--edit-last`, `--delete-last` and other pull request
+  numbers] → raised by #157's review of 0f38499. Claude Code's rules can't pin the number, and the App's token can
+  only write pull requests in this repository, so a misled review could at worst edit or delete its own last comment,
+  or comment on another open pull request. Accepted.
 - [A human pull request that a bot later pushes to] → the action refuses the bot actor and that run fails. The
   review is advisory, so this is accepted.
 

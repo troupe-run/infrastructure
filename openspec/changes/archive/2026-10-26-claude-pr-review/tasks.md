@@ -127,7 +127,7 @@
 ## Workflow follow-up
 
 These happen only after the merge and the apply, so they're bullets, not tasks: the change is archived before it
-merges. #154 stays open until they're done.
+merges. #157 closes #154, since the guard requires a `Closes #n`, so they're tracked in #159.
 
 - Read `.github/workflows/claude-review.yml` and `.github/guard-delivery.json` in troupe and website. Check each
   matches its source and the list names the workflow.
@@ -137,6 +137,6 @@ merges. #154 stays open until they're done.
 - On the first Dependabot or release pull request after delivery, check the review job shows as skipped and the run
   didn't fail. The job's `if:` is pinned by `test_claude_review_workflow.py` until then. Link the run on #154.
 - Archive the change on the branch, rebase onto main's latest state commit, then ask for the plan approval once.
-- After the merge: comment on #154 with the PR, the archived change and the run from 5.1, and what's still to come
-  from the bullets above. Close #154 only once they're done, then check its card says Done.
+- After the merge: comment on #154 with the PR, the archived change and the runs from 5.1 and 6.6, and that the
+  bullets above are tracked in #159. Check #154 is closed and its card says Done.
 - Delete the worktree and branch once merged and verified.
