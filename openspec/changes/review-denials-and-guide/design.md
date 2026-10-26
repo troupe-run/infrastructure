@@ -29,8 +29,10 @@ See proposal.md for why. What shapes the approach (read 2026-10-26):
 - The review can read every document its prompt tells it to check.
 
 **Non-Goals:**
-- Finding the cause of run 40299015647's denial. Its execution file is gone with its runner. #159 finds the cause from
-  the next denial that's named.
+- Finding the cause of run 40299015647's denial. Its execution file is gone with its runner. Its likeliest cause is the
+  guide's URL (a local `claude -p` run asked to fetch it gave one `WebFetch` denial), which D4 removes, so it may never
+  recur to be named. #159's denial item is done when the first reviews in troupe and website each print
+  `No tool call was refused.`, or any denial they name is explained there (owner, 2026-10-26).
 - Failing a review on a denial. The review is advisory. A denial is a thing to look into, not a broken run.
 - Giving the review a URL fetch, `gh api`, or any other tool.
 
