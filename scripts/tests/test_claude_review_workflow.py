@@ -1,12 +1,19 @@
 """claude-review.yml reviews each member's pull request and can't change the repository (spec:
-pr-review; claude-pr-review design D1 to D4, D7, D8).
+pr-review; claude-pr-review design D1 to D4, D7, D8; review-denials-and-guide design D1 to D4).
 
 GitHub evaluates the workflow, so these tests pin what it's given: when it runs and what it
-skips, what its token may do, which credentials reach the action, and which tools Claude has."""
+skips, what its token may do, which credentials reach the action, which tools Claude has, what
+it checks out, and the one step of its own, which names the tool calls Claude was refused."""
 
 import copy
+import hashlib
+import json
+import os
 import re
 import shlex
+import subprocess
+import sys
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -14,6 +21,11 @@ import yaml
 from conftest import REPO
 
 REVIEW = REPO / ".github" / "workflows" / "claude-review.yml"
+FIXTURES = Path(__file__).parent / "fixtures"
+# Real execution files, captured with `claude -p --output-format stream-json` and stripped of the
+# owner's local setup; the result messages are as captured (review-denials-and-guide design D3).
+DENIED = FIXTURES / "claude-execution-denied.json"
+CLEAN = FIXTURES / "claude-execution-clean.json"
 EVENTS = ["opened", "synchronize", "reopened", "ready_for_review"]
 # The run's own token only checks out the code (design D1). No id-token: without it the action can't
 # swap OIDC for a Claude App token that writes contents.
@@ -78,6 +90,29 @@ TOOLS = {
 # design D8).
 SETTING_SOURCES = "user"
 PINNED = re.compile(r"^[\w.-]+/[\w.-]+@[0-9a-f]{40}$")
+# The org's contributing guide, checked out where Read(./**) reaches it, keeping no token: the
+# review has no tool that fetches a URL (review-denials-and-guide design D4).
+GUIDE = {
+    "repository": "troupe-run/.github",
+    "ref": "main",
+    "path": ".org-guide",
+    "sparse-checkout": "CONTRIBUTING.md",
+    "sparse-checkout-cone-mode": False,
+    "fetch-depth": 1,
+    "persist-credentials": False,
+}
+GUIDE_URL = "https://github.com/troupe-run/.github/blob/main/CONTRIBUTING.md"
+# The one step that runs a command: it names each tool call Claude was refused, from the action's
+# execution file, and shows nothing else of the session (design D1, D2). Its script is pinned by
+# hash, so changing it changes this test in the same diff.
+REPORT_NAME = "Name the tool calls Claude was refused"
+REPORT = {
+    "if": "${{ !cancelled() }}",
+    "continue-on-error": True,
+    "shell": "python3 {0}",
+    "env": {"EXECUTION_FILE": "${{ steps.review.outputs.execution_file }}"},
+}
+REPORT_SHA256 = "0226ac402c3987ad33791bf8b0176f07585e3f5059fab9541c473e56ccf9fcf6"
 
 
 def review() -> dict[str, Any]:
@@ -145,13 +180,17 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         found.append("review has no timeout-minutes")
 
     steps = job.get("steps") or []
+    reports = []
     for step in steps:
         uses = step.get("uses")
         if uses is not None and not PINNED.match(str(uses)):
             found.append(f"{uses!r} isn't pinned to a full commit SHA")
-        if "run" in step:
+        if "run" in step and step.get("name") == REPORT_NAME:
+            reports.append(step)
+        elif "run" in step:
             found.append(
-                f"review runs a command of its own ({step['run']!r}); only the action runs"
+                f"review runs a command of its own ({step['run']!r}); only the action and the "
+                "denials report run"
             )
     checkouts = [s for s in steps if str(s.get("uses", "")).startswith("actions/checkout@")]
     for step in checkouts:
@@ -159,6 +198,16 @@ def problems(workflow: dict[str, Any]) -> list[str]:
             found.append(
                 "the checkout leaves its token in .git/config (persist-credentials isn't false)"
             )
+    if len(checkouts) != 2:
+        found.append(
+            f"review checks out {len(checkouts)} times, not the pull request and the guide"
+        )
+    else:
+        own, guide = (dict(step.get("with") or {}) for step in checkouts)
+        if "repository" in own:
+            found.append(f"the first checkout is {own['repository']!r}, not the pull request's own")
+        if guide != GUIDE:
+            found.append(f"the guide's checkout is {guide!r}, not {GUIDE!r}")
     tokens = [step for step in steps if str(step.get("uses", "")).startswith(f"{MINTER}@")]
     actions = [step for step in steps if str(step.get("uses", "")).startswith(f"{ACTION}@")]
     if len(tokens) != 1:
@@ -178,6 +227,32 @@ def problems(workflow: dict[str, Any]) -> list[str]:
     if len(actions) != 1:
         return [*found, f"review uses {ACTION} {len(actions)} times, not once"]
     inputs = actions[0].get("with") or {}
+
+    if actions[0].get("id") != "review":
+        found.append(f"the action's step id is {actions[0].get('id')!r}, not review")
+    if len(reports) != 1:
+        found.append(f"review has {len(reports)} denials reports, not one")
+    for report in reports:
+        given = {key: report.get(key) for key in REPORT}
+        if given != REPORT:
+            found.append(f"the denials report is given {given!r}, not {REPORT!r}")
+        others = sorted(set(report) - {*REPORT, "name", "run"})
+        if others:
+            found.append(f"the denials report also has {others}")
+        script = str(report["run"])
+        if "${{" in script:
+            found.append("the denials report's script interpolates an expression; use its env")
+        if hashlib.sha256(script.encode()).hexdigest() != REPORT_SHA256:
+            found.append("the denials report's script isn't the one this test pins (REPORT_SHA256)")
+        if steps.index(report) < steps.index(actions[0]):
+            found.append("the denials report runs before the action")
+
+    prompt = str(inputs.get("prompt", ""))
+    for path in (".org-guide/CONTRIBUTING.md", "org-profile/CONTRIBUTING.md"):
+        if path not in prompt:
+            found.append(f"the prompt doesn't name {path}")
+    if GUIDE_URL in prompt:
+        found.append("the prompt names the guide by URL, which the review has no tool to fetch")
 
     for name, value in CREDENTIALS.items():
         if inputs.get(name) != value:
@@ -213,9 +288,28 @@ def job(w: dict[str, Any]) -> dict[str, Any]:
     return w["jobs"]["review"]  # type: ignore[no-any-return]
 
 
-def action(w: dict[str, Any]) -> dict[str, Any]:
+def action_step(w: dict[str, Any]) -> dict[str, Any]:
     step = next(s for s in job(w)["steps"] if str(s.get("uses", "")).startswith(ACTION))
+    return step  # type: ignore[no-any-return]
+
+
+def action(w: dict[str, Any]) -> dict[str, Any]:
+    return action_step(w)["with"]  # type: ignore[no-any-return]
+
+
+def report(w: dict[str, Any]) -> dict[str, Any]:
+    step = next(s for s in job(w)["steps"] if s.get("name") == REPORT_NAME)
+    return step  # type: ignore[no-any-return]
+
+
+def guide(w: dict[str, Any]) -> dict[str, Any]:
+    step = next(s for s in job(w)["steps"] if (s.get("with") or {}).get("repository"))
     return step["with"]  # type: ignore[no-any-return]
+
+
+def move(w: dict[str, Any], step: dict[str, Any], to: int) -> None:
+    steps = job(w)["steps"]
+    steps.insert(to, steps.pop(steps.index(step)))
 
 
 def token(w: dict[str, Any]) -> dict[str, Any]:
@@ -305,9 +399,69 @@ def sources(w: dict[str, Any], change: str) -> None:
             lambda w: job(w)["steps"][0].update({"uses": "actions/checkout@v7"}),
             "isn't pinned",
         ),
+        (lambda w: action_step(w).update({"uses": f"{ACTION}@v1"}), "isn't pinned"),
+        (lambda w: action_step(w).update({"id": "claude"}), "not review"),
+        (lambda w: job(w)["steps"].remove(report(w)), "0 denials reports"),
         (
-            lambda w: job(w)["steps"][-1].update({"uses": f"{ACTION}@v1"}),
-            "isn't pinned",
+            lambda w: job(w)["steps"].append({**report(w), "run": "print('x')"}),
+            "2 denials reports",
+        ),
+        (
+            lambda w: report(w).update(
+                {"run": str(report(w)["run"]) + "print(open('x').read())\n"}
+            ),
+            "isn't the one this test pins",
+        ),
+        (
+            lambda w: report(w).update(
+                {
+                    "run": str(report(w)["run"]).replace(
+                        'os.environ.get("EXECUTION_FILE", "")',
+                        '"${{ steps.review.outputs.execution_file }}"',
+                    )
+                }
+            ),
+            "interpolates an expression",
+        ),
+        (lambda w: report(w).pop("continue-on-error"), "the denials report is given"),
+        (lambda w: report(w).update({"if": "${{ always() }}"}), "the denials report is given"),
+        (lambda w: report(w).update({"shell": "bash"}), "the denials report is given"),
+        (
+            lambda w: report(w)["env"].update({"TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"}),
+            "the denials report is given",
+        ),
+        (
+            lambda w: report(w).update({"working-directory": ".org-guide"}),
+            "also has ['working-directory']",
+        ),
+        (lambda w: move(w, report(w), 0), "runs before the action"),
+        (lambda w: action(w).update({"display_report": "true"}), "given display_report"),
+        (lambda w: guide(w).update({"persist-credentials": True}), "persist-credentials"),
+        (lambda w: guide(w).update({"repository": "troupe-run/troupe"}), "the guide's checkout"),
+        (lambda w: guide(w).update({"path": "../guide"}), "the guide's checkout"),
+        (lambda w: guide(w).update({"path": "/tmp/guide"}), "the guide's checkout"),  # noqa: S108
+        (lambda w: guide(w).pop("sparse-checkout"), "the guide's checkout"),
+        (lambda w: move(w, job(w)["steps"][0], 2), "the first checkout is 'troupe-run/.github'"),
+        (
+            lambda w: job(w)["steps"].insert(0, copy.deepcopy(job(w)["steps"][0])),
+            "checks out 3 times",
+        ),
+        (lambda w: tools(w, "Bash(gh pr view:*),WebFetch"), "add ['WebFetch']"),
+        (
+            lambda w: action(w).update(
+                {
+                    "prompt": str(action(w)["prompt"]).replace(
+                        ".org-guide/CONTRIBUTING.md", GUIDE_URL
+                    )
+                }
+            ),
+            "names the guide by URL",
+        ),
+        (
+            lambda w: action(w).update(
+                {"prompt": str(action(w)["prompt"]).replace("org-profile/CONTRIBUTING.md", "")}
+            ),
+            "doesn't name org-profile/CONTRIBUTING.md",
         ),
         (lambda w: action(w).pop("github_token"), "github_token"),
         (
@@ -373,3 +527,97 @@ def test_each_way_the_workflow_can_go_wrong_is_named(change: Any, named: str) ->
     workflow = copy.deepcopy(review())
     change(workflow)
     assert any(named in problem for problem in problems(workflow)), problems(workflow)
+
+
+def run_report(tmp_path: Path, content: str | None, set_path: bool = True) -> tuple[int, str]:
+    """Run the workflow's own denials report, as the runner would, against an execution file."""
+    script = tmp_path / "report.py"
+    script.write_text(str(report(review())["run"]), encoding="utf-8")
+    env = {key: value for key, value in os.environ.items() if key != "EXECUTION_FILE"}
+    execution = tmp_path / "claude-execution-output.json"
+    if content is not None:
+        execution.write_text(content, encoding="utf-8")
+    if set_path:
+        env["EXECUTION_FILE"] = str(execution)
+    done = subprocess.run(
+        [sys.executable, str(script)], capture_output=True, text=True, env=env, check=False
+    )
+    return done.returncode, done.stdout
+
+
+def test_a_refused_call_is_named_in_one_warning(tmp_path: Path) -> None:
+    code, out = run_report(tmp_path, DENIED.read_text(encoding="utf-8"))
+    assert code == 0
+    assert out.splitlines() == [
+        "::warning title=Claude was refused a tool call::WebFetch "
+        + json.dumps(
+            {
+                "prompt": "What is the first heading in this document? Quote it exactly.",
+                "url": GUIDE_URL,
+            },
+            sort_keys=True,
+        )
+    ]
+
+
+def test_a_review_with_no_denial_says_so_and_warns_of_nothing(tmp_path: Path) -> None:
+    code, out = run_report(tmp_path, CLEAN.read_text(encoding="utf-8"))
+    assert (code, out) == (0, "No tool call was refused.\n")
+
+
+def test_the_session_s_messages_are_not_shown(tmp_path: Path) -> None:
+    _, out = run_report(tmp_path, DENIED.read_text(encoding="utf-8"))
+    # The fixture's own reply and the denial's message are in the file, never in the log.
+    assert "couldn't fetch it" not in out
+    assert "haven't granted it" not in out
+
+
+@pytest.mark.parametrize("set_path", [False, True])
+def test_no_execution_file_warns_that_the_denials_are_unknown(
+    tmp_path: Path, set_path: bool
+) -> None:
+    code, out = run_report(tmp_path, None, set_path=set_path)
+    assert code == 0
+    assert out.startswith(
+        "::warning title=Claude's denials are unknown::The action left no execution"
+    )
+
+
+@pytest.mark.parametrize(
+    ("content", "named"),
+    [
+        ("not json", "isn't readable JSON"),
+        ('{"type": "result", "permission_denials": []}', "isn't a list of messages"),
+        ('[{"type": "assistant"}]', "with a result message"),
+        ('[{"type": "result", "permission_denials": 3}]', "aren't each a tool call"),
+        ('[{"type": "result", "permission_denials": [{"tool_input": {}}]}]', "each a tool call"),
+    ],
+)
+def test_a_malformed_execution_file_is_named_and_fails_the_step(
+    tmp_path: Path, content: str, named: str
+) -> None:
+    code, out = run_report(tmp_path, content)
+    assert code == 1
+    assert out.startswith("::warning title=Claude's denials are unknown::")
+    assert named in out
+    assert "No tool call was refused" not in out
+
+
+def test_an_input_that_holds_a_workflow_command_stays_inside_one_warning(tmp_path: Path) -> None:
+    messages = json.loads(DENIED.read_text(encoding="utf-8"))
+    result = next(m for m in messages if m["type"] == "result")
+    hostile = "a\n::error::x\r%0A" + "y" * 1000
+    result["permission_denials"][0]["tool_input"] = {"command": hostile}
+    code, out = run_report(tmp_path, json.dumps(messages))
+    assert code == 0
+    lines = out.splitlines()
+    assert len(lines) == 1
+    assert lines[0].startswith("::warning title=Claude was refused a tool call::WebFetch ")
+    message = lines[0].split("::", 2)[2]
+    # The runner unescapes a message as the toolkit escaped it; the input never begins a line.
+    shown = message.replace("%0A", "\n").replace("%0D", "\r").replace("%25", "%")
+    expected = "WebFetch " + json.dumps({"command": hostile}, sort_keys=True)
+    assert shown == expected[:300] + "..."
+    assert "\n" not in shown
+    assert "\r" not in shown
+    assert "%250A" in message

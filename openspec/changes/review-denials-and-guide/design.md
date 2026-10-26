@@ -69,8 +69,9 @@ read one, which D9 of claude-pr-review stops. Secrets the job holds are masked i
 "Only the action runs" becomes "the only `run` step is the report step". The test finds it by name, and checks its
 `shell`, `if`, `continue-on-error` and `env` against constants. It checks the script against a sha256 written in the
 test, so a change to the script changes the test in the same diff, which the owner reviews. Any other `run` step is
-still named and refused. Behaviour tests run the script itself, taken from the workflow, with `sys.executable` on all
-three OSes.
+still named and refused. Behaviour tests run the script itself, taken from the workflow, with `sys.executable`. They run in
+CI's Linux `check` job: the OS legs run only `test_guard_*.py`, and the step itself runs only on `ubuntu-latest`.
+(This design first said all three OSes, which CI doesn't do for this file; corrected in apply, 2026-10-26.)
 
 The fixtures are real execution files, not hand-written ones. They're captured locally with
 `claude -p --output-format stream-json --verbose --setting-sources user --allowedTools Read(./**)`, in an empty

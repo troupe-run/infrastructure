@@ -29,7 +29,7 @@
 
 ## 2. The report step (design D1 to D3)
 
-- [ ] 2.1 In `test_claude_review_workflow.py`, replace "only the action runs" with D3's rule: the only `run` step is
+- [x] 2.1 In `test_claude_review_workflow.py`, replace "only the action runs" with D3's rule: the only `run` step is
       the one named for reporting denials, with exactly D1's `shell`, `if`, `continue-on-error` and `env`, after the
       action, whose step has `id: review`, and with a script whose sha256 matches the test's constant. Add
       parametrised mutations for each: another `run` step, a changed script, the step moved before the action, a
@@ -40,22 +40,22 @@
       that isn't JSON, a JSON object, or a list with no `result` message gives a warning naming the problem and exit 1;
       a `tool_input` holding `\n::error::x`, `%0A` and 1,000 characters prints one line, escaped, cut to 300
       characters before escaping. Verify the new tests fail against the current workflow, for the reason they name
-- [ ] 2.2 Add the step and `id: review` to `.github/workflows/claude-review.yml`, with a comment naming this design
+- [x] 2.2 Add the step and `id: review` to `.github/workflows/claude-review.yml`, with a comment naming this design
       and why the session's output stays hidden. Verify `uv run pytest scripts/tests/test_claude_review_workflow.py`
-      passes, every parametrised mutation is named, and the behaviour tests pass on CI's three OSes when the pull
-      request runs
-- [ ] 2.3 Say in `docs/development-workflow.md`'s review paragraph and README.md's row that a refused tool call is named
+      passes, every parametrised mutation is named, and the behaviour tests pass. Done: 88 passed locally; CI's
+      `check` job runs them on Linux, where the step runs (the OS legs run only `test_guard_*.py`; design D3)
+- [x] 2.3 Say in `docs/development-workflow.md`'s review paragraph and README.md's row that a refused tool call is named
       in the run's log, and nothing else of the session is. Verify `uv run scripts/check.py` passes
 
 ## 3. The guide's checkout (design D4)
 
-- [ ] 3.1 In the test, require exactly two checkouts: the pull request's own (no `repository`), and
+- [x] 3.1 In the test, require exactly two checkouts: the pull request's own (no `repository`), and
       `troupe-run/.github` with exactly D4's inputs, after it. Both keep `persist-credentials: false`. Add mutations:
       the guide's checkout keeps credentials, has another `repository`, a `path` outside the workspace
       (`../guide`, `/tmp/guide`), or comes before the main checkout; a third checkout; `WebFetch` added to the tools.
       Add a test that the prompt names `.org-guide/CONTRIBUTING.md` and `org-profile/CONTRIBUTING.md` and no longer
       holds the guide's URL. Verify these fail against the current workflow, for the reason they name
-- [ ] 3.2 Add the checkout and rewrite check 5 of the prompt as D4 says. Verify the tests from 3.1 pass, and
+- [x] 3.2 Add the checkout and rewrite check 5 of the prompt as D4 says. Verify the tests from 3.1 pass, and
       `uv run scripts/check.py` passes
 
 ## 4. Before delivery
