@@ -10,7 +10,7 @@
 
 ## 1. The decision script (design D1, D2)
 
-- [ ] 1.1 Write `scripts/tests/test_plan_target.py` first, with real temporary repositories (conftest's `git`
+- [x] 1.1 Write `scripts/tests/test_plan_target.py` first, with real temporary repositories (conftest's `git`
       helper): state commits as the App's address changing only `tofu/terraform.tfstate`, merges as the tester. One
       test per case, each named for its answer: a scheduled or manual run plans `main`'s head; a state commit as C
       plans nothing; C not on `main` fails naming C; C with the current state plans C, with and without later merges;
@@ -18,10 +18,12 @@
       of those state commits; a state commit after a later merge plans nothing and names that merge; a break-glass
       merge that changes the state under another author doesn't count as a state commit; an unknown event, or a
       commit that isn't a full sha, is an error naming the input. Verify they fail (no script yet) with
-      `uv run pytest scripts/tests/test_plan_target.py`
-- [ ] 1.2 Write `scripts/plan_target.py`: standard library and `git` only, `--event`, `--commit`, `--state-author`,
+      `uv run pytest scripts/tests/test_plan_target.py`. Done: collection failed on the missing module; a state-only
+      commit by someone else was added as a case too
+- [x] 1.2 Write `scripts/plan_target.py`: standard library and `git` only, `--event`, `--commit`, `--state-author`,
       `--main` (default `origin/main`); prints `sha=` and `plan=` for `$GITHUB_OUTPUT`, and one summary line to the
-      file `--summary` names. Verify 1.1's tests pass, and `uv run scripts/check.py` is clean (ruff, mypy --strict)
+      file `--summary` names. Verify 1.1's tests pass, and `uv run scripts/check.py` is clean (ruff, mypy --strict).
+      Done: 26 passed, all gates passed. With the walk over state commits removed, 5 of them fail
 
 ## 2. The workflow (design D3)
 
