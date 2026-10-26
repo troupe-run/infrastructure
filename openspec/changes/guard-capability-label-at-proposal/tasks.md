@@ -20,40 +20,52 @@
 
 ## 2. The capability-label rule (design D1, D2, D5)
 
-- [ ] 2.1 Add `CAPABILITY_RULE = "capability-label"` to `RULES` (not `OVERRIDABLE_RULES`), and
+- [x] 2.1 Add `CAPABILITY_RULE = "capability-label"` to `RULES` (not `OVERRIDABLE_RULES`), and
   `CAPABILITY_REPOSITORIES` naming `troupe-run/troupe`, each with a docstring citing this design. Verify the existing
-  rule-list tests (`test_guard_docs.py` among them) fail until 2.5 adds the rule's row, then pass
-- [ ] 2.2 Write the scope (D2): from `openspec_scope()` and the head's tree, the main specs to judge and the
+  rule-list tests (`test_guard_docs.py` among them) fail until 2.5 adds the rule's row, then pass. Result: with
+  the rules doc from HEAD, `test_the_docs_list_exactly_the_guard_s_rules` fails (`'command-unparseable' !=
+  'capability-label'`); with 2.5's row, 3 passed
+- [x] 2.2 Write the scope (D2): from `openspec_scope()` and the head's tree, the main specs to judge and the
   `(change, spec)` deltas whose main spec doesn't exist. Verify with tests for each of the spec's "judges what the
   range touches" scenarios: no spec touched, a delta for an existing spec skipped, everything on a push to `main` and
-  on a change to `scripts/guard.py`, and an archive commit judging the new main spec
-- [ ] 2.3 Write the rule: it takes the scope, the repository and a labels reader, and returns `ALLOW` outside
+  on a change to `scripts/guard.py`, and an archive commit judging the new main spec. Result: the scope tests in
+  `test_guard_capability_labels.py` pass; replacing the "main spec doesn't exist" filter with `True` fails
+  `test_a_delta_for_a_spec_that_exists_isn_t_judged`
+- [x] 2.3 Write the rule: it takes the scope, the repository and a labels reader, and returns `ALLOW` outside
   `CAPABILITY_REPOSITORIES` or for an empty scope without calling the reader, else one refusal listing every finding
   as D5 words it, sorted by spec, with the fix for each kind found. Verify with a test per scenario of "A troupe
   spec's capability labels are checked on GitHub", each asserting the names, label and fix text, including the
   standard change's URL with its `#a-capability-label` anchor. Check by hand that the anchor resolves on
-  `docs/standard-changes.md` (GitHub's heading slug), and record it here
-- [ ] 2.4 Call it from `run_ci_entry` after `openspec-strict`, with the repository from `GITHUB_REPOSITORY` (the run's,
+  `docs/standard-changes.md` (GitHub's heading slug), and record it here. Result: the rule tests pass; dropping the
+  undeclared check fails 5 of them. The heading is `## A capability label`, whose GitHub slug is
+  `a-capability-label`. Findings are joined by `; `, as `openspec-strict` lists its items (design D5 updated)
+- [x] 2.4 Call it from `run_ci_entry` after `openspec-strict`, with the repository from `GITHUB_REPOSITORY` (the run's,
   not the head's; D1) and the same `notes` line style (`guard: capability-label: judged N spec(s) ...` or why it
   wasn't run). Verify with a `run_ci_entry` test that a fork pull request into troupe is judged, and one that both
-  refusals print when both rules fail
-- [ ] 2.5 In `docs/development-workflow.md`, add `capability-label` to the `guard` check's row of the layer table, and
+  refusals print when both rules fail. Result: 3 CI-entry tests pass (fork judged, both refusals, the passing
+  run's log line); passing the head repository instead of `GITHUB_REPOSITORY` fails all 3
+- [x] 2.5 In `docs/development-workflow.md`, add `capability-label` to the `guard` check's row of the layer table, and
   the rule's row to the rules table: what it refuses, its scope, that it reads infrastructure's `main` over the
   network, that it's GitHub-only and not overridable, and the fix. Verify `uv run pytest
-  scripts/tests/test_guard_docs.py` passes
+  scripts/tests/test_guard_docs.py` passes. Result: 3 passed
 
 ## 3. Reading the declared labels (design D3)
 
-- [ ] 3.1 Write the reader: the contents API URL at `ref=main` with the raw media type, `CAPABILITY_LABELS_TIMEOUT_SECONDS
+- [x] 3.1 Write the reader: the contents API URL at `ref=main` with the raw media type, `CAPABILITY_LABELS_TIMEOUT_SECONDS
   = 30.0`, the bearer token from `GITHUB_TOKEN` when set, and a check that the body is a JSON list of objects with a
   string `name`. Any failure raises an error the rule turns into its unreadable refusal. Verify with tests, the
   request injected: a good body, an HTTP error, a timeout, invalid JSON, a list with an entry missing `name`, and that
-  the header is sent only when the token is set
-- [ ] 3.2 Verify the reader against GitHub itself, once, outside the test suite: run it from the branch and confirm it
-  returns exactly the label names in `origin/main`'s `tofu/labels/troupe.json` (36 on 2026-10-26). Record the command and the count here
+  the header is sent only when the token is set. Result: 9 reader tests pass (good body and URL and headers,
+  token, six unreadable cases, and the rule's refusal for an unreadable read)
+- [x] 3.2 Verify the reader against GitHub itself, once, outside the test suite: run it from the branch and confirm it
+  returns exactly the label names in `origin/main`'s `tofu/labels/troupe.json` (36 on 2026-10-26). Result: with
+  no `GITHUB_TOKEN`, `uv run --no-project python -c 'import sys; sys.path.insert(0, "scripts"); import guard;
+  print(len(guard.declared_labels()))'` prints 36, and the set equals the names in `git show
+  origin/main:tofu/labels/troupe.json` Record the command and the count here
 - [ ] 3.3 In `.github/workflows/guard.yml`, add `GITHUB_TOKEN: ${{ github.token }}` to the "Check the workflow rules"
   step's `env`, and mention the labels read in the file's header comment. Verify `uv run scripts/check.py` passes
-  (workflow lint included), and `scripts/tests/test_guard_workflow.py` still passes
+  (workflow lint included), and `scripts/tests/test_guard_workflow.py` still passes. Result: see this commit's
+  check run
 
 ## 4. Integration checks
 

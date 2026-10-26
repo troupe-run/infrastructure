@@ -109,7 +109,8 @@ through #152 first.
 
 ### D5. The refusal
 
-One `Decision` for the rule, listing every finding, each on its own line, sorted by spec:
+One `Decision` for the rule, listing every finding sorted by spec, joined by `; ` as `openspec-strict`'s refusal
+lists its items:
 
 - undeclared: ``change `x`: spec `run-workspaces` names `cap:workspaces`, which troupe-run/infrastructure doesn't
   declare on main`` (for a main spec, ``spec `stages` names ...``);
