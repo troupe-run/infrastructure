@@ -54,17 +54,24 @@
 
 ## 5. Integration checks
 
-- [ ] 5.1 Run `uv run scripts/oob.py` against GitHub with the branch's code. Verify the only difference left is
+- [x] 5.1 Run `uv run scripts/oob.py` against GitHub with the branch's code. Verify the only difference left is
   `App installations: 'troupe-run-review'` (#154), with no `troupe specs` or `troupe labels` line, and record the
-  output here
-- [ ] 5.2 Using the branch's parser, print the labels each of troupe's 25 specs names on `main`. Verify they match
+  output here. Result (59e4ed2): `App installations: 'troupe-run-review' is on GitHub but not declared`, then
+  `oob: 1 difference(s)`, and nothing else
+- [x] 5.2 Using the branch's parser, print the labels each of troupe's 25 specs names on `main`. Verify they match
   troupe#169's mapping table row for row, and record any difference here (one would mean the parser or troupe's lines
-  are wrong, not the table)
-- [ ] 5.3 Fast-forward onto `origin/main` if only a state commit is ahead, then run `uv run scripts/tofu.py plan`.
+  are wrong, not the table). Result: all 25 match, with no mismatches
+- [x] 5.3 Fast-forward onto `origin/main` if only a state commit is ahead, then run `uv run scripts/tofu.py plan`.
   Verify it shows `github_issue_labels` for troupe changing in place, creating `cap:development` and changing
-  `cap:flows`' description, with no label removed and nothing else changing. Record the summary line here
-- [ ] 5.4 Push the branch and open the pull request (`Closes #158`, `Part of #151`), saying the `troupe-run-review`
-  drift is #154's. Verify CI passes and the PR's plan comment matches 5.3
+  `cap:flows`' description, with no label removed and nothing else changing. Record the summary line here. Result: the local plan
+  couldn't run, because 1Password's approval timed out (`authorization timeout`) with the owner remote. The PR's CI plan
+  for 59e4ed2 stands in for it: `Plan: 0 to add, 1 to change, 0 to destroy.`, `module.repo_troupe.github_issue_labels.this`
+  updated in place, `cap:development` added and `cap:flows`' description changed, nothing else. The provider shows a
+  set element replaced, but it updates a changed description in place without taking the label off issues
+  (cap-label-descriptions design), so the 4 troupe issues with `cap:flows` keep it
+- [x] 5.4 Push the branch and open the pull request (`Closes #158`, `Part of #151`), saying the `troupe-run-review`
+  drift is #154's. Verify CI passes and the PR's plan comment matches 5.3. Result: PR #160. Every check passes (check, guard tests,
+  guard, plan, DCO), and the plan comment matches 5.3
 
 ## Workflow follow-up
 
