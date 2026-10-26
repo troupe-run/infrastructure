@@ -31,16 +31,21 @@
 
 ## 3. Remove the 13 labels from the declaration (design D4, D5)
 
-- [ ] 3.1 Delete the 12 folded labels and `cap:lifecycle` from `tofu/labels/troupe.json`. Verify it has 36 labels,
+- [x] 3.1 Delete the 12 folded labels and `cap:lifecycle` from `tofu/labels/troupe.json`. Verify it has 36 labels,
   still in byte order, with `uv run pytest scripts/tests/test_labels.py`, and that `git grep` outside
   `openspec/changes/archive` and this change finds none of the 13 names except where the `labels` spec quotes them
-  as examples.
-- [ ] 3.2 Check that no oob record is keyed by, or names, a removed label (D5): `git grep -n "cap:" -- oob/` names
+  as examples. Result: 36 labels in byte order, 13 passed. The only hit is the `labels`
+  spec's scenario saying no `cap:artifact-store` is declared, which is still true
+- [x] 3.2 Check that no oob record is keyed by, or names, a removed label (D5): `git grep -n "cap:" -- oob/` names
   none of the 13, and `oob/troupe-spec-purposes.json`'s keys are all specs on troupe's `main`. Remove any record
   found, and say so here. Then run `uv run scripts/oob.py` and verify it reports no `troupe specs` or `troupe labels`
-  difference. Record its output here.
-- [ ] 3.3 Run `uv run scripts/check.py` and verify every gate passes, including `openspec validate --strict` for
-  this change.
+  difference. Record its output here. Result: in `oob/` only `README.md` names a `cap:`
+  label, as a shape (`cap:<name>`). The record's 25 keys are exactly troupe's spec folders. Nothing removed. `oob.py`:
+  `oob: no differences (.github files, org settings, App installations, issue types, projects, troupe specs, troupe
+  label descriptions, code security, milestones)`
+- [x] 3.3 Run `uv run scripts/check.py` and verify every gate passes, including `openspec validate --strict` for
+  this change. Result: `check: all gates passed`. `check.py` doesn't run OpenSpec, so
+  `openspec validate relabel-folded-capabilities --strict` was run on its own: valid
 
 ## 4. Integration checks
 
