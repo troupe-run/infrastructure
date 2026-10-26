@@ -19,7 +19,8 @@ drift apart:
 **Claude's review isn't one of them.** `.github/workflows/claude-review.yml` posts Claude's findings on each member's
 pull request, but it enforces nothing: it isn't a required check, it can't approve or request changes, and its run can
 only read the code and comment (spec: pr-review). A failed or skipped review never stops a merge. Bots' and forks'
-pull requests aren't reviewed.
+pull requests aren't reviewed. It doesn't load the repository's Claude Code settings, so the guard's hooks don't run
+in it: they're written for an agent in your terminal, and would widen what the review can do (spec: pr-review).
 
 **The git hooks are on by default.** Git never runs hooks from a fresh clone, so the repository's own tooling turns
 them on: running `uv run scripts/check.py` does it, and so does starting a Claude Code session. Each says so when it

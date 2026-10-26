@@ -145,6 +145,30 @@ been run under them (tasks 4.3).
 `anthropics/claude-code-action@<sha> # v1.0.262`, as every other `uses:` here is pinned. This follows the repository's
 practice, not a rule: the owner declined *requiring* pinning (2026-10-16). Dependabot's actions updates move it.
 
+### D8. The review loads no settings from the repository, so the guard's hooks don't run in it
+
+Pass `--setting-sources user` in `claude_args`. The action otherwise loads `user`, `project` and `local` settings, and
+`project` is the repository's `.claude/settings.json` (restored from the base branch): the guard's Claude Code hooks.
+
+- **Found on PR #157 (2026-10-26).** Its own review run (40285341213) posted nothing: 3 turns, one permission denial.
+  The probe repository had no `.claude/settings.json` and worked. The hooks run `uv run ... scripts/guard.py` with
+  `onFailure: block`, and the runner has no `uv`, so the hook command fails and blocks the call. The action hides the
+  session's output, so this is inferred from the denial and the difference from the probe. The rerun after D8
+  confirms it or not (tasks 5.2).
+- **Installing `uv` instead was rejected.** With `uv`, the guard allows the review's four commands (checked on #157's
+  merge checkout). But the guard also grants `gh pr edit`, `gh pr close`, `gh pr ready`, `gh issue close`,
+  `gh project item-edit` and other writes (`GH_GRANTED` in `scripts/guard.py`). A hook's grant can let a tool run that
+  `--allowedTools` leaves out. Then a prompt-injected review could close or retitle a pull request. A deny list could
+  stop that, but it would need a probe to prove deny beats a hook's grant, and it would have to keep up with every
+  future grant.
+- **Owner, 2026-10-26:** "the rule book was created for me and you running here, with the gh command line
+  authenticated where you can do all sorts. That's presumably different to what happens in an action where things are
+  more restricted and controlled and doesn't need that same check." Turning off an agent's guard hooks is the owner's
+  to grant, and this is that grant, for this workflow only. In the review, the fence is the token (D1) and the tool
+  list (D4), both pinned by `test_claude_review_workflow.py`.
+- It costs nothing the review needs. The guard's hooks govern edits, commits and `gh`, and the review has no edit or
+  git tools, and only four `gh` commands.
+
 ## Risks / Trade-offs
 
 - [The OAuth token is billed to the owner's Claude subscription, and its usage limits are shared with the owner's
@@ -162,6 +186,8 @@ practice, not a rule: the owner declined *requiring* pinning (2026-10-16). Depen
   plan and diff the owner reviews.
 - [The action expects write access for some step in a PR review] → the probe (tasks) runs it with exactly these
   permissions before anything is delivered.
+- [A future change drops `--setting-sources user`, and the guard's hooks widen the review again] → the test names
+  it ("Claude loads settings from …"), and the workflow's comment says why it's there (D8).
 - [A future change to the review workflow adds a step a target's check refuses, as `guard.yml` did] → task 4.3's
   check runs again whenever the workflow changes; it's written into the workflow's header as the step to repeat.
 - [A human pull request that a bot later pushes to] → the action refuses the bot actor and that run fails. The

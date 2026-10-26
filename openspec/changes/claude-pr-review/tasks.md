@@ -86,6 +86,10 @@
 - [ ] 5.1 Open the pull request with `Closes #154`, D1's decision and the probe's findings. Verify that this pull
       request's own run of `claude-review` posts a review from its head (the first live review, in infrastructure),
       that its log shows only read access to contents, and that the plan on it matches 4.2
+- [ ] 5.2 Fix the empty review on #157 (design D8, owner, 2026-10-26): pass `--setting-sources user`, pinned by
+      `test_claude_review_workflow.py` with mutations for no sources, `user,project` and `project`, and record it in
+      the workflow's comment, the spec and `docs/development-workflow.md`. Verify the tests pass, and that #157's
+      review run for the new head posts comments, with no permission denial in its log
 
 ## Workflow follow-up
 
