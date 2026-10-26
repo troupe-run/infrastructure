@@ -12,6 +12,7 @@ import yaml
 from conftest import REPO, SCRIPTS
 
 import plan_needed
+import tofu_text
 
 TOFU = REPO / "tofu"
 FILE_CALL = re.compile(r'file(?:set)?\("\$\{path\.module\}/([^"]*)"')
@@ -29,13 +30,7 @@ def paths_opentofu_reads() -> set[str]:
             literal = argument.split("${", 1)[0]
             if literal.startswith("../"):
                 read.add(literal.removeprefix("../") or ".")
-    guard_files = re.search(
-        r"guard_files = toset\(\[(.*?)\]\)",
-        (TOFU / "guard_delivery.tf").read_text(encoding="utf-8"),
-        re.S,
-    )
-    assert guard_files is not None
-    read |= set(re.findall(r'"([^"]+)"', guard_files.group(1)))
+    read |= set(tofu_text.guard_files((TOFU / "guard_delivery.tf").read_text(encoding="utf-8")))
     read |= {
         str(path.relative_to(REPO)) for path in (REPO / "org-profile").rglob("*") if path.is_file()
     }
