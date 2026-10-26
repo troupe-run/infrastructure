@@ -33,7 +33,7 @@
 
 ## 4. The runbook
 
-- [ ] 4.1 Write `docs/standard-changes.md`: what a standard change is, then the "Capability label" section with
+- [x] 4.1 Write `docs/standard-changes.md`: what a standard change is, then the "Capability label" section with
       design D2's steps as commands whose only blanks are `<name>`, `<description>` and `<issue>`, and the checklist
       for the sub-issue's body. Point to it from `oob/README.md`'s "A new capability's label" paragraph and from
       `docs/development-workflow.md`, without writing anything about Purpose records. Verify `uv run scripts/check.py`
