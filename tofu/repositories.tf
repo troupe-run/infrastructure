@@ -109,6 +109,9 @@ module "repo_infrastructure" {
   # CI commits the state here after an apply (spec: ci-apply, design D4).
   app_bypass_id   = local.infrastructure_app_id
   required_checks = local.checks_for["infrastructure"]
+  # Every check it requires runs on merge groups (scripts/tests/test_required_checks.py);
+  # website and troupe follow once theirs do (#197; spec: rulesets, merge-queue design D7).
+  merge_queue = true
 }
 
 module "repo_website" {
