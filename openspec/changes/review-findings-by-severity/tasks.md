@@ -96,7 +96,7 @@
 
 ## 7. Look back at merged pull requests (#194, question 5)
 
-- [ ] 7.1 Read the review's summary and inline comments on infrastructure #160 to #198 (14 pull requests), troupe#183
+- [x] 7.1 Read the review's summary and inline comments on infrastructure #160 to #198 (14 pull requests), troupe#183
   and website#70; classify each finding by D1's tiers, and for each must-fix or decision, say whether a
   later commit or pull request addressed it; post the table as a comment on #194, and open an issue (on the board) for
   each must-fix or decision that's still open; verify the comment and each issue exist
