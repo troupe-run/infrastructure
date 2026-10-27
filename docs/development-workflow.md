@@ -332,7 +332,9 @@ the update type: patch, minor, major, or unknown when the versions can't be read
 Dependabot supersedes an update, the open issue is relinked to the new pull request rather than a second one opened.
 A pull request closed without merging closes its issue as not planned, once an hour has passed with no successor,
 and reopening the pull request reopens it. So to drop an update, close Dependabot's pull request, or comment
-`@dependabot ignore this dependency` on it, rather than closing the issue. The
+`@dependabot ignore this dependency` on it, rather than closing the issue. Add notes to the issue as comments: the
+last line of its description, hidden on the page, says which pull request it tracks. Without it the workflow leaves
+that issue and its pull request alone and fails, naming it, until the line is put back from the edit history. The
 workflow reads only pull requests by `dependabot[bot]` and issues its App opened, and never checks out a pull
 request. `uv run scripts/dependabot_issues.py` run locally only reads, and prints what it would do.
 
