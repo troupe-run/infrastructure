@@ -73,8 +73,15 @@
 
 ## 6. Plan (Migration 3)
 
-- [ ] 6.1 Run `uv run scripts/check.py`, open the pull request (`Closes #172`), and check its plan shows only the
+- [x] 6.1 Run `uv run scripts/check.py`, open the pull request (`Closes #172`), and check its plan shows only the
   environment, its deployment policy and the variable. Record the plan's summary here.
+  - Local plan, 2026-10-27, on a02b662 (level with `origin/main`): `Plan: 3 to add, 0 to change, 0 to destroy.`
+    `github_actions_variable.dependabot_app_client_id` (`DEPENDABOT_APP_CLIENT_ID` = `Iv23lip7KZ08OFBhsLuQ` on
+    infrastructure), `github_repository_environment.dependabot_issues` (`dependabot-issues`,
+    `can_admins_bypass = false`, custom branch policies) and
+    `github_repository_environment_deployment_policy.dependabot_issues_main_only` (`main`). Ticked with the
+    archive, before the push that opens the pull request, so its plan is asked for once; the pull request's own
+    plan comment is checked against this.
 
 ## Workflow follow-up
 
