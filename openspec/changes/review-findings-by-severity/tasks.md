@@ -87,7 +87,7 @@
 
 ## 6. The workflow step (design D6)
 
-- [ ] 6.1 Add the step to `org-profile/CONTRIBUTING.md`'s step 4, to CLAUDE.md's "How work happens here", and one line
+- [x] 6.1 Add the step to `org-profile/CONTRIBUTING.md`'s step 4, to CLAUDE.md's "How work happens here", and one line
   to this repository's `openspec/config.yaml` context under "Working"; verify with `grep` that each names the
   three tiers and who resolves each, and that `uv run scripts/check.py` passes
 - [ ] 6.2 Open an issue in troupe-run/troupe and one in troupe-run/website, each with `--project "troupe roadmap"`,

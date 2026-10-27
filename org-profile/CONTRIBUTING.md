@@ -49,10 +49,15 @@ status; OpenSpec holds what the system does and how each change will do it.
    proposal, spec deltas, a design and tasks. Its proposal cites the issue.
 3. **A pull request delivers it.** It names the change and closes the issue (`Closes #12`). Specs, code and tests
    change together, and the repository's check passes before every commit (its README says how to run it).
-4. **Before the merge,** the change is archived on its branch, which updates `openspec/specs/`, so the pull
+4. **Claude's review is acted on.** It reviews each push, and posts every finding as a conversation on the lines
+   it's about, labelled for who resolves it. A **must-fix** is fixed, or answered with a reason, and the review
+   resolves it on its next run once it's addressed. A **nit** is fixed, or answered (a follow-up issue, or why it
+   isn't worth it), and the author resolves it. A **decision** is the maintainer's, and so is a must-fix still in
+   dispute after the re-review. The pull request can't merge while any conversation is open.
+5. **Before the merge,** the change is archived on its branch, which updates `openspec/specs/`, so the pull
    request lands code, tests and specs together. It's merged by rebase, through the repository's merge queue where
    it has one: the queue tests it on top of `main` and whatever is queued ahead of it, then lands what it tested.
-5. **After the merge,** the issue gets a comment linking the PR and the change, and is closed.
+6. **After the merge,** the issue gets a comment linking the PR and the change, and is closed.
 
 Small fixes follow the same path. A bug fix adds the scenario that reproduces the bug to the spec.
 
