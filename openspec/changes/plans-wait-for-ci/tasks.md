@@ -25,14 +25,14 @@
 
 ## 2. Wiring it into `tofu.yml` (design D1, D3, D5, D6)
 
-- [ ] 2.1 Write `scripts/tests/test_main_ci_workflow.py` first, pinning: the `plan` job runs `scripts/main_ci.py` in
+- [x] 2.1 Write `scripts/tests/test_main_ci_workflow.py` first, pinning: the `plan` job runs `scripts/main_ci.py` in
   exactly one step, after `The commit to plan` and before the guard wait; its `if:` is
   `github.event_name != 'workflow_run' && steps.target.outputs.plan == 'true'`; it passes `--main origin/main`,
   `--summary "$GITHUB_STEP_SUMMARY"` and `GH_TOKEN`; the job's `timeout-minutes` exceeds the script's limit plus the
   guard wait's 10 minutes; `ci.yml`'s `push` `paths-ignore` is exactly `[plan_target.STATE_PATH]`;
   `workflow_dispatch` has no inputs; the `oob` job has no `needs` and doesn't run the gate. Verify each test fails on
   the current `tofu.yml` where it should (the step, the timeout).
-- [ ] 2.2 Add the step to `tofu.yml`'s `plan` job, raise its timeout to 45 minutes, and update the comments (the
+- [x] 2.2 Add the step to `tofu.yml`'s `plan` job, raise its timeout to 45 minutes, and update the comments (the
   header table, and the guard wait's "After a merge, CI has passed" comment to cover scheduled and manual runs).
   Verify `test_main_ci_workflow.py`, `test_plan_target_workflow.py` and `test_oob_job.py` pass, and
   `uv run scripts/check.py` is clean.

@@ -5,8 +5,10 @@ name: tofu
 #   pull request          changes   no environment                 does it touch what OpenTofu reads?
 #                         pr-plan   env plan-pr (owner approves)   plan posted on the PR, unless not
 #   CI green on main  --> plan      env plan-main (main only)      plan in the run summary, with the
-#   or a manual run                                                board's descriptions to set
-#   or daily at 06:00 UTC apply     env apply (owner approves)     apply that saved plan, then commit
+#   or a manual run                                                board's descriptions to set; a
+#   or daily at 06:00 UTC                                          daily or manual run waits for green
+#                                                                  CI on main, and fails if it's red
+#                         apply     env apply (owner approves)     apply that saved plan, then commit
 #                                                                  the state to main as the App
 #                         board     env board (main only)          after the apply, set the board's
 #                                                                  descriptions the plan listed
@@ -199,7 +201,8 @@ jobs:
         (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
       )
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Above the CI wait's 25 minutes and the guard wait's 10, so each says why it gave up.
+    timeout-minutes: 45
     environment:
       name: plan-main
       deployment: false
@@ -240,15 +243,27 @@ jobs:
         env:
           SHA: ${{ steps.target.outputs.sha }}
         run: git checkout -q --detach "$SHA"
+      # A daily or manual run plans only once CI has passed on main: on the commit CI runs on for
+      # main's head, the App's state commits looked past. It waits while CI runs, up to its limit,
+      # and fails with the ways to recover when CI isn't green. No input skips it. A run after CI on
+      # a merge already follows CI's success (scripts/main_ci.py; plans-wait-for-ci design D1-D6).
+      - name: Wait for green CI on main
+        if: github.event_name != 'workflow_run' && steps.target.outputs.plan == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python3 scripts/main_ci.py --main origin/main --repository "$GITHUB_REPOSITORY"
+          --summary "$GITHUB_STEP_SUMMARY"
       - name: Wait for the guard check on this commit
         if: steps.target.outputs.plan == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.target.outputs.sha }}
         run: |
-          # After a merge, CI has passed (this run follows it); the guard is a separate workflow,
-          # delivered to troupe as it is, so it is checked here. It runs on the App's state commit's
-          # push too, which plan_target.py may name. An apply follows green CI and guard (design D1).
+          # CI has passed: this run follows it after a merge, and the step above waited for it
+          # otherwise. The guard is a separate workflow, delivered to troupe as it is, so it is
+          # checked here. It runs on the App's state commit's push too, which plan_target.py may
+          # name. An apply follows green CI and guard (design D1).
           for _ in $(seq 1 60); do
             result=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow guard.yml --commit "$SHA" \
               --event push --json status,conclusion --jq '.[0] | "\(.status) \(.conclusion)"')
