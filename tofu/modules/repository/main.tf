@@ -144,8 +144,9 @@ resource "github_repository_ruleset" "main" {
     required_linear_history = true
 
     pull_request {
-      required_approving_review_count = 0
-      allowed_merge_methods           = ["rebase"]
+      required_approving_review_count   = 0
+      allowed_merge_methods             = ["rebase"]
+      required_review_thread_resolution = var.review_thread_resolution
     }
 
     # The queue lands only what it tested: main with the pull requests ahead of it and this one's
