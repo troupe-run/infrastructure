@@ -53,8 +53,10 @@ resource "github_repository_file" "guard" {
   overwrite_on_create = false
 
   # After each receiving repository's ruleset, which lets the App push (design D5). Without
-  # this the deliveries race the bypass, and one that lands first is refused with a 409.
-  depends_on = [module.repo_troupe, module.repo_website]
+  # this the deliveries race the bypass, and one that lands first is refused with a 409. After the
+  # Dependabot branch rulesets too, so the guard's exemption never arrives before the reservation
+  # it trusts (dependabot-exemption design D7).
+  depends_on = [module.repo_troupe, module.repo_website, github_repository_ruleset.dependabot_branches]
 
   # Changes exactly when the content does, so a delivery never reuses an earlier message
   # (design D3).

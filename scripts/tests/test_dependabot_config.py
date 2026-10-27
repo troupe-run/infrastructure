@@ -145,6 +145,17 @@ def test_every_label_in_the_real_configurations_is_declared_for_that_repository(
             assert set(update["labels"]) <= declared, (name, update["labels"])
 
 
+@pytest.mark.dependabot
+@pytest.mark.labels
+@pytest.mark.tofu
+def test_no_real_configuration_moves_dependabots_branches_out_of_the_reserved_name() -> None:
+    # The ruleset reserves Dependabot's default dependabot/ prefix and / separator
+    # (dependabot-exemption design D2), so no entry may change either.
+    for name, content in dependabot_config.generated().items():
+        for update in yaml.safe_load(content)["updates"]:
+            assert "pull-request-branch-name" not in update, name
+
+
 # Delivered workflows
 
 
