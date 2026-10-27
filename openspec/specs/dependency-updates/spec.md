@@ -391,8 +391,8 @@ but start `dependabot-issues` on infrastructure's `main`. It SHALL be one of the
 
 #### Scenario: The dispatch credential is missing
 - **WHEN** troupe's dispatcher runs before `DISPATCH_APP_PRIVATE_KEY` is set
-- **THEN** its run fails, and the next daily backstop reports any pull request this left without its issue or closing
-  line
+- **THEN** its run fails, and a later run, the daily backstop at the latest, reports any pull request this left
+  without its issue or closing line
 
 ### Requirement: A daily backstop does the work any run would do
 `dependabot-issues` SHALL also run once a day on a schedule, and SHALL do in that run all that any other run does. That
@@ -407,49 +407,54 @@ includes what only a run more than an hour after a pull request closes can do, s
 - **THEN** the next backstop run after the hour closes its issue as not planned
 
 ### Requirement: A missed event is reported
-A backstop run SHALL count as missed each open Dependabot pull request that, when the run starts, lacks its issue or
-closing line and was last updated over an hour ago. It SHALL fix each one, then report the misses in one tracking issue
-in infrastructure, and fail. No other work it does SHALL count as a miss.
+Every run, whatever started it, SHALL count as missed each open Dependabot pull request that, when the run starts,
+lacks its issue or closing line and was last updated over an hour ago. It SHALL fix each one, then report the misses in
+one tracking issue in infrastructure, and fail. No other work it does SHALL count as a miss.
 
 #### Scenario: A dispatch didn't happen
-- **WHEN** a backstop run finds a website pull request rebased three hours ago with no closing line
+- **WHEN** a run finds a website pull request rebased three hours ago with no closing line
 - **THEN** it puts the line back, opens or comments on the tracking issue naming the pull request, and the run fails
 
-#### Scenario: Work only the backstop can do
-- **WHEN** a backstop run's only work is closing issues whose pull requests closed over an hour ago, or merged
+#### Scenario: Work only time or a person makes due
+- **WHEN** a run's only work is closing issues whose pull requests closed over an hour ago, or merged
 - **THEN** it does that work, reports no miss, and the run succeeds
 
 #### Scenario: A pull request updated within the hour
-- **WHEN** a backstop run finds a pull request without its closing line that Dependabot rewrote 10 minutes ago
+- **WHEN** a run finds a pull request without its closing line that Dependabot rewrote 10 minutes ago
 - **THEN** it puts the line back and doesn't count it as a miss
 
-#### Scenario: A run that isn't the backstop
-- **WHEN** a run started by Dependabot's run, by dispatch, or by hand without asking for the backstop finds a pull
-  request missing its issue or line
-- **THEN** it fixes it and reports no miss
+#### Scenario: The run Dependabot's change started
+- **WHEN** a run started by a "Dependabot Updates" run, or by its dispatch, finds the pull request Dependabot just
+  opened or rewrote without its issue or line
+- **THEN** it fixes it and doesn't count it as a miss, since the pull request changed within the hour
 
-#### Scenario: The backstop started by hand
-- **WHEN** the owner starts `dependabot-issues` by hand asking for the backstop
-- **THEN** the run counts and reports misses as the daily backstop does
+#### Scenario: The schedule's run is replaced in the queue
+- **WHEN** the daily run is waiting behind a run in progress, and a newer run replaces it in the queue
+- **THEN** the newer run counts and reports misses as the daily run would have
 
 ### Requirement: The missed-event tracking issue follows the misses
 The tracking issue SHALL be opened by the Dependabot issues App in infrastructure, titled "Dependabot events missed",
-and put on the troupe roadmap board. A backstop SHALL open it when it finds misses and none is open, comment only when
-the misses differ from those last reported, and close it with a comment when it finds none.
+and put on the troupe roadmap board. A run SHALL open it when it finds misses and none is open, and comment only when
+the misses differ from those last reported. Only the daily scheduled run SHALL close it, with a comment, when it read
+every repository and found no miss.
 
 #### Scenario: First misses
-- **WHEN** a backstop run finds misses and no tracking issue is open
+- **WHEN** a run finds misses and no tracking issue is open
 - **THEN** it opens the tracking issue, naming each pull request and linking the run, and the board job adds it to
   the board
 
-#### Scenario: The same misses the next day
-- **WHEN** a backstop run finds the same misses the open issue last reported
+#### Scenario: The same misses again
+- **WHEN** a later run finds the same misses the open issue last reported
 - **THEN** it adds no comment
 
 #### Scenario: Back to normal
-- **WHEN** a backstop run finds no miss and the tracking issue is open
+- **WHEN** the daily scheduled run reads every repository, finds no miss, and the tracking issue is open
 - **THEN** it closes the issue with a comment linking the run
+
+#### Scenario: A clean run soon after a miss
+- **WHEN** a run started by Dependabot's activity finds no miss minutes after another run reported one
+- **THEN** the tracking issue stays open, since the miss's cause, such as a missing key, may still be there
 
 #### Scenario: An issue someone else opened with the same title
 - **WHEN** an open issue has the tracking title but wasn't opened by the App
-- **THEN** the backstop neither comments on it nor closes it
+- **THEN** no run comments on it or closes it

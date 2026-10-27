@@ -91,14 +91,7 @@ def url_pattern(job: dict[str, Any]) -> str | None:
 TRIGGERS = {"workflow_run", "schedule", "workflow_dispatch"}
 DEPENDABOT_RUNS = {"workflows": ["Dependabot Updates"], "types": ["completed"]}
 DAILY = re.compile(r"\d{1,2} \d{1,2} \* \* \*")
-BACKSTOP_INPUT = {
-    "description": (
-        "Run as the daily backstop: report pull requests an event run should have handled"
-    ),
-    "type": "boolean",
-    "default": False,
-}
-BACKSTOP_CHOICE = '[[ "$GITHUB_EVENT_NAME" == schedule || "$BACKSTOP" == true ]]'
+COMMAND = "uv run --no-project scripts/dependabot_issues.py"
 
 
 def problems(w: dict[str, Any]) -> list[str]:
@@ -111,9 +104,9 @@ def problems(w: dict[str, Any]) -> list[str]:
     crons = [entry.get("cron") for entry in on.get("schedule") or []]
     if len(crons) != 1 or not DAILY.fullmatch(str(crons[0])):
         found.append(f"its schedule is {crons}, not one daily run")
-    inputs = (on.get("workflow_dispatch") or {}).get("inputs")
-    if inputs != {"backstop": BACKSTOP_INPUT}:
-        found.append(f"its inputs are {inputs!r}, not the boolean backstop")
+    # Every run does the same work, so a run by hand needs nothing to say which kind it is.
+    if on.get("workflow_dispatch") is not None:
+        found.append(f"its workflow_dispatch is {on.get('workflow_dispatch')!r}, not plain")
     if w.get("permissions") != {}:
         found.append(f"the default permissions are {w.get('permissions')!r}, not {{}}")
     if w.get("concurrency") != {"group": "dependabot-issues", "cancel-in-progress": False}:
@@ -160,18 +153,12 @@ def problems(w: dict[str, Any]) -> list[str]:
         command = str(step.get("run"))
         if "${{" in command:
             found.append("the script's command line holds an expression")
-        if (step.get("env") or {}).get("BACKSTOP") != "${{ inputs.backstop }}":
-            found.append("the step's BACKSTOP isn't the backstop input")
-        lines = [line.strip() for line in command.splitlines() if line.strip()]
-        expected = [
-            f"if {BACKSTOP_CHOICE}; then",
-            "uv run --no-project scripts/dependabot_issues.py --backstop",
-            "else",
-            "uv run --no-project scripts/dependabot_issues.py",
-            "fi",
-        ]
-        if lines != expected:
-            found.append(f"the backstop isn't chosen by the schedule or the input: {lines!r}")
+        if set(step.get("env") or {}) != {"GH_TOKEN"}:
+            found.append(
+                f"the script's step sets {sorted(step.get('env') or {})}, not GH_TOKEN only"
+            )
+        if " ".join(command.split()) != COMMAND:
+            found.append(f"the step runs {command!r}, not {COMMAND!r} the same way every time")
     if (issues.get("outputs") or {}).get("issue-urls") != "${{ steps.issues.outputs.issue-urls }}":
         found.append(f"issues' issue-urls output is {issues.get('outputs')!r}")
 
@@ -241,26 +228,21 @@ Change = Callable[[dict[str, Any]], object]
             lambda w: w["on"]["schedule"].append({"cron": "0 12 * * *"}),
             "not one daily run",
         ),
-        (lambda w: w["on"].update({"workflow_dispatch": None}), "not the boolean backstop"),
         (
-            lambda w: w["on"]["workflow_dispatch"]["inputs"]["backstop"].update({"default": True}),
-            "not the boolean backstop",
-        ),
-        (
-            lambda w: w["jobs"]["issues"]["steps"][-1]["env"].pop("BACKSTOP"),
-            "BACKSTOP isn't the backstop input",
-        ),
-        (
-            lambda w: w["jobs"]["issues"]["steps"][-1].update(
-                {"run": w["jobs"]["issues"]["steps"][-1]["run"].replace("schedule", "push")}
+            lambda w: w["on"].update(
+                {"workflow_dispatch": {"inputs": {"backstop": {"type": "boolean"}}}}
             ),
-            "isn't chosen by the schedule",
+            "not plain",
         ),
         (
-            lambda w: w["jobs"]["issues"]["steps"][-1].update(
-                {"run": w["jobs"]["issues"]["steps"][-1]["run"].replace(" --backstop", "")}
+            lambda w: w["jobs"]["issues"]["steps"][-1]["env"].update(
+                {"EVENT": "${{ github.event_name }}"}
             ),
-            "isn't chosen by the schedule",
+            "not GH_TOKEN only",
+        ),
+        (
+            lambda w: w["jobs"]["issues"]["steps"][-1].update({"run": f"{COMMAND} --backstop"}),
+            "the same way every time",
         ),
         (lambda w: w.update({"permissions": {"issues": "write"}}), "not {}"),
         (lambda w: w["concurrency"].update({"cancel-in-progress": True}), "could overlap"),

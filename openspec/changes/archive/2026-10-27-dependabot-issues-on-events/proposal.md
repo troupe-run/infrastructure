@@ -18,9 +18,9 @@ so the run should start then too, and a run that never comes should be reported,
 - **A new App, `troupe-run-dispatch`**, created by the owner, has Actions write and nothing else, and is installed on
   infrastructure only. Its key is a secret in a main-only `dependabot-dispatch` environment in troupe and in website.
   Its client ID is a repository variable in both. This follows the docs App's pattern.
-- **The `*/10` schedule goes. A daily backstop replaces it.** The backstop does the same work. When it finds an open
+- **The `*/10` schedule goes. A daily backstop replaces it.** It does the same work. When any run finds an open
   Dependabot pull request that has been missing its issue or closing line for over an hour, an event was missed. It
-  fixes the pull request, reports it in one tracking issue in infrastructure, and the run fails. A clean backstop
+  fixes the pull request, reports it in one tracking issue in infrastructure, and the run fails. A clean run
   closes the tracking issue.
 - **The schedule watch watches the backstop**, with a 2-day limit, so a schedule that never fires is reported too.
 - The dispatcher is one of the guard's delivered files. It's protected by the delivered-file rule there, and
@@ -42,11 +42,11 @@ so the run should start then too, and a run that never comes should be reported,
 
 ## Impact
 
-- `.github/workflows/dependabot-issues.yml`: triggers, the backstop flag, and a handover of the tracking issue to
+- `.github/workflows/dependabot-issues.yml`: triggers, and a handover of the tracking issue to
   the board job.
 - New `.github/workflows/dependabot-dispatch.yml`, added to `guard_files` in `tofu/guard_delivery.tf`, and delivered to
   troupe and website.
-- `scripts/dependabot_issues.py`: reports misses and keeps the tracking issue on a backstop run. Tests to go with it.
+- `scripts/dependabot_issues.py`: reports misses and keeps the tracking issue on every run. Tests to go with it.
 - `tofu/`: new `dependabot_dispatch.tf` (environments, deployment policies, variables). Regenerated
   `tofu/dependabot/*.yml` (the new exclusion). `oob/app-installations.json` gets the new App.
 - `scripts/watched-schedules.json`, `scripts/tests/test_main_only_environments.py`, and new workflow tests.

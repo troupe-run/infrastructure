@@ -1,7 +1,7 @@
 """Gives every Dependabot pull request its issue, and links the pull request to it (spec:
 dependency-updates; #172; openspec/changes/dependabot-issues/design.md).
 
-Usage: uv run scripts/dependabot_issues.py [--backstop]
+Usage: uv run scripts/dependabot_issues.py
 
 For each repository with Dependabot ecosystems in tofu/labels/dependabot.json, this reads the open
 pull requests by dependabot[bot] and the issues the troupe-run-dependabot App opened. Each open pull
@@ -11,17 +11,17 @@ pull request merged, or closed with no successor after an hour, is closed (desig
 reads a pull request's files: only the API's metadata, and the description to find its own line.
 
 Dependabot's own runs start it, so a pull request is handled soon after Dependabot changes it
-(spec: dependency-updates; #195; dependabot-issues-on-events design D1, D2). With --backstop, the
-daily run, it also counts each pull request still missing its issue or closing line over an hour
-after it was last updated: an event run should have handled it, so one was missed. It reports the
-misses in one tracking issue in infrastructure, after every other write (design D4, D5).
+(spec: dependency-updates; #195; dependabot-issues-on-events design D1, D2). A daily schedule is
+the backstop. Every run, whatever started it, counts each pull request still missing its issue or
+closing line over an hour after it was last updated: the run Dependabot's change started should
+have handled it, so an event was missed. It reports the misses in one tracking issue in
+infrastructure, after every other write (design D4, D5).
 
-It exits 1 when it couldn't handle a repository, after handling the others, or when the backstop
-found a miss, and 2 when it couldn't start at all. Outside GitHub Actions it only reads, and prints
+It exits 1 when it couldn't handle a repository, after handling the others, or when it found a
+miss, and 2 when it couldn't start at all. Outside GitHub Actions it only reads, and prints
 what it would do (design D8).
 """
 
-import argparse
 import json
 import os
 import re
@@ -43,8 +43,8 @@ LABEL = "dependencies"
 ISSUE_TYPE = "Task"
 # How long a pull request closed without merging waits for a successor before its issue closes.
 GRACE = timedelta(hours=1)
-# How soon an event run handles a pull request Dependabot changed (spec: dependency-updates). The
-# backstop counts a pull request still missing its issue or line after this as a missed event.
+# How soon an event run handles a pull request Dependabot changed (spec: dependency-updates). A run
+# counts a pull request still missing its issue or line after this as a missed event.
 BOUND = timedelta(hours=1)
 # Closed issues are read back this far, so a reopened pull request finds its issue again.
 CLOSED_LOOKBACK = timedelta(days=30)
@@ -63,7 +63,7 @@ BRANCH = re.compile(r"dependabot/(?P<ecosystem>[a-z0-9_-]+)/.+")
 VERSION = re.compile(r"v?(\d+(?:\.\d+)*)")
 MILESTONE_TITLE = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)")
 MARKER = re.compile(r"<!-- dependabot-issue: (\{.*?\}) -->")
-# The backstop's tracking issue, in infrastructure (design D5). It carries no `dependencies` label
+# The missed-event tracking issue, in infrastructure (design D5). It carries no `dependencies` label
 # and no dependabot-issue marker, so it's never taken for an update's issue.
 TRACKING_REPOSITORY = "infrastructure"
 TRACKING_TITLE = "Dependabot events missed"
@@ -396,7 +396,7 @@ def misses(name: str, decided: Plan, now: datetime) -> list[str]:
     return sorted(found, key=lambda ref: (ref.split("#")[0], int(ref.split("#")[1])))
 
 
-# --- The backstop's tracking issue (design D5) ---
+# --- The missed-event tracking issue (design D5) ---
 
 
 def tracking_issues(listed: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -429,23 +429,25 @@ def last_reported(issue: Mapping[str, Any], comments: list[dict[str, Any]]) -> l
 
 
 def decide_tracking(
-    missed: list[str], issue: Mapping[str, Any] | None, last: list[str] | None, complete: bool
+    missed: list[str], issue: Mapping[str, Any] | None, last: list[str] | None, may_close: bool
 ) -> str:
-    """open, comment, close or none. A run that couldn't read every repository doesn't know there
-    are no misses, so it never closes the issue."""
+    """open, comment, close or none. Any run opens or comments, but only one that may close does:
+    the daily schedule's, having read every repository (design D5). A run minutes after a miss
+    finds it already fixed, so closing then would hide a cause, such as a missing key, that's still
+    there."""
     if missed and issue is None:
         return "open"
     if missed:
         return "none" if last == missed else "comment"
-    return "close" if issue is not None and complete else "none"
+    return "close" if issue is not None and may_close else "none"
 
 
 def tracking_report(missed: list[str], run_url: str) -> str:
     lines = [
-        f"The daily backstop found {len(missed)} Dependabot pull request(s) missing an issue or "
+        f"A run found {len(missed)} Dependabot pull request(s) missing an issue or "
         f"closing line over {int(BOUND.total_seconds() // 3600)} hour after they last changed. "
         "The run that Dependabot's activity starts should have handled each one, so an event was "
-        "missed. The backstop has handled them now.",
+        "missed. This run has handled them now.",
         "",
         *[f"- {ref}" for ref in missed],
         "",
@@ -455,8 +457,9 @@ def tracking_report(missed: list[str], run_url: str) -> str:
         "",
         f"Run: {run_url}",
         "",
-        "This issue is kept by `dependabot-issues`' daily backstop (#195). It's commented on when "
-        "the misses change, and closed by a run that finds none.",
+        "This issue is kept by `dependabot-issues` (#195). It's commented on when the misses "
+        "change, and closed by the daily scheduled run when it finds none, so a cause that's "
+        "still there keeps it open.",
         "",
         f"<!-- dependabot-missed: {json.dumps(missed)} -->",
     ]
@@ -680,7 +683,6 @@ def run(
     env: Mapping[str, str],
     gh: Gh,
     now: datetime | None = None,
-    backstop: bool = False,
 ) -> int:
     now = now or datetime.now(UTC)
     try:
@@ -697,7 +699,7 @@ def run(
         try:
             repo = read_repository(name, title, gh, now)
             decided = plan(repo.open_pulls, repo.issues, repo.linked, now)
-            found = misses(name, decided, now) if backstop else []
+            found = misses(name, decided, now)
         except ReadError as error:
             print(
                 f"dependabot-issues: {ORG}/{name}: couldn't read {error}. Nothing was changed "
@@ -743,12 +745,14 @@ def run(
             if made and made.get("html_url"):
                 urls.append(str(made["html_url"]))
         open_issues += urls
-    if backstop:
-        tracked = track(missed, not failed, env, gh, in_actions)
-        if tracked is None:
-            failed.append(TRACKING_REPOSITORY)
-        elif tracked:
-            open_issues.append(tracked)
+    # Every run, so it doesn't matter which one the concurrency group lets through (design D4).
+    # Only the daily schedule's run closes the tracking issue, and only having read everything.
+    may_close = not failed and env.get("GITHUB_EVENT_NAME") == "schedule"
+    tracked = track(missed, may_close, env, gh, in_actions)
+    if tracked is None:
+        failed.append(TRACKING_REPOSITORY)
+    elif tracked:
+        open_issues.append(tracked)
     # The board job (dependabot-issues.yml) adds each one that isn't on the board yet.
     if in_actions and (output := env.get("GITHUB_OUTPUT")):
         with Path(output).open("a", encoding="utf-8") as out:
@@ -765,7 +769,7 @@ def run(
 
 
 def track(
-    missed: list[str], complete: bool, env: Mapping[str, str], gh: Gh, in_actions: bool
+    missed: list[str], may_close: bool, env: Mapping[str, str], gh: Gh, in_actions: bool
 ) -> str | None:
     """Brings the tracking issue up to date. Returns its URL while it's open, "" when there's none,
     and None when it couldn't be read or written."""
@@ -789,7 +793,7 @@ def track(
             file=sys.stderr,
         )
         return None
-    action = decide_tracking(missed, issue, last, complete)
+    action = decide_tracking(missed, issue, last, may_close)
     url = str(issue["html_url"]) if issue is not None else ""
     if not in_actions:
         target = f" #{issue['number']}" if issue is not None else ""
@@ -820,7 +824,7 @@ def track(
             comment(gh, base, int(issue["number"]), tracking_report(missed, run_url))
         elif action == "close" and issue is not None:
             comment(
-                gh, base, int(issue["number"]), f"The backstop found no missed event: {run_url}"
+                gh, base, int(issue["number"]), f"The daily run found no missed event: {run_url}"
             )
             write(
                 gh,
@@ -836,16 +840,9 @@ def track(
     return url
 
 
-def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "--backstop",
-        action="store_true",
-        help="the daily run: also report pull requests an event run should have handled",
-    )
-    args = parser.parse_args(argv)
-    return run(LABELS, MILESTONES, os.environ, run_gh, backstop=args.backstop)
+def main() -> int:
+    return run(LABELS, MILESTONES, os.environ, run_gh)
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())

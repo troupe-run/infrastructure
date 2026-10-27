@@ -189,8 +189,8 @@ def command(jobs: dict[str, Any], run: str) -> None:
         (lambda w: command(w["jobs"], DISPATCH.replace("--ref main", "--ref next")), "--ref next"),
         (lambda w: command(w["jobs"], DISPATCH.replace("dependabot-issues", "tofu")), "tofu.yml"),
         (
-            lambda w: command(w["jobs"], f"{DISPATCH} -f backstop=true"),
-            "-f backstop=true",
+            lambda w: command(w["jobs"], f"{DISPATCH} -f only=website"),
+            "-f only=website",
         ),
         (
             lambda w: dispatch(w["jobs"]).update(
