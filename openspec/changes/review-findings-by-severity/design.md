@@ -151,6 +151,22 @@ reach anyway.
 comment with one line, `Resolve: <id> <id>`. The step reads it from the review App's latest summary comment. The
 checks against the snapshot are the same, so the trust doesn't change. Only where the list comes from does.
 
+### D4a. Resolving runs in a job of its own, with the review App widened to contents write
+
+The probe showed resolving needs `contents: write` (Probe results). The owner chose to give `troupe-run-review`
+contents write (2026-10-28) over a separate resolver App or resolving by hand. So that Claude never runs beside a
+token that can push, the resolving step moves out of the review job into a job of its own, `resolve`, which `needs:
+review` and runs only when the review succeeded. It checks out nothing and runs no action but the token minter: it
+mints a review App token with contents write and pull requests write, reads the conversations again (the same step as
+D3), and runs the resolving step on `needs.review.outputs.structured_output`. The review job still mints its token
+with contents read.
+
+What widening opens: the review App's key, an org secret visible to troupe, infrastructure and website, can now mint a
+token that pushes. A pull request's run uses that pull request's own workflow file, so a member who edits the workflow
+can mint one. A member can already push, and GitHub isn't asked to tell an agent from the owner (#47); the guard still
+refuses an agent's edit of a delivered file. A fork's run gets no secrets. Prompt injection in a pull request reaches
+only Claude, in a job whose token can't push.
+
 ### D5. The guard allows `resolveReviewThread` for a nit only
 
 `resolveReviewThread` joins `GH_MUTATIONS_ALLOWED` with a condition. The guard reads the mutation's `threadId`, which
@@ -189,6 +205,16 @@ stay refused. A top-level `gh pr comment` doesn't count as a reply, because it i
 
 *Alternative:* allow any resolve, and have the review reopen must-fix or decision conversations resolved by anyone
 but itself. Rejected, because it would also reopen the owner's decisions: the owner and an agent are the same login.
+
+### D5a. Merging is the owner's
+
+The probe showed `gh pr merge` on a pull request blocked by an open conversation doesn't refuse: it turns on
+auto-merge. A merge an agent starts would then land the pull request whenever its last conversation is resolved, with
+no look from the owner at that point, and the owner's merge is this design's backstop. So the guard refuses `gh pr
+merge` from an agent, whatever its flags, as owner-only (the `merge` group, beside `--admin`), and GraphQL's
+`enablePullRequestAutoMerge` and `enqueuePullRequest` with it (owner, 2026-10-28). The workflow already says the owner
+merges, so nothing an agent does now is lost. Throwaway repositories stay exempt, as for every owner-only act. The
+guide says to merge once every conversation is resolved, since the owner's own early click arms auto-merge too.
 
 ### D6. The step reaches every change through the guide and `openspec/config.yaml`
 

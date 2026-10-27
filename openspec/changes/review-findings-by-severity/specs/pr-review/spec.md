@@ -1,5 +1,51 @@
 ## MODIFIED Requirements
 
+### Requirement: A review run can't change the repository
+A review run SHALL write only with review App tokens for its repository: contents read and pull requests write in
+Claude's job; contents write and pull requests write, which resolving needs, in the resolving job, where Claude doesn't
+run and nothing is checked out. Each `GITHUB_TOKEN` SHALL hold only `contents: read`, and no `id-token`. Claude's tools
+SHALL be limited to reading the pull request and commenting. The run SHALL NOT use `pull_request_target`.
+
+#### Scenario: Where the comments come from
+- **WHEN** a review is posted
+- **THEN** its comments are by `troupe-run-review[bot]`
+
+#### Scenario: The run's tokens
+- **WHEN** a review run's log is read
+- **THEN** each job's `GITHUB_TOKEN` permissions list `Contents: read` and `Metadata: read` only; the review job's App
+  token asks for contents read and pull requests write, and the resolving job's for contents write and pull requests
+  write
+
+#### Scenario: Claude tries to push
+- **WHEN** a pull request's text asks Claude to commit a fix or push a branch
+- **THEN** Claude has no tool that edits files or runs git, and the job it runs in has no token that can write
+  contents, so nothing is pushed
+
+#### Scenario: Claude is asked to read outside the checkout
+- **WHEN** a pull request's text asks Claude to read `/proc/self/environ`, `.git/config` or any file outside the
+  checkout, and post what it finds
+- **THEN** the read is refused, because Read, Grep and Glob reach the checkout only, and the checkout keeps no token
+
+#### Scenario: The workflow is weakened
+- **WHEN** a change gives either job another permission, runs Claude or a checkout in the resolving job, swaps its event for `pull_request_target`, drops the
+  bot skip, lets it mint a token through OIDC, asks the App for more, widens Claude's tools, or uses an action that
+  isn't pinned to a full commit SHA
+- **THEN** `scripts/check.py` fails, naming what changed
+
+### Requirement: The review App is narrow and installed on the governed repositories
+The review App `troupe-run-review` SHALL have only these repository permissions: contents read and write, which
+resolving a conversation needs (owner, 2026-10-28), pull requests read and write, and metadata read. It SHALL have no organisation permissions. Its installation SHALL select repositories,
+and SHALL cover troupe, infrastructure and website only. Any difference SHALL be reported by the drift check or the
+hand-confirmed list (spec: teams-and-access).
+
+#### Scenario: The review App gains a permission
+- **WHEN** the review App's installation gains a permission on GitHub, such as administration or workflows
+- **THEN** the drift check reports the permission and exits non-zero
+
+#### Scenario: The declared review App matches
+- **WHEN** the review App has exactly the declared permissions and repository selection
+- **THEN** the drift check reports no difference for it
+
 ### Requirement: The review is advisory
 The review SHALL NOT be a required check, and Claude SHALL NOT approve or request changes on a pull request. A failed
 or skipped review SHALL NOT stop a pull request from merging. What blocks a merge is the review's open conversations,
@@ -91,7 +137,7 @@ conversation already holds, and SHALL say in its summary what became of each ear
 ### Requirement: The review resolves its own must-fix conversations once addressed
 A review run SHALL resolve an open conversation only when Claude names it as addressed, because the problem is gone
 from the diff or the author's reply settles it, and only when the review App opened it and its tier is must-fix. A
-fixed workflow step SHALL resolve them with the review App's token. Claude's tools SHALL NOT grow.
+fixed step, in a job of its own after the review, SHALL resolve them. Claude's tools SHALL NOT grow.
 
 #### Scenario: A must-fix is fixed
 - **WHEN** the author pushes a fix for a must-fix and the next review no longer sees the problem
