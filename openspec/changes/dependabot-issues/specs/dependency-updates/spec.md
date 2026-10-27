@@ -156,6 +156,12 @@ response is missing or malformed. It SHALL act on nothing that depended on what 
 - **WHEN** listing website's pull requests fails
 - **THEN** the run changes nothing in website, still handles troupe and infrastructure, and fails naming website
 
+#### Scenario: An issue whose marker was edited away
+- **WHEN** someone edits one of the App's issues in website and removes the line that says which pull request it
+  tracks
+- **THEN** the run leaves that issue alone, and any Dependabot pull request whose description closes it, still
+  handles every other pull request and issue in website, and fails naming the issue and how to restore the line
+
 #### Scenario: A malformed milestone declaration
 - **WHEN** `tofu/milestones.json` has no open milestone
 - **THEN** the run opens no issue anywhere and fails, saying there is no release in progress

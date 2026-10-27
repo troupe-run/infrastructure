@@ -282,6 +282,31 @@ def test_an_issue_a_change_closed_isnt_reopened_while_dependabot_s_pull_request_
     assert di.plan([p], [issue], {}, NOW).actions == []
 
 
+def test_an_issue_whose_marker_was_edited_away_is_left_alone_with_its_pull_request() -> None:
+    p = pull()
+    damaged = app_issue(p, body="Someone tidied this description.")
+    other = pull("website-55")
+    result = di.plan([lined(p, 100), other], [damaged], {}, NOW)
+    # No duplicate for #44, nothing done to #100, and #55 is still handled.
+    assert kinds(result) == [("open", 55, None)]
+    assert len(result.unreadable) == 1
+    assert "#100" in result.unreadable[0]
+    assert "edit history" in result.unreadable[0]
+
+
+def test_a_damaged_closed_issue_doesn_t_stop_a_merge_closing_another() -> None:
+    p = pull()
+    old = pull("website-58")
+    damaged = app_issue(old, number=99, state="closed", body="no marker")
+    result = di.plan([], [damaged, app_issue(p)], {44: closed(p, timedelta(1), merged=True)}, NOW)
+    assert kinds(result) == [("close-completed", 44, 100)]
+    assert len(result.unreadable) == 1
+
+
+def test_the_issue_says_to_add_notes_as_comments() -> None:
+    assert "Add notes as comments" in di.issue_body(pull(), di.read_update(pull()))
+
+
 def test_an_issue_whose_pull_request_wasnt_read_is_an_error() -> None:
     with pytest.raises(di.ReadError, match="#44 wasn't read"):
         di.plan([], [app_issue(pull())], {}, NOW)
@@ -480,6 +505,23 @@ def test_a_repository_that_cant_be_read_is_left_alone_and_the_run_fails(
         "repos/troupe-run/troupe/pulls/175",
     ]
     assert "troupe-run/website" in capsys.readouterr().err
+
+
+def test_a_damaged_issue_fails_the_run_after_the_rest_is_handled(
+    declarations: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    p = pull()
+    damaged = app_issue(p, body="no marker")
+    gh = FakeGitHub({"website": {"pulls": [lined(p, 100), pull("website-55")],
+                                 "issues": [damaged]}, "troupe": {}})  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 1
+    assert [path for _, path, _ in gh.writes] == [
+        "repos/troupe-run/website/issues",
+        "repos/troupe-run/website/pulls/55",
+    ]
+    err = capsys.readouterr().err
+    assert "troupe-run/website" in err
+    assert "#100" in err
 
 
 def test_a_repository_without_the_milestone_gets_no_issue_and_the_run_fails(

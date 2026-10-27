@@ -107,6 +107,8 @@ class Action:
 @dataclass
 class Plan:
     actions: list[Action] = field(default_factory=list)
+    # The App's issues whose marker couldn't be read: each is left alone, with what depends on it.
+    unreadable: list[str] = field(default_factory=list)
 
 
 # --- Reading a pull request ---
@@ -188,7 +190,9 @@ def issue_body(pull: Mapping[str, Any], update: Update) -> str:
     lines += [
         "",
         "Opened by `dependabot-issues` in troupe-run/infrastructure (#172). It's relinked when "
-        "Dependabot supersedes the update, and closed when the pull request merges or is closed.",
+        "Dependabot supersedes the update, and closed when the pull request merges or is closed. "
+        "Add notes as comments: the last line of this description, hidden on the page, says which "
+        "pull request it tracks, and an issue without it is left alone.",
         "",
         marker(update, number),
     ]
@@ -277,8 +281,20 @@ def plan(
     isn't open."""
     result = Plan()
     pulls = sorted((p for p in open_pulls if is_dependabot(p)), key=lambda p: int(p["number"]))
-    mine = sorted((i for i in issues if is_app_issue(i)), key=lambda i: int(i["number"]))
-    markers = {int(i["number"]): read_marker(i) for i in mine}
+    mine: list[dict[str, Any]] = []
+    markers: dict[int, Marker] = {}
+    unreadable: set[int] = set()
+    for each in sorted((i for i in issues if is_app_issue(i)), key=lambda i: int(i["number"])):
+        try:
+            markers[int(each["number"])] = read_marker(each)
+            mine.append(each)
+        except ReadError as error:
+            # Not a guess either way: neither reused, closed, nor replaced (design D3).
+            unreadable.add(int(each["number"]))
+            result.unreadable.append(
+                f"{error}, so it and any pull request that closes it are left alone. Put its last "
+                "line back from the description's edit history"
+            )
     open_numbers = {int(p["number"]) for p in pulls}
     open_keys = {u.key for u in (read_update(p) for p in pulls) if u.key is not None}
     taken: set[int] = set()
@@ -286,6 +302,8 @@ def plan(
     for pull in pulls:
         number = int(pull["number"])
         update = read_update(pull)
+        if any(has_closing_line(pull, bad) for bad in unreadable):
+            continue  # its issue may be the unreadable one, so a new one could be a duplicate
         issue = next(
             (
                 i
@@ -428,7 +446,10 @@ def read_repository(name: str, title: str, gh: Gh, now: datetime) -> Repository:
     for issue in issues:
         if not is_app_issue(issue) or issue.get("state") != "open":
             continue
-        pull = read_marker(issue).pull
+        try:
+            pull = read_marker(issue).pull
+        except ReadError:
+            continue  # plan() reports it, and leaves it alone
         if pull not in open_numbers and pull not in linked:
             linked[pull] = gh_json(gh, f"{base}/pulls/{pull}")
     return Repository(name, numbers[0], pulls, issues, linked)
@@ -578,6 +599,10 @@ def run(
             )
             failed.append(name)
             continue
+        for problem in decided.unreadable:
+            print(f"dependabot-issues: {ORG}/{name}: {problem}", file=sys.stderr)
+        if decided.unreadable:
+            failed.append(name)
         if not decided.actions:
             print(f"{ORG}/{name}: nothing to do")
         closing = {

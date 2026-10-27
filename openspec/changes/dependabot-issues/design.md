@@ -115,6 +115,12 @@ The issue body ends with a marker the script reads back:
 - **`pull`** is the number of the pull request the issue is linked to now. Relinking changes it.
 - A title that doesn't parse gets no key. Its issue is never reused, and isn't closed by a successor (spec: versions
   that can't be read).
+- **A marker that can't be read** (someone edited the description and removed it, which is easy since it doesn't
+  show on the page) leaves that issue alone, and every Dependabot pull request whose description closes it. A new
+  issue for such a pull request could duplicate the damaged one, so it gets none. Everything else in the repository
+  is handled, and the run fails at the end naming the issue, so it's still an error, not a guess. The issue's body
+  says to add notes as comments. *Rejected: stopping the whole repository*, the first version, which a side review
+  flagged during apply: one tidied description would have stalled every update there, failing every 10 minutes.
 - *Alternative: find the issue from the pull request's closing line alone.* Dependabot's description isn't the
   App's to keep, and a superseding pull request starts without the line. The marker is in a body only the App writes.
 
