@@ -62,6 +62,9 @@
   origin/main first) showing no change while every repository's switch is off
 - [x] 4.2 Update the ruleset's comment and `strict_required_status_checks_policy`'s comment to say the queue, not
   strict, guards combinations; verify by reading against D2
+- [ ] 4.3 Set `allow_auto_merge` from the same switch, and say in the README that `--admin` skips the queue and is for
+  emergencies; verify `tofu validate`, and that the local plan of 4.1 shows `allow_auto_merge` unchanged while
+  every switch is off
 
 ## 5. Docs for the new merge step
 
@@ -79,7 +82,8 @@
 ## 7. Turn on infrastructure's queue (design D7)
 
 - [ ] 7.1 Set `merge_queue = true` for infrastructure only in `tofu/repositories.tf`; verify a local plan, fast-forwarded
-  onto origin/main first, shows only the `merge_queue` block added to infrastructure's `protect main` ruleset, besides
+  onto origin/main first, shows only the `merge_queue` block added to infrastructure's `protect main` ruleset and
+  `allow_auto_merge` turned on for it, besides
   the guard's delivered files to troupe and website
 - [ ] 7.2 Open the pull request (`Closes #169`); verify its posted plan matches 7.1's and every required check passes
 
