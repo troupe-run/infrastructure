@@ -76,7 +76,7 @@
 
 ## 5. The ruleset (design D2, D8)
 
-- [ ] 5.1 Turn the module's `review_thread_resolution` switch (1.1) on by default in
+- [x] 5.1 Turn the module's `review_thread_resolution` switch (1.1) on by default in
   `tofu/modules/repository/variables.tf`, so every `protect main` ruleset sets `required_review_thread_resolution`; add a test in
   `scripts/tests/` that fails when the setting is false or missing; verify `tofu fmt -check`, `tofu validate`, the
   test, and a local plan (fast-forwarded onto origin/main first) showing the one in-place change on each of the three
