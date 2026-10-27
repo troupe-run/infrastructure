@@ -34,17 +34,17 @@
 
 ## 3. The backstop in the script (spec dependency-updates: backstop, missed event, tracking issue; design D4, D5)
 
-- [ ] 3.1 Add `--backstop` to `scripts/dependabot_issues.py`. When it's given, count as a miss each open Dependabot
+- [x] 3.1 Add `--backstop` to `scripts/dependabot_issues.py`. When it's given, count as a miss each open Dependabot
   pull request that needs a new or relinked issue, or its closing line, and whose `updated_at` is over the hour (one
   named constant). Without it, behave as now. Test it with fixtures based on real payloads: a miss for a missing line
   and for a missing issue; no miss within the hour; no miss for closing merged or not-planned issues or reopening; and
   no miss without `--backstop`. Verify the tests pass, with `GITHUB_ACTIONS` set both ways.
-- [ ] 3.2 Keep the "Dependabot events missed" tracking issue in infrastructure. Open it when there are misses and none
+- [x] 3.2 Keep the "Dependabot events missed" tracking issue in infrastructure. Open it when there are misses and none
   is open, comment only when the set differs from the last report, and close it clean with a comment linking the run.
   Ignore same-titled issues by anyone else, and update the oldest when two are open. The issue gets no `dependencies`
   label and no update marker. Test each case, and that the script's update listing never takes the tracking issue for
   an update's issue. Verify the tests pass.
-- [ ] 3.3 Make every write first, then report the misses and exit 1. Add the tracking issue's URL to the
+- [x] 3.3 Make every write first, then report the misses and exit 1. Add the tracking issue's URL to the
   `issue-urls` output. Test that the exit code and message name the misses and any failed repository together, and
   that outside Actions the backstop only prints what it would open, comment or close. Verify the tests pass, and that
   a local `uv run scripts/dependabot_issues.py --backstop` only reads.

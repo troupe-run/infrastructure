@@ -6,7 +6,7 @@ reads. Tests that need another value (a closed state, a missing closing line, an
 field of these files, so every shape is GitHub's own.
 
 Pull requests, each read with
-`gh api repos/troupe-run/<repo>/pulls/<n> --jq '{number,title,state,user:{login:.user.login,type:.user.type},head:{ref:.head.ref},body,merged_at,closed_at,html_url}'`:
+`gh api repos/troupe-run/<repo>/pulls/<n> --jq '{number,title,state,user:{login:.user.login,type:.user.type},head:{ref:.head.ref},body,merged_at,closed_at,updated_at,html_url}'`:
 
 | File | What it shows |
 |---|---|
