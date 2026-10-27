@@ -51,19 +51,19 @@
 
 ## 4. The workflows (spec dependency-updates: Dependabot's runs, dispatch, workflow never runs code; design D1–D3, D7)
 
-- [ ] 4.1 In `.github/workflows/dependabot-issues.yml`, replace the `*/10` cron with `workflow_run` of "Dependabot
+- [x] 4.1 In `.github/workflows/dependabot-issues.yml`, replace the `*/10` cron with `workflow_run` of "Dependabot
   Updates" (`completed`), a daily `37 4 * * *`, and `workflow_dispatch` with a boolean `backstop` input. Pass
   `--backstop` on `schedule` or when the input is set. Update the header comment and the concurrency comment (D3). Extend
   `scripts/tests/test_dependabot_issues_workflow.py`: the triggers, the single daily cron, no expression reading
   `github.event.`, the backstop flag's condition, and the existing checkout pin. Verify the tests pass.
-- [ ] 4.2 Add `.github/workflows/dependabot-dispatch.yml` (D2). It runs on `workflow_run` of "Dependabot Updates" with
+- [x] 4.2 Add `.github/workflows/dependabot-dispatch.yml` (D2). It runs on `workflow_run` of "Dependabot Updates" with
   `permissions: {}`. Its one job is skipped in `troupe-run/infrastructure`, uses the `dependabot-dispatch`
   environment, mints the dispatch token for `repositories: infrastructure` with `permission-actions: write`, and runs
   `gh workflow run dependabot-issues.yml -R troupe-run/infrastructure --ref main`. It has the delivered-file header.
   Add `scripts/tests/test_dependabot_dispatch_workflow.py` to check: no checkout, no `github.event.` expression, the
   repository condition, the environment, the token's scope, and the one dispatch command. Verify the tests pass and
   `actionlint` is clean, if `scripts/check.py` runs it.
-- [ ] 4.3 Add the dispatcher to `guard_files` in `tofu/guard_delivery.tf`, and run `uv run scripts/dependabot_config.py`.
+- [x] 4.3 Add the dispatcher to `guard_files` in `tofu/guard_delivery.tf`, and run `uv run scripts/dependabot_config.py`.
   Verify `tofu/dependabot/troupe.yml` and `website.yml` now leave out `.github/workflows/dependabot-dispatch.yml`,
   infrastructure's leaves out nothing, and the guard-delivery and Dependabot config tests pass.
 
