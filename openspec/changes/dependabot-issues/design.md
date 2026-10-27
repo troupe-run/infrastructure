@@ -185,7 +185,9 @@ watch does. Its tests set `GITHUB_ACTIONS` both ways, since CI's check runs them
   `@dependabot rebase` of a pull request behind `main` replaced the description and the `Closes` line was gone. (On
   a pull request already up to date it only commented, and changed nothing.) Dependabot rebases on its own when a
   pull request conflicts.
-  → Each run restores it (spec). Between the rewrite and the next run, `guard` is red for up to about 20 minutes.
+  → Each run restores it (spec): after a second rebase dropped the line, the script run with the App's token put
+  `Closes #3` back, and the run after it found nothing to do. Between the rewrite and the next run, `guard` is red
+  for up to about 20 minutes.
 - **[Risk] The successor appears more than an hour later**, and the issue was already closed as not planned.
   → The successor gets a new issue. Nothing is lost, but there are two issues for one dependency. The hour can be
   changed in one place.

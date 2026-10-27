@@ -69,7 +69,7 @@ lists below are checked by hand in each App's settings, by any change that adds,
 | `troupe-run-release` | `troupe` | 2026-10-13, owner |
 | `troupe-run-board` | none | 2026-10-18, by the App's own token (`GET /installation/repositories` returned `[]`) |
 | `troupe-run-docs` | `website` | 2026-10-19, by the App's own token (`GET /installation/repositories` returned `website` only) |
-| `troupe-run-dependabot` | `troupe`, `infrastructure`, `website`, and `infra-probe-dependabot-issues` until it's deleted (dependabot-issues 1.4) | 2026-10-27, by the App's own token (`GET /installation/repositories`) |
+| `troupe-run-dependabot` | `troupe`, `infrastructure`, `website` | 2026-10-27, by the App's own token (`GET /installation/repositories`, after the probe repository was deleted) |
 | `troupe-run-review` | `troupe`, `infrastructure`, `website` | 2026-10-26, owner |
 
 A repository the infrastructure App isn't installed on shows only its public view to OpenTofu (merge settings read as
