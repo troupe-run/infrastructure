@@ -8,12 +8,12 @@ state commits, which change only the state file.
 from pathlib import Path
 
 import pytest
-from conftest import git
+from conftest import STATE_APP, History, git
 
 import guard
 import plan_target
 
-APP = "340938853+troupe-run-infrastructure[bot]@users.noreply.github.com"
+APP = STATE_APP
 STATE = plan_target.STATE_PATH
 
 
@@ -22,63 +22,6 @@ def no_hook_repository(monkeypatch: pytest.MonkeyPatch) -> None:
     """The script reads git where it runs; under a pre-commit hook, GIT_DIR points elsewhere."""
     for name in guard.REPOSITORY_LOCATION_VARIABLES:
         monkeypatch.delenv(name, raising=False)
-
-
-class History:
-    def __init__(self, path: Path) -> None:
-        self.path = path
-        path.mkdir()
-        git(path, "init", "-q", "-b", "main")
-        git(path, "config", "user.email", "tester@example.com")
-        git(path, "config", "user.name", "Tester")
-        git(path, "config", "commit.gpgsign", "false")
-        self.state = 0
-        self.declaration = 0
-        self.write(STATE, "state 0")
-        self.write("tofu/main.tf", "declaration 0")
-        git(path, "add", "-A")
-        git(path, "commit", "-q", "-m", "chore: start")
-
-    def write(self, relative: str, text: str) -> None:
-        target = self.path / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text + "\n", encoding="utf-8")
-
-    def head(self) -> str:
-        return git(self.path, "rev-parse", "HEAD").stdout.strip()
-
-    def merge(self, *, state: bool = False) -> str:
-        """A merged pull request: the declaration changes, and with `state`, the state too
-        (a break-glass apply)."""
-        self.declaration += 1
-        self.write("tofu/main.tf", f"declaration {self.declaration}")
-        if state:
-            self.state += 1
-            self.write(STATE, f"state {self.state}")
-        git(self.path, "add", "-A")
-        git(self.path, "commit", "-q", "-m", f"feat: merge {self.declaration}")
-        return self.head()
-
-    def apply(self) -> str:
-        """The App's state commit after an apply: only the state file, by the App's bot."""
-        self.state += 1
-        self.write(STATE, f"state {self.state}")
-        git(self.path, "add", STATE)
-        # --author, not user.email: under a commit hook, git's GIT_AUTHOR_* would win over config.
-        git(
-            self.path,
-            "commit",
-            "-q",
-            f"--author=troupe-run-infrastructure[bot] <{APP}>",
-            "-m",
-            "chore(tofu): commit the state after applying x",
-        )
-        return self.head()
-
-
-@pytest.fixture
-def history(tmp_path: Path) -> History:
-    return History(tmp_path / "repo")
 
 
 def target(history: History, event: str, commit: str) -> plan_target.Target:
@@ -183,11 +126,7 @@ def test_a_break_glass_merge_changing_the_state_isnt_a_state_commit(history: His
 
 def test_a_state_only_commit_by_someone_else_isnt_a_state_commit(history: History) -> None:
     merge = history.merge()
-    history.state += 1
-    history.write(STATE, f"state {history.state}")
-    git(history.path, "add", STATE)
-    git(history.path, "commit", "-q", "-m", "chore: hand-made state")
-    other = history.head()
+    other = history.state_only()
     found = target(history, "workflow_run", merge)
     assert found.sha is None
     assert other[:7] in found.reason

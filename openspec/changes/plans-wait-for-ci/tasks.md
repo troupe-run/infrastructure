@@ -2,11 +2,11 @@
 
 ## 1. The gate script (spec ci-apply, "A scheduled or manual plan of main waits for green CI", "A red main fails a scheduled or manual plan, saying how to recover"; design D1-D4)
 
-- [ ] 1.1 Move `History` (and its fixture) from `scripts/tests/test_plan_target.py` to `scripts/tests/conftest.py`,
+- [x] 1.1 Move `History` (and its fixture) from `scripts/tests/test_plan_target.py` to `scripts/tests/conftest.py`,
   so both scripts' tests build `main`'s history the same way, with a `state_only()` helper for a person's
   state-only commit (a break-glass state merge). Verify `uv run pytest scripts/tests/test_plan_target.py` passes
   unchanged.
-- [ ] 1.2 Write `scripts/tests/test_main_ci.py` first, each test named for what its body checks, with `gh` and the
+- [x] 1.2 Write `scripts/tests/test_main_ci.py` first, each test named for what its body checks, with `gh` and the
   clock passed in (no network, no real sleep): CI passed on the head merge plans; the App's state commit at the head
   is looked past to the merge before it; a person's state-only commit with no CI run is looked past; a state-only
   last commit that has a CI run is the one checked; a merge with no run yet waits, and is found once a run appears;
@@ -15,10 +15,10 @@
   an unknown status fails naming it; a failed `gh` read fails with its error; the limit fails with "didn't finish"
   and the commit; the failure summary names the commit's short sha and subject, links the run, and lists the three
   ways to recover; a pass writes one line to the summary. Verify they fail before 1.3 (no module).
-- [ ] 1.3 Write `scripts/main_ci.py` (standard library and `gh`; `STATE_PATH` imported from `plan_target`; limit 25
+- [x] 1.3 Write `scripts/main_ci.py` (standard library and `gh`; `STATE_PATH` imported from `plan_target`; limit 25
   minutes, poll 15 s, as named constants) to D2-D4. Verify `uv run pytest scripts/tests/test_main_ci.py` passes,
   and `uv run scripts/check.py` is clean (mypy --strict, ruff).
-- [ ] 1.4 Run it read-only against this repository's real `main` (`python3 scripts/main_ci.py --main origin/main
+- [x] 1.4 Run it read-only against this repository's real `main` (`python3 scripts/main_ci.py --main origin/main
   --summary <scratch file>` after a fetch), and verify it names the right commit and CI run (compare with
   `gh run list --workflow ci.yml --branch main --event push -L 3`) and passes or waits as that run's state says.
   Record the output in the pull request.
