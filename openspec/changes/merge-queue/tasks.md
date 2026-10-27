@@ -2,22 +2,22 @@
 
 ## 1. Probe (design D1)
 
-- [ ] 1.1 Add `probe_merge_queue` to `tofu/probe/main.tf` (the module's ruleset with the `merge_queue` block of D2 and
+- [x] 1.1 Add `probe_merge_queue` to `tofu/probe/main.tf` (the module's ruleset with the `merge_queue` block of D2 and
   the probe's required checks: a workflow job that runs on `merge_group`, one skipped there by `if:`, and `DCO`), with
   its run instructions in the file's header comment; verify `tofu fmt -check` and `tofu validate` pass in `tofu/probe`
-- [ ] 1.2 Create public `troupe-run/infra-probe-merge-queue`, ask the owner to add it to the infrastructure App's and
+- [x] 1.2 Create public `troupe-run/infra-probe-merge-queue`, ask the owner to add it to the infrastructure App's and
   the DCO App's installations, then apply the probe after the owner approves its plan; verify the ruleset shows the
   merge queue rule (`gh api repos/troupe-run/infra-probe-merge-queue/rulesets/<id>`), or record that the Free plan
   refuses it and stop here for the owner
-- [ ] 1.3 Queue a signed-off pull request and record: it lands by rebase under linear history, `main`'s head equals
+- [x] 1.3 Queue a signed-off pull request and record: it lands by rebase under linear history, `main`'s head equals
   the queue's tested commit, DCO reports from the `dco` App on the merge group, and the `if:`-skipped job reports
   skipped and doesn't block; verify each with the merge group's check runs (`gh api .../commits/<sha>/check-runs`)
-- [ ] 1.4 Record what DCO does with a sign-off name that differs from the author's GitHub profile name, whether the
+- [x] 1.4 Record what DCO does with a sign-off name that differs from the author's GitHub profile name, whether the
   queue's `gh-readonly-queue/main/...` push starts a `push` workflow, and whether a person can push a branch with that
   prefix; verify each with the run list and the push's response
-- [ ] 1.5 Record that the App's `always` bypass still pushes to `main` directly, and that the owner can still merge
+- [x] 1.5 Record that the App's `always` bypass still pushes to `main` directly, and that the owner can still merge
   past a failing check without the queue; verify with the push and merge results
-- [ ] 1.6 Write the answers into design.md as "Probe results", with what each one changes. If the queue isn't
+- [x] 1.6 Write the answers into design.md as "Probe results", with what each one changes. If the queue isn't
   offered, or DCO doesn't report, stop and take it back to the owner on #169. Verify by deleting the probe
   repository and the probe's local state, and by `gh repo view` reporting it gone
 

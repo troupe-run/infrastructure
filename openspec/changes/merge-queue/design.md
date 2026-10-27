@@ -64,6 +64,34 @@ Answers go in this design (a "Probe results" section) before any live change, as
 **Alternative: read the docs and turn it on live.** The docs don't settle 1-3. A wrong guess stalls every merge in a
 live repository.
 
+### Probe results (2026-10-27)
+
+On public `troupe-run/infra-probe-merge-queue`, with the module's ruleset and `merge_queue` on, requiring `DCO`
+(1861), `probe check` and `probe skipped` (15368, the second skipped by `if:` on merge groups):
+
+1. **The Free plan offers the queue.** GitHub accepted the ruleset with the `merge_queue` rule, and
+   `rules/branches/main` lists it with D2's values. (The first apply was refused with "Invalid integration ids"
+   until the DCO App was installed on the probe: a check pinned to an App needs that App installed.)
+2. **A `REBASE` queue lands under `required_linear_history`.** PRs #2 and #3 landed as `2959b92` and `7432405`, each
+   with one parent and each the exact commit the queue's checks ran on. #3 queued on top of #2's group.
+3. **DCO reports on merge groups**, from the `dco` App, success on both groups. That includes #3, whose author and
+   sign-off are "M. Lau", not the profile's name (dcoapp/app#311 didn't reproduce under rebase).
+4. **A job skipped by `if:` reports `skipped` on a merge group, and the queue lands.** D5 holds.
+5. **The App's `always` bypass still pushes straight to `main`** (`c7837f4`, signed, recorded as a bypass by
+   `troupe-run-infrastructure[bot]`, no queue run). **The owner's `gh pr merge --rebase --admin` merges past a failing
+   required check at once, without the queue** (#4, recorded as a bypass). The rollback in the Migration Plan works.
+6. **A queue's push to `gh-readonly-queue/main/...` starts `push` workflows**, so guard.yml's exclusion (D3) is
+   needed: without it, the guard's push run would fail the queue's commit under `commit-branch-change`. **GitHub
+   doesn't reserve the prefix**: a person pushed `gh-readonly-queue/main/pr-99-probe`. D3's exemption keys on the
+   `merge_group` event, so that branch's pull request is still judged by the branch rule. Its pushes aren't judged,
+   which is no weaker than today: a push to a branch without a pull request reaches nothing protected.
+
+One finding changes how the owner merges: **`gh pr merge` can't add a pull request to the queue here.** With a
+queue it asks for auto-merge, and the module sets `allow_auto_merge = false`, so GitHub refuses ("Auto merge is not
+allowed for this repository"). GitHub's `enqueuePullRequest` mutation isn't on the guard's gh allow-list. So the owner
+queues with GitHub's "Merge when ready" button. Turning `allow_auto_merge` on would let `gh pr merge` queue, but
+it's a repository setting under the repositories spec, so it is left to the owner as its own decision.
+
 ### D2. One switch per repository, in the module
 
 The module gets `merge_queue` (bool, default `false`). When it's on, the `protect main` ruleset gains:
