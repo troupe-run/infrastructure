@@ -51,7 +51,7 @@ guard: commit-on-main: commits aren't made on main; work reaches main through a 
 | Rule | Layer | Refuses | Fix |
 |---|---|---|---|
 | `commit-on-main` | git | a commit with `main` checked out | create a branch named after the change |
-| `commit-branch-change` | git | a commit on a branch with no matching OpenSpec change (active, or archived on that branch), or on a detached HEAD. On GitHub, a `release-please--` branch is exempt by its name when it lives in a repository whose ruleset lets only the release App create or update those branches (`RELEASE_REPOSITORIES` in `scripts/guard.py`: troupe only). Who authored its commits isn't asked. For a pull request that's its head repository, so a fork's branch is never exempt; a run that names no repository exempts nothing | propose the change, or switch to its branch |
+| `commit-branch-change` | git | a commit on a branch with no matching OpenSpec change (active, or archived on that branch), or on a detached HEAD. On GitHub, a `release-please--` branch is exempt by its name when it lives in a repository whose ruleset lets only the release App create or update those branches (`RELEASE_REPOSITORIES` in `scripts/guard.py`: troupe only). Who authored its commits isn't asked. For a pull request that's its head repository, so a fork's branch is never exempt; a run that names no repository exempts nothing. A `dependabot/` branch is exempt on GitHub, on the same terms, in a repository whose ruleset lets only Dependabot create or update those branches (`DEPENDABOT_REPOSITORIES`: troupe, website and this one), and only when every commit changes only dependency files (`package.json`, `package-lock.json`, `pyproject.toml`, `uv.lock`, or a workflow's `uses:` lines) and its subject is one minor or patch update, with any `update-type` in its message agreeing. Its commits' authors and the pull request's title aren't read. One that fails a condition is refused saying which | propose the change, or switch to its branch; for a Dependabot update that isn't exempt, take it through an OpenSpec change (see "Dependabot pull requests") |
 | `commit-message` | git | a first line that isn't a Conventional Commit (`type(scope)!: subject`); `fixup!`, `squash!` and `amend!` are accepted when they name a Conventional Commit subject. The `guard` check applies the same rule to a pull request's title, which becomes the commit message if squash merging is ever turned on | use one of `feat fix docs build ci test refactor perf style chore revert` |
 | `schema-commit-type` | git | a commit that changes, adds, moves or removes a file under `protocol/schemas/` under a type that releases nothing. release-please releases the protocol, and moves the version troupe records for its copy of the schemas, only for `feat`, `fix`, `perf` and `revert`, or a breaking change of any type (`!`, or a `BREAKING CHANGE:` or `BREAKING-CHANGE:` footer). Any other type would ship changed schemas under the old protocol version (#122). The paths are `SCHEMA_PATHS` and the types `RELEASING_TYPES`, both in `scripts/guard.py`. It judges the files the commit contains, including with `git commit -a` or `git commit <path>`, and a fixup by the type of the commit it names. A repository with no `protocol/schemas/` (today, everything but troupe) is never refused. An override excuses the local hook only: the `pre-push` hook and the `guard` check judge each commit again, so a schema change that merges has a releasing type | use `feat`, `fix`, `perf` or `revert` (e.g. `fix(protocol): <what changed>`), or mark it breaking; if the rest of the work shouldn't release, commit the schema change on its own |
 | `commit-checks` | git | a commit while tracked files have changes it leaves out, while `scripts/check.py` fails, or while `scripts/check-paths.toml` is malformed. The check runs only what the staged paths need (see below). It judges what the commit contains, including with `git commit -a` or `git commit <path>`, so `-a` goes ahead, and a path commit is refused while another tracked file has an edit, staged or not, that it leaves out, because the check runs on the working tree | stage or stash the changes, or with `git commit <path>` name them too or commit without paths; fix what the check reports, or the declaration |
@@ -316,7 +316,7 @@ in `tofu/dependabot.json`, and a repository's ecosystems and labels in `tofu/lab
 `uv run scripts/dependabot_config.py`. An edit to the delivered file itself is refused in troupe and website, and
 reverted by the next apply everywhere. Version updates leave out the workflows the guard delivers. Those are bumped
 here, and the next apply delivers them. Their pull requests are titled `chore(deps): …` and carry only declared
-labels, and they take the same path as security updates below.
+labels, and they take the same paths as security updates, below.
 
 OpenTofu's providers here (`tofu/.terraform.lock.hcl`) get no version updates: Dependabot's `opentofu` updates
 proposed nothing for a `registry.opentofu.org` lockfile when probed (deliver-dependabot design D6). Update them by
@@ -338,19 +338,27 @@ that issue and its pull request alone and fails, naming it, until the line is pu
 workflow reads only pull requests by `dependabot[bot]` and issues its App opened, and never checks out a pull
 request. `uv run scripts/dependabot_issues.py` run locally only reads, and prints what it would do.
 
-- **In a governed repository** (troupe, infrastructure, website), Dependabot's pull request is an alert that comes
-  with a fix.
-  It can't merge as it is: its `dependabot/...` branch matches no OpenSpec change, so the `guard` check fails on
-  `commit-branch-change`. (Its commit is a Conventional Commit, signed off as `dependabot[bot] <support@github.com>`,
-  and once its issue is linked its description closes an issue, so that's what stops it.) Until #174's exemption
-  lands, take the fix into an OpenSpec change for its issue like any other change: make the same bump on a branch
-  named after the change, with a pull request that closes the issue. Merge that first: it closes the issue, and
-  Dependabot then closes its own pull request as up to date (or close it yourself, with a comment linking the
-  change). Closing Dependabot's pull request while its issue is still open closes the issue as not planned an hour
-  later. A major or unknown update takes this path even after #174. There's no exemption for Dependabot's branches yet, and a test fails if
-  one appears (security-scanning, design D5).
-- The website has no DCO, so there the branch is the only thing that stops it. It's handled the same way
-  (govern-website).
+In a governed repository (troupe, infrastructure, website), a Dependabot pull request takes one of two paths. The
+`guard` check decides which (spec: `development-workflow`; dependabot-exemption).
+
+- **A minor or patch update of dependency files merges as it is.** Its `dependabot/` branch matches no OpenSpec
+  change, but `commit-branch-change` exempts it, because a ruleset in each of the three repositories lets only
+  Dependabot create or update `dependabot/` branches (spec: `dependency-updates`). Every commit must change only
+  `package.json`, `package-lock.json`, `pyproject.toml`, `uv.lock`, or a workflow's `uses:` lines, and name one
+  dependency moving to a minor or patch release (`Bump zod from 4.6.5 to 4.6.7`), counted as the issue counts it. Every
+  other check still applies, and its description closes its issue through the line `dependabot-issues` adds. A green
+  one waits for your merge like any pull request.
+- **Anything else takes an OpenSpec change**: a major update, one whose versions can't be read (such as a requirement
+  range, `Update uv-build requirement`), or one changing other files. Its `guard` run fails on `commit-branch-change`,
+  saying which condition failed. Take the update into an OpenSpec change for its issue like any other change: make the
+  same bump on a branch named after the change, with a pull request that closes the issue. Merge that first: it closes
+  the issue, and Dependabot then closes its own pull request as up to date (or close it yourself, with a comment
+  linking the change). Closing Dependabot's pull request while its issue is still open closes the issue as not planned
+  an hour later.
+
+Only Dependabot can write to its branches, you included. To bring one up to date with `main`, comment
+`@dependabot rebase`; GitHub's "Update branch" is refused by the ruleset. An open pull request is judged by the guard
+on its own branch, so it picks up a change to these rules only once Dependabot rebases it.
 
 ## Known gaps
 
