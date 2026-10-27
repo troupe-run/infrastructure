@@ -23,14 +23,14 @@
 
 ## 2. The guard judges a merge group (design D3)
 
-- [ ] 2.1 Write tests first in `scripts/tests/` for `github_ci_inputs` on a `merge_group` event (range
+- [x] 2.1 Write tests first in `scripts/tests/` for `github_ci_inputs` on a `merge_group` event (range
   `base_sha..head_sha`, branch `main`, no title, description or repository), for an event missing either commit
   (refused under `commit-branch-change` with the re-run fix), and for a pull request from a branch named
   `gh-readonly-queue/main/pr-1-abc` (still judged by the branch rule); verify they fail on main's `guard.py`
-- [ ] 2.2 Teach `github_ci_inputs` and `run_ci_entry` the `merge_group` event; verify the 2.1 tests and the guard's
+- [x] 2.2 Teach `github_ci_inputs` and `run_ci_entry` the `merge_group` event; verify the 2.1 tests and the guard's
   full suite pass, with `GITHUB_ACTIONS` both set and unset (memory: CI runs pytest with it set), and mypy --strict
   and ruff are clean
-- [ ] 2.3 Add `merge_group: types: [checks_requested]` to `.github/workflows/guard.yml`, narrow its `push` to
+- [x] 2.3 Add `merge_group: types: [checks_requested]` to `.github/workflows/guard.yml`, narrow its `push` to
   `["**", "!gh-readonly-queue/**"]`, and update its header comment; verify with a test that reads the workflow's
   triggers, and with `uv run scripts/check.py`
 - [ ] 2.4 Run the branch's `guard.py ci` over a fresh scratch clone of troupe with `GITHUB_REPOSITORY=troupe-run/troupe`
@@ -92,6 +92,7 @@
   and that their `guard` runs there passed.
 - Check that the next infrastructure pull request lands through the queue: its merge group's `check`, `guard tests`,
   `guard (workflow rules)` and `DCO` pass, `plan (pull request)` reports skipped, and `main`'s head equals the tested
-  commit. If it stalls, turn the switch off in a pull request and reopen #169.
+  commit. If it stalls, merge a pull request turning the switch off with the owner's bypass (the queue holds it
+  otherwise), or disable the rule on GitHub, and reopen #169.
 - Comment on #169 with the PR and the archived change, check it's closed and its card says Done.
 - Website's and troupe's queues are turned on under the infrastructure issue from 6.1.

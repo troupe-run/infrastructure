@@ -53,6 +53,11 @@ resource "github_repository" "this" {
 
   lifecycle {
     prevent_destroy = true
+
+    precondition {
+      condition     = !var.merge_queue || var.main_ruleset == "pull-request"
+      error_message = "merge_queue needs main_ruleset = \"pull-request\": only that ruleset takes pull requests into main."
+    }
   }
 }
 
@@ -112,9 +117,9 @@ resource "github_issue_labels" "this" {
   }
 }
 
-# main is changed only through pull requests merged by rebase, once their required checks pass; its
-# history can't be rewritten or deleted (spec: rulesets; protect-main design D2 and D3,
-# required-checks design D1 and D4).
+# main is changed only through pull requests merged by rebase, once their required checks pass,
+# through a merge queue where it's on; its history can't be rewritten or deleted (spec: rulesets;
+# protect-main design D2 and D3, required-checks design D1 and D4, merge-queue design D2).
 resource "github_repository_ruleset" "main" {
   count = var.main_ruleset == "pull-request" ? 1 : 0
 
@@ -140,9 +145,26 @@ resource "github_repository_ruleset" "main" {
       allowed_merge_methods           = ["rebase"]
     }
 
+    # The queue lands only what it tested: main with the pull requests ahead of it and this one's
+    # commits, rebased, each pull request's own commit green (ALLGREEN). A lone pull request lands
+    # straight away; with one maintainer, waiting for a group only adds delay (merge-queue D2).
+    dynamic "merge_queue" {
+      for_each = var.merge_queue ? [1] : []
+      content {
+        merge_method                      = "REBASE"
+        grouping_strategy                 = "ALLGREEN"
+        max_entries_to_build              = 5
+        max_entries_to_merge              = 5
+        min_entries_to_merge              = 1
+        min_entries_to_merge_wait_minutes = 0
+        check_response_timeout_minutes    = 60
+      }
+    }
+
     # Each check is pinned to the App that posts it, so a status of the same name from anywhere
     # else doesn't count. Not strict: the App's state commit after every apply would otherwise put
-    # every open pull request out of date (required-checks design D3).
+    # every open pull request out of date (required-checks design D3). Where the queue is on, it
+    # tests each combination before it lands, which is what strict would have caught.
     dynamic "required_status_checks" {
       for_each = length(var.required_checks) > 0 ? [1] : []
       content {

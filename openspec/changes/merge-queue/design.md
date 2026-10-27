@@ -94,7 +94,7 @@ for good.
 
 `guard.yml` adds `merge_group: types: [checks_requested]` and narrows `push` to `branches: ["**",
 "!gh-readonly-queue/**"]`. `github_ci_inputs` reads a `merge_group` event's `merge_group.base_sha` and `head_sha` as
-the range, with the branch `main` and no title, description or head repository. Every rule then runs as it does for
+the range, the branch it lands on (`main`, from `base_ref`) and the run's repository, as for a push, with no title or description. Every rule then runs as it does for
 a push to `main`. The branch rule doesn't apply to `main`. `openspec_scope` validates in full when the branch is
 `main`. Capability labels follow the scope. An event without either commit refuses under `commit-branch-change`,
 with the same "re-run, then tell the owner" fix as the other unreadable payloads.
@@ -162,6 +162,8 @@ issue and change for one line, and proves nothing the probe and step 3 don't.
   before too.
 - [DCO flakes in the queue (dcoapp/app#311)] → probed with a sign-off name that differs from the profile. The
   repository's switch can be turned off in one pull request.
+- [The queue is stuck, so the pull request turning it off can't land either] → the owner's bypass merges it without
+  the queue, or the rule is disabled on GitHub (Migration Plan). D1.5 confirms the bypass before the switch goes on.
 - [Turning the queue off while pull requests are queued] → GitHub removes them from the queue. They are merged again
   by hand. Nothing is lost.
 
@@ -169,6 +171,10 @@ issue and change for one line, and proves nothing the probe and step 3 don't.
 
 D7 is the rollout. Rollback is the switch: `merge_queue = false` for a repository, applied after the owner approves
 its plan. The `merge_group` triggers can stay, since nothing sends them.
+
+A stuck queue holds the switch-off pull request too, so the rollback starts outside it: the owner merges that pull
+request with their bypass, merging without the queue (D1.5 shows this works before anything goes live), or, failing
+that, disables the merge queue rule on GitHub, which the next plan shows as drift until the switch-off applies.
 
 ## Open Questions
 

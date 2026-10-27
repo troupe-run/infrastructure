@@ -81,6 +81,14 @@ variable "required_checks" {
   default = []
 }
 
+# On only once every check the repository requires runs on merge groups, so the queue never waits
+# on a check that can't report (spec: rulesets; merge-queue design D2).
+variable "merge_queue" {
+  description = "Pull requests reach main through a merge queue that merges by rebase (pull-request only)."
+  type        = bool
+  default     = false
+}
+
 variable "owner_bypass" {
   description = "Org owners may bypass the ruleset on pull requests only (design D3). Off only on the probe."
   type        = bool
