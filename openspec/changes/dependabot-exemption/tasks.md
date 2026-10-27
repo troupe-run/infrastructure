@@ -161,8 +161,14 @@
   lines too. A first run judged `main`'s tip by mistake (the probe script set each `pr-<n>` to `FETCH_HEAD`, which was
   `main`); with an empty range the guard refused saying the branch `carries no commits`. The clones were deleted;
   nothing was pushed
-- [ ] 5.2 Push the branch and open the pull request with `Closes #174`. Verify its `guard` run passes and its plan
-  comment matches 3.3. Record the PR, the run and the plan
+- [x] 5.2 Push the branch and open the pull request with `Closes #174`. Verify its `guard` run passes and its plan
+  comment matches 3.3. Record the PR, the run and the plan. Result: PR #193. On 4817048 every check passed: `guard
+  (workflow rules)` on the pull request (run 40452534410) and the push (40452529297), the guard tests on all three OSes,
+  `check`, DCO and `claude review`. The plan for 4817048 (run 40452534401, approved by the owner) is `3 to add, 2 to
+  change, 0 to destroy`, the same resources as 3.3: the three `dependabot_branches` rulesets (`refs/heads/dependabot/**/*`,
+  bypass 29110 only) and `scripts/guard.py` delivered to troupe and website. The review's two points are answered: 4.6
+  narrows the trusted name to Dependabot's shape, and the deeper-name check stays a must-pass after the apply (design
+  Risks). 4.6 changes `scripts/guard.py` again, so the next plan delivers a different hash to the same two files
 
 ## Workflow follow-up
 
