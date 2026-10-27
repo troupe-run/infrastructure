@@ -147,6 +147,10 @@ It allows the mutation only if `troupe-run-review[bot]` wrote the first comment 
 comment among the last 100 as a nit. The tier is the latest label, so the last 100 is the part that matters. If none
 of them is the review's, the conversation counts as unlabelled and the resolve is refused.
 
+GitHub's GraphQL API names the App as an author `troupe-run-review`, with `__typename` `Bot` (read from #193's
+conversations, 2026-10-27), not `troupe-run-review[bot]` as REST does. A person could register that login, so both
+the guard and the resolving step check the type as well as the login.
+
 A failed read refuses the mutation. That's the guard's first online read in a hook. It's acceptable because the
 command it judges is itself online. `unresolveReviewThread` stays refused, with no `gh` equivalent: reopening is the
 owner's.
