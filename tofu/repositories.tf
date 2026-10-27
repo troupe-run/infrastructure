@@ -76,6 +76,9 @@ module "repo_troupe" {
   # troupe receives the guard from this repository (guard_delivery.tf).
   app_bypass_id   = local.infrastructure_app_id
   required_checks = local.checks_for["troupe"]
+  # Every check it requires runs on merge groups: `check` in full since troupe-run/troupe#183, which
+  # troupe's own tests guard, and the delivered guard (#197; spec: rulesets).
+  merge_queue = true
 }
 
 module "repo_github" {
@@ -109,8 +112,8 @@ module "repo_infrastructure" {
   # CI commits the state here after an apply (spec: ci-apply, design D4).
   app_bypass_id   = local.infrastructure_app_id
   required_checks = local.checks_for["infrastructure"]
-  # Every check it requires runs on merge groups (scripts/tests/test_required_checks.py);
-  # website and troupe follow once theirs do (#197; spec: rulesets, merge-queue design D7).
+  # Every check it requires runs on merge groups (scripts/tests/test_required_checks.py; spec:
+  # rulesets, merge-queue design D7).
   merge_queue = true
 }
 
@@ -138,4 +141,7 @@ module "repo_website" {
   # domain and fails on HTTPS ("The certificate does not exist yet"), and a second, once GitHub has
   # approved the new certificate, enforces it.
   pages = { cname = "troupe.run" }
+  # Every check it requires runs on merge groups: `test` in full since troupe-run/website#70, and
+  # the delivered guard (#197; spec: rulesets).
+  merge_queue = true
 }
