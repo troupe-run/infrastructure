@@ -230,6 +230,24 @@ so they fall to the owner, or to a re-review that posts the finding again with a
   a shell line, which a pull request's text could break out of); and a review that returns no structured output fails
   its step, so the resolving step runs only when the review succeeded, and resolves nothing otherwise.
 
+- **What an open conversation blocks (tasks 1.2, 1.3, 2026-10-28)**, on `troupe-run/infra-probe-review-threads`, whose
+  `protect main` ruleset had `required_review_thread_resolution` and a rebase merge queue (`rules/branches/main` listed
+  both). The review App posted an inline comment on two pull requests, with a token minted as the workflow mints it
+  (contents read, metadata read, pull requests write, the one repository).
+  - The open conversation blocked the merge: `mergeStateStatus` BLOCKED, `mergeable` MERGEABLE.
+  - `gh pr merge --rebase` didn't refuse ("The merge strategy for main is set by the merge queue"): it turned on
+    auto-merge, with method SQUASH, and the pull request stayed out of the queue.
+  - The owner's bypass, `gh pr merge --rebase --admin`, merged the other pull request past its open conversation.
+  - Once the conversation was resolved, the pull request read CLEAN with auto-merge still on, but in three minutes it
+    neither merged nor joined the queue. So whether auto-merge lands a pull request the moment its last conversation
+    is resolved isn't settled. If it does, the owner's merge click stops being a look at the final state.
+- **Who can resolve (task 1.4, 2026-10-28).** The review App's token **can't**: `resolveReviewThread` returned
+  FORBIDDEN, "Resource not accessible by integration". A token holding **only `contents: write`** (the infrastructure
+  App's, scoped to the probe) resolved the same conversation. So resolving needs contents write, which pull requests
+  write doesn't give. The review App's token could still minimize its own comment (`minimizeComment`), and was refused
+  a contents write (403), as designed. **This breaks D4 as written**: giving the review App contents write is what
+  claude-pr-review design D1 rules out, so who resolves a must-fix goes back to the owner (#194).
+
 ## Risks / Trade-offs
 
 - [The review disagrees with itself across runs, opening a finding it earlier let pass] → It's a new conversation, the
