@@ -41,8 +41,8 @@ first.
 - **THEN** its comment is labelled nit, and the author chooses
 
 ### Requirement: A conversation's tier is the review's latest label in it
-A conversation's tier SHALL be the label on the latest comment in it by `troupe-run-review[bot]`. Only the review SHALL
-change a tier, by replying in the conversation with a new label line and its reason; the author argues for a change by
+A conversation's tier SHALL be the latest label `troupe-run-review[bot]` gave in it; a later reply of the review's
+with no label keeps it. Only the review SHALL change a tier, by replying in the conversation with a new label line and its reason; the author argues for a change by
 replying, and a label in anyone else's comment SHALL count for nothing.
 
 #### Scenario: A must-fix turns out to be a choice
