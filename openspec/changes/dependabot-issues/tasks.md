@@ -55,12 +55,12 @@
 
 ## 4. The workflow (design D1, D6, D7)
 
-- [ ] 4.1 Write `.github/workflows/dependabot-issues.yml`: `schedule` every 10 minutes and `workflow_dispatch`;
+- [x] 4.1 Write `.github/workflows/dependabot-issues.yml`: `schedule` every 10 minutes and `workflow_dispatch`;
   `concurrency` without cancelling; an `issues` job in the `dependabot-issues` environment that mints the App's token
   for the three repositories and runs the script; a `board` job in the `board` environment that checks each issue URL
   against `^https://github\.com/troupe-run/(troupe|website|infrastructure)/issues/[0-9]+$` and adds those missing from
   the board. Verify `scripts/check.py` passes.
-- [ ] 4.2 Add `scripts/tests/test_dependabot_issues_workflow.py`: no `pull_request` or `pull_request_target`
+- [x] 4.2 Add `scripts/tests/test_dependabot_issues_workflow.py`: no `pull_request` or `pull_request_target`
   trigger, one checkout with no `ref` or `repository`, no `${{ }}` expression reading `github.event`, top-level
   `permissions: {}`, each job's environment, and `cancel-in-progress: false`. Verify it passes, and fails when a
   checkout gains `ref: ${{ github.event.pull_request.head.sha }}`.

@@ -1,0 +1,113 @@
+name: dependabot-issues
+
+# Gives every Dependabot pull request in the org its issue, and links the pull request to it (spec:
+# dependency-updates; #172; openspec/changes/dependabot-issues/design.md). For each repository with
+# Dependabot ecosystems in tofu/labels/dependabot.json, the script opens an issue for each open
+# Dependabot pull request (type Task, label dependencies, the release in progress), adds
+# `Closes #<n>` to its description, relinks the issue when Dependabot supersedes the update, and
+# closes it when the pull request merges or closes with no successor.
+#
+#   issues   env dependabot-issues (main only)   runs scripts/dependabot_issues.py with the
+#                                                troupe-run-dependabot App's token
+#   board    env board (main only)               adds each open issue that isn't on the troupe
+#                                                roadmap board, with the board App's token
+#
+# It runs on a schedule, from main, so nothing a pull request carries is in its context, and it never
+# checks out or runs a pull request's files: it reads their metadata through the API (design D1, D6).
+# The App's edits start workflows, so adding the closing line re-runs `guard` on the pull request,
+# which GITHUB_TOKEN's edits wouldn't.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+# Two runs at once could each open an issue for the same pull request.
+concurrency:
+  group: dependabot-issues
+  cancel-in-progress: false
+
+jobs:
+  issues:
+    name: open and link the issues
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Limited to main, and holds only the troupe-run-dependabot App's key (tofu/dependabot_issues.tf).
+    environment:
+      name: dependabot-issues
+      deployment: false
+    permissions:
+      contents: read
+    outputs:
+      issue-urls: ${{ steps.issues.outputs.issue-urls }}
+    steps:
+      # This repository's main: the script and its declarations. No pull request's code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+      # The App is installed on exactly the repositories it serves (spec:
+      # dependabot-issue-credentials), so the token covers those and no others.
+      - name: Mint the troupe-run-dependabot App's token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.DEPENDABOT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DEPENDABOT_APP_PRIVATE_KEY }}
+          owner: troupe-run
+          permission-issues: write
+          permission-pull-requests: write
+      - name: Open and link the issues
+        id: issues
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: uv run --no-project scripts/dependabot_issues.py
+
+  board:
+    name: put the issues on the board
+    # issues fails when it couldn't handle a repository, after handling the others, so this runs on
+    # any outcome but cancelled, when it handed over URLs.
+    needs: issues
+    if: ${{ !cancelled() && needs.issues.outputs.issue-urls != '' && needs.issues.outputs.issue-urls != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: board
+      deployment: false
+    permissions: {}
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: token
+        with:
+          client-id: ${{ vars.BOARD_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BOARD_APP_PRIVATE_KEY }}
+          owner: troupe-run
+          permission-organization-projects: write
+      - name: Add each issue that isn't on the troupe roadmap board
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          ISSUE_URLS: ${{ needs.issues.outputs.issue-urls }}
+        run: |
+          set -euo pipefail
+          # What issues hands over is checked before it's used: a JSON list of issue URLs in the
+          # repositories it serves.
+          if ! jq -e 'type == "array" and all(.[]; type == "string")' <<<"$ISSUE_URLS" >/dev/null; then
+            printf '::error::issue-urls from the issues job is not a JSON list of strings: %q\n' "$ISSUE_URLS"
+            exit 1
+          fi
+          mapfile -t urls < <(jq -r '.[]' <<<"$ISSUE_URLS")
+          for ISSUE_URL in "${urls[@]}"; do
+            if [[ ! "$ISSUE_URL" =~ ^https://github\.com/troupe-run/(troupe|website|infrastructure)/issues/[0-9]+$ ]]; then
+              printf '::error::issue-urls holds something that is not an issue it serves: %q\n' "$ISSUE_URL"
+              exit 1
+            fi
+          done
+          on_board=$(gh project item-list 1 --owner troupe-run --format json --limit 5000 --jq '.items[].content.url')
+          for ISSUE_URL in "${urls[@]}"; do
+            if grep -qxF "$ISSUE_URL" <<<"$on_board"; then
+              continue
+            fi
+            gh project item-add 1 --owner troupe-run --url "$ISSUE_URL"
+            echo "Added $ISSUE_URL"
+          done
