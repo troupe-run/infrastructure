@@ -76,9 +76,14 @@
   five weakenings (creation, update, pattern, another App, a second bypass actor) and removing the block leave the
   repositories uncovered. `test_no_real_configuration_moves_dependabots_branches_out_of_the_reserved_name` is in
   `test_dependabot_config.py`. `uv run pytest -m tofu`: 142 passed
-- [ ] 3.3 Run a local plan (fast-forward onto `origin/main` first) and verify it adds exactly three
+- [x] 3.3 Run a local plan (fast-forward onto `origin/main` first) and verify it adds exactly three
   `dependabot_branches` rulesets, for troupe, website and infrastructure, and changes the delivered `scripts/guard.py`
-  in troupe and website, and nothing else. Record the plan's summary here
+  in troupe and website, and nothing else. Record the plan's summary here. Result: on be05322 (0 behind `origin/main`),
+  after two failed tries (a 1Password authorisation timeout, then DNS failures reaching `api.github.com`): `Plan: 3 to
+  add, 2 to change, 0 to destroy`. The three adds are `dependabot_branches` for infrastructure, troupe and website,
+  each `refs/heads/dependabot/**/*`, `creation` and `update` true, `update_allows_fetch_and_merge` false, and one
+  bypass actor, `Integration` 29110 `always`. The two changes are `github_repository_file.guard` for
+  `scripts/guard.py` in troupe and website, `60135e3cf269` → `fc621d1fb36d`
 
 ## 4. The exemption (design D3-D6)
 
@@ -135,10 +140,20 @@
 
 ## 5. Integration checks
 
-- [ ] 5.1 Probe the branch's guard on scratch clones, with `GITHUB_EVENT_NAME=pull_request`, hand-written payloads
+- [x] 5.1 Probe the branch's guard on scratch clones, with `GITHUB_EVENT_NAME=pull_request`, hand-written payloads
   naming the head repository, and nothing pushed: website at #44's head (passes, given a closing body) and #55's
   head (fails `commit-branch-change`, saying major); troupe at #174's head (passes) and #175's (fails, versions
-  unreadable); infrastructure at #184's head (passes). Record each output here, and delete the clones
+  unreadable); infrastructure at #184's head (passes). Record each output here, and delete the clones. Result: fresh
+  clones in the scratchpad, this branch's guard at be05322, `GITHUB_EVENT_NAME=pull_request` with each pull request's
+  real title, description and head repository from `gh pr view`. website #44 (a90da16), troupe #174 (2ac4eb7) and
+  infrastructure #184 (9401d74): `every rule passes`, exit 0. website #55 (334f684): exit 1, `commit-branch-change`
+  only, `… is a major update; 334f684's message says update-type: version-update:semver-major`. troupe #175 (e0e168b):
+  exit 1, `commit-branch-change` only, `… subject 'chore(deps-dev): Update uv-build requirement' doesn't give one
+  dependency's versions`. The other 13 open Dependabot pull requests (website #45, #46, #54, #56-#59; troupe #172,
+  #173; infrastructure #182, #183, #185, #186) each pass, so `pr-closes-issue` is satisfied by the issue workflow's
+  lines too. A first run judged `main`'s tip by mistake (the probe script set each `pr-<n>` to `FETCH_HEAD`, which was
+  `main`); with an empty range the guard refused saying the branch `carries no commits`. The clones were deleted;
+  nothing was pushed
 - [ ] 5.2 Push the branch and open the pull request with `Closes #174`. Verify its `guard` run passes and its plan
   comment matches 3.3. Record the PR, the run and the plan
 
