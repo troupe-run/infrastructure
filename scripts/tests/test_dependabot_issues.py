@@ -276,6 +276,12 @@ def test_a_reopened_pull_request_reopens_its_issue() -> None:
     assert kinds(di.plan([lined(p, 100)], [issue], {}, NOW)) == [("reopen", 44, 100)]
 
 
+def test_an_issue_a_change_closed_isnt_reopened_while_dependabot_s_pull_request_is_open() -> None:
+    p = pull()
+    issue = app_issue(p, state="closed", state_reason="completed")
+    assert di.plan([p], [issue], {}, NOW).actions == []
+
+
 def test_an_issue_whose_pull_request_wasnt_read_is_an_error() -> None:
     with pytest.raises(di.ReadError, match="#44 wasn't read"):
         di.plan([], [app_issue(pull())], {}, NOW)

@@ -85,7 +85,11 @@ Then, per open Dependabot pull request:
 
 1. **Its issue** is the App's issue whose marker names it. Failing that, it's the App's open issue for the same
    dependency key (D3), which is relinked. Failing that, a new issue.
-2. **A closed issue for an open pull request is reopened** (spec: a reopened pull request).
+2. **A closed issue for an open pull request is reopened only if it was closed as not planned**, which only the
+   App does, when the pull request closed (spec: a reopened pull request). One closed as completed was closed by a
+   change that took the update over (D5's manual path, or a major's OpenSpec change), and stays closed until
+   Dependabot closes its pull request as up to date. Found while writing the docs (apply, 5.1): reopening any closed
+   issue would have undone that change's close on the next run.
 3. **The closing line:** if no line of the description is exactly `Closes #<n>` for its issue, the script appends
    `\n\nCloses #<n>` and writes the description back. Everything Dependabot wrote stays.
 
@@ -189,6 +193,9 @@ watch does. Its tests set `GITHUB_ACTIONS` both ways, since CI's check runs them
 - **[Risk] Setting the issue type with only Issues write.** The REST API takes `type` on creation, but whether the
   App needs more for an org's issue types is unconfirmed.
   → Probed first. If it needs more, the permission is added to the spec and the declaration.
+- **[Risk] A person closes an issue as not planned while Dependabot's pull request is still open.**
+  → The next run reopens it, since that's how a reopened pull request looks. To drop an update, close Dependabot's
+  pull request (or tell it `@dependabot ignore`), and the App closes the issue.
 - **[Trade-off] Runs every 10 minutes, mostly with nothing to do.** Actions minutes are free on public repositories,
   and a run with nothing to do makes only reads.
 
