@@ -36,7 +36,7 @@
 
 ## 3. The guard allows resolving a nit (design D5)
 
-- [ ] 3.1 Write tests first: `resolveReviewThread` on a review-App nit, or a must-fix the review re-labelled nit, is
+- [x] 3.1 Write tests first: `resolveReviewThread` on a review-App nit, or a must-fix the review re-labelled nit, is
   allowed; a must-fix, a decision, a nit the review re-labelled must-fix or decision, one whose last 100 comments
   hold no review label, an unlabelled finding and a person's conversation are each refused with D5's fix; a failed
   or timed-out lookup, a query that names two conversations, a `threadId` from `-F field=@file` or stdin, and
@@ -44,9 +44,9 @@
   tests); verify they fail on main's `guard.py`
 - [ ] 3.2 Implement the condition and lookup under `gh-allow-list`, and give `GH_MUTATIONS_ALLOWED`'s comment the
   reason this one is allowed; verify the 3.1 tests, the full suite on all three OSes in CI, `mypy --strict` and ruff
-- [ ] 3.3 Run the branch's `guard.py` hook over a fresh scratch clone of troupe with a stubbed lookup (memory: probe
+- [x] 3.3 Run the branch's `guard.py` hook over a fresh scratch clone of troupe with a stubbed lookup (memory: probe
   the guard on a troupe clone); verify a nit's resolve is allowed and a must-fix's is refused there too
-- [ ] 3.4 Document the rule in `docs/development-workflow.md`'s `gh-allow-list` row and in the section on Claude's
+- [x] 3.4 Document the rule in `docs/development-workflow.md`'s `gh-allow-list` row and in the section on Claude's
   review, with the one way to reply in a conversation (D5: `gh api -X POST …/pulls/<n>/comments -F in_reply_to=<id>`);
   add a test that this reply is allowed and that `…/comments/<id>/replies` and `addPullRequestReviewThreadReply` are
   refused; verify the doc names the new requirement and that `uv run scripts/check.py` passes
