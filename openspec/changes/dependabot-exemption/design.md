@@ -172,6 +172,11 @@ are checked the same way.
   yet reserved. Agents can't use the gap (the local rule has no exemption, and the owner's review is the gate,
   #47), and the apply follows the merge. Splitting into two pull requests would close it at the cost of a second
   review; not worth it.
+- **[Risk] The pattern misses deeper branch names.** The probe proved `refs/heads/dependabot/**/*` only on
+  `dependabot/<ecosystem>/<name>`, but scoped npm packages and actions go a level deeper (website #58,
+  infrastructure #184). If GitHub didn't match those, the guard would exempt branches anyone can push. → After the
+  apply, and before any Dependabot pull request is rebased onto the new guard, GitHub's `rules/branches/<name>` is
+  checked for a deeper name in each repository; a miss stops everything until the pattern is fixed.
 - **[Trade-off] "Update branch" stops working on Dependabot's pull requests.** The ruleset refuses it. The docs say to
   use `@dependabot rebase`, which is what Dependabot expects anyway.
 - **[Risk] Dependabot changes its commit format.** → The exemption reads nothing it can't parse, so a new format makes
