@@ -52,6 +52,15 @@
 # `module "probe"` and the two `import` blocks that target it, in the working tree only, then plan
 # and apply: the repository is archived and its labels, ruleset and Dependabot settings are
 # destroyed. To recover, `gh repo unarchive`, `git checkout` this file and apply again.
+#
+# The merge-queue probe (merge-queue design D1) sets probe_merge_queue, with probe_delivery_bypass
+# and probe_required_checks naming `probe check` and `probe skipped` (GitHub Actions, 15368) and
+# `DCO` (1861). Before the apply, push two workflows to the probe's main (no ruleset yet): probe.yml,
+# on pull_request and merge_group, with job `probe check` (fails when a file FAIL exists) and job
+# `probe skipped` (`if: github.event_name == 'pull_request'`); and push.yml, on push to "**",
+# echoing the ref. The owner adds the probe to the infrastructure App's and the DCO App's
+# installations. Queue signed-off pull requests, and read each merge group's check runs; change
+# README.probe.md and apply to push to main as the App.
 
 terraform {
   required_version = ">= 1.8"
@@ -131,6 +140,12 @@ variable "probe_required_checks" {
     integration_id = number
   }))
   default = []
+}
+
+variable "probe_merge_queue" {
+  description = "Passed to the module's merge_queue (merge-queue design D1)."
+  type        = bool
+  default     = false
 }
 
 variable "probe_environments" {
@@ -218,6 +233,7 @@ module "probe" {
   owner_bypass    = var.probe_bypass
   main_ruleset    = var.probe_main_ruleset
   required_checks = var.probe_required_checks
+  merge_queue     = var.probe_merge_queue
 
   app_bypass_id = var.probe_delivery_bypass ? 5272634 : null
 }

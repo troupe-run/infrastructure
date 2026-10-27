@@ -371,9 +371,12 @@ def test_a_path_filter_on_pull_requests_is_named() -> None:
     ]
 
 
-def test_guard_re_runs_when_a_pull_request_is_renamed_and_still_runs_on_every_push() -> None:
-    """release-please-prs design D4: the title is checked, so editing it must re-run the check."""
+def test_guard_re_runs_when_a_pull_request_is_renamed_and_runs_on_every_push_but_a_queue_s() -> (
+    None
+):
+    """release-please-prs design D4: the title is checked, so editing it must re-run the check. A
+    merge queue's branch is judged on its merge group instead (merge-queue design D3)."""
     workflow: dict[Any, Any] = load_yaml(WORKFLOWS / "guard.yml")
     on = workflow["on"] if "on" in workflow else workflow[True]
     assert on["pull_request"]["types"] == ["opened", "edited", "synchronize", "reopened"]
-    assert on["push"]["branches"] == ["**"]
+    assert on["push"]["branches"] == ["**", "!gh-readonly-queue/**"]
