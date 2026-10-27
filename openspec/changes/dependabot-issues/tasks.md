@@ -31,26 +31,26 @@
 
 ## 3. The script (spec dependency-updates; design D2–D6, D8)
 
-- [ ] 3.1 Save real payloads as fixtures under `scripts/tests/fixtures/dependabot-issues/`: website #44 (patch), #55
+- [x] 3.1 Save real payloads as fixtures under `scripts/tests/fixtures/dependabot-issues/`: website #44 (patch), #55
   (major), #58 (scoped name), #54 (`build(deps):`), troupe #175 (requirement range) and infrastructure #184
   (`github-actions`), with a README saying where each came from. Verify each fixture's fields match
   `gh api repos/troupe-run/<repo>/pulls/<n>`.
-- [ ] 3.2 Write the title parser, the dependency key and the update type in `scripts/dependabot_issues.py` (D3, D4).
+- [x] 3.2 Write the title parser, the dependency key and the update type in `scripts/dependabot_issues.py` (D3, D4).
   Test each fixture's dependency, directory, versions and type, an unparseable title, and that `0.30.0 → 0.30.2` is
   patch and `3 → 7` is major. Verify the tests pass.
-- [ ] 3.3 Add choosing the release in progress (D5). Test today's `tofu/milestones.json` gives `0.1.0`, a declaration
+- [x] 3.3 Add choosing the release in progress (D5). Test today's `tofu/milestones.json` gives `0.1.0`, a declaration
   with no open milestone fails before any write, and a repository missing the title fails alone. Verify they pass.
-- [ ] 3.4 Add reading a repository and planning its writes (D2, D6): new issue, relink, reopen, restore the line,
+- [x] 3.4 Add reading a repository and planning its writes (D2, D6): new issue, relink, reopen, restore the line,
   close as completed, close as not planned after the hour, and nothing to do. Use a fake `gh`. Test each spec scenario
   of "Every Dependabot pull request has its issue", "closes its issue", "superseded", "closed without merging" and
   "only … trusted", including a person's `dependabot/...` branch, a person's issue with a copied marker, and a
   closing line to another issue. Verify they pass.
-- [ ] 3.5 Add the writes, through `gh api` with fields as arguments, and the read-only mode outside Actions (D8). Test
-  a run with `GITHUB_ACTIONS` unset makes no write and prints each, and with it `true` makes exactly the planned
+- [x] 3.5 Add the writes, through `gh api` with the fields as JSON on stdin (a description can exceed an
+  argument's size limit), and the read-only mode outside Actions (D8). Test a run with `GITHUB_ACTIONS` unset makes no write and prints each, and with it `true` makes exactly the planned
   writes. Test a repository whose listing fails is left alone while the others are handled, and the run exits 1
   naming it. Verify the tests pass both with and without `GITHUB_ACTIONS=true`, and that mypy `--strict` and ruff are
   clean.
-- [ ] 3.6 Run the script locally against the live repositories. Verify it prints an issue it would open for each of
+- [x] 3.6 Run the script locally against the live repositories. Verify it prints an issue it would open for each of
   the 18 open Dependabot pull requests (or however many are open then), and writes nothing.
 
 ## 4. The workflow (design D1, D6, D7)
