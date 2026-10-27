@@ -19,11 +19,11 @@ that a ruleset can reserve the name for Dependabot alone. **If it can't, the cha
 ## What Changes
 
 - **First, a probe** on a throwaway `troupe-run/infra-probe-*` repository. It checks that a ruleset can let only
-  Dependabot (App 29110) create and update `dependabot/**` branches, that Dependabot still opens, rebases and
+  Dependabot (App 29110) create and update `dependabot/` branches, that Dependabot still opens, rebases and
   recreates its pull requests under it, and that the owner can't push to one. If any of that fails, the change stops
   and reports to the owner (design D1).
 - **A "dependabot branches" ruleset** in each repository that gets a `.github/dependabot.yml` (troupe, website,
-  infrastructure). It refuses creating and updating `dependabot/**` branches to everyone but Dependabot, with no
+  infrastructure). It refuses creating and updating `dependabot/` branches to everyone but Dependabot, with no
   owner bypass. Force-pushes and deletion stay allowed, for Dependabot's rebases and delete-on-merge (design D2).
 - **The guard's `commit-branch-change` rule exempts a Dependabot branch on GitHub** only when all of these hold
   (design D3-D5):

@@ -84,10 +84,16 @@ pull request red.
 
 `tofu/dependabot.tf` declares `github_repository_ruleset.dependabot_branches`, `for_each` over the same repositories
 `local.dependabot_files` has (troupe, website, infrastructure), so a repository gets the ruleset exactly when it gets
-a `dependabot.yml`. Its body copies `release_branches`: `refs/heads/dependabot/**`, `creation` and `update` true,
+a `dependabot.yml`. Its body copies `release_branches`: `refs/heads/dependabot/**/*`, `creation` and `update` true,
 `update_allows_fetch_and_merge = false`, no `deletion` or `non_fast_forward` rule, one bypass actor (`Integration`,
 `local.dependabot_app_id = 29110`, `always`). No owner bypass; the break-glass is editing the ruleset on GitHub, which
 the next plan shows as drift.
+
+The pattern is `refs/heads/dependabot/**/*`, not `refs/heads/dependabot/**`: the probe (task 1) showed GitHub matches
+the second to no `dependabot/<ecosystem>/<name>` branch, so an owner's push of one went through, while the first
+matched every such branch it was tried on. Names a level deeper, such as
+`dependabot/npm_and_yarn/axe-core/playwright-4.14.0`, weren't probed: after the apply, GitHub's
+`rules/branches/<name>` endpoint is checked for one. The tofu-text test pins the exact pattern.
 
 `dependabot/` is Dependabot's default prefix with its default `/` separator. The generated configuration sets neither,
 and a test pins that, so the policy can't move Dependabot's branches out from under the ruleset.

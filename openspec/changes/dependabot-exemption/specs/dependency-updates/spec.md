@@ -2,13 +2,13 @@
 
 ### Requirement: Only Dependabot creates or updates its branches
 Each repository that gets a `.github/dependabot.yml` SHALL have a ruleset that refuses creating and updating any
-`dependabot/**` branch to everyone but Dependabot, with no bypass for org owners. It SHALL NOT refuse Dependabot's
-force-push, since Dependabot rewrites its branch when it rebases, and SHALL NOT refuse deletion, so delete-on-merge
-removes the branch. A change to the ruleset on GitHub SHALL show in the next plan.
+branch whose name starts with `dependabot/` to everyone but Dependabot, with no bypass for org owners. It SHALL NOT
+refuse Dependabot's force-push, since Dependabot rewrites its branch when it rebases, and SHALL NOT refuse deletion,
+so delete-on-merge removes the branch. A change to the ruleset on GitHub SHALL show in the next plan.
 
 #### Scenario: Every repository with a configuration has the ruleset
 - **WHEN** the declared rulesets are read
-- **THEN** troupe, website and infrastructure each have one covering `refs/heads/dependabot/**`, refusing creation
+- **THEN** troupe, website and infrastructure each have one covering `refs/heads/dependabot/**/*`, refusing creation
   and update, whose only bypass actor is Dependabot, and `.github` has none
 
 #### Scenario: An owner creates a Dependabot branch
@@ -16,7 +16,7 @@ removes the branch. A change to the ruleset on GitHub SHALL show in the next pla
 - **THEN** GitHub refuses the push
 
 #### Scenario: An owner writes to a Dependabot branch
-- **WHEN** an org owner pushes a commit to an existing `dependabot/**` branch, or uses "Update branch" on its pull
+- **WHEN** an org owner pushes a commit to an existing Dependabot branch, or uses "Update branch" on its pull
   request
 - **THEN** GitHub refuses it, and the branch is unchanged
 
