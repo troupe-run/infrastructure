@@ -1,3 +1,4 @@
 [
-  {"repository": "website", "workflow": "links-weekly.yml", "max_age_days": 8}
+  {"repository": "website", "workflow": "links-weekly.yml", "max_age_days": 8},
+  {"repository": "infrastructure", "workflow": "dependabot-issues.yml", "max_age_days": 2}
 ]

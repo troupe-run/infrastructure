@@ -69,7 +69,7 @@
 
 ## 5. Watching the backstop (spec schedule-watch; design D6)
 
-- [ ] 5.1 Add `{"repository": "infrastructure", "workflow": "dependabot-issues.yml", "max_age_days": 2}` to
+- [x] 5.1 Add `{"repository": "infrastructure", "workflow": "dependabot-issues.yml", "max_age_days": 2}` to
   `scripts/watched-schedules.json`, and update the test that names the declared entries. Verify
   `test_watch_schedules.py` passes, and that a local `uv run scripts/watch_schedules.py` reads the new entry. Before
   the first scheduled run it reports that the workflow has never run on its schedule, which is expected until the
@@ -77,7 +77,7 @@
 
 ## 6. Docs (design D1–D6)
 
-- [ ] 6.1 Update "Dependabot pull requests" in `docs/development-workflow.md`. Say what starts the run: Dependabot's
+- [x] 6.1 Update "Dependabot pull requests" in `docs/development-workflow.md`. Say what starts the run: Dependabot's
   runs, the dispatch from troupe and website, the daily backstop, and by hand. Give the hour bound, and say that a
   missed event shows in the "Dependabot events missed" issue. Say that closing a Dependabot pull request by hand closes
   its issue at the next backstop. Update README.md's rows for `dependabot-issues.yml` and the delivered workflows.

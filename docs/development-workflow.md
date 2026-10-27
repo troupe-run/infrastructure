@@ -323,7 +323,7 @@ proposed nothing for a `registry.opentofu.org` lockfile when probed (deliver-dep
 hand with `tofu init -upgrade` in a change of their own. Its plan and apply need the owner's approval as usual.
 
 Each Dependabot pull request in troupe, website and this repository gets an issue, from the `dependabot-issues`
-workflow here, which runs every 10 minutes (spec: `dependency-updates`). The issue is opened in the pull request's
+workflow here (spec: `dependency-updates`). The issue is opened in the pull request's
 repository by the `troupe-run-dependabot` App: type Task, label `dependencies`, the release in progress (the lowest
 open milestone in `tofu/milestones.json`) as its milestone, and on the troupe roadmap board. Its title names the
 dependency and the versions, and its body links the pull request, whose description has the release notes, and gives
@@ -337,6 +337,18 @@ last line of its description, hidden on the page, says which pull request it tra
 that issue and its pull request alone and fails, naming it, until the line is put back from the edit history. The
 workflow reads only pull requests by `dependabot[bot]` and issues its App opened, and never checks out a pull
 request. `uv run scripts/dependabot_issues.py` run locally only reads, and prints what it would do.
+
+The workflow starts when Dependabot acts, so a pull request has its issue and closing line within an hour of
+Dependabot opening or rewriting it, with nobody starting anything (#195). Each finished "Dependabot Updates" run starts
+it: here directly, and in troupe and website through their `dependabot-dispatch` workflow, which the guard delivers.
+That workflow starts this one with the `troupe-run-dispatch` App's token, kept in a main-only environment
+(oob/README.md). A daily backstop does the same work, plus what only time makes due, such as closing an issue as not
+planned an hour after its pull request closed. Closing a Dependabot pull request by hand starts no Dependabot run, so
+its issue closes at the next backstop. A pull request the backstop finds still missing its issue or closing line over
+an hour after it last changed means an event was missed. The backstop fixes it, lists it in the "Dependabot events
+missed" issue here, and fails. The issue closes after a backstop that finds none. The schedule watch reports the
+backstop if its schedule stops. To run the workflow by hand: `gh workflow run dependabot-issues.yml -R
+troupe-run/infrastructure`, adding `-f backstop=true` to run it as the backstop.
 
 In a governed repository (troupe, infrastructure, website), a Dependabot pull request takes one of two paths. The
 `guard` check decides which (spec: `development-workflow`; dependabot-exemption).
