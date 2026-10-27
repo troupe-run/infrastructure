@@ -17,7 +17,7 @@
 - [ ] 1.4 With the same token, resolve that conversation with `resolveReviewThread`, and try `minimizeComment` and a
   contents write; record that the resolve succeeds and the others are refused; verify by reading the conversation's
   `isResolved` and each refusal
-- [ ] 1.5 Record whether `anthropics/claude-code-action` at the workflow's pinned SHA accepts `--json-schema` in
+- [x] 1.5 Record whether `anthropics/claude-code-action` at the workflow's pinned SHA accepts `--json-schema` in
   `claude_args` and exposes `structured_output` (its `action.yml` and docs at that SHA); choose D4's primary path or
   its fallback; verify by quoting the input or output definition
 - [ ] 1.6 Write the answers into design.md as "Probe results", with what each one changes; if an open conversation
@@ -26,12 +26,12 @@
 
 ## 2. Tier labels and their parser (design D1)
 
-- [ ] 2.1 Write tests first in `scripts/tests/` for a tier parser over a table of first lines: each of must-fix, nit
+- [x] 2.1 Write tests first in `scripts/tests/` for a tier parser over a table of first lines: each of must-fix, nit
   and decision, a missing label, an unknown tier (including `critical` and `minor`), two tiers on one line, extra
   spaces or a different separator, and a label that isn't on the first line; and a conversation's tier as the review App's latest label, across a
   must-fix re-labelled decision, a must-fix re-labelled nit, a nit re-labelled must-fix, and a must-fix whose only
   `**nit**` is in the author's reply; verify they fail before the parser exists
-- [ ] 2.2 Add the parser and the label format to `scripts/guard.py`, as one named table of tiers; verify the 2.1
+- [x] 2.2 Add the parser and the label format to `scripts/guard.py`, as one named table of tiers; verify the 2.1
   tests, the guard's full suite (with `GITHUB_ACTIONS` set and unset), `mypy --strict` and ruff pass
 
 ## 3. The guard allows resolving a nit (design D5)

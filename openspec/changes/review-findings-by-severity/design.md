@@ -200,6 +200,17 @@ unresolved conversations in the three repositories, so the owner knows what the 
 Conversations from before this change have no label (D1). The review can't resolve them, and an agent can't either,
 so they fall to the owner, or to a re-review that posts the finding again with a label.
 
+## Probe results
+
+- **Structured output (task 1.5, 2026-10-27).** `anthropics/claude-code-action` at the pinned SHA (`925afb5`, v1.0.262)
+  declares the output `structured_output`: "JSON string containing all structured output fields when --json-schema is
+  provided in claude_args" (`action.yml`, line 182). `base-action/src/run-claude-sdk.ts` sets it from the SDK's result
+  message, and fails the step ("--json-schema was provided but Claude did not return structured_output") when there
+  is none. So D4 takes its primary path, not the fallback. Two consequences for the workflow: the resolving step reads
+  the output through an environment variable, never interpolated into its script (the docs' own example pastes it into
+  a shell line, which a pull request's text could break out of); and a review that returns no structured output fails
+  its step, so the resolving step runs only when the review succeeded, and resolves nothing otherwise.
+
 ## Risks / Trade-offs
 
 - [The review disagrees with itself across runs, opening a finding it earlier let pass] → It's a new conversation, the

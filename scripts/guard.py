@@ -38,7 +38,7 @@ import time
 import tomllib
 import urllib.error
 import urllib.request
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -2158,6 +2158,44 @@ GH_MUTATIONS_OWNER_ONLY = {
     "deleteBranchProtectionRule": "gates",
     "updateProjectV2Field": "admin",
 }  # fmt: skip
+
+# Claude's review labels each finding with a tier, named for who resolves it: the review
+# (must-fix), the author (nit) or the owner (decision). The label is the comment's first line, in
+# one fixed form; claude-review.yml's prompt shows it, and its resolving step carries a copy of
+# this parser, which scripts/tests/test_claude_review_workflow.py holds equal
+# (review-findings-by-severity design D1).
+REVIEW_TIERS = ("must-fix", "nit", "decision")
+REVIEW_LABEL = re.compile(rf"\*\*({'|'.join(map(re.escape, REVIEW_TIERS))})\*\* · \S.*")
+# How GitHub's GraphQL API names the review App as an author. A person could register the same
+# login, so only a Bot of that name is the review (design D5).
+REVIEW_BOT = {"__typename": "Bot", "login": "troupe-run-review"}
+
+
+def review_tier(body: str) -> str | None:
+    """The tier a review comment's first line names, or None if it isn't in the fixed form."""
+    match = REVIEW_LABEL.fullmatch(body.splitlines()[0] if body else "")
+    return match.group(1) if match else None
+
+
+def is_review_bot(author: object) -> bool:
+    return (
+        isinstance(author, dict)
+        and author.get("__typename") == REVIEW_BOT["__typename"]
+        and author.get("login") == REVIEW_BOT["login"]
+    )
+
+
+def conversation_tier(comments: Sequence[Mapping[str, object]]) -> str | None:
+    """A conversation's tier: the label on the review's latest labelled comment in it. Only the
+    review re-tiers, so a label in anyone else's comment counts for nothing (design D1)."""
+    for comment in reversed(comments):
+        body = comment.get("body")
+        if is_review_bot(comment.get("author")) and isinstance(body, str):
+            tier = review_tier(body)
+            if tier is not None:
+                return tier
+    return None
+
 
 # Throwaway repositories (design D2): any write by an agent, but only infra-probe-* may be deleted,
 # and archiving, unarchiving or deleting the others' records is the owner's.
