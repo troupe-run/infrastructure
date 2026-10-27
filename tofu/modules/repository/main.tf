@@ -22,10 +22,13 @@ resource "github_repository" "this" {
   allow_forking   = true
   is_template     = false
 
+  # Auto-merge is on where the merge queue is, so `gh pr merge` queues a pull request rather than
+  # failing, which would leave `--admin`, which skips the queue, as the only merge from a terminal
+  # (merge-queue design D2).
   allow_merge_commit          = var.allow_merge_commit
   allow_squash_merge          = var.allow_squash_merge
   allow_rebase_merge          = var.allow_rebase_merge
-  allow_auto_merge            = false
+  allow_auto_merge            = var.merge_queue
   allow_update_branch         = false
   delete_branch_on_merge      = var.delete_branch_on_merge
   merge_commit_title          = "MERGE_MESSAGE"

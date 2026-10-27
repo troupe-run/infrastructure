@@ -88,9 +88,10 @@ On public `troupe-run/infra-probe-merge-queue`, with the module's ruleset and `m
 
 One finding changes how the owner merges: **`gh pr merge` can't add a pull request to the queue here.** With a
 queue it asks for auto-merge, and the module sets `allow_auto_merge = false`, so GitHub refuses ("Auto merge is not
-allowed for this repository"). GitHub's `enqueuePullRequest` mutation isn't on the guard's gh allow-list. So the owner
-queues with GitHub's "Merge when ready" button. Turning `allow_auto_merge` on would let `gh pr merge` queue, but
-it's a repository setting under the repositories spec, so it is left to the owner as its own decision.
+allowed for this repository"). GitHub's `enqueuePullRequest` mutation isn't on the guard's gh allow-list. That would leave
+`gh pr merge --admin`, which skips the queue entirely, as the only merge that works from a terminal, and an easy wrong
+habit. The owner chose (2026-10-27) to turn auto-merge on wherever the queue is on (D2), so `gh pr merge <n>` queues,
+the "Merge when ready" button does too, and `--admin` stays the emergency bypass.
 
 ### D2. One switch per repository, in the module
 
@@ -108,7 +109,8 @@ merge_queue {
 }
 ```
 
-`REBASE` keeps `allowed_merge_methods = ["rebase"]` and the linear history. `ALLGREEN` means each pull request's own
+The same switch sets `allow_auto_merge`, so `gh pr merge` queues rather than failing (Probe results; spec:
+repositories). `REBASE` keeps `allowed_merge_methods = ["rebase"]` and the linear history. `ALLGREEN` means each pull request's own
 queue commit must pass, so a failure names the pull request that caused it. A wait of 0 lands a lone pull request
 straight away. With one maintainer, waiting for a group only adds delay. 60 minutes covers the guard tests on three
 OSes with room to spare. `repositories.tf` turns it on per repository. A precondition refuses the switch where

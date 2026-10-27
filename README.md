@@ -241,7 +241,9 @@ Every other managed repository has a ruleset named "protect main" on its default
   together, without making every open pull request stale after each state commit or delivery.
 - **The owner's bypass works only on pull requests.** An org admin can merge a PR past a rule that blocks it with
   `gh pr merge --rebase --admin` (or the checkbox in the UI), past failing or missing required checks too, and the
-  ruleset's insights record it as a bypass. The bypass doesn't allow a merge commit or a squash, and doesn't allow a
+  ruleset's insights record it as a bypass. Where the queue is on, that merge skips the queue as well, so it's for
+  emergencies, such as clearing a stuck queue. A normal merge is `gh pr merge <n>`, which queues the pull request
+  (auto-merge is on wherever the queue is), or the "Merge when ready" button. The bypass doesn't allow a merge commit or a squash, and doesn't allow a
   direct push.
 - **Break-glass:** an org owner can always edit or disable a ruleset on GitHub. The next plan shows the edit as
   drift, and an apply restores the declared ruleset. Follow it with a PR.

@@ -20,7 +20,9 @@ manual step.
 - **The `main` ruleset gains a `merge_queue` rule**, merging by rebase, behind a per-repository switch in the
   repository module, so each repository is turned on only once every check it requires reports on merge groups.
   Strict up-to-date checks stay off: the queue does what strict would, without making every open pull request
-  stale after each state commit or delivery.
+  stale after each state commit or delivery. The same switch turns auto-merge on, so `gh pr merge` adds a pull
+  request to the queue. The probe found that with auto-merge off it fails, leaving only `--admin`, which skips the
+  queue (owner's choice, 2026-10-27).
 - **The guard runs on `merge_group`** and judges a queue's range as it judges `main`: commit messages, schema
   commit types, archived tasks, delivered files, strict OpenSpec validation in full and capability labels. No branch
   rule and no description rule, since every pull request in the group already passed them. Its `push` trigger leaves
@@ -52,6 +54,7 @@ None.
 - `rulesets`: pull requests into `main` reach it through a merge queue that merges by rebase and needs every
   required check to pass on the queued combination, in each repository whose switch is on.
 - `ci-apply`: CI tests the queue's combination in full, and the pull request's plan isn't run again in the queue.
+- `repositories`: auto-merge is on exactly where the merge queue is, so `gh pr merge` queues a pull request.
 - `development-workflow`: the guard re-checks a merge group as it does `main`, and a queue's branch push isn't judged
   as a branch with no change.
 
