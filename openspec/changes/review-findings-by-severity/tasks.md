@@ -53,19 +53,19 @@
 
 ## 4. The review labels, reads and resolves (design D1 to D4)
 
-- [ ] 4.1 Extend `scripts/tests/test_claude_review_workflow.py` first: the snapshot step runs before the action, with
+- [x] 4.1 Extend `scripts/tests/test_claude_review_workflow.py` first: the snapshot step runs before the action, with
   the App token, and writes `.review-threads.json`; the resolving step runs after it, with the App token only, and
   its script matches a pinned hash; Claude's tool list doesn't gain `gh api`; the prompt's example first lines parse
   with the guard's parser (2.2); verify the new tests fail on the current workflow
-- [ ] 4.2 Add the snapshot step (paginated `reviewThreads`, failing the run when the query fails); verify with a test
+- [x] 4.2 Add the snapshot step (paginated `reviewThreads`, failing the run when the query fails); verify with a test
   that runs its script against a stubbed `gh` and a two-page response, and one where `gh` fails
-- [ ] 4.3 Rewrite the prompt: the three tiers, their rule and label format, and "unsure means must-fix" (D1), every finding inline and where a finding
+- [x] 4.3 Rewrite the prompt: the three tiers, their rule and label format, and "unsure means must-fix" (D1), every finding inline and where a finding
   about the whole pull request goes (D2), read `.review-threads.json` and don't repeat an open finding, post a fresh
   must-fix when a resolved nit looks wrong, re-tier an open conversation by replying with a new label and its reason
   when the author's reply shows it's a decision or only a nit, report each earlier finding in the summary, and return the
   IDs it considers addressed (D4, or its fallback after 1.5); verify by reading it against D1 to D4 and with 4.1's
   tests
-- [ ] 4.4 Add the resolving step with D4's checks against the snapshot; verify with tests that run its script on a
+- [x] 4.4 Add the resolving step with D4's checks against the snapshot; verify with tests that run its script on a
   snapshot holding two review-App must-fixes (one first posted as a nit and re-labelled), a must-fix re-labelled
   nit, a nit, a decision, an unlabelled one, a person's conversation and an ID
   not on the pull request, and that only the two must-fixes are resolved (stubbed `gh`), each other one named in a

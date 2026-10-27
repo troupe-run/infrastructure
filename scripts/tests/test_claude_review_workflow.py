@@ -1,10 +1,14 @@
 """claude-review.yml reviews each member's pull request and can't change the repository (spec:
-pr-review; claude-pr-review design D1 to D4, D7, D8; review-denials-and-guide design D1 to D4).
+pr-review; claude-pr-review design D1 to D4, D7, D8; review-denials-and-guide design D1 to D4;
+review-findings-by-severity design D1 to D4).
 
 GitHub evaluates the workflow, so these tests pin what it's given: when it runs and what it
 skips, what its token may do, which credentials reach the action, which tools Claude has, what
-it checks out, and the one step of its own, which names the tool calls Claude was refused."""
+it checks out, and its three steps of its own: one reads the review conversations before Claude
+starts, one resolves and re-tiers what Claude names, and one names the tool calls Claude was
+refused."""
 
+import ast
 import copy
 import hashlib
 import json
@@ -19,6 +23,8 @@ from typing import Any
 import pytest
 import yaml
 from conftest import REPO
+
+import guard
 
 REVIEW = REPO / ".github" / "workflows" / "claude-review.yml"
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -113,6 +119,48 @@ REPORT = {
     "env": {"EXECUTION_FILE": "${{ steps.review.outputs.execution_file }}"},
 }
 REPORT_SHA256 = "0226ac402c3987ad33791bf8b0176f07585e3f5059fab9541c473e56ccf9fcf6"
+# The review App's token, the only one the two conversation steps hold (design D3, D4).
+STEP_ENV = {
+    "GH_TOKEN": "${{ steps.app-token.outputs.token }}",
+    "REPOSITORY": "${{ github.repository }}",
+    "NUMBER": "${{ github.event.pull_request.number }}",
+}
+# Before Claude: the pull request's review conversations, for Claude and for the resolving step.
+SNAPSHOT_NAME = "Read the pull request's review conversations"
+SNAPSHOT = {"shell": "python3 {0}", "env": STEP_ENV}
+SNAPSHOT_SHA256 = "04ae3e81dc1951dcf13691262dedbad071bef9282c04f62f1b140c96fd4b69b0"
+# After Claude, only when the review succeeded: resolve and re-tier what Claude names, checked
+# against the snapshot.
+RESOLVER_NAME = "Resolve and re-tier what Claude named"
+RESOLVER = {
+    "shell": "python3 {0}",
+    "env": {**STEP_ENV, "STRUCTURED_OUTPUT": "${{ steps.review.outputs.structured_output }}"},
+}
+RESOLVER_SHA256 = "0edb8face669593a9f3bff916607df894a1eddb85579f0dd4604c9275ba68269"
+OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME, RESOLVER_NAME}
+# What Claude returns, and all the resolving step reads from it (design D4).
+SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["resolve", "retier"],
+    "properties": {
+        "resolve": {"type": "array", "items": {"type": "string"}},
+        "retier": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["thread", "tier", "title", "reason"],
+                "properties": {
+                    "thread": {"type": "string"},
+                    "tier": {"type": "string", "enum": list(guard.REVIEW_TIERS)},
+                    "title": {"type": "string"},
+                    "reason": {"type": "string"},
+                },
+            },
+        },
+    },
+}
 
 
 def review() -> dict[str, Any]:
@@ -124,14 +172,17 @@ def review() -> dict[str, Any]:
 
 
 def claude_args(inputs: dict[str, Any]) -> tuple[set[str], str | None, list[str]]:
-    """The allowed tools, the setting sources, and every other flag, in the action's claude_args."""
+    """The allowed tools, the setting sources, and every other flag, in the action's claude_args.
+    The --json-schema is read by json_schema."""
     words = shlex.split(str(inputs.get("claude_args", "")))
     tools: set[str] = set()
     sources = None
     others = []
     i = 0
     while i < len(words):
-        if words[i] == "--allowedTools" and i + 1 < len(words):
+        if words[i] == "--json-schema" and i + 1 < len(words):
+            i += 2
+        elif words[i] == "--allowedTools" and i + 1 < len(words):
             tools |= {tool.strip() for tool in words[i + 1].split(",") if tool.strip()}
             i += 2
         elif words[i] == "--max-turns" and i + 1 < len(words) and words[i + 1].isdigit():
@@ -143,6 +194,35 @@ def claude_args(inputs: dict[str, Any]) -> tuple[set[str], str | None, list[str]
             others.append(words[i])
             i += 1
     return tools, sources, others
+
+
+def json_schema(inputs: dict[str, Any]) -> object:
+    """The structured output's schema in claude_args, or None."""
+    words = shlex.split(str(inputs.get("claude_args", "")))
+    if "--json-schema" not in words or words.index("--json-schema") + 1 >= len(words):
+        return None
+    try:
+        return json.loads(words[words.index("--json-schema") + 1])
+    except ValueError:
+        return None
+
+
+def own_step_problems(
+    step: dict[str, Any], expected: dict[str, Any], sha256: str, what: str
+) -> list[str]:
+    found = []
+    given = {key: step.get(key) for key in expected}
+    if given != expected:
+        found.append(f"{what} is given {given!r}, not {expected!r}")
+    others = sorted(set(step) - {*expected, "name", "run"})
+    if others:
+        found.append(f"{what} also has {others}")
+    script = str(step["run"])
+    if "${{" in script:
+        found.append(f"{what}'s script interpolates an expression; use its env")
+    if hashlib.sha256(script.encode()).hexdigest() != sha256:
+        found.append(f"{what}'s script isn't the one this test pins")
+    return found
 
 
 def problems(workflow: dict[str, Any]) -> list[str]:
@@ -187,10 +267,10 @@ def problems(workflow: dict[str, Any]) -> list[str]:
             found.append(f"{uses!r} isn't pinned to a full commit SHA")
         if "run" in step and step.get("name") == REPORT_NAME:
             reports.append(step)
-        elif "run" in step:
+        elif "run" in step and step.get("name") not in OWN_STEPS:
             found.append(
-                f"review runs a command of its own ({step['run']!r}); only the action and the "
-                "denials report run"
+                f"review runs a command of its own ({step['run']!r}); only the action, the "
+                "conversation steps and the denials report run"
             )
     checkouts = [s for s in steps if str(s.get("uses", "")).startswith("actions/checkout@")]
     for step in checkouts:
@@ -246,6 +326,22 @@ def problems(workflow: dict[str, Any]) -> list[str]:
             found.append("the denials report's script isn't the one this test pins (REPORT_SHA256)")
         if steps.index(report) < steps.index(actions[0]):
             found.append("the denials report runs before the action")
+    for name, expected, sha256, before in (
+        (SNAPSHOT_NAME, SNAPSHOT, SNAPSHOT_SHA256, True),
+        (RESOLVER_NAME, RESOLVER, RESOLVER_SHA256, False),
+    ):
+        named = [step for step in steps if step.get("name") == name and "run" in step]
+        if len(named) != 1:
+            found.append(f"review has {len(named)} steps named {name!r}, not one")
+            continue
+        found += own_step_problems(named[0], expected, sha256, repr(name))
+        at = steps.index(named[0])
+        if before and not (tokens and steps.index(tokens[0]) < at < steps.index(actions[0])):
+            found.append(f"{name!r} doesn't run between minting the token and the action")
+        if not before and at < steps.index(actions[0]):
+            found.append(f"{name!r} runs before the action")
+    if json_schema(inputs) != SCHEMA:
+        found.append("Claude's structured output isn't the schema this test pins (SCHEMA)")
 
     prompt = str(inputs.get("prompt", ""))
     for path in (".org-guide/CONTRIBUTING.md", "org-profile/CONTRIBUTING.md"):
@@ -268,7 +364,8 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         found.append(f"Claude's tools add {sorted(tools - TOOLS)} and drop {sorted(TOOLS - tools)}")
     if others:
         found.append(
-            f"claude_args has {others!r} besides --allowedTools, --max-turns and --setting-sources"
+            f"claude_args has {others!r} besides --allowedTools, --max-turns, --setting-sources "
+            "and --json-schema"
         )
     if "--max-turns" not in str(inputs.get("claude_args", "")):
         found.append("claude_args has no --max-turns")
@@ -310,6 +407,16 @@ def guide(w: dict[str, Any]) -> dict[str, Any]:
 def move(w: dict[str, Any], step: dict[str, Any], to: int) -> None:
     steps = job(w)["steps"]
     steps.insert(to, steps.pop(steps.index(step)))
+
+
+def snapshot(w: dict[str, Any]) -> dict[str, Any]:
+    step = next(s for s in job(w)["steps"] if s.get("name") == SNAPSHOT_NAME)
+    return step  # type: ignore[no-any-return]
+
+
+def resolver(w: dict[str, Any]) -> dict[str, Any]:
+    step = next(s for s in job(w)["steps"] if s.get("name") == RESOLVER_NAME)
+    return step  # type: ignore[no-any-return]
 
 
 def token(w: dict[str, Any]) -> dict[str, Any]:
@@ -518,6 +625,67 @@ def sources(w: dict[str, Any], change: str) -> None:
             ),
             "no --max-turns",
         ),
+        (lambda w: job(w)["steps"].remove(snapshot(w)), '0 steps named "Read the pull'),
+        (lambda w: job(w)["steps"].remove(resolver(w)), "0 steps named 'Resolve"),
+        (lambda w: move(w, snapshot(w), len(job(w)["steps"])), "doesn't run between minting"),
+        (lambda w: move(w, snapshot(w), 0), "doesn't run between minting"),
+        (lambda w: move(w, resolver(w), 0), "'Resolve and re-tier what Claude named' runs before"),
+        (
+            lambda w: resolver(w)["env"].update({"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"}),
+            "'Resolve and re-tier what Claude named' is given",
+        ),
+        (
+            lambda w: snapshot(w)["env"].update(
+                {"CLAUDE": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"}
+            ),
+            'review conversations" is given',
+        ),
+        (
+            lambda w: resolver(w).update({"if": "${{ always() }}"}),
+            "'Resolve and re-tier what Claude named' also has ['if']",
+        ),
+        (
+            lambda w: resolver(w).update({"continue-on-error": True}),
+            "also has ['continue-on-error']",
+        ),
+        (
+            lambda w: resolver(w).update(
+                {"run": str(resolver(w)["run"]).replace('if current != "must-fix":', "if False:")}
+            ),
+            "'Resolve and re-tier what Claude named''s script isn't the one this test pins",
+        ),
+        (
+            lambda w: resolver(w).update(
+                {
+                    "run": str(resolver(w)["run"]).replace(
+                        'os.environ.get("STRUCTURED_OUTPUT", "")',
+                        "'${{ steps.review.outputs.structured_output }}'",
+                    )
+                }
+            ),
+            "interpolates an expression",
+        ),
+        (
+            lambda w: snapshot(w).update({"run": str(snapshot(w)["run"]) + "print(1)\n"}),
+            "review conversations\"'s script isn't the one this test pins",
+        ),
+        (lambda w: tools(w, "Bash(gh pr view:*),Bash(gh api:*)"), "add ['Bash(gh api:*)']"),
+        (
+            lambda w: action(w).update(
+                {"claude_args": re.sub(r"--json-schema '[^']*'", "", str(action(w)["claude_args"]))}
+            ),
+            "isn't the schema this test pins",
+        ),
+        (
+            lambda w: action(w).update(
+                {
+                    "claude_args": str(action(w)["claude_args"]).replace(
+                        '"decision"]', '"decision","owner"]'
+                    )
+                }
+            ),
+            "isn't the schema this test pins",
+        ),
         (lambda w: sources(w, ""), "from None"),
         (lambda w: sources(w, "--setting-sources user,project"), "from 'user,project'"),
         (lambda w: sources(w, "--setting-sources project"), "from 'project'"),
@@ -621,3 +789,294 @@ def test_an_input_that_holds_a_workflow_command_stays_inside_one_warning(tmp_pat
     assert "\n" not in shown
     assert "\r" not in shown
     assert "%250A" in message
+
+
+# The resolving step's copy of the guard's tier parser (design D1)
+
+
+def resolver_constants() -> tuple[re.Pattern[str], object]:
+    """The LABEL and BOT the resolving step's script defines, read without running it."""
+    tree = ast.parse(str(resolver(review())["run"]))
+    found: dict[str, Any] = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
+            name = node.targets[0].id
+            if name == "LABEL" and isinstance(node.value, ast.Call):
+                found[name] = re.compile(ast.literal_eval(node.value.args[0]))
+            elif name == "BOT":
+                found[name] = ast.literal_eval(node.value)
+    return found["LABEL"], found["BOT"]
+
+
+FIRST_LINES = [
+    "**must-fix** · a", "**nit** · a", "**decision** · a", "**critical** · a", "**minor** · a",
+    "**must-fix · nit** · a", "**must-fix**  ·  a", "**must-fix** - a", "**must-fix** ·",
+    "**Must-Fix** · a", " **nit** · a", "nit · a", "",
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("line", FIRST_LINES)
+def test_the_resolving_step_reads_a_label_as_the_guard_does(line: str) -> None:
+    label, bot = resolver_constants()
+    match = label.fullmatch(line)
+    assert (match.group(1) if match else None) == guard.review_tier(line)
+    assert bot == guard.REVIEW_BOT
+
+
+def test_the_prompt_s_examples_are_labels_of_each_tier() -> None:
+    prompt = str(action(review())["prompt"])
+    examples = [line.strip() for line in prompt.splitlines() if line.strip().startswith("**")]
+    assert examples
+    assert [guard.review_tier(line) for line in examples] == list(guard.REVIEW_TIERS)
+
+
+# The two steps, run as the runner would, with a gh on PATH that answers from a script
+
+GH_STUB = """\
+import json, os, sys
+here = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(here, "calls.jsonl"), "a", encoding="utf-8") as calls:
+    calls.write(json.dumps(sys.argv[1:]) + "\\n")
+with open(os.path.join(here, "answers.json"), encoding="utf-8") as file:
+    answers = json.load(file)
+count = sum(1 for _ in open(os.path.join(here, "calls.jsonl"), encoding="utf-8"))
+fail = answers.get("fail_when", "")
+if fail and any(fail in arg for arg in sys.argv[1:]):
+    sys.exit(1)
+pages = answers.get("pages", [])
+sys.stdout.write(json.dumps(pages[count - 1]) if count <= len(pages) else "{}")
+sys.exit(answers.get("status", 0))
+"""
+
+
+def stub_gh(directory: Path, answers: dict[str, Any]) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "stub.py").write_text(GH_STUB, encoding="utf-8")
+    (directory / "answers.json").write_text(json.dumps(answers), encoding="utf-8")
+    if os.name == "nt":
+        (directory / "gh.cmd").write_text(
+            f'@"{sys.executable}" "{directory / "stub.py"}" %*\r\n', encoding="utf-8"
+        )
+    else:
+        wrapper = directory / "gh"
+        wrapper.write_text(
+            f'#!/bin/sh\nexec "{sys.executable}" "{directory / "stub.py"}" "$@"\n',
+            encoding="utf-8",
+        )
+        wrapper.chmod(0o755)
+    return directory
+
+
+def gh_calls(directory: Path) -> list[list[str]]:
+    path = directory / "calls.jsonl"
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+
+def run_step(
+    step: dict[str, Any], tmp_path: Path, bin_dir: Path, env: dict[str, str]
+) -> subprocess.CompletedProcess[str]:
+    """Run one of the workflow's own steps in a workspace, with RUNNER_TEMP and the step's env."""
+    workspace = tmp_path / "workspace"
+    runner_temp = tmp_path / "runner-temp"
+    workspace.mkdir(exist_ok=True)
+    runner_temp.mkdir(exist_ok=True)
+    script = tmp_path / "step.py"
+    script.write_text(str(step["run"]), encoding="utf-8")
+    full = {key: value for key, value in os.environ.items() if not key.startswith("GH_")}
+    full |= {
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        "RUNNER_TEMP": str(runner_temp),
+        "GH_TOKEN": "app-token",
+        "REPOSITORY": "troupe-run/infrastructure",
+        "NUMBER": "7",
+        **env,
+    }
+    return subprocess.run(
+        [sys.executable, str(script)], cwd=workspace, capture_output=True, text=True,
+        encoding="utf-8", env=full, check=False,
+    )  # fmt: skip
+
+
+BOT_AUTHOR = {"__typename": "Bot", "login": "troupe-run-review"}
+PERSON = {"__typename": "User", "login": "martin-at-hpsgd"}
+
+
+def conversation(ident: str, opener: dict[str, str], *bodies: tuple[dict[str, str], str]) -> Any:  # noqa: ANN401
+    return {
+        "id": ident, "isResolved": False, "isOutdated": False, "path": "scripts/guard.py",
+        "line": 10, "opened": {"nodes": [{"databaseId": 100, "author": opener}]},
+        "comments": {"nodes": [
+            {"databaseId": 100 + i, "author": author, "body": body}
+            for i, (author, body) in enumerate(bodies)
+        ]},
+    }  # fmt: skip
+
+
+def page(nodes: list[Any], more: bool, cursor: str | None) -> dict[str, Any]:
+    threads = {"pageInfo": {"hasNextPage": more, "endCursor": cursor}, "nodes": nodes}
+    return {"data": {"repository": {"pullRequest": {"reviewThreads": threads}}}}
+
+
+def test_the_snapshot_reads_every_page_into_the_workspace_and_runner_temp(tmp_path: Path) -> None:
+    one = conversation("PRRT_1", BOT_AUTHOR, (BOT_AUTHOR, "**nit** · a"))
+    two = conversation("PRRT_2", PERSON, (PERSON, "a person's comment"))
+    bin_dir = stub_gh(
+        tmp_path / "bin", {"pages": [page([one], True, "C1"), page([two], False, None)]}
+    )
+    done = run_step(snapshot(review()), tmp_path, bin_dir, {})
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "2 review conversation(s) read." in done.stdout
+    for path in (tmp_path / "workspace" / ".review-threads.json",
+                 tmp_path / "runner-temp" / "review-threads.json"):  # fmt: skip
+        assert [t["id"] for t in json.loads(path.read_text(encoding="utf-8"))] == [
+            "PRRT_1",
+            "PRRT_2",
+        ]
+    calls = gh_calls(bin_dir)
+    assert len(calls) == 2
+    assert all(call[:2] == ["api", "graphql"] for call in calls)
+    assert "cursor=C1" not in calls[0]
+    assert "cursor=C1" in calls[1]
+    assert {"owner=troupe-run", "name=infrastructure", "number=7"} <= set(calls[0])
+    query = next(arg for arg in calls[0] if arg.startswith("query=")).partition("=")[2]
+    assert guard.graphql_mutations(query) == []
+
+
+@pytest.mark.parametrize(
+    "answers", [{"status": 1}, {"pages": ["not a page"]}, {"pages": [{"data": None}]}]
+)
+def test_a_snapshot_that_can_t_be_read_fails_the_run(
+    tmp_path: Path, answers: dict[str, Any]
+) -> None:
+    done = run_step(snapshot(review()), tmp_path, stub_gh(tmp_path / "bin", answers), {})
+    assert done.returncode == 1
+    assert done.stdout.startswith("::error title=Review conversations unread::")
+    assert not (tmp_path / "runner-temp" / "review-threads.json").exists()
+
+
+SNAPSHOT_THREADS = [
+    conversation("PRRT_mustfix", BOT_AUTHOR, (BOT_AUTHOR, "**must-fix** · a bug")),
+    # First posted as a nit, re-tiered by the review.
+    conversation("PRRT_upgraded", BOT_AUTHOR, (BOT_AUTHOR, "**nit** · a"),
+                 (BOT_AUTHOR, "**must-fix** · it matters")),
+    conversation("PRRT_downgraded", BOT_AUTHOR, (BOT_AUTHOR, "**must-fix** · a"),
+                 (BOT_AUTHOR, "**nit** · wording only")),
+    conversation("PRRT_nit", BOT_AUTHOR, (BOT_AUTHOR, "**nit** · stale path")),
+    conversation("PRRT_decision", BOT_AUTHOR, (BOT_AUTHOR, "**decision** · a choice")),
+    conversation("PRRT_unlabelled", BOT_AUTHOR, (BOT_AUTHOR, "An earlier finding.")),
+    conversation("PRRT_person", PERSON, (PERSON, "**must-fix** · a person's")),
+    conversation("PRRT_selflabel", BOT_AUTHOR, (BOT_AUTHOR, "**nit** · a"),
+                 (PERSON, "**must-fix** · the author says so")),
+    {**conversation("PRRT_done", BOT_AUTHOR, (BOT_AUTHOR, "**must-fix** · a")), "isResolved": True},
+]  # fmt: skip
+
+
+def resolve_run(
+    tmp_path: Path, answer: object, fail_when: str = ""
+) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
+    temp = tmp_path / "runner-temp"
+    temp.mkdir(parents=True, exist_ok=True)
+    (temp / "review-threads.json").write_text(json.dumps(SNAPSHOT_THREADS), encoding="utf-8")
+    bin_dir = stub_gh(tmp_path / "bin", {"fail_when": fail_when})
+    output = answer if isinstance(answer, str) else json.dumps(answer)
+    done = run_step(resolver(review()), tmp_path, bin_dir, {"STRUCTURED_OUTPUT": output})
+    return done, gh_calls(bin_dir)
+
+
+def resolved(calls: list[list[str]]) -> list[str]:
+    return [arg[3:] for call in calls if "graphql" in call for arg in call if arg.startswith("id=")]
+
+
+def test_only_the_review_s_open_must_fixes_are_resolved(tmp_path: Path) -> None:
+    named = [
+        "PRRT_mustfix", "PRRT_upgraded", "PRRT_downgraded", "PRRT_nit", "PRRT_decision",
+        "PRRT_unlabelled", "PRRT_person", "PRRT_selflabel", "PRRT_done", "PRRT_elsewhere",
+    ]  # fmt: skip
+    done, calls = resolve_run(tmp_path, {"resolve": named, "retier": []})
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert resolved(calls) == ["PRRT_mustfix", "PRRT_upgraded"]
+    for call in calls:
+        query = next(arg for arg in call if arg.startswith("query=")).partition("=")[2]
+        assert guard.graphql_mutations(query) == ["resolveReviewThread"]
+    warnings = [line for line in done.stdout.splitlines() if line.startswith("::warning")]
+    assert len(warnings) == len(named) - 2
+    for ident in named[2:]:
+        assert any(ident in line for line in warnings), ident
+
+
+def test_a_resolve_that_fails_warns_and_the_rest_go_ahead(tmp_path: Path) -> None:
+    answer = {"resolve": ["PRRT_mustfix", "PRRT_upgraded"], "retier": []}
+    done, calls = resolve_run(tmp_path, answer, fail_when="id=PRRT_mustfix")
+    assert done.returncode == 0
+    assert resolved(calls) == ["PRRT_mustfix", "PRRT_upgraded"]
+    assert "PRRT_mustfix couldn't be resolved." in done.stdout
+    assert "PRRT_upgraded: resolved." in done.stdout
+
+
+def test_a_re_tier_is_a_labelled_reply_from_the_review(tmp_path: Path) -> None:
+    answer = {"resolve": [], "retier": [
+        {"thread": "PRRT_mustfix", "tier": "decision", "title": "trust the\nruleset?",
+         "reason": "Both are defensible."},
+    ]}  # fmt: skip
+    done, calls = resolve_run(tmp_path, answer)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert len(calls) == 1
+    call = calls[0]
+    assert call[:4] == ["api", "-X", "POST", "repos/troupe-run/infrastructure/pulls/7/comments"]
+    assert "in_reply_to=100" in call
+    body = next(arg for arg in call if arg.startswith("body=")).partition("=")[2]
+    assert body == "**decision** · trust the ruleset?\n\nBoth are defensible."
+    assert guard.review_tier(body) == "decision"
+
+
+@pytest.mark.parametrize(
+    ("item", "said"),
+    [
+        ({"thread": "PRRT_person", "tier": "nit", "title": "a", "reason": "r"}, "wasn't opened"),
+        ({"thread": "PRRT_done", "tier": "nit", "title": "a", "reason": "r"}, "already resolved"),
+        (
+            {"thread": "PRRT_gone", "tier": "nit", "title": "a", "reason": "r"},
+            "isn't a conversation",
+        ),
+        ({"thread": "PRRT_nit", "tier": "nit", "title": "a", "reason": "r"}, "already a nit"),
+        ({"thread": "PRRT_nit", "tier": "owner", "title": "a", "reason": "r"}, "needs a tier"),
+        ({"thread": "PRRT_nit", "tier": "must-fix", "title": " ", "reason": "r"}, "needs a tier"),
+        ({"thread": "PRRT_nit", "tier": "must-fix", "title": "a", "reason": ""}, "needs a tier"),
+    ],
+)
+def test_a_re_tier_the_review_may_not_make_is_skipped(
+    tmp_path: Path, item: dict[str, str], said: str
+) -> None:
+    done, calls = resolve_run(tmp_path, {"resolve": [], "retier": [item]})
+    assert done.returncode == 0
+    assert calls == []
+    assert said in done.stdout
+
+
+def test_a_conversation_named_to_resolve_and_re_tier_is_only_resolved(tmp_path: Path) -> None:
+    item = {"thread": "PRRT_mustfix", "tier": "nit", "title": "a", "reason": "r"}
+    done, calls = resolve_run(tmp_path, {"resolve": ["PRRT_mustfix"], "retier": [item]})
+    assert resolved(calls) == ["PRRT_mustfix"]
+    assert len(calls) == 1
+    assert "it was only resolved" in done.stdout
+
+
+@pytest.mark.parametrize(
+    "answer", ["", "not json", {"resolve": "PRRT_mustfix", "retier": []}, {"retier": []}]
+)
+def test_an_unreadable_answer_resolves_nothing_and_fails_the_step(
+    tmp_path: Path, answer: object
+) -> None:
+    done, calls = resolve_run(tmp_path, answer)
+    assert done.returncode == 1
+    assert calls == []
+    assert done.stdout.startswith("::warning title=Nothing resolved::")
+
+
+def test_a_hostile_id_stays_inside_one_warning(tmp_path: Path) -> None:
+    done, _ = resolve_run(tmp_path, {"resolve": ["x\n::error::y"], "retier": []})
+    lines = done.stdout.splitlines()
+    assert len(lines) == 1
+    assert lines[0].startswith("::warning title=A review conversation was left as it is::x%0A")
