@@ -86,6 +86,11 @@ RELEASE_REPOSITORIES = frozenset({"troupe-run/troupe"})
 else, a fork included, anyone can use the name (open-release-exemption design D1;
 drop-forgery-resistance design D1)."""
 DEPENDABOT_BRANCH_PREFIX = "dependabot/"
+DEPENDABOT_BRANCH = re.compile(r"dependabot/[^/]+/.+")
+"""The shape of Dependabot's branch names, dependabot/<ecosystem>/<name>, which the ruleset's
+refs/heads/dependabot/**/* was shown to reserve. A name of another shape, such as dependabot/x,
+isn't trusted even under the prefix: GitHub wasn't shown to reserve it (dependabot-exemption
+task 1.3)."""
 DEPENDABOT_REPOSITORIES = frozenset(
     {"troupe-run/troupe", "troupe-run/website", "troupe-run/infrastructure"}
 )
@@ -2878,9 +2883,7 @@ def reserved_dependabot_branch(branch: str | None, repository: str | None) -> bo
     """A Dependabot branch in a repository where GitHub lets only Dependabot create or update it.
     As for a release branch, the name is the proof, and no author is read (dependabot-exemption
     design D3). With no repository named, nothing is reserved."""
-    return repository in DEPENDABOT_REPOSITORIES and (branch or "").startswith(
-        DEPENDABOT_BRANCH_PREFIX
-    )
+    return repository in DEPENDABOT_REPOSITORIES and bool(DEPENDABOT_BRANCH.fullmatch(branch or ""))
 
 
 def dependabot_update_kind(old: str | None, new: str | None) -> str:

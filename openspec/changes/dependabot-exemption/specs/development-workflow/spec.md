@@ -28,8 +28,8 @@ unticked task. It applies the same rules as the git hooks, so a commit that skip
 ## ADDED Requirements
 
 ### Requirement: A minor or patch Dependabot branch passes the branch rule where GitHub reserves its name
-The GitHub check SHALL exempt a branch from the branch-change rule when its name starts with `dependabot/`, it lives in
-a repository (a pull request's head repository) whose ruleset lets only Dependabot create or update those branches,
+The GitHub check SHALL exempt a branch from the branch-change rule when its name has Dependabot's shape,
+`dependabot/<ecosystem>/<name>`, it lives in a repository (a pull request's head repository) whose ruleset lets only Dependabot create or update those branches,
 it changes only dependency files, and it is a single minor or patch update. Who authored its commits SHALL NOT
 matter. Elsewhere, or with no repository named, no Dependabot branch SHALL be exempt. Every other rule SHALL still
 apply.
@@ -58,6 +58,11 @@ apply.
 #### Scenario: A repository without the ruleset
 - **WHEN** a push to `troupe-run/.github`, or any repository not reserving the name, is checked for a qualifying
   `dependabot/npm_and_yarn/zod-4.6.7` branch
+- **THEN** the GitHub check fails on the branch-change rule
+
+#### Scenario: A name under the prefix but not Dependabot's shape
+- **WHEN** a push to `troupe-run/website` is checked for a branch named `dependabot/zod-4.6.7` whose commits would
+  otherwise qualify
 - **THEN** the GitHub check fails on the branch-change rule
 
 #### Scenario: A Dependabot branch from a fork
