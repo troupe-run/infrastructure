@@ -119,11 +119,11 @@
 
 ## 9. Merging is the owner's (design D5a)
 
-- [ ] 9.1 Write tests first: `gh pr merge 32 --rebase`, `gh pr merge 32 --auto`, `gh pr merge` with no number, and
+- [x] 9.1 Write tests first: `gh pr merge 32 --rebase`, `gh pr merge 32 --auto`, `gh pr merge` with no number, and
   GraphQL `enablePullRequestAutoMerge` and `enqueuePullRequest` are refused as owner-only with the merge fix; `gh pr
   merge` on `troupe-run/infra-probe-*` is still allowed; and the spec examples moved off `gh pr merge` still hold
   (`gh pr ready` allowed, `gh pr checkout` allowed but not granted); verify they fail on main's `guard.py`
-- [ ] 9.2 Make `gh pr merge` owner-only in `scripts/guard.py` and add the two mutations; update the merge message, the
+- [x] 9.2 Make `gh pr merge` owner-only in `scripts/guard.py` and add the two mutations; update the merge message, the
   `owner-only` row in `docs/development-workflow.md`, and the guide's merge step (merge once every conversation is
   resolved); verify 9.1's tests and the full suite both ways
 

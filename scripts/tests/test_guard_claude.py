@@ -342,7 +342,11 @@ MAIN_REFUSALS: dict[str, set[tuple[str, str]]] = {
     "gh issue view 1": set(),
     "gh auth token": {("owner-only", "agents don't handle the login's credentials.")},
     "gh pr merge 17 --rebase --admin": {
-        ("owner-only", "only the owner merges past a pull request's rules.")
+        (
+            "owner-only",
+            "only the owner merges a pull request, queues it, turns on its auto-merge, or merges "
+            "past its rules.",
+        )
     },
     "gh repo edit --visibility public": {
         ("owner-only", "only the owner changes the org's or a repository's administration.")
@@ -828,7 +832,7 @@ def test_a_command_the_guard_allows_but_doesn_t_grant_gets_nothing(
     make_repo: Callable[[], Repo],
 ) -> None:
     repo = reviewed(make_repo())
-    assert pre_tool_use(repo.path, "Bash", {"command": "gh pr merge 32 --rebase"}) is None
+    assert pre_tool_use(repo.path, "Bash", {"command": "gh pr checkout 32"}) is None
 
 
 # read-nested-commands design D7: the hook reads the PowerShell tool's commands as PowerShell

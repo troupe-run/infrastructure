@@ -115,8 +115,6 @@ def test_a_graphql_query_whose_strings_mention_mutation_is_a_read() -> None:
         "gh pr reopen 17",
         "gh pr comment 17 --body hi",
         "gh pr checkout 17",
-        "gh pr merge 17 --rebase",
-        "gh pr merge 17 --rebase --admin=false",
         "gh issue create --title t --body b",
         "gh issue comment 14 --body hi",
         "gh issue edit 1 --body-file b.md",
@@ -297,6 +295,23 @@ def test_every_hinted_mutation_is_refused_as_unlisted() -> None:
     [
         ("gh pr merge 17 --rebase --admin", "merge"),
         ("gh pr merge 17 --admin=true", "merge"),
+        # A plain merge too: on a blocked pull request it turns on auto-merge, which lands it later
+        # with no look from the owner (review-findings-by-severity design D5a).
+        ("gh pr merge 17 --rebase", "merge"),
+        ("gh pr merge 17 --rebase --admin=false", "merge"),
+        ("gh pr merge 17 --auto", "merge"),
+        ("gh pr merge", "merge"),
+        ("gh pr merge 17 -R troupe-run/troupe --rebase", "merge"),
+        (
+            "gh api graphql -f query='mutation { enablePullRequestAutoMerge(input: "
+            '{pullRequestId: "PR_1"}) { clientMutationId } }\'',
+            "merge",
+        ),
+        (
+            "gh api graphql -f query='mutation { enqueuePullRequest(input: "
+            '{pullRequestId: "PR_1"}) { clientMutationId } }\'',
+            "merge",
+        ),
         ("gh api -X PUT repos/troupe-run/troupe/pulls/31/merge", "merge"),
         ("gh api repos/troupe-run/troupe/pulls/31/merge -f merge_method=rebase", "merge"),
         ("gh api -X PUT https://api.github.com/repos/troupe-run/troupe/pulls/31/merge", "merge"),
