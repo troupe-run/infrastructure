@@ -90,11 +90,12 @@ variable "merge_queue" {
 }
 
 # Every review conversation is resolved before a merge (spec: rulesets; review-findings-by-severity
-# design D2). Off until the review that resolves its own conversations is delivered (design D8).
+# design D2). On everywhere, in the same apply that delivers the review that resolves its own
+# must-fixes (design D8); scripts/tests/test_review_thread_resolution.py keeps it on.
 variable "review_thread_resolution" {
   description = "A pull request into main merges, or joins the merge queue, only once every review conversation is resolved (pull-request only)."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "owner_bypass" {

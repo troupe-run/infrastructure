@@ -70,7 +70,7 @@
   nit, a nit, a decision, an unlabelled one, a person's conversation and an ID
   not on the pull request, and that only the two must-fixes are resolved (stubbed `gh`), each other one named in a
   warning, and that a failed mutation warns and continues
-- [ ] 4.5 Update the workflow's header comment and the pr-review section of `docs/development-workflow.md`; then run
+- [x] 4.5 Update the workflow's header comment and the pr-review section of `docs/development-workflow.md`; then run
   website's `npx vitest run tests/unit/workflow-node-version.test.ts` and troupe's `uv run scripts/check.py` with the
   workflow in place (the workflow's header asks for both); verify each passes and `uv run scripts/check.py` passes here
 
