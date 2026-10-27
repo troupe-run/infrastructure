@@ -2,22 +2,47 @@
 
 ## 1. Prove the reservation (design D1). If it fails, stop here
 
-- [ ] 1.1 Create private `troupe-run/infra-probe-dependabot-branches` (ask the owner to run `gh repo create` if the
+- [x] 1.1 Create private `troupe-run/infra-probe-dependabot-branches` (ask the owner to run `gh repo create` if the
   permission check refuses it) with a `package.json` and `package-lock.json` pinning a package one patch release
   behind, a `.github/dependabot.yml` for `npm` (weekly, no cooldown), and delete-on-merge on. Add D2's ruleset with
   `gh api -X POST repos/troupe-run/infra-probe-dependabot-branches/rulesets`: `refs/heads/dependabot/**`, `creation`
   and `update`, `update_allows_fetch_and_merge` false, one bypass actor `Integration` 29110 `always`. Verify GitHub
-  accepts it (`gh api .../rulesets/<id>` shows the bypass actor), and record the response here
-- [ ] 1.2 Verify Dependabot opens its pull request under the ruleset (trigger a run from the repository's Dependabot
+  accepts it (`gh api .../rulesets/<id>` shows the bypass actor), and record the response here. Result: the probe
+  is **public**, not private, because GitHub Free applies rulesets only to public repositories; the owner created it
+  (the permission check refused the agent). `package.json` pins `ms` 2.1.2 (latest 2.1.3), with its lockfile, at
+  331e582. The ruleset was POSTed *before* `dependabot.yml` landed, and GitHub accepted it with no 422: id 25932824,
+  `rules` `creation` and `update`, `bypass_actors` `[{"actor_id":29110,"actor_type":"Integration","bypass_mode":
+  "always"}]`, `current_user_can_bypass` `never` for the owner's login. `dependabot.yml` (npm, daily) landed at
+  91717b0 at 14:06:56 AEST. **But that pattern matched nothing**: see 1.3. The probe went on with
+  `refs/heads/dependabot/**/*` (ruleset 25933017, same rules and bypass actor), and design D2 now says so
+- [x] 1.2 Verify Dependabot opens its pull request under the ruleset (trigger a run from the repository's Dependabot
   page, or wait for the first run after the config lands), then push a commit to `main` and comment
-  `@dependabot rebase`, and verify the branch is force-pushed. Record both, with the branch's SHAs
-- [ ] 1.3 Hand the owner the commands to try, with their login: push a new branch `dependabot/npm_and_yarn/x`, push a
+  `@dependabot rebase`, and verify the branch is force-pushed. Record both, with the branch's SHAs. Result: under
+  the first ruleset Dependabot opened #1 (`dependabot/npm_and_yarn/ms-2.1.3`, a7d4a24, verified, by
+  `dependabot[bot]`) at 14:07:57 and rebased it onto 8c73f85 as 149f73d, but that ruleset turned out to match no
+  branch, so neither counts. Under `refs/heads/dependabot/**/*`, whose `creation` and `update` rules GitHub's
+  `rules/branches/<name>` endpoint listed for the branch: `@dependabot rebase` after `main` moved to 4320b80
+  force-pushed e1bfbec (parent 4320b80) at 14:12:11; and after #1 merged, pinning `debug` 4.4.1 and changing
+  `dependabot.yml`, Dependabot **created** `dependabot/npm_and_yarn/debug-4.4.3` (61f944f, `dependabot[bot]`) and
+  opened #2 at 14:13:55, with the rules endpoint listing ruleset 25933017's `creation` and `update` for it
+- [x] 1.3 Hand the owner the commands to try, with their login: push a new branch `dependabot/npm_and_yarn/x`, push a
   commit to Dependabot's branch, and press "Update branch" on its pull request. Verify each is refused by the ruleset
   and the branch is unchanged. Then merge Dependabot's pull request and verify its branch is deleted. Record each
-  result here
-- [ ] 1.4 Delete the probe repository (`gh repo delete --yes`) and verify `gh repo view` says it doesn't exist. If
+  result here. Result: run by the agent with the owner's `gh` login (`martin-at-hpsgd`, an org owner), which is the
+  same identity. Under `refs/heads/dependabot/**`, pushing a new `dependabot/npm_and_yarn/x` **was allowed**, and
+  `rules/branches/` listed no rule for it or for Dependabot's branch, while troupe's release branch lists its
+  ruleset's. Three more rulesets were POSTed to find a pattern: `refs/heads/dependabot/**/*` and
+  `refs/heads/dependabot/npm_and_yarn/*` matched both branches, `refs/heads/dependabot/*` didn't. Keeping only
+  `**/*`, each was refused with `GH013: Repository rule violations`: creating `dependabot/npm_and_yarn/y` ("Cannot
+  create ref due to creations being restricted"), a commit to the stray `x` branch, a commit to Dependabot's branch,
+  and a force-push of `main` onto it; the branch stayed 149f73d. `gh pr update-branch 1` after `main` moved failed
+  (GitHub's GraphQL returned only "Something went wrong", not the rule) and left the branch at 149f73d. Merging #1
+  with delete-on-merge deleted `dependabot/npm_and_yarn/ms-2.1.3`
+- [x] 1.4 Delete the probe repository (`gh repo delete --yes`) and verify `gh repo view` says it doesn't exist. If
   1.1, 1.2's opening, or 1.3's refusals failed: record it here, comment on #174 with what failed, tell the owner, and
-  stop (owner, 2026-10-26). If only the rebase or the deletion failed: ask the owner before going on
+  stop (owner, 2026-10-26). If only the rebase or the deletion failed: ask the owner before going on. Result: deleted;
+  `gh repo view` says it can't resolve the repository. Nothing failed under `refs/heads/dependabot/**/*`, so the change
+  goes on, with that pattern
 
 ## 2. Pin what must not change
 
@@ -91,7 +116,9 @@
 - Archive the change on the branch before asking for the plan's approval, and rebase onto `main`'s state commit, so
   the approval is asked once.
 - After the owner merges and approves the apply: verify the three rulesets exist (`gh api repos/troupe-run/<repo>/rulesets`)
-  and the next plan is clean. Then comment `@dependabot rebase` on website #44, #45 and #46 (or their successors) and
+  and the next plan is clean. Check `gh api repos/troupe-run/website/rules/branches/dependabot/npm_and_yarn/axe-core/playwright-4.14.0`
+  (a name one level deeper than the probe tried) lists the ruleset's `creation` and `update`; if it doesn't, the
+  exemption covers a branch GitHub doesn't reserve, so stop and fix the pattern before anything else. Then comment `@dependabot rebase` on website #44, #45 and #46 (or their successors) and
   on infrastructure's open Dependabot pull requests, and verify each patch or minor one's `guard` passes and website
   #55 still fails naming the major update. Record the runs on #174.
 - Comment on #174 with the PR and the archived change, check it's closed and its card says Done. #170 stays open
