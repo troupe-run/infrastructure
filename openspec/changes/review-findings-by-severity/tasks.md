@@ -103,7 +103,7 @@
 
 ## 8. Resolving with contents write (design D4a; owner, 2026-10-28)
 
-- [ ] 8.1 Ask the owner to give `troupe-run-review` contents read and write on GitHub, and to accept it on the org's
+- [x] 8.1 Ask the owner to give `troupe-run-review` contents read and write on GitHub, and to accept it on the org's
   installation; update its declared permissions in `oob/app-installations.json` and `oob/README.md`; verify with the
   drift check's App comparison (`uv run scripts/oob.py`, or its test) that the declared and live permissions match
 - [x] 8.2 Write tests first in `scripts/tests/test_claude_review_workflow.py` for a `resolve` job that needs `review`,
@@ -113,7 +113,7 @@
   current workflow
 - [x] 8.3 Move the resolving step into the `resolve` job, with the review job's `outputs`; verify 8.2's tests, the
   scripts' behaviour tests, and website's and troupe's checks with the workflow in place, as in 4.5
-- [ ] 8.4 On the probe, with a review App token minted as the `resolve` job mints it, resolve a review-App
+- [x] 8.4 On the probe, with a review App token minted as the `resolve` job mints it, resolve a review-App
   conversation; verify `isResolved` is true; then delete the probe repository and the probe's local state, and verify
   `gh repo view` reports it gone
 

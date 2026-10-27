@@ -273,6 +273,11 @@ so they fall to the owner, or to a re-review that posts the finding again with a
   write doesn't give. The review App's token could still minimize its own comment (`minimizeComment`), and was refused
   a contents write (403), as designed. **This breaks D4 as written**: giving the review App contents write is what
   claude-pr-review design D1 rules out, so who resolves a must-fix goes back to the owner (#194).
+- **Resolving with the widened review App (task 8.4, 2026-10-28).** After the owner gave `troupe-run-review` contents
+  write and the org accepted it (the installation reads contents write, metadata read, pull requests write; `oob.py`
+  reports no differences), a conversation it posted with a token minted as the review job mints it (contents read)
+  was resolved with a token minted as the `resolve` job mints it (contents write, pull requests write):
+  `isResolved: true`. The probe repository is deleted.
 
 ## Risks / Trade-offs
 
