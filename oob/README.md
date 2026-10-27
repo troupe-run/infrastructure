@@ -304,14 +304,18 @@ command above again. Then delete the old key in the App's settings.
 
 `.github/workflows/claude-review.yml` reviews each member's pull request in troupe, infrastructure and website with
 Claude (spec: pr-review, #154). It needs two credentials, and OpenTofu never holds a secret, so these steps are the
-owner's. Its comments come from `troupe-run-review[bot]`: the run writes only with a token for the `troupe-run-review`
-App, which can read code and write on pull requests and nothing else. It doesn't use Anthropic's Claude GitHub App,
-whose token can write contents whatever the workflow asks for (claude-pr-review design D1).
+owner's. Its comments come from `troupe-run-review[bot]`: the run writes only with tokens for the `troupe-run-review`
+App. The job Claude runs in mints one that can read code and write on pull requests and nothing else. The job that
+resolves review conversations, which needs contents write, mints one that can also write contents; Claude never runs
+there (review-findings-by-severity design D4a). It doesn't use Anthropic's Claude GitHub App, whose token can write
+contents in the job Claude runs in, whatever the workflow asks for (claude-pr-review design D1).
 
 **Creating the App** (done 2026-10-26). In the org's settings, under GitHub Apps, create a new App:
 - name `troupe-run-review`, installable only on this account, webhook off;
-- repository permissions "Contents: read" and "Pull requests: read and write", and nothing else; GitHub adds
-  "Metadata: read". No organisation or account permissions;
+- repository permissions "Contents: read and write" and "Pull requests: read and write", and nothing else; GitHub
+  adds "Metadata: read". No organisation or account permissions. Contents was read only until 2026-10-28, when
+  resolving conversations needed write (owner, #194); widening it needs the org to accept the change on the
+  installation;
 - install it with "Only select repositories" and select `troupe`, `infrastructure` and `website`, and add its row to
   the table above.
 
@@ -321,8 +325,9 @@ written in the workflow (`client-id`), so a pull request's run can use it before
 **Its key.** Generate a private key in the App's settings. Store it in 1Password as an SSH Key item named
 `troupe-run-review` in vault `troupe.run`, by importing the downloaded `.pem`, then delete the file. It's an org
 secret visible to the three repositories only: not in an environment, because the pull request runs that need it
-aren't on `main`. Any member's pull request run can reach it, which gives contents read and pull request write on
-three public repositories. Nothing is printed:
+aren't on `main`. Any member's pull request run can reach it, which gives contents and pull request write on
+three public repositories: a member who edits the workflow in a pull request could mint a token that pushes. A member
+can push already, and the guard refuses an agent's edit of a delivered file (#47). Nothing is printed:
 
 ```sh
 export OP_ACCOUNT=l-a-u.1password.com
