@@ -106,12 +106,12 @@
 - [ ] 8.1 Ask the owner to give `troupe-run-review` contents read and write on GitHub, and to accept it on the org's
   installation; update its declared permissions in `oob/app-installations.json` and `oob/README.md`; verify with the
   drift check's App comparison (`uv run scripts/oob.py`, or its test) that the declared and live permissions match
-- [ ] 8.2 Write tests first in `scripts/tests/test_claude_review_workflow.py` for a `resolve` job that needs `review`,
+- [x] 8.2 Write tests first in `scripts/tests/test_claude_review_workflow.py` for a `resolve` job that needs `review`,
   runs only on its success, checks out nothing, runs no Claude action, mints the App token with contents write and pull
   requests write, and runs the snapshot and resolving steps in that order on `needs.review.outputs.structured_output`;
   and for the review job keeping its contents-read token and having no resolving step; verify they fail on the branch's
   current workflow
-- [ ] 8.3 Move the resolving step into the `resolve` job, with the review job's `outputs`; verify 8.2's tests, the
+- [x] 8.3 Move the resolving step into the `resolve` job, with the review job's `outputs`; verify 8.2's tests, the
   scripts' behaviour tests, and website's and troupe's checks with the workflow in place, as in 4.5
 - [ ] 8.4 On the probe, with a review App token minted as the `resolve` job mints it, resolve a review-App
   conversation; verify `isResolved` is true; then delete the probe repository and the probe's local state, and verify
