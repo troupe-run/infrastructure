@@ -14,8 +14,11 @@ Every change, however small, follows one path. The full guide is the org's
 2. **An OpenSpec change** says how: `/opsx:propose <name>`, on a branch named exactly `<name>`.
 3. **`/opsx:apply`** builds it. A task is ticked only when its verification has run and passed.
 4. **A pull request** closes the issue (`Closes #n`). CI posts its plan as evidence, once the owner approves that run.
-5. **`/opsx:archive`** runs on the branch before merging. The owner merges by rebase, through the merge queue.
-6. **After the merge**, comment on the issue with the PR and the archived change.
+5. **Claude's review is acted on**, after the review of the last push: fix or answer each finding, resolve only nits,
+   and raise decisions and disputed must-fixes with the owner. The review resolves its own must-fixes once they're
+   addressed. A merge needs every conversation resolved ([docs/development-workflow.md](docs/development-workflow.md)).
+6. **`/opsx:archive`** runs on the branch before merging. The owner merges by rebase, through the merge queue.
+7. **After the merge**, comment on the issue with the PR and the archived change.
 
 Commits are Conventional Commits, signed off, and `uv run scripts/check.py` passes before each one.
 
