@@ -33,21 +33,26 @@ its repository list by hand (spec: teams-and-access).
 
 ### Requirement: The dispatch App's token starts infrastructure workflows and writes nothing else
 A token minted for the dispatch App SHALL be able to start a `workflow_dispatch` run of a workflow in
-troupe-run/infrastructure. It SHALL NOT be able to write infrastructure's contents, issues or pull requests, or act in
-any other repository.
+troupe-run/infrastructure. It SHALL NOT be able to write infrastructure's contents, change an existing issue or pull
+request, or start a workflow in any other repository. Opening a new issue in a public repository needs no permission,
+for an App as for any account, so it isn't refused.
 
 #### Scenario: Starting dependabot-issues
 - **WHEN** a troupe workflow mints the dispatch App's token and creates a `workflow_dispatch` event for
   infrastructure's `dependabot-issues.yml` on `main`
 - **THEN** GitHub starts a run of that workflow
 
-#### Scenario: Writing infrastructure's contents or issues
-- **WHEN** the same token is used to create a branch or a file, or open an issue, in troupe-run/infrastructure
+#### Scenario: Writing infrastructure's contents
+- **WHEN** the same token is used to create a branch or a file in troupe-run/infrastructure
 - **THEN** GitHub refuses it with 403, and nothing in the repository changes
 
+#### Scenario: Changing someone else's issue
+- **WHEN** the same token is used to comment on, close or label an issue the App didn't open
+- **THEN** GitHub refuses it with 403
+
 #### Scenario: Acting in another repository
-- **WHEN** the same token is used to start a workflow in troupe or website
-- **THEN** GitHub refuses it
+- **WHEN** the same token is used to start a workflow, or comment on a pull request, in troupe or website
+- **THEN** GitHub refuses it with 403
 
 ### Requirement: The dispatch key is readable from main only
 troupe-run/troupe and troupe-run/website SHALL each have an environment named `dependabot-dispatch` whose deployment
