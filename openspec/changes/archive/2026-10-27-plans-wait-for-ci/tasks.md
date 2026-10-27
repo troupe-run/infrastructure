@@ -46,7 +46,7 @@
 
 ## 4. Integration
 
-- [ ] 4.1 Run `openspec validate plans-wait-for-ci --strict` and the full `uv run scripts/check.py`. Verify both are
+- [x] 4.1 Run `openspec validate plans-wait-for-ci --strict` and the full `uv run scripts/check.py`. Verify both are
   clean, and that the pull request's `plan (pull request)` shows no OpenTofu changes.
 
 ## Workflow follow-up
