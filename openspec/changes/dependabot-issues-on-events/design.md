@@ -87,8 +87,9 @@ on:
   repositories other than infrastructure that have Dependabot.
 - **`DISPATCH_APP_CLIENT_ID`** is a repository variable in troupe and website. `DISPATCH_APP_PRIVATE_KEY` is each
   `dependabot-dispatch` environment's secret, set by the owner (`oob/README.md`), as with the docs key.
-- New `tofu/dependabot_dispatch.tf` declares the two environments, their main-only policies and the two variables, with
-  `prevent_destroy` like the other credential environments. `test_main_only_environments.py` gains both.
+- New `tofu/dependabot_dispatch.tf` declares the two environments, their main-only policies and the two variables.
+  Like the other credential environments, they're guarded by `test_main_only_environments.py`, not `prevent_destroy`,
+  which a deleted block bypasses (#61). The test gains both.
 
 ### D3. Concurrency already coalesces a burst
 

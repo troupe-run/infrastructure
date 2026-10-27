@@ -71,6 +71,7 @@ lists below are checked by hand in each App's settings, by any change that adds,
 | `troupe-run-docs` | `website` | 2026-10-19, by the App's own token (`GET /installation/repositories` returned `website` only) |
 | `troupe-run-dependabot` | `troupe`, `infrastructure`, `website` | 2026-10-27, by the App's own token (`GET /installation/repositories`, after the probe repository was deleted) |
 | `troupe-run-review` | `troupe`, `infrastructure`, `website` | 2026-10-26, owner |
+| `troupe-run-dispatch` | `infrastructure` | 2026-10-27, by the App's own token (`GET /installation/repositories`, after the probe repository was deleted) |
 
 A repository the infrastructure App isn't installed on shows only its public view to OpenTofu (merge settings read as
 off, no security settings), so the first plan after adding one will show that it's missing from this list.
@@ -249,6 +250,55 @@ gh api repos/troupe-run/infrastructure/environments/dependabot-issues/secrets --
 **Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run the
 command above again. Then delete the old key in the App's settings. A run between the two steps still works, because
 both keys are valid until the old one is deleted.
+
+## The dispatch App (set up by hand)
+
+When Dependabot acts in troupe or website, `.github/workflows/dependabot-dispatch.yml` there starts infrastructure's
+`dependabot-issues` (spec: dependency-updates, dependabot-dispatch-credentials, #195). A run's `GITHUB_TOKEN` covers
+only its own repository, so the dispatcher mints the `troupe-run-dispatch` App's token. That token can start a
+`workflow_dispatch` run on infrastructure. It can't write contents, change an issue or pull request, or act in another
+repository (probed 2026-10-27, each refused with 403). Like any account, it can open a new issue in a public
+repository, which needs no permission. GitHub has no API for creating an App, and OpenTofu never holds a secret, so
+these steps are the owner's. The App's IDs are recorded on #195. `tofu/dependabot_dispatch.tf` declares a
+`dependabot-dispatch` environment and the client-ID variable on troupe and on website.
+
+**Creating it** (done 2026-10-27). In the org's settings, under GitHub Apps, create a new App:
+- name `troupe-run-dispatch`, installable only on this account, webhook off;
+- repository permission "Actions: read and write", and nothing else: no organisation or account permissions. GitHub
+  adds "Metadata: read";
+- install it with "Only select repositories" and select `infrastructure` only. It isn't installed on troupe or
+  website: their runs mint a token for infrastructure's installation.
+
+Its installation is checked by `oob.py` against `app-installations.json`. Its client ID goes in
+`tofu/dependabot_dispatch.tf`.
+
+**Its key.** Generate a private key in the App's settings. Store it in 1Password as an SSH Key item named
+`troupe-run-dispatch` in vault `troupe.run`, by importing the downloaded `.pem`, then delete the file. Once the
+`dependabot-dispatch` environment exists on troupe and on website (after the apply that creates each), set the secret
+in both. Nothing is printed:
+
+```sh
+export OP_ACCOUNT=l-a-u.1password.com
+# gh runs only once op has read the key, and only if it's PKCS#1 or PKCS#8 (create-github-app-token refuses OpenSSH).
+key=$(op read -n "op://troupe.run/troupe-run-dispatch/private key") &&
+  case "$key" in "-----BEGIN RSA PRIVATE KEY-----"*|"-----BEGIN PRIVATE KEY-----"*) ;; *) false ;; esac &&
+  printf '%s' "$key" | gh secret set DISPATCH_APP_PRIVATE_KEY --env dependabot-dispatch -R troupe-run/troupe &&
+  printf '%s' "$key" | gh secret set DISPATCH_APP_PRIVATE_KEY --env dependabot-dispatch -R troupe-run/website
+unset key
+```
+
+Check each by name, never by value:
+
+```sh
+gh api repos/troupe-run/troupe/environments/dependabot-dispatch/secrets --jq '.secrets[].name'
+gh api repos/troupe-run/website/environments/dependabot-dispatch/secrets --jq '.secrets[].name'
+```
+
+Until both are set, a Dependabot run in that repository starts a dispatcher run that fails, and the daily backstop
+reports any pull request it left without its issue or closing line.
+
+**Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run the
+command above again. Then delete the old key in the App's settings.
 
 ## The review App and the Claude token (set up by hand)
 

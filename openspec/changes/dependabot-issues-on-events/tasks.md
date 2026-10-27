@@ -21,12 +21,12 @@
 
 ## 2. The credential declarations (spec dependabot-dispatch-credentials; design D2)
 
-- [ ] 2.1 Add `tofu/dependabot_dispatch.tf`. It declares the `dependabot-dispatch` environment in troupe and in website
-  (main only, no admin bypass, no reviewers, `prevent_destroy`), their `main` deployment policies, and
+- [x] 2.1 Add `tofu/dependabot_dispatch.tf`. It declares the `dependabot-dispatch` environment in troupe and in website
+  (main only, no admin bypass, no reviewers), their `main` deployment policies, and
   `DISPATCH_APP_CLIENT_ID` in both from 1.1. Verify `tofu fmt` and `tofu validate` are clean.
-- [ ] 2.2 Add both environments to `scripts/tests/test_main_only_environments.py` (`TF_FILES` and `MAIN_ONLY`). Verify
+- [x] 2.2 Add both environments to `scripts/tests/test_main_only_environments.py` (`TF_FILES` and `MAIN_ONLY`). Verify
   the test passes, and fails when either declaration is deleted, widened beyond `main`, or opened to an admin bypass.
-- [ ] 2.3 Declare the App in `oob/app-installations.json`, and its repository in the hand-confirmed list. Add "The
+- [x] 2.3 Declare the App in `oob/app-installations.json`, and its repository in the hand-confirmed list. Add "The
   dispatch App (set up by hand)" to `oob/README.md`: creating it, and setting `DISPATCH_APP_PRIVATE_KEY` in both
   environments with a command that prints nothing and checks the key's first line (PKCS#1). Add a row to README.md's
   table for `tofu/dependabot_dispatch.tf`. Verify the oob tests pass, and that the drift check, run locally, reports no
