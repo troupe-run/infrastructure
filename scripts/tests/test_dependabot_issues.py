@@ -65,6 +65,11 @@ def lined(p: dict[str, Any], issue: int) -> dict[str, Any]:
     return {**p, "body": di.with_closing_line(p, issue)}
 
 
+def just_changed(p: dict[str, Any]) -> dict[str, Any]:
+    """As the run Dependabot's change started sees it: updated minutes ago, so not a miss."""
+    return {**p, "updated_at": (NOW - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")}
+
+
 # Reading a pull request (spec: "The issue says what the update is"; design D3, D4)
 
 
@@ -382,7 +387,8 @@ class FakeGitHub:
     """Answers the reads from per-repository data, and records every write."""
 
     def __init__(self, data: dict[str, dict[str, Any]]) -> None:
-        self.data = data
+        # Every run reads the tracking issue there (design D5); a test that needs it down says so.
+        self.data = {"infrastructure": {}, **data}
         self.writes: list[tuple[str, str, dict[str, Any]]] = []
         self.next_issue = 500
 
@@ -436,7 +442,7 @@ ACTIONS = {"GITHUB_ACTIONS": "true"}
 def test_outside_actions_it_writes_nothing_and_says_what_it_would_do(
     declarations: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    gh = FakeGitHub({"website": {"pulls": [pull()]}, "troupe": {}})
+    gh = FakeGitHub({"website": {"pulls": [just_changed(pull())]}, "troupe": {}})
     assert di.run(*declarations, {}, gh, NOW) == 0
     assert gh.writes == []
     out = capsys.readouterr().out
@@ -447,7 +453,7 @@ def test_in_actions_a_new_pull_request_gets_its_issue_and_line(
     declarations: tuple[Path, Path], tmp_path: Path
 ) -> None:
     output = tmp_path / "output"
-    gh = FakeGitHub({"website": {"pulls": [pull()]}, "troupe": {}})
+    gh = FakeGitHub({"website": {"pulls": [just_changed(pull())]}, "troupe": {}})
     assert di.run(*declarations, {**ACTIONS, "GITHUB_OUTPUT": str(output)}, gh, NOW) == 0
     (m1, p1, issue), (m2, p2, edit) = gh.writes
     assert (m1, p1) == ("POST", "repos/troupe-run/website/issues")
@@ -469,7 +475,7 @@ def test_in_actions_nothing_to_do_writes_nothing(declarations: tuple[Path, Path]
 
 def test_in_actions_relinking_retitles_and_comments(declarations: tuple[Path, Path]) -> None:
     old = pull()
-    new = pull(number=60, title="chore(deps): Bump zod from 4.6.5 to 4.6.8")
+    new = just_changed(pull(number=60, title="chore(deps): Bump zod from 4.6.5 to 4.6.8"))
     gh = FakeGitHub({"website": {"pulls": [new], "issues": [app_issue(old)],
                                  "linked": {44: closed(old, timedelta(minutes=5))}},
                      "troupe": {}})  # fmt: skip
@@ -503,7 +509,9 @@ def test_in_actions_closing_as_not_planned_comments_then_closes(
 def test_a_repository_that_cant_be_read_is_left_alone_and_the_run_fails(
     declarations: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    gh = FakeGitHub({"website": {"fail": True}, "troupe": {"pulls": [pull("troupe-175")]}})
+    gh = FakeGitHub(
+        {"website": {"fail": True}, "troupe": {"pulls": [just_changed(pull("troupe-175"))]}}
+    )
     assert di.run(*declarations, ACTIONS, gh, NOW) == 1
     assert [p for _, p, _ in gh.writes] == [
         "repos/troupe-run/troupe/issues",
@@ -517,7 +525,7 @@ def test_a_damaged_issue_fails_the_run_after_the_rest_is_handled(
 ) -> None:
     p = pull()
     damaged = app_issue(p, body="no marker")
-    gh = FakeGitHub({"website": {"pulls": [lined(p, 100), pull("website-55")],
+    gh = FakeGitHub({"website": {"pulls": [lined(p, 100), just_changed(pull("website-55"))],
                                  "issues": [damaged]}, "troupe": {}})  # fmt: skip
     assert di.run(*declarations, ACTIONS, gh, NOW) == 1
     assert [path for _, path, _ in gh.writes] == [
@@ -559,8 +567,12 @@ def test_no_release_in_progress_stops_before_any_read(
 def test_pull_request_text_reaches_github_only_as_json_data(
     declarations: tuple[Path, Path],
 ) -> None:
-    hostile = pull(title='chore(deps): Bump zod from 4.6.5 to 4.6.7"; $(rm -rf /) ${{ x }}',
-                   body="`whoami` $(id) ${{ secrets.X }}")  # fmt: skip
+    hostile = just_changed(
+        pull(
+            title='chore(deps): Bump zod from 4.6.5 to 4.6.7"; $(rm -rf /) ${{ x }}',
+            body="`whoami` $(id) ${{ secrets.X }}",
+        )
+    )
     seen: list[tuple[list[str], str | None]] = []
     gh = FakeGitHub({"website": {"pulls": [hostile]}, "troupe": {}})
 
@@ -577,7 +589,7 @@ def test_pull_request_text_reaches_github_only_as_json_data(
     assert "`whoami` $(id) ${{ secrets.X }}" in edit["body"]
 
 
-# The backstop (spec: dependency-updates, "A missed event is reported", "The missed-event tracking
+# Missed events (spec: dependency-updates, "A missed event is reported", "The missed-event tracking
 # issue follows the misses"; dependabot-issues-on-events design D4, D5)
 
 
@@ -635,7 +647,7 @@ def test_a_pull_request_changed_within_the_hour_is_fixed_but_not_a_miss() -> Non
     assert di.misses("website", decided, NOW) == []
 
 
-def test_work_only_the_backstop_can_do_is_not_a_miss() -> None:
+def test_work_only_time_or_a_person_makes_due_is_not_a_miss() -> None:
     merged, gone = pull(), pull("website-55")
     issues = [app_issue(merged, 100), app_issue(gone, 101)]
     linked = {
@@ -678,7 +690,7 @@ def test_the_newest_report_is_the_last_one() -> None:
 
 
 @pytest.mark.parametrize(
-    ("missed", "has_issue", "last", "complete", "action"),
+    ("missed", "has_issue", "last", "may_close", "action"),
     [
         (["a#1"], False, None, True, "open"),
         (["a#1"], True, ["a#1"], True, "none"),
@@ -689,10 +701,10 @@ def test_the_newest_report_is_the_last_one() -> None:
     ],
 )
 def test_the_tracking_issue_follows_the_misses(
-    missed: list[str], has_issue: bool, last: list[str] | None, complete: bool, action: str
+    missed: list[str], has_issue: bool, last: list[str] | None, may_close: bool, action: str
 ) -> None:
     issue = tracking() if has_issue else None
-    assert di.decide_tracking(missed, issue, last, complete) == action
+    assert di.decide_tracking(missed, issue, last, may_close) == action
 
 
 def test_someone_else_s_issue_with_the_tracking_title_is_ignored() -> None:
@@ -705,19 +717,22 @@ def test_two_tracking_issues_update_the_oldest() -> None:
 
 
 RUN_ENV = {**ACTIONS, "GITHUB_SERVER_URL": "https://github.com",
-           "GITHUB_REPOSITORY": "troupe-run/infrastructure", "GITHUB_RUN_ID": "42"}  # fmt: skip
+           "GITHUB_REPOSITORY": "troupe-run/infrastructure", "GITHUB_RUN_ID": "42",
+           "GITHUB_EVENT_NAME": "workflow_run"}  # fmt: skip
+DAILY_ENV = {**RUN_ENV, "GITHUB_EVENT_NAME": "schedule"}
 RUN_URL = "https://github.com/troupe-run/infrastructure/actions/runs/42"
 
 
-def test_without_the_backstop_a_miss_is_fixed_and_not_reported(
+def test_a_run_dependabot_s_change_started_reports_no_miss(
     declarations: tuple[Path, Path],
 ) -> None:
-    gh = FakeGitHub({"website": {"pulls": [stale(pull(), timedelta(hours=3))]}, "troupe": {}})
+    """The pull request it was started for changed minutes ago, so it isn't late (design D4)."""
+    gh = FakeGitHub({"website": {"pulls": [just_changed(pull())]}, "troupe": {}})
     assert di.run(*declarations, RUN_ENV, gh, NOW) == 0
     assert all("infrastructure" not in path for _, path, _ in gh.writes)
 
 
-def test_the_backstop_fixes_first_then_opens_the_tracking_issue_and_fails(
+def test_any_run_fixes_a_miss_first_then_opens_the_tracking_issue_and_fails(
     declarations: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     output = tmp_path / "output"
@@ -725,7 +740,7 @@ def test_the_backstop_fixes_first_then_opens_the_tracking_issue_and_fails(
     gh = FakeGitHub({"website": {"pulls": [p], "issues": [app_issue(p)]}, "troupe": {},
                      "infrastructure": {}})  # fmt: skip
     env = {**RUN_ENV, "GITHUB_OUTPUT": str(output)}
-    assert di.run(*declarations, env, gh, NOW, backstop=True) == 1
+    assert di.run(*declarations, env, gh, NOW) == 1
     (_, line, _), (method, path, opened) = gh.writes
     assert line == "repos/troupe-run/website/pulls/44"
     assert (method, path) == ("POST", "repos/troupe-run/infrastructure/issues")
@@ -738,35 +753,35 @@ def test_the_backstop_fixes_first_then_opens_the_tracking_issue_and_fails(
     assert "https://github.com/troupe-run/infrastructure/issues/501" in urls
 
 
-def test_the_backstop_with_the_same_misses_adds_no_comment(declarations: tuple[Path, Path]) -> None:
+def test_the_same_misses_add_no_comment(declarations: tuple[Path, Path]) -> None:
     p = stale(pull(), timedelta(hours=3))
     reported = tracking(missed=["troupe-run/website#44"])
     gh = FakeGitHub({"website": {"pulls": [p], "issues": [app_issue(p)]}, "troupe": {},
                      "infrastructure": {"issues": [reported]}})  # fmt: skip
-    assert di.run(*declarations, RUN_ENV, gh, NOW, backstop=True) == 1
+    assert di.run(*declarations, RUN_ENV, gh, NOW) == 1
     assert [path for _, path, _ in gh.writes] == ["repos/troupe-run/website/pulls/44"]
 
 
-def test_the_backstop_with_new_misses_comments(declarations: tuple[Path, Path]) -> None:
+def test_new_misses_comment(declarations: tuple[Path, Path]) -> None:
     p = stale(pull(), timedelta(hours=3))
     reported = tracking(missed=["troupe-run/troupe#175"])
     gh = FakeGitHub({"website": {"pulls": [p], "issues": [app_issue(p)]}, "troupe": {},
                      "infrastructure": {"issues": [reported]}})  # fmt: skip
-    assert di.run(*declarations, RUN_ENV, gh, NOW, backstop=True) == 1
+    assert di.run(*declarations, RUN_ENV, gh, NOW) == 1
     method, path, said = gh.writes[-1]
     assert (method, path) == ("POST", "repos/troupe-run/infrastructure/issues/7/comments")
     assert "- troupe-run/website#44" in said["body"]
 
 
-def test_a_clean_backstop_closes_the_tracking_issue_and_succeeds(
+def test_a_clean_daily_run_closes_the_tracking_issue_and_succeeds(
     declarations: tuple[Path, Path], tmp_path: Path
 ) -> None:
     output = tmp_path / "output"
     p = pull()
     gh = FakeGitHub({"website": {"pulls": [lined(p, 100)], "issues": [app_issue(p)]},
                      "troupe": {}, "infrastructure": {"issues": [tracking()]}})  # fmt: skip
-    env = {**RUN_ENV, "GITHUB_OUTPUT": str(output)}
-    assert di.run(*declarations, env, gh, NOW, backstop=True) == 0
+    env = {**DAILY_ENV, "GITHUB_OUTPUT": str(output)}
+    assert di.run(*declarations, env, gh, NOW) == 0
     (_, c, said), (method, path, state) = gh.writes
     assert c == "repos/troupe-run/infrastructure/issues/7/comments"
     assert RUN_URL in said["body"]
@@ -775,12 +790,26 @@ def test_a_clean_backstop_closes_the_tracking_issue_and_succeeds(
     assert "infrastructure/issues/7" not in output.read_text()
 
 
-def test_a_backstop_that_couldn_t_read_a_repository_leaves_the_tracking_issue_open(
+def test_a_clean_event_run_leaves_the_tracking_issue_open(
+    declarations: tuple[Path, Path], tmp_path: Path
+) -> None:
+    """Minutes after a miss, the next run finds it fixed. The cause may still be there, so only the
+    daily run closes the issue (design D5)."""
+    output = tmp_path / "output"
+    p = pull()
+    gh = FakeGitHub({"website": {"pulls": [lined(p, 100)], "issues": [app_issue(p)]},
+                     "troupe": {}, "infrastructure": {"issues": [tracking()]}})  # fmt: skip
+    assert di.run(*declarations, {**RUN_ENV, "GITHUB_OUTPUT": str(output)}, gh, NOW) == 0
+    assert gh.writes == []
+    assert "https://github.com/troupe-run/infrastructure/issues/7" in output.read_text()
+
+
+def test_a_daily_run_that_couldn_t_read_a_repository_leaves_the_tracking_issue_open(
     declarations: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:
     gh = FakeGitHub({"website": {"fail": True}, "troupe": {},
                      "infrastructure": {"issues": [tracking()]}})  # fmt: skip
-    assert di.run(*declarations, RUN_ENV, gh, NOW, backstop=True) == 1
+    assert di.run(*declarations, DAILY_ENV, gh, NOW) == 1
     assert gh.writes == []
     assert "troupe-run/website" in capsys.readouterr().err
 
@@ -790,7 +819,7 @@ def test_misses_and_a_failed_repository_are_both_named(
 ) -> None:
     p = stale(pull("troupe-175"), timedelta(hours=3))
     gh = FakeGitHub({"website": {"fail": True}, "troupe": {"pulls": [p]}, "infrastructure": {}})
-    assert di.run(*declarations, RUN_ENV, gh, NOW, backstop=True) == 1
+    assert di.run(*declarations, RUN_ENV, gh, NOW) == 1
     err = capsys.readouterr().err
     assert "missed events, handled now: troupe-run/troupe#175" in err
     assert "couldn't handle website" in err
@@ -800,32 +829,19 @@ def test_a_tracking_issue_that_can_t_be_read_fails_the_run_after_the_fixes(
     declarations: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:
     p = stale(pull(), timedelta(hours=3))
-    gh = FakeGitHub({"website": {"pulls": [p], "issues": [app_issue(p)]}, "troupe": {}})
-    assert di.run(*declarations, RUN_ENV, gh, NOW, backstop=True) == 1
+    gh = FakeGitHub({"website": {"pulls": [p], "issues": [app_issue(p)]}, "troupe": {},
+                     "infrastructure": {"fail": True}})  # fmt: skip
+    assert di.run(*declarations, RUN_ENV, gh, NOW) == 1
     assert [path for _, path, _ in gh.writes] == ["repos/troupe-run/website/pulls/44"]
     assert "couldn't read the tracking issue" in capsys.readouterr().err
 
 
-def test_outside_actions_the_backstop_only_says_what_it_would_do(
+def test_outside_actions_a_miss_only_says_what_it_would_do(
     declarations: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:
     p = stale(pull(), timedelta(hours=3))
     gh = FakeGitHub({"website": {"pulls": [p], "issues": [app_issue(p)]}, "troupe": {},
                      "infrastructure": {}})  # fmt: skip
-    assert di.run(*declarations, {}, gh, NOW, backstop=True) == 1
+    assert di.run(*declarations, {}, gh, NOW) == 1
     assert gh.writes == []
     assert "would open the tracking issue" in capsys.readouterr().out
-
-
-def test_the_command_line_takes_backstop(monkeypatch: pytest.MonkeyPatch) -> None:
-    seen: dict[str, Any] = {}
-
-    def fake_run(*args: Any, backstop: bool = False) -> int:  # noqa: ANN401
-        seen["backstop"] = backstop
-        return 0
-
-    monkeypatch.setattr(di, "run", fake_run)
-    assert di.main(["--backstop"]) == 0
-    assert seen == {"backstop": True}
-    assert di.main([]) == 0
-    assert seen == {"backstop": False}

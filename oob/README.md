@@ -294,8 +294,8 @@ gh api repos/troupe-run/troupe/environments/dependabot-dispatch/secrets --jq '.s
 gh api repos/troupe-run/website/environments/dependabot-dispatch/secrets --jq '.secrets[].name'
 ```
 
-Until both are set, a Dependabot run in that repository starts a dispatcher run that fails, and the daily backstop
-reports any pull request it left without its issue or closing line.
+Until both are set, a Dependabot run in that repository starts a dispatcher run that fails, and a later run, the daily
+backstop at the latest, reports any pull request it left without its issue or closing line.
 
 **Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run the
 command above again. Then delete the old key in the App's settings.

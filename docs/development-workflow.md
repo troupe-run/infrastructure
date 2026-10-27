@@ -342,13 +342,14 @@ The workflow starts when Dependabot acts, so a pull request has its issue and cl
 Dependabot opening or rewriting it, with nobody starting anything (#195). Each finished "Dependabot Updates" run starts
 it: here directly, and in troupe and website through their `dependabot-dispatch` workflow, which the guard delivers.
 That workflow starts this one with the `troupe-run-dispatch` App's token, kept in a main-only environment
-(oob/README.md). A daily backstop does the same work, plus what only time makes due, such as closing an issue as not
-planned an hour after its pull request closed. Closing a Dependabot pull request by hand starts no Dependabot run, so
-its issue closes at the next backstop. A pull request the backstop finds still missing its issue or closing line over
-an hour after it last changed means an event was missed. The backstop fixes it, lists it in the "Dependabot events
-missed" issue here, and fails. The issue closes after a backstop that finds none. The schedule watch reports the
-backstop if its schedule stops. To run the workflow by hand: `gh workflow run dependabot-issues.yml -R
-troupe-run/infrastructure`, adding `-f backstop=true` to run it as the backstop.
+(oob/README.md). A daily run, the backstop, does the same work, which includes what only time makes due, such as
+closing an issue as not planned an hour after its pull request closed. Closing a Dependabot pull request by hand starts
+no Dependabot run, so its issue closes at the next backstop. Any run that finds a pull request still missing its issue
+or closing line over an hour after it last changed has found a missed event. The run fixes it, lists it in the
+"Dependabot events missed" issue here, and fails. Only the daily run closes the issue, when it finds none, so it stays
+open while a cause such as a missing key is still there. The schedule watch
+reports the backstop if its schedule stops. To run the workflow by hand: `gh workflow run dependabot-issues.yml -R
+troupe-run/infrastructure`.
 
 In a governed repository (troupe, infrastructure, website), a Dependabot pull request takes one of two paths. The
 `guard` check decides which (spec: `development-workflow`; dependabot-exemption).

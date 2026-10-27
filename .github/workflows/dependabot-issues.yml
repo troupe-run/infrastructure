@@ -14,9 +14,9 @@ name: dependabot-issues
 #
 # Dependabot's own runs start it: "Dependabot Updates" here, and the same runs in troupe and website
 # through their delivered dependabot-dispatch.yml (spec: dependency-updates; #195;
-# dependabot-issues-on-events design D1, D2). A daily schedule is the backstop. It does the same
-# work, and reports a pull request still missing its issue or line an hour after it last changed as
-# a missed event (design D4). Every trigger runs main's file, so nothing a pull request carries is
+# dependabot-issues-on-events design D1, D2). A daily schedule is the backstop, for what only time
+# makes due. Every run, whatever started it, reports a pull request still missing its issue or line
+# an hour after it last changed as a missed event (design D4). Every trigger runs main's file, so nothing a pull request carries is
 # in its context, no expression reads the event, and it never checks out or runs a pull request's
 # files: it reads their metadata through the API (dependabot-issues design D1, D6). The App's edits
 # start workflows, so adding the closing line re-runs `guard` on the pull request, which
@@ -30,17 +30,13 @@ on:
   schedule:
     - cron: "37 4 * * *"
   workflow_dispatch:
-    inputs:
-      backstop:
-        description: "Run as the daily backstop: report pull requests an event run should have handled"
-        type: boolean
-        default: false
 
 permissions: {}
 
 # Two runs at once could each open an issue for the same pull request. Dependabot's weekly run is
 # many runs, each starting this: one stays in progress, and a newer pending run replaces the older,
-# so the burst ends with a run that starts after the last of them (design D3).
+# so the burst ends with a run that starts after the last of them (design D3). A replaced run may
+# be the schedule's, which is why every run, not only the schedule's, counts misses (design D4).
 concurrency:
   group: dependabot-issues
   cancel-in-progress: false
@@ -75,18 +71,11 @@ jobs:
           owner: troupe-run
           permission-issues: write
           permission-pull-requests: write
-      # The schedule is the backstop, and so is a run started by hand with backstop set (design D4).
       - name: Open and link the issues
         id: issues
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          BACKSTOP: ${{ inputs.backstop }}
-        run: |
-          if [[ "$GITHUB_EVENT_NAME" == schedule || "$BACKSTOP" == true ]]; then
-            uv run --no-project scripts/dependabot_issues.py --backstop
-          else
-            uv run --no-project scripts/dependabot_issues.py
-          fi
+        run: uv run --no-project scripts/dependabot_issues.py
 
   board:
     name: put the issues on the board

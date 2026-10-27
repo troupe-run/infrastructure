@@ -31,8 +31,8 @@ See proposal.md for why. What this builds on:
 **Goals:**
 - Starting the run needs nothing from a pull request: the trigger runs from `main`, reads nothing from its event, and
   checks out nothing in troupe or website.
-- Every way the event path can fail ends in the same place, the backstop's tracking issue. That covers no event, a
-  dispatch that fails, or a key that's missing. The schedule watch covers the backstop itself.
+- Every way the event path can fail ends in the same place, the missed-event tracking issue. That covers no event, a
+  dispatch that fails, or a key that's missing. The schedule watch covers the daily backstop itself.
 
 **Non-Goals:**
 - **Starting a run when a person closes or merges a Dependabot pull request.** A merge closes the issue through its
@@ -60,8 +60,8 @@ on:
   `main`-only environment admits it. It's started by the run that changed the pull requests, not by the pull request.
   Every kind of Dependabot activity that drops a closing line or needs an issue happens in such a run.
 - **`completed`, any conclusion.** A failed Dependabot run may still have opened or rebased a pull request.
-- **Nothing from the event is read** (spec). The only `github.event_name` use is choosing the backstop mode (D4). A
-  test pins that no expression reads `github.event.`.
+- **Nothing from the event is read** (spec). Every run does the same work (D4), so the step needn't know what started
+  it. A test pins that no expression reads `github.event`.
 - *Rejected: `pull_request` / `pull_request_target` from Dependabot.* Only Dependabot secrets or none, the pull
   request's context in a writing job, and in troupe and website the key would have to be a Dependabot secret that any
   Dependabot pull request's workflows can read.
@@ -99,18 +99,27 @@ pending run replaces the older one. So a burst ends with a run that starts after
 needs, since each run reads everything. The replaced runs show as cancelled, which is expected. It stays unchanged,
 and the design comment in the workflow says why.
 
-### D4. The daily backstop counts misses, and only misses
+### D4. Every run counts misses, and only misses
 
-A run started by `schedule` passes `--backstop` to the script, and so does one started by hand with the boolean
-input `backstop` set, so the path can be proved without waiting for the schedule. Without it, the script behaves
-exactly as now.
+Every run, whatever started it, counts misses and keeps the tracking issue. The daily schedule is the backstop: it
+makes sure some run happens each day, for work only time makes due and for misses no event run came to see.
+
+- **Why every run, not only the schedule's** (revised after Claude's review on #196, 2026-10-27, with the owner's
+  agreement). The first version passed `--backstop` only on `schedule`, or by hand with a `backstop` input. But the
+  concurrency group (D3) keeps one pending run, and a newer one replaces it. A schedule run waiting behind an event
+  run, then replaced by the next event's run, would skip that day's check, and the watch would still see a scheduled
+  run created. With every run checking, it doesn't matter which run the queue lets through. A run Dependabot's change
+  started sees that pull request as minutes old, so it's never counted as missed. A gap over an hour old is a miss
+  whichever run finds it. *Alternative the owner declined:* keep the flag, and have the watch report a cancelled
+  scheduled run. That would make the gap visible, but the day would still go unchecked, and it would change the
+  watch's rules for `links-weekly` too.
 
 - **A miss** is an open Dependabot pull request that, when the run reads it, needs a new issue or relink (D2 step 1 of
   `dependabot-issues`), or its closing line (step 3), and whose `updated_at` is over an hour old (spec). A pull request
   updated within the hour may have an event run on its way, so it's fixed but not counted.
 - **Not a miss:** closing an issue for a merged pull request, closing as not planned after the hour, or reopening an
   issue. Only time or a person's action makes that work due, so no event could have done it. That's the side agent's
-  point (2026-10-27), and the spec's "Work only the backstop can do".
+  point (2026-10-27), and the spec's "Work only time or a person makes due".
 - **`updated_at`** moves on any activity, such as a comment. A person's comment can only delay a miss by a day. It can't
   invent one, so the error is toward silence for one day, never a false alarm.
 - **The hour** is the spec's bound, kept as one constant in the script.
@@ -126,6 +135,12 @@ exactly as now.
   with a comment linking the run; ignore issues with that title by anyone else; when two are open, update the oldest.
   The script reuses the watch's approach but keeps its own code: `watch_schedules.py` writes with `GITHUB_TOKEN`
   and its decision function is shaped around its own problems. A shared module is a refactor this change doesn't need.
+- **Only the daily scheduled run closes it**, when it read every repository and found no miss. Any run may open or
+  comment on it. With every run checking (D4), the next run, often minutes later in a burst, finds the miss already
+  fixed. If it could close the issue, a cause still there, such as a missing dispatch key, would make the issue open
+  and close over and over, and it would read as fixed. Found by a side review, 2026-10-27. If the schedule's run is
+  replaced in the queue, the issue stays open another day, which errs toward being seen. The script reads
+  `GITHUB_EVENT_NAME`, which Actions sets for every run, so no workflow expression reads the event.
 - **It carries no `dependencies` label and no `dependabot-issue` marker**, so the script's own issue listing never
   treats it as an update's issue.
 - **Its URL joins `issue-urls`**, so the existing board job puts it on the board, already restricted to issue URLs in
@@ -197,8 +212,8 @@ otherwise: it runs late either way.
    `dependabot-dispatch` environments (oob/README.md).
 5. Check end to end. Comment `@dependabot rebase` on a Dependabot pull request that's behind `main` in each of troupe,
    website and infrastructure. Check a `dependabot-issues` run starts after each Dependabot run, and the closing line
-   is back within the hour. Start the workflow by hand with `backstop` set while nothing is missed, and check that it
-   succeeds and opens no tracking issue. Then check the first scheduled run happens, and the watch's next run finds no
+   is back within the hour. Start the workflow by hand while nothing is missed, and check that it succeeds and opens no
+   tracking issue. Then check the first scheduled run happens, and the watch's next run finds no
    problem for `dependabot-issues.yml`.
 
 Rollback: revert the workflow's triggers to `workflow_dispatch` only and run it by hand as now. Removing the

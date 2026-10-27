@@ -91,6 +91,12 @@
 - [x] 7.2 Open the pull request with `Closes #195`, its body written to a file first and passed to `--body-file`.
   Verify CI is green on all three OSes and the plan comment matches 7.1.
 
+## After review
+
+- Claude's review on #196 found that the backstop flag could be lost in the queue (design D4). With the owner's
+  agreement, `--backstop` and the `backstop` input were removed, and every run now counts misses. Tasks 3.1, 3.3 and
+  4.1 above describe the first version. The spec, design, tests and docs describe the change as merged.
+
 ## Workflow follow-up
 
 - Archive the change on the branch, batched with the rebase onto `main`'s state commit, and ask for the plan approval
@@ -99,7 +105,7 @@
   `dependabot-dispatch` environments (oob/README.md).
 - Check end to end (design Migration 5). Comment `@dependabot rebase` on a Dependabot pull request that's behind
   `main` in each repository, and see `dependabot-issues` start and restore the line within the hour. Run the backstop
-  by hand with `backstop` set and see it succeed with no tracking issue. Then confirm the first scheduled run, and the
+  by hand and see it succeed with no tracking issue. Then confirm the first scheduled run, and the
   watch's clean report.
 - Comment on #195 with the PR and the archived change, check it's closed and its card says Done, and remove the
   by-hand step from the `dependabot-issues-findings` memory.
