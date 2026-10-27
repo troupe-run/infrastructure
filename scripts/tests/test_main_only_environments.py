@@ -1,6 +1,6 @@
 """The environments only main may use stay declared that way (specs: ci-apply, release-credentials,
-repositories, board-credentials, docs-build-credentials; check-main-only-environments design D1 to
-D3).
+repositories, board-credentials, docs-build-credentials, dependabot-issue-credentials;
+check-main-only-environments design D1 to D3).
 
 prevent_destroy goes with its block: deleting an environment's declaration plans a destroy that
 nothing refuses, and the next job that names the environment makes GitHub recreate it with no
@@ -24,6 +24,7 @@ TF_FILES = (
     REPO / "tofu" / "release.tf",
     REPO / "tofu" / "board.tf",
     REPO / "tofu" / "docs.tf",
+    REPO / "tofu" / "dependabot_issues.tf",
 )
 
 
@@ -39,6 +40,7 @@ MAIN_ONLY = {
     ("repo_infrastructure", "board"): False,
     ("repo_troupe", "docs"): False,
     ("repo_infrastructure", "docs"): False,
+    ("repo_infrastructure", "dependabot-issues"): False,
 }
 
 

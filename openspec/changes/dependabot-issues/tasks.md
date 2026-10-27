@@ -2,11 +2,11 @@
 
 ## 1. The App, and what GitHub allows it (design D7, Migration 1–2)
 
-- [ ] 1.1 Ask the owner to create `troupe-run-dependabot` with Issues read/write, Pull requests read/write and
+- [x] 1.1 Ask the owner to create `troupe-run-dependabot` with Issues read/write, Pull requests read/write and
   Metadata read, no organisation permission and no webhook, and to install it on troupe, website, infrastructure and
   `troupe-run/infra-probe-dependabot-issues`. Verify with the owner's org App list that the installation exists, and
   record the App's ID and client ID on #172.
-- [ ] 1.2 Create `troupe-run/infra-probe-dependabot-issues` with an `npm` manifest pinning an old patch release, a
+- [x] 1.2 Create `troupe-run/infra-probe-dependabot-issues` with an `npm` manifest pinning an old patch release, a
   `.github/dependabot.yml` for it, and a workflow on `pull_request: [edited]` that only echoes. Verify Dependabot
   opens a pull request there (`gh pr list -R troupe-run/infra-probe-dependabot-issues --author app/dependabot`).
 - [ ] 1.3 With an App token, in the probe repository: create an issue with `type: Task`, a label and a milestone; edit
@@ -20,10 +20,10 @@
 
 ## 2. The credential declarations (spec dependabot-issue-credentials)
 
-- [ ] 2.1 Add `tofu/dependabot_issues.tf`: the `dependabot-issues` environment in infrastructure (main only, no admin
+- [x] 2.1 Add `tofu/dependabot_issues.tf`: the `dependabot-issues` environment in infrastructure (main only, no admin
   bypass, no reviewers), its `main` deployment policy, and `DEPENDABOT_APP_CLIENT_ID` from 1.1. Verify `tofu fmt` and
   `tofu validate` are clean.
-- [ ] 2.2 Add the environment to `scripts/tests/test_main_only_environments.py`. Verify the test passes, and fails
+- [x] 2.2 Add the environment to `scripts/tests/test_main_only_environments.py`. Verify the test passes, and fails
   when the declaration is deleted, widened beyond `main`, or opened to an admin bypass.
 - [ ] 2.3 Declare the App in `oob/app-installations.json`, and document creating it and setting its key in
   `oob/README.md`, with a command that prints nothing and checks the key's first line (PKCS#1). Verify the oob tests
