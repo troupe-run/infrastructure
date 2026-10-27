@@ -1,14 +1,15 @@
 """The environments only main may use stay declared that way (specs: ci-apply, release-credentials,
-repositories, board-credentials, docs-build-credentials, dependabot-issue-credentials;
-check-main-only-environments design D1 to D3).
+repositories, board-credentials, docs-build-credentials, dependabot-issue-credentials,
+dependabot-dispatch-credentials; check-main-only-environments design D1 to D3).
 
 prevent_destroy goes with its block: deleting an environment's declaration plans a destroy that
 nothing refuses, and the next job that names the environment makes GitHub recreate it with no
 branch rule and no reviewer (#61). So this test reads the declarations as text and fails when one
 of these environments is no longer declared, no longer limited to main, or open to an admin bypass.
-Removing one means changing MAIN_ONLY below, in the same diff the owner reviews. `board` and `docs`
-are each in two repositories (watch-website-link-check design D5, rebuild-site-on-milestones design
-D1), so an environment is named with its repository wherever its name alone would be ambiguous.
+Removing one means changing MAIN_ONLY below, in the same diff the owner reviews. `board`, `docs` and
+`dependabot-dispatch` are each in two repositories (watch-website-link-check design D5,
+rebuild-site-on-milestones design D1, dependabot-issues-on-events design D2), so an environment is
+named with its repository wherever its name alone would be ambiguous.
 """
 
 import re
@@ -25,6 +26,7 @@ TF_FILES = (
     REPO / "tofu" / "board.tf",
     REPO / "tofu" / "docs.tf",
     REPO / "tofu" / "dependabot_issues.tf",
+    REPO / "tofu" / "dependabot_dispatch.tf",
 )
 
 
@@ -41,6 +43,8 @@ MAIN_ONLY = {
     ("repo_troupe", "docs"): False,
     ("repo_infrastructure", "docs"): False,
     ("repo_infrastructure", "dependabot-issues"): False,
+    ("repo_troupe", "dependabot-dispatch"): False,
+    ("repo_website", "dependabot-dispatch"): False,
 }
 
 
@@ -435,6 +439,44 @@ def test_infrastructure_s_board_open_to_an_admin_bypass_is_named() -> None:
         text[start:], "can_admins_bypass   = false", "can_admins_bypass   = true"
     )
     assert problems(texts) == ["board on repo_infrastructure: can_admins_bypass isn't false"]
+
+
+DISPATCH_TROUPE = 'resource "github_repository_environment" "dependabot_dispatch_troupe" {'
+DISPATCH_TROUPE_POLICY = (
+    'resource "github_repository_environment_deployment_policy" '
+    '"dependabot_dispatch_troupe_main_only" {'
+)
+DISPATCH_WEBSITE = 'resource "github_repository_environment" "dependabot_dispatch_website" {'
+
+
+def test_a_deleted_troupe_dispatch_declaration_is_named() -> None:
+    """website's dependabot-dispatch, still declared, doesn't count for troupe's."""
+    texts = real_texts()
+    texts["dependabot_dispatch.tf"] = delete_block(
+        delete_block(texts["dependabot_dispatch.tf"], DISPATCH_TROUPE), DISPATCH_TROUPE_POLICY
+    )
+    assert problems(texts) == ["dependabot-dispatch on repo_troupe: not declared"]
+
+
+def test_website_s_dispatch_open_to_an_admin_bypass_is_named() -> None:
+    texts = real_texts()
+    text = texts["dependabot_dispatch.tf"]
+    start = text.index(DISPATCH_WEBSITE)
+    texts["dependabot_dispatch.tf"] = text[:start] + edit(
+        text[start:], "can_admins_bypass   = false", "can_admins_bypass   = true"
+    )
+    assert problems(texts) == ["dependabot-dispatch on repo_website: can_admins_bypass isn't false"]
+
+
+def test_troupe_s_dispatch_widened_beyond_main_is_named() -> None:
+    texts = edited(
+        "dependabot_dispatch.tf",
+        'dependabot_dispatch_troupe.environment\n  branch_pattern = "main"',
+        'dependabot_dispatch_troupe.environment\n  branch_pattern = "*"',
+    )
+    assert problems(texts) == [
+        "dependabot-dispatch on repo_troupe: its branch policies are ['*'], not ['main']"
+    ]
 
 
 def test_apply_dropped_from_the_ci_environments_is_named() -> None:

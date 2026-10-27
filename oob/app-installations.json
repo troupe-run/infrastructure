@@ -28,6 +28,14 @@
     "repository_selection": "selected"
   },
   {
+    "app_slug": "troupe-run-dispatch",
+    "permissions": {
+      "actions": "write",
+      "metadata": "read"
+    },
+    "repository_selection": "selected"
+  },
+  {
     "app_slug": "troupe-run-docs",
     "permissions": {
       "actions": "write",
