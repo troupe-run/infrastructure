@@ -88,7 +88,7 @@
 - [x] 7.1 Run `uv run scripts/check.py` and a local plan, fast-forwarded onto `origin/main`. Verify the check passes,
   and the plan shows the two environments, their policies, the two variables, the dispatcher and the new
   `guard-delivery.json` delivered to troupe and website, and the regenerated `dependabot.yml`s, and nothing else.
-- [ ] 7.2 Open the pull request with `Closes #195`, its body written to a file first and passed to `--body-file`.
+- [x] 7.2 Open the pull request with `Closes #195`, its body written to a file first and passed to `--body-file`.
   Verify CI is green on all three OSes and the plan comment matches 7.1.
 
 ## Workflow follow-up
