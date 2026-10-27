@@ -129,15 +129,24 @@ STEP_ENV = {
 SNAPSHOT_NAME = "Read the pull request's review conversations"
 SNAPSHOT = {"shell": "python3 {0}", "env": STEP_ENV}
 SNAPSHOT_SHA256 = "04ae3e81dc1951dcf13691262dedbad071bef9282c04f62f1b140c96fd4b69b0"
-# After Claude, only when the review succeeded: resolve and re-tier what Claude names, checked
-# against the snapshot.
+# After Claude, in a job of its own, only when the review succeeded: resolve and re-tier what Claude
+# names, checked against conversations read again in that job (design D4, D4a).
 RESOLVER_NAME = "Resolve and re-tier what Claude named"
 RESOLVER = {
     "shell": "python3 {0}",
-    "env": {**STEP_ENV, "STRUCTURED_OUTPUT": "${{ steps.review.outputs.structured_output }}"},
+    "env": {**STEP_ENV, "STRUCTURED_OUTPUT": "${{ needs.review.outputs.structured_output }}"},
+}
+REVIEW_OUTPUTS = {"structured_output": "${{ steps.review.outputs.structured_output }}"}
+# The resolving job: after the review, only when it succeeded, with nothing checked out and no
+# Claude, and the one token that can write contents, which resolving a conversation needs (D4a).
+RESOLVE_NEEDS = "review"
+RESOLVE_IF = "needs.review.result == 'success'"
+RESOLVE_TOKEN_INPUTS = {
+    **TOKEN_INPUTS,
+    "permission-contents": "write",
 }
 RESOLVER_SHA256 = "0edb8face669593a9f3bff916607df894a1eddb85579f0dd4604c9275ba68269"
-OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME, RESOLVER_NAME}
+OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME}
 # What Claude returns, and all the resolving step reads from it (design D4).
 SCHEMA = {
     "type": "object",
@@ -225,6 +234,49 @@ def own_step_problems(
     return found
 
 
+def resolve_job_problems(job: dict[str, Any]) -> list[str]:
+    """The resolving job: after the review, on its success only, minting the write token, reading
+    the conversations again, then resolving; no checkout, no Claude, nothing else (design D4a)."""
+    found = []
+    if job.get("needs") != RESOLVE_NEEDS:
+        found.append(f"resolve needs {job.get('needs')!r}, not {RESOLVE_NEEDS!r}")
+    if job.get("if") != RESOLVE_IF:
+        found.append(f"resolve runs when {job.get('if')!r}, not {RESOLVE_IF!r}")
+    if job.get("permissions") != PERMISSIONS:
+        found.append(
+            f"resolve's GITHUB_TOKEN permissions are {job.get('permissions')!r}, "
+            f"not {PERMISSIONS!r}"
+        )
+    if "environment" in job:
+        found.append(f"resolve runs in environment {job['environment']!r}; it needs none")
+    if not isinstance(job.get("timeout-minutes"), int):
+        found.append("resolve has no timeout-minutes")
+    steps = job.get("steps") or []
+    shape = [
+        "token"
+        if str(s.get("uses", "")).startswith(f"{MINTER}@")
+        else s.get("name") or s.get("uses")
+        for s in steps
+    ]
+    if shape != ["token", SNAPSHOT_NAME, RESOLVER_NAME]:
+        return [*found, f"resolve's steps are {shape!r}, not the token, {SNAPSHOT_NAME!r} and "
+                f"{RESOLVER_NAME!r}, in that order"]  # fmt: skip
+    minted, read, resolving = steps
+    if not PINNED.match(str(minted.get("uses"))):
+        found.append(f"{minted.get('uses')!r} isn't pinned to a full commit SHA")
+    if minted.get("id") != "app-token":
+        found.append(f"resolve's token step's id is {minted.get('id')!r}, not app-token")
+    given = dict(minted.get("with") or {})
+    client_id = str(given.pop("client-id", ""))
+    if not REVIEW_APP_CLIENT_ID.match(client_id):
+        found.append(f"resolve's client ID is {client_id!r}, not one written here")
+    if given != RESOLVE_TOKEN_INPUTS:
+        found.append(f"resolve's token is minted with {given!r}, not {RESOLVE_TOKEN_INPUTS!r}")
+    found += own_step_problems(read, SNAPSHOT, SNAPSHOT_SHA256, f"resolve's {SNAPSHOT_NAME!r}")
+    found += own_step_problems(resolving, RESOLVER, RESOLVER_SHA256, repr(RESOLVER_NAME))
+    return found
+
+
 def problems(workflow: dict[str, Any]) -> list[str]:
     found = []
     on = workflow.get("on") or {}
@@ -239,9 +291,12 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         )
 
     jobs = workflow.get("jobs") or {}
-    if set(jobs) != {"review"}:
-        return [*found, f"its jobs are {sorted(jobs)}, not review only"]
+    if set(jobs) != {"review", "resolve"}:
+        return [*found, f"its jobs are {sorted(jobs)}, not review and resolve"]
     job = jobs["review"]
+    found += resolve_job_problems(jobs["resolve"])
+    if job.get("outputs") != REVIEW_OUTPUTS:
+        found.append(f"review's outputs are {job.get('outputs')!r}, not {REVIEW_OUTPUTS!r}")
 
     if job.get("if") != SKIP:
         found.append(f"review runs when {job.get('if')!r}, not skipping bots and forks")
@@ -326,20 +381,14 @@ def problems(workflow: dict[str, Any]) -> list[str]:
             found.append("the denials report's script isn't the one this test pins (REPORT_SHA256)")
         if steps.index(report) < steps.index(actions[0]):
             found.append("the denials report runs before the action")
-    for name, expected, sha256, before in (
-        (SNAPSHOT_NAME, SNAPSHOT, SNAPSHOT_SHA256, True),
-        (RESOLVER_NAME, RESOLVER, RESOLVER_SHA256, False),
-    ):
-        named = [step for step in steps if step.get("name") == name and "run" in step]
-        if len(named) != 1:
-            found.append(f"review has {len(named)} steps named {name!r}, not one")
-            continue
-        found += own_step_problems(named[0], expected, sha256, repr(name))
+    named = [step for step in steps if step.get("name") == SNAPSHOT_NAME and "run" in step]
+    if len(named) != 1:
+        found.append(f"review has {len(named)} steps named {SNAPSHOT_NAME!r}, not one")
+    else:
+        found += own_step_problems(named[0], SNAPSHOT, SNAPSHOT_SHA256, repr(SNAPSHOT_NAME))
         at = steps.index(named[0])
-        if before and not (tokens and steps.index(tokens[0]) < at < steps.index(actions[0])):
-            found.append(f"{name!r} doesn't run between minting the token and the action")
-        if not before and at < steps.index(actions[0]):
-            found.append(f"{name!r} runs before the action")
+        if not (tokens and steps.index(tokens[0]) < at < steps.index(actions[0])):
+            found.append(f"{SNAPSHOT_NAME!r} doesn't run between minting the token and the action")
     if json_schema(inputs) != SCHEMA:
         found.append("Claude's structured output isn't the schema this test pins (SCHEMA)")
 
@@ -414,8 +463,17 @@ def snapshot(w: dict[str, Any]) -> dict[str, Any]:
     return step  # type: ignore[no-any-return]
 
 
+def resolve_job(w: dict[str, Any]) -> dict[str, Any]:
+    return w["jobs"]["resolve"]  # type: ignore[no-any-return]
+
+
 def resolver(w: dict[str, Any]) -> dict[str, Any]:
-    step = next(s for s in job(w)["steps"] if s.get("name") == RESOLVER_NAME)
+    step = next(s for s in resolve_job(w)["steps"] if s.get("name") == RESOLVER_NAME)
+    return step  # type: ignore[no-any-return]
+
+
+def resolve_token(w: dict[str, Any]) -> dict[str, Any]:
+    step = resolve_job(w)["steps"][0]
     return step  # type: ignore[no-any-return]
 
 
@@ -497,7 +555,7 @@ def sources(w: dict[str, Any], change: str) -> None:
         (lambda w: w.pop("concurrency"), "one run per pull request"),
         (lambda w: w["concurrency"].update({"cancel-in-progress": False}), "cancelling the last"),
         (lambda w: job(w).pop("timeout-minutes"), "no timeout-minutes"),
-        (lambda w: w["jobs"].update({"other": {}}), "not review only"),
+        (lambda w: w["jobs"].update({"other": {}}), "not review and resolve"),
         (
             lambda w: job(w)["steps"].append({"run": "git push"}),
             "runs a command of its own",
@@ -626,10 +684,40 @@ def sources(w: dict[str, Any], change: str) -> None:
             "no --max-turns",
         ),
         (lambda w: job(w)["steps"].remove(snapshot(w)), '0 steps named "Read the pull'),
-        (lambda w: job(w)["steps"].remove(resolver(w)), "0 steps named 'Resolve"),
+        (lambda w: resolve_job(w)["steps"].remove(resolver(w)), "resolve's steps are"),
+        (lambda w: w["jobs"].pop("resolve"), "not review and resolve"),
+        (lambda w: resolve_job(w).pop("needs"), "resolve needs None"),
+        (lambda w: resolve_job(w).update({"if": "always()"}), "resolve runs when 'always()'"),
+        (
+            lambda w: resolve_job(w)["permissions"].update({"contents": "write"}),
+            "resolve's GITHUB_TOKEN permissions",
+        ),
+        (
+            lambda w: resolve_job(w)["steps"].insert(0, copy.deepcopy(job(w)["steps"][0])),
+            "resolve's steps are",
+        ),
+        (
+            lambda w: resolve_job(w)["steps"].append(copy.deepcopy(action_step(w))),
+            "resolve's steps are",
+        ),
+        (
+            lambda w: resolve_token(w)["with"].update({"permission-administration": "write"}),
+            "resolve's token is minted with",
+        ),
+        (
+            lambda w: resolve_token(w)["with"].update({"permission-contents": "read"}),
+            "resolve's token is minted with",
+        ),
+        (lambda w: job(w).pop("outputs"), "review's outputs are None"),
+        (lambda w: job(w)["steps"].append(copy.deepcopy(resolver(w))), "runs a command of its own"),
         (lambda w: move(w, snapshot(w), len(job(w)["steps"])), "doesn't run between minting"),
         (lambda w: move(w, snapshot(w), 0), "doesn't run between minting"),
-        (lambda w: move(w, resolver(w), 0), "'Resolve and re-tier what Claude named' runs before"),
+        (
+            lambda w: resolve_job(w)["steps"].insert(
+                1, resolve_job(w)["steps"].pop(resolve_job(w)["steps"].index(resolver(w)))
+            ),
+            "resolve's steps are",
+        ),
         (
             lambda w: resolver(w)["env"].update({"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"}),
             "'Resolve and re-tier what Claude named' is given",

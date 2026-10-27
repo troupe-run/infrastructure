@@ -4,12 +4,14 @@ name: claude review
 # Claude reviews each member's pull request when it's opened and on each update, drafts included,
 # and posts each finding as a conversation, labelled must-fix, nit or decision for who resolves it
 # (spec: pr-review, #154, #194). It isn't a required check, and it can't approve, request changes
-# or push; what blocks a merge is an unresolved conversation, through the ruleset. A step after
-# Claude resolves the review's own must-fixes that Claude found addressed, and posts the re-tiers it
-# names (review-findings-by-severity design D3, D4). Its comments come from troupe-run-review[bot]:
-# the run writes only with a token for our review App, minted read-only on contents, never with a
-# Claude App token, which would be minted with contents: write (claude-pr-review design D1). Bots'
-# and forks' pull requests are skipped (D2); a fork's run gets no secrets anyway.
+# or push; what blocks a merge is an unresolved conversation, through the ruleset. A job after the
+# review resolves the review's own must-fixes that Claude found addressed, and posts the re-tiers it
+# names; resolving needs contents write, so its token can write contents and the review job's can't,
+# and Claude never runs there (review-findings-by-severity design D3, D4, D4a). Its comments come
+# from troupe-run-review[bot]: Claude's job writes only with a token for our review App, minted
+# read-only on contents, never with a Claude App token, which would be minted with contents: write
+# (claude-pr-review design D1). Bots' and forks' pull requests are skipped (D2); a fork's run gets
+# no secrets anyway.
 #
 # Delivered to troupe and website with the guard's files (tofu/guard_delivery.tf). Each copy also
 # runs under its repository's own checks, so whenever this file changes, run website's
@@ -34,6 +36,9 @@ jobs:
     if: github.event.pull_request.user.type != 'Bot' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # What Claude names to resolve or re-tier, for the resolve job (design D4a).
+    outputs:
+      structured_output: ${{ steps.review.outputs.structured_output }}
     # The run's own token only checks out the code. No id-token: without it the action can't
     # exchange OIDC for a Claude App token (design D1).
     permissions:
@@ -246,19 +251,174 @@ jobs:
             the owner), re-tiered, or resolved by its author. If you find nothing, say so plainly in
             that comment. Don't approve or request changes. Finish with the structured output:
             `resolve` and `retier`, each empty when there's nothing to name.
+      # The step of our own after the action: it names each tool call Claude was refused, read from the action's
+      # execution file, so a denial can be traced. Nothing else of the session is shown: the action
+      # hides it, and show_full_output stays off, since it shows whatever the review saw
+      # (review-denials-and-guide design D1 to D3, #161). Its script is pinned by hash in
+      # scripts/tests/test_claude_review_workflow.py, and it can't fail the job.
+      - name: Name the tool calls Claude was refused
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: python3 {0}
+        env:
+          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
+        run: |
+          import json
+          import os
+          import sys
+
+          # The action's execution file: every message of the session, which stays hidden. Only the
+          # result messages' permission_denials are read, and only their tool and input are printed.
+          LIMIT = 300
+
+
+          def escape(text):
+              # As the runner's toolkit escapes a command's message, so no input can start a line.
+              return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+          def warn(message, title="Claude's denials are unknown"):
+              print(f"::warning title={title}::{escape(message)}")
+
+
+          path = os.environ.get("EXECUTION_FILE", "")
+          if not path or not os.path.isfile(path):
+              warn("The action left no execution file, so which tool calls were refused isn't known.")
+              sys.exit(0)
+          try:
+              with open(path, encoding="utf-8") as file:
+                  messages = json.load(file)
+          except (OSError, ValueError) as error:
+              warn(f"The execution file isn't readable JSON ({error}).")
+              sys.exit(1)
+          if isinstance(messages, list):
+              results = [m for m in messages if isinstance(m, dict) and m.get("type") == "result"]
+          if not isinstance(messages, list) or not results:
+              warn("The execution file isn't a list of messages with a result message.")
+              sys.exit(1)
+          lists = [m.get("permission_denials", []) for m in results]
+          denials = [d for each in lists if isinstance(each, list) for d in each]
+          if not all(isinstance(each, list) for each in lists) or not all(
+              isinstance(d, dict) and isinstance(d.get("tool_name"), str) for d in denials
+          ):
+              warn("The execution file's permission_denials aren't each a tool call.")
+              sys.exit(1)
+          for denial in denials:
+              text = f"{denial['tool_name']} {json.dumps(denial.get('tool_input'), sort_keys=True)}"
+              if len(text) > LIMIT:
+                  text = text[:LIMIT] + "..."
+              warn(text, title="Claude was refused a tool call")
+          if not denials:
+              print("No tool call was refused.")
+
+  # Resolving a conversation needs contents write (review-findings-by-severity Probe results), so
+  # it runs here, in a job of its own after the review, never beside Claude: nothing is checked
+  # out and no action runs but the token minter. The review App's token here can write contents;
+  # the review job's can't (design D4a). It reads the conversations again, with the same step as
+  # the review job, and acts only on what passes the checks against them.
+  resolve:
+    name: resolve review conversations
+    needs: review
+    if: needs.review.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          # Not a secret: it names the App, and minting a token also needs the key (design D3). The
+          # App ID is 5476894, recorded on #154.
+          client-id: Iv23liIWLSHXQlYupT89
+          private-key: ${{ secrets.REVIEW_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Read the pull request's review conversations
+        shell: python3 {0}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+
+          QUERY = """
+          query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+            repository(owner: $owner, name: $name) {
+              pullRequest(number: $number) {
+                reviewThreads(first: 50, after: $cursor) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes {
+                    id isResolved isOutdated path line
+                    opened: comments(first: 1) {
+                      nodes { databaseId author { __typename login } }
+                    }
+                    comments(last: 100) {
+                      nodes { databaseId author { __typename login } body }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          """
+
+
+          def fail(reason):
+              print(f"::error title=Review conversations unread::{reason}, so the review can't "
+                    "see its earlier findings.")
+              sys.exit(1)
+
+
+          gh = shutil.which("gh")
+          if gh is None:
+              fail("gh wasn't found")
+          owner, _, name = os.environ["REPOSITORY"].partition("/")
+          threads = []
+          cursor = None
+          while True:
+              args = [gh, "api", "graphql", "-f", f"query={QUERY}", "-f", f"owner={owner}",
+                      "-f", f"name={name}", "-F", f"number={os.environ['NUMBER']}"]
+              if cursor:
+                  args += ["-f", f"cursor={cursor}"]
+              done = subprocess.run(args, capture_output=True, text=True, check=False)
+              if done.returncode != 0:
+                  fail(f"gh exited with {done.returncode}")
+              try:
+                  page = json.loads(done.stdout)["data"]["repository"]["pullRequest"]
+                  page = page["reviewThreads"]
+                  threads += page["nodes"]
+                  more = page["pageInfo"]["hasNextPage"]
+                  cursor = page["pageInfo"]["endCursor"]
+              except (ValueError, KeyError, TypeError):
+                  fail("GitHub's answer isn't a page of review conversations")
+              if not more:
+                  break
+          text = json.dumps(threads, indent=1)
+          for path in (".review-threads.json",
+                       os.path.join(os.environ["RUNNER_TEMP"], "review-threads.json")):
+              with open(path, "w", encoding="utf-8") as file:
+                  file.write(text)
+          print(f"{len(threads)} review conversation(s) read.")
       # Claude names what it found addressed, and what to re-tier, as structured output; this step
-      # does only that, checked against the conversations read before Claude started, never
-      # against anything Claude says about them (review-findings-by-severity design D4). It
-      # resolves the review's own must-fixes, and posts a re-tier as a reply from the review App,
-      # whose label line it writes itself. It runs only when the review succeeded, and reads the
-      # output from its env, never from an expression in the script.
+      # does only that, checked against the conversations just read, never against anything Claude
+      # says about them (review-findings-by-severity design D4). It resolves the review's own
+      # must-fixes, and posts a re-tier as a reply from the review App, whose label line it writes
+      # itself. It reads the output from its env, never from an expression in the script.
       - name: Resolve and re-tier what Claude named
         shell: python3 {0}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
-          STRUCTURED_OUTPUT: ${{ steps.review.outputs.structured_output }}
+          STRUCTURED_OUTPUT: ${{ needs.review.outputs.structured_output }}
         run: |
           import json
           import os
@@ -369,62 +529,3 @@ jobs:
                   print(f"{ident}: resolved.")
               else:
                   warn(f"{ident} couldn't be resolved.")
-      # The step of our own after the action: it names each tool call Claude was refused, read from the action's
-      # execution file, so a denial can be traced. Nothing else of the session is shown: the action
-      # hides it, and show_full_output stays off, since it shows whatever the review saw
-      # (review-denials-and-guide design D1 to D3, #161). Its script is pinned by hash in
-      # scripts/tests/test_claude_review_workflow.py, and it can't fail the job.
-      - name: Name the tool calls Claude was refused
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        shell: python3 {0}
-        env:
-          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
-        run: |
-          import json
-          import os
-          import sys
-
-          # The action's execution file: every message of the session, which stays hidden. Only the
-          # result messages' permission_denials are read, and only their tool and input are printed.
-          LIMIT = 300
-
-
-          def escape(text):
-              # As the runner's toolkit escapes a command's message, so no input can start a line.
-              return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-
-
-          def warn(message, title="Claude's denials are unknown"):
-              print(f"::warning title={title}::{escape(message)}")
-
-
-          path = os.environ.get("EXECUTION_FILE", "")
-          if not path or not os.path.isfile(path):
-              warn("The action left no execution file, so which tool calls were refused isn't known.")
-              sys.exit(0)
-          try:
-              with open(path, encoding="utf-8") as file:
-                  messages = json.load(file)
-          except (OSError, ValueError) as error:
-              warn(f"The execution file isn't readable JSON ({error}).")
-              sys.exit(1)
-          if isinstance(messages, list):
-              results = [m for m in messages if isinstance(m, dict) and m.get("type") == "result"]
-          if not isinstance(messages, list) or not results:
-              warn("The execution file isn't a list of messages with a result message.")
-              sys.exit(1)
-          lists = [m.get("permission_denials", []) for m in results]
-          denials = [d for each in lists if isinstance(each, list) for d in each]
-          if not all(isinstance(each, list) for each in lists) or not all(
-              isinstance(d, dict) and isinstance(d.get("tool_name"), str) for d in denials
-          ):
-              warn("The execution file's permission_denials aren't each a tool call.")
-              sys.exit(1)
-          for denial in denials:
-              text = f"{denial['tool_name']} {json.dumps(denial.get('tool_input'), sort_keys=True)}"
-              if len(text) > LIMIT:
-                  text = text[:LIMIT] + "..."
-              warn(text, title="Claude was refused a tool call")
-          if not denials:
-              print("No tool call was refused.")
