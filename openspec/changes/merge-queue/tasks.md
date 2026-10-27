@@ -33,25 +33,25 @@
 - [x] 2.3 Add `merge_group: types: [checks_requested]` to `.github/workflows/guard.yml`, narrow its `push` to
   `["**", "!gh-readonly-queue/**"]`, and update its header comment; verify with a test that reads the workflow's
   triggers, and with `uv run scripts/check.py`
-- [ ] 2.4 Run the branch's `guard.py ci` over a fresh scratch clone of troupe with `GITHUB_REPOSITORY=troupe-run/troupe`
+- [x] 2.4 Run the branch's `guard.py ci` over a fresh scratch clone of troupe with `GITHUB_REPOSITORY=troupe-run/troupe`
   and a synthetic `merge_group` payload whose range is troupe's last few commits on main (memory: probe the guard on a
   troupe clone); verify it passes, and fails when one commit's message is made non-conventional
-- [ ] 2.5 Document the merge group's handling and the queue branch's exclusion in `docs/development-workflow.md`;
+- [x] 2.5 Document the merge group's handling and the queue branch's exclusion in `docs/development-workflow.md`;
   verify the doc names both new requirements and that `uv run scripts/check.py` passes
 
 ## 3. CI and the plan on the queue (design D4, D5)
 
-- [ ] 3.1 Add `merge_group:` to `.github/workflows/ci.yml`, keeping `changes` pull-request-only so a merge group runs
+- [x] 3.1 Add `merge_group:` to `.github/workflows/ci.yml`, keeping `changes` pull-request-only so a merge group runs
   in full, and update its header comment; verify with a test in `scripts/tests/` that a `merge_group` run's `check`
   and guard legs have no condition that skips them
-- [ ] 3.2 Add `merge_group:` to `.github/workflows/tofu.yml` with a concurrency group of `tofu-mq-<head_sha>` for it,
+- [x] 3.2 Add `merge_group:` to `.github/workflows/tofu.yml` with a concurrency group of `tofu-mq-<head_sha>` for it,
   leaving every job but `pr-plan` unreachable on that event and `pr-plan` skipped by its `if:`; verify with a test
   that only `pr-plan` can report on `merge_group`, that it can't run there, and that the concurrency group never
   resolves to `tofu-main` for it
-- [ ] 3.3 Extend `scripts/tests/test_required_checks.py`: when infrastructure's queue switch is on, every workflow
+- [x] 3.3 Extend `scripts/tests/test_required_checks.py`: when infrastructure's queue switch is on, every workflow
   defining one of its required GitHub Actions checks runs on `merge_group`; verify it fails with the trigger removed
   from `ci.yml`, naming the check and the workflow
-- [ ] 3.4 Update the header comments that describe each run (ci.yml's run list, tofu.yml's table) to include the merge
+- [x] 3.4 Update the header comments that describe each run (ci.yml's run list, tofu.yml's table) to include the merge
   queue; verify by reading them against D4 and D5, and with `uv run scripts/check.py`
 
 ## 4. The ruleset's switch (design D2)
@@ -60,12 +60,12 @@
   `merge_queue` block to the `protect main` ruleset with D2's values, and a precondition refusing it unless
   `main_ruleset` is `pull-request`; verify `tofu fmt -check` and `tofu validate`, and a local plan (fast-forwarded onto
   origin/main first) showing no change while every repository's switch is off
-- [ ] 4.2 Update the ruleset's comment and `strict_required_status_checks_policy`'s comment to say the queue, not
+- [x] 4.2 Update the ruleset's comment and `strict_required_status_checks_policy`'s comment to say the queue, not
   strict, guards combinations; verify by reading against D2
 
 ## 5. Docs for the new merge step
 
-- [ ] 5.1 Change the merge step in CLAUDE.md, `org-profile/CONTRIBUTING.md` and `docs/standard-changes.md` to
+- [x] 5.1 Change the merge step in CLAUDE.md, `org-profile/CONTRIBUTING.md` and `docs/standard-changes.md` to
   "add to the merge queue", where a repository's queue is on; verify with `grep` that no doc still says the owner
   merges by rebase without the queue, and that `uv run scripts/check.py` passes
 

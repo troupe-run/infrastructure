@@ -6,6 +6,8 @@ name: CI
 # - a pull request, once, merged onto main. A branch's own push doesn't run it again: nothing
 #   reaches main without a pull request.
 # - main after every merge. tofu.yml's plan of main follows this run.
+# - each commit a merge queue tests: main with the pull requests ahead of it and this one's
+#   commits, in full, as main is (merge-queue design D4). `changes` doesn't run, so nothing skips.
 # - not the App's state commit after an apply: it changes only the state file, and tofu.yml's
 #   plan skips it too.
 #
@@ -26,6 +28,7 @@ on:
   push:
     branches: [main]
     paths-ignore: [tofu/terraform.tfstate]
+  merge_group:
 
 permissions:
   contents: read
@@ -64,7 +67,8 @@ jobs:
   check:
     name: check
     # A required check. Skipped, which counts as passed, only when `changes` succeeded and found
-    # only skipped paths. With no answer (a push to main, or a failed `changes`) it runs in full.
+    # only skipped paths. With no answer (a push to main, a merge group, or a failed `changes`) it
+    # runs in full.
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.scope != 'none' }}
     runs-on: ubuntu-latest
