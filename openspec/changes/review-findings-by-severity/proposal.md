@@ -30,6 +30,11 @@ themselves: they want to be involved only when a finding is unclear or is a real
 - **The review resolves its own conversations** through a fixed workflow step, not a new tool: a step before Claude
   writes the pull request's review conversations to a file Claude reads, and a step after it resolves exactly the ones
   Claude names, and only the review App's own must-fixes, with the App's token. Claude's tool list doesn't grow.
+- **The review App gains contents write, used only in a job of its own** (owner, 2026-10-28). The probe showed GitHub
+  needs contents write to resolve a conversation. The review job keeps its contents-read token; a `resolve` job after
+  it, where Claude doesn't run and nothing is checked out, mints the write token and resolves.
+- **Merging becomes the owner's.** On a blocked pull request `gh pr merge` turns on auto-merge, which would land it
+  later with no look from the owner, so the guard refuses it from agents, as it already refuses `--admin`.
 - **The guard lets an agent resolve a nit, and nothing else.** `resolveReviewThread` becomes the one allowed GraphQL
   mutation (gh has no command for it), granted only when the conversation was opened by `troupe-run-review[bot]` and
   its tier, the review's latest label in it, is nit. Any other conversation stays the owner's or the review's. An agent
@@ -56,6 +61,8 @@ None.
   the review's latest label in it; the review reads its earlier conversations on each run and resolves its own
   must-fixes once addressed; it is no longer purely advisory, because its open conversations block a merge.
 - `rulesets`: a pull request into `main` merges only once every review conversation is resolved.
+- `development-workflow` (modified): merging a pull request is owner-only for agents, auto-merge and the queue included.
+- `pr-review` (modified): the review App holds contents write, used only by the resolving job.
 - `development-workflow`: the guard allows an agent to resolve a nit, and no other conversation; findings are acted
   on before a change is archived.
 
