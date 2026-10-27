@@ -40,7 +40,8 @@ The gate is a Python script, standard library plus `gh`, run with the runner's `
 takes `--main origin/main`, `--summary "$GITHUB_STEP_SUMMARY"` and the repository, and exits 0 only when CI passed.
 `gh` and the clock are passed in, so the tests drive every outcome without GitHub or real waiting.
 
-The step runs right after `The commit to plan`, gated on
+The step runs after `The commit to plan` and `Check out that commit` (which the plan-target test pins straight
+after it), gated on
 `github.event_name != 'workflow_run' && steps.target.outputs.plan == 'true'`, and before the guard wait. Every later
 step already depends on the job not having failed, so a failed gate stops the plan.
 
