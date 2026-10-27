@@ -2042,7 +2042,7 @@ GH_READS = frozenset(
 GH_WORKFLOW_WRITES = frozenset(
     {
         ("pr", "create"), ("pr", "edit"), ("pr", "ready"), ("pr", "close"), ("pr", "reopen"),
-        ("pr", "comment"), ("pr", "checkout"), ("pr", "merge"),
+        ("pr", "comment"), ("pr", "checkout"),
         ("issue", "create"), ("issue", "comment"), ("issue", "edit"), ("issue", "close"),
         ("issue", "reopen"),
         ("project", "item-add"), ("project", "item-edit"), ("project", "item-archive"),
@@ -2051,14 +2051,18 @@ GH_WORKFLOW_WRITES = frozenset(
 )  # fmt: skip
 # What the hook grants, so it runs without a prompt or auto mode's check (guard-grants-gh
 # design D1). A grant skips auto mode's classifier entirely, so this is narrower than the
-# allow-list: merging, checking out, starting or stopping runs, and reads that write local files
-# anywhere keep Claude Code's own check, and so does gh api.
+# allow-list: checking out, starting or stopping runs, and reads that write local files anywhere
+# keep Claude Code's own check, and so does gh api. Merging isn't an agent's at all (GH_OWNER_ONLY).
 GH_NOT_GRANTED = frozenset(
-    {("pr", "merge"), ("pr", "checkout"), ("workflow", "run"), ("run", "rerun"), ("run", "cancel"),
+    {("pr", "checkout"), ("workflow", "run"), ("run", "rerun"), ("run", "cancel"),
      ("run", "download"), ("repo", "clone")}
 )  # fmt: skip
 GH_GRANTED = (GH_READS | GH_WORKFLOW_WRITES) - GH_NOT_GRANTED
 GH_OWNER_ONLY = {
+    # Any merge, not only --admin: on a pull request blocked by an open review conversation,
+    # gh pr merge turns on auto-merge, which lands it later with no look from the owner
+    # (review-findings-by-severity design D5a). A throwaway repository's stays exempt.
+    ("pr", "merge"): "merge",
     ("secret", "set"): "admin", ("secret", "delete"): "admin",
     ("variable", "set"): "admin", ("variable", "delete"): "admin",
     ("repo", "create"): "admin", ("repo", "edit"): "admin", ("repo", "rename"): "admin",
@@ -2155,7 +2159,8 @@ GH_MUTATION_EQUIVALENTS: dict[str, tuple[str, ...]] = {
     "createPullRequest": ("gh pr create --title <title> --body-file <file>",),
 }  # fmt: skip
 GH_MUTATIONS_OWNER_ONLY = {
-    "mergePullRequest": "merge",
+    "mergePullRequest": "merge", "enablePullRequestAutoMerge": "merge",
+    "enqueuePullRequest": "merge",
     "approveDeployments": "deployment", "rejectDeployments": "deployment",
     "createRepositoryRuleset": "gates", "updateRepositoryRuleset": "gates",
     "deleteRepositoryRuleset": "gates",
@@ -2222,8 +2227,11 @@ GH_REPO_VALUE_FLAGS = GH_PR_CREATE_VALUE_FLAGS | GH_API_VALUE_FLAGS
 
 OWNER_ONLY_MESSAGES = {
     "merge": (
-        "only the owner merges past a pull request's rules.",
-        "Ask the owner to merge it, or fix what blocks it.",
+        "only the owner merges a pull request, queues it, turns on its auto-merge, or merges past "
+        "its rules.",
+        "Ask the owner to merge it once every review conversation is resolved, or fix what blocks "
+        "it. On a blocked pull request gh pr merge turns on auto-merge, which would land it later "
+        "without the owner looking again.",
     ),
     "deployment": (
         "only the owner approves or rejects a deployment.",
