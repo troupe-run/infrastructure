@@ -113,7 +113,8 @@ query from a mutation. `gh pr view --comments` doesn't return conversations' IDs
 ### D4. The review names what it considers addressed, and a fixed step resolves it
 
 Claude returns the IDs of the conversations it considers addressed as the action's structured output: `claude_args`
-gets `--json-schema` with `{"resolve": [string]}`, which the action exposes as `steps.review.outputs.structured_output`.
+gets `--json-schema` with `{"resolve": [string], "retier": [...]}`, which the action exposes as
+`steps.review.outputs.structured_output`.
 A step after Claude, run with the App's token, resolves each ID only if it passes every check against the snapshot
 from D3 (not against anything Claude says):
 
@@ -131,6 +132,20 @@ it judge. It can't reach a person's conversation, a nit (the author's), or a dec
 The step's script is pinned by hash in `scripts/tests/test_claude_review_workflow.py`, like the denial report's. The
 same test fails if the step runs with any other token, resolves without the snapshot checks, or if Claude's tool list
 gains `gh api`.
+
+**Re-tiering goes through the same step.** The pinned action's inline-comment tool only posts a new comment on a line
+(`src/mcp/github-inline-comment-server.ts` calls `pulls.createReviewComment` with a path and line, and takes no
+`in_reply_to`), so Claude can't reply in a conversation. Rather than give it a tool that can, the structured output also
+carries `retier`: each entry names a conversation, its new tier, a one-line title and the reason. The step posts the
+reply as the review App, `POST …/pulls/<n>/comments` with `in_reply_to` set to the conversation's first comment, and
+writes the label line itself, so its form is always the one D1 parses. It applies the same checks against the snapshot
+(on the pull request, unresolved, opened by the review), and skips a re-tier to the tier it already has, one with no
+title or reason, and one for a conversation also named in `resolve`, which is only resolved. So the review re-tiers by
+replying, as the spec says, through a step whose every write is fixed.
+
+The snapshot is written twice: to `.review-threads.json` in the workspace, for Claude's Read, and to `RUNNER_TEMP`,
+which the resolving step reads. Claude has no tool that writes files, and the copy outside the workspace is out of its
+reach anyway.
 
 *Fallback, if the probe (task 1) shows the pinned action doesn't support `--json-schema`:* Claude ends its summary
 comment with one line, `Resolve: <id> <id>`. The step reads it from the review App's latest summary comment. The
