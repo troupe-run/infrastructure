@@ -120,13 +120,18 @@
   `test_guard_dependabot.py` 48 passed, and with `test_guard_push_and_ci.py`, `test_guard_pr_description.py` and
   `test_dependabot_config.py`, 159 passed. ruff and `mypy --strict` are clean. The full `scripts/check.py` runs in the
   commit hook
-- [ ] 4.5 Update `docs/development-workflow.md`: the `commit-branch-change` row describes the Dependabot exemption
+- [x] 4.5 Update `docs/development-workflow.md`: the `commit-branch-change` row describes the Dependabot exemption
   (reserved name, `DEPENDABOT_REPOSITORIES`, dependency files, minor or patch, authors not read); the `pr-closes-issue`
   row still says Dependabot isn't exempt from it; the "Dependabot pull requests" section is rewritten for both paths:
   minor and patch merge as they are, majors and anything else take an OpenSpec change as D5 described, use
   `@dependabot rebase` rather than "Update branch", and the D5 test sentence goes. Update `.github/workflows/guard.yml`'s
   header comment only if it lists exemptions. Verify `uv run pytest scripts/tests/test_guard_docs.py` and
-  `uv run scripts/check.py` pass
+  `uv run scripts/check.py` pass. Result: the `commit-branch-change` row adds the
+  Dependabot exemption and its fix; the `pr-closes-issue` row already said a Dependabot pull request isn't exempt from
+  it, and stays. The section now opens on the two paths, with the manual one kept for majors and the rest, and a
+  paragraph on `@dependabot rebase` and on open pull requests picking the rule up only once rebased. The old D5 test
+  sentence and website's DCO aside went. `guard.yml`'s header lists no branch exemption, so it's unchanged.
+  `test_guard_docs.py`: 3 passed; `scripts/check.py` runs in the commit hook
 
 ## 5. Integration checks
 
