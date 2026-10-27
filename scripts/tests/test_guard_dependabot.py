@@ -570,3 +570,18 @@ def test_a_branch_outside_dependabot_s_name_is_refused_as_ever(
     [refusal] = ci(repo, base, "bump-zod")
     assert refusal.rule == "commit-branch-change"
     assert "Dependabot" not in refusal.problem
+
+
+@pytest.mark.parametrize(
+    "branch", ["dependabot/zod-4.6.7", "dependabot/npm_and_yarn/", "dependabot/"]
+)
+def test_a_name_not_shaped_like_dependabot_s_isn_t_trusted(
+    make_repo: Callable[[], Repo], tmp_path: Path, branch: str
+) -> None:
+    # The probe showed the ruleset reserves dependabot/<ecosystem>/<name>, not other shapes.
+    repo, base = dependabot_repo(make_repo, tmp_path)
+    repo.switch("qualifying")
+    bump(repo, ZOD, "package-lock.json")
+    [refusal] = ci(repo, base, branch)
+    assert refusal.rule == "commit-branch-change"
+    assert "Dependabot" not in refusal.problem

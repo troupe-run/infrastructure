@@ -111,6 +111,10 @@ GitHub for everyone, owner included. Reading the author on top would be a check 
 which the owner ruled out on GitHub (#47; `docs/development-workflow.md`, Known gaps). Without the ruleset, the name
 exempts nothing.
 
+The name must have Dependabot's shape, `dependabot/<ecosystem>/<name>` (`DEPENDABOT_BRANCH`), not merely start with
+`dependabot/`. The probe showed the ruleset reserves that shape; a one-level name such as `dependabot/x` wasn't tried,
+so the guard doesn't trust it (raised in review on #193).
+
 The pull request's title isn't read either: a person with write access can edit it. The update's kind comes from the
 commit messages, which only Dependabot can write on a reserved branch, and a push has them too.
 

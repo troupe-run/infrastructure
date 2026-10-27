@@ -137,6 +137,13 @@
   paragraph on `@dependabot rebase` and on open pull requests picking the rule up only once rebased. The old D5 test
   sentence and website's DCO aside went. `guard.yml`'s header lists no branch exemption, so it's unchanged.
   `test_guard_docs.py`: 3 passed; `scripts/check.py` runs in the commit hook
+- [x] 4.6 From the review on #193: trust only Dependabot's shape, `dependabot/<ecosystem>/<name>`, which the probe
+  showed the ruleset reserves, not any name under `dependabot/`. Verify with a test that `dependabot/zod-4.6.7`,
+  `dependabot/npm_and_yarn/` and `dependabot/` are refused with today's refusal in website, and that it fails under
+  the old prefix test. Result: `DEPENDABOT_BRANCH` (`dependabot/[^/]+/.+`, fullmatch) in `reserved_dependabot_branch`;
+  `test_a_name_not_shaped_like_dependabot_s_isn_t_trusted`. With `startswith(DEPENDABOT_BRANCH_PREFIX)` restored: 3
+  failed; with the fix: `test_guard_dependabot.py` 51 passed. The spec gained the scenario, design D3 and the
+  `commit-branch-change` row say so
 
 ## 5. Integration checks
 
