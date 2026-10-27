@@ -17,7 +17,7 @@
   each saying where its CI runs on merge groups (website#70, troupe#183), and update infrastructure's comment so it no
   longer says the others follow; verify `tofu fmt -check` and `tofu validate`, and that
   `scripts/tests/test_required_checks.py` still passes (`merge_queue_modules()` now reads all three)
-- [x] 2.3 Update the merge-queue bullet in `README.md` so it says the queue is on in infrastructure, website and troupe
+- [x] 2.2 Update the merge-queue bullet in `README.md` so it says the queue is on in infrastructure, website and troupe
   (not "infrastructure first, then website and troupe"); verify with `grep -rn -i "then website and troupe\|website
   and troupe follow" README.md tofu/ docs/ CLAUDE.md` returning nothing, and `uv run scripts/check.py` passing
 
@@ -30,7 +30,7 @@
 
 ## 4. Pull request
 
-- [ ] 4.1 Open the pull request (`Closes #197`) with the readiness evidence of 1.1 and 1.2; verify every required check
+- [x] 4.1 Open the pull request (`Closes #197`) with the readiness evidence of 1.1 and 1.2; verify every required check
   passes but `plan (pull request)`, which the owner approves once, after the archive (memory: archive before plan
   approval)
 
