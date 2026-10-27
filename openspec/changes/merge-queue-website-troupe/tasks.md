@@ -27,7 +27,7 @@
 
 ## 3. The product repositories' docs
 
-- [ ] 3.1 Open an issue in troupe-run/website and one in troupe-run/troupe, each with `--project "troupe roadmap"`,
+- [x] 3.1 Open an issue in troupe-run/website and one in troupe-run/troupe, each with `--project "troupe roadmap"`,
   asking for their CLAUDE.md merge step to say pull requests land through the merge queue (`gh pr merge <n>` queues;
   `--admin` skips it and is for emergencies), linking #197; verify each is on the board (`gh issue view <n> -R
   troupe-run/<repo> --json projectItems`) and linked from #197 in a comment
