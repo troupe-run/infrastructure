@@ -56,13 +56,13 @@
 
 ## 4. The ruleset's switch (design D2)
 
-- [ ] 4.1 Add `merge_queue` (bool, default `false`) to `tofu/modules/repository/variables.tf`, the dynamic
+- [x] 4.1 Add `merge_queue` (bool, default `false`) to `tofu/modules/repository/variables.tf`, the dynamic
   `merge_queue` block to the `protect main` ruleset with D2's values, and a precondition refusing it unless
   `main_ruleset` is `pull-request`; verify `tofu fmt -check` and `tofu validate`, and a local plan (fast-forwarded onto
   origin/main first) showing no change while every repository's switch is off
 - [x] 4.2 Update the ruleset's comment and `strict_required_status_checks_policy`'s comment to say the queue, not
   strict, guards combinations; verify by reading against D2
-- [ ] 4.3 Set `allow_auto_merge` from the same switch, and say in the README that `--admin` skips the queue and is for
+- [x] 4.3 Set `allow_auto_merge` from the same switch, and say in the README that `--admin` skips the queue and is for
   emergencies; verify `tofu validate`, and that the local plan of 4.1 shows `allow_auto_merge` unchanged while
   every switch is off
 
@@ -74,14 +74,14 @@
 
 ## 6. troupe and website (design D6)
 
-- [ ] 6.1 Open an issue in troupe-run/troupe and one in troupe-run/website, each with `--project "troupe roadmap"`,
+- [x] 6.1 Open an issue in troupe-run/troupe and one in troupe-run/website, each with `--project "troupe roadmap"`,
   asking for `merge_group:` on the workflow behind `check` (troupe) and `test` (website), run in full on that event;
   and one in troupe-run/infrastructure to turn on their queues once those merge; verify each is on the board
   (`gh issue view <n> --json projectItems`) and all three are linked from #169
 
 ## 7. Turn on infrastructure's queue (design D7)
 
-- [ ] 7.1 Set `merge_queue = true` for infrastructure only in `tofu/repositories.tf`; verify a local plan, fast-forwarded
+- [x] 7.1 Set `merge_queue = true` for infrastructure only in `tofu/repositories.tf`; verify a local plan, fast-forwarded
   onto origin/main first, shows only the `merge_queue` block added to infrastructure's `protect main` ruleset and
   `allow_auto_merge` turned on for it, besides
   the guard's delivered files to troupe and website
