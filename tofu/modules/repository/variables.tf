@@ -89,6 +89,14 @@ variable "merge_queue" {
   default     = false
 }
 
+# Every review conversation is resolved before a merge (spec: rulesets; review-findings-by-severity
+# design D2). Off until the review that resolves its own conversations is delivered (design D8).
+variable "review_thread_resolution" {
+  description = "A pull request into main merges, or joins the merge queue, only once every review conversation is resolved (pull-request only)."
+  type        = bool
+  default     = false
+}
+
 variable "owner_bypass" {
   description = "Org owners may bypass the ruleset on pull requests only (design D3). Off only on the probe."
   type        = bool

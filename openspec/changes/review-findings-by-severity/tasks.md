@@ -2,8 +2,9 @@
 
 ## 1. Probe (design D4, D8; Risks)
 
-- [ ] 1.1 Add `probe_review_threads` to `tofu/probe/main.tf`: the module's `protect main` ruleset with
-  `required_review_thread_resolution = true` and a merge queue, with run instructions in the file's header comment;
+- [x] 1.1 Add `probe_review_threads` to `tofu/probe/main.tf`, passed to a new module switch
+  `review_thread_resolution` (default `false` until 5.1), which sets the `protect main` ruleset's
+  `required_review_thread_resolution`, with a merge queue, with run instructions in the file's header comment;
   verify `tofu fmt -check` and `tofu validate` pass in `tofu/probe`
 - [ ] 1.2 Create public `troupe-run/infra-probe-review-threads`, ask the owner to add it to the infrastructure App's
   and the review App's installations, then apply the probe after the owner approves its plan; verify
@@ -75,8 +76,8 @@
 
 ## 5. The ruleset (design D2, D8)
 
-- [ ] 5.1 Set `required_review_thread_resolution = true` in the `pull_request` block of
-  `tofu/modules/repository/main.tf`, with a comment naming spec: rulesets and this change; add a test in
+- [ ] 5.1 Turn the module's `review_thread_resolution` switch (1.1) on by default in
+  `tofu/modules/repository/variables.tf`, so every `protect main` ruleset sets `required_review_thread_resolution`; add a test in
   `scripts/tests/` that fails when the setting is false or missing; verify `tofu fmt -check`, `tofu validate`, the
   test, and a local plan (fast-forwarded onto origin/main first) showing the one in-place change on each of the three
   `protect main` rulesets

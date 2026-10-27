@@ -61,6 +61,14 @@
 # echoing the ref. The owner adds the probe to the infrastructure App's and the DCO App's
 # installations. Queue signed-off pull requests, and read each merge group's check runs; change
 # README.probe.md and apply to push to main as the App.
+#
+# The review-threads probe (review-findings-by-severity task 1) sets probe_review_threads and
+# probe_merge_queue, with no required checks. The owner adds the probe to the infrastructure App's
+# and the review App's (troupe-run-review) installations. Open a pull request, post an inline
+# comment on it with a review App installation token (contents read, pull requests write), and try
+# `gh pr merge --rebase` and `gh pr merge` (the queue) while it's unresolved, then the owner's
+# bypass. Resolve it with that token through resolveReviewThread, and try minimizeComment and a
+# contents write with it, which must be refused.
 
 terraform {
   required_version = ">= 1.8"
@@ -144,6 +152,12 @@ variable "probe_required_checks" {
 
 variable "probe_merge_queue" {
   description = "Passed to the module's merge_queue (merge-queue design D1)."
+  type        = bool
+  default     = false
+}
+
+variable "probe_review_threads" {
+  description = "Passed to the module's review_thread_resolution (review-findings-by-severity task 1)."
   type        = bool
   default     = false
 }
@@ -234,6 +248,8 @@ module "probe" {
   main_ruleset    = var.probe_main_ruleset
   required_checks = var.probe_required_checks
   merge_queue     = var.probe_merge_queue
+
+  review_thread_resolution = var.probe_review_threads
 
   app_bypass_id = var.probe_delivery_bypass ? 5272634 : null
 }
