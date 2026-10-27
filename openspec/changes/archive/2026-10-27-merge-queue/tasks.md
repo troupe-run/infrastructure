@@ -85,12 +85,13 @@
   onto origin/main first, shows only the `merge_queue` block added to infrastructure's `protect main` ruleset and
   `allow_auto_merge` turned on for it, besides
   the guard's delivered files to troupe and website
-- [ ] 7.2 Open the pull request (`Closes #169`); verify its posted plan matches 7.1's and every required check passes
+- [x] 7.2 Open the pull request (`Closes #169`); verify every required check passes but `plan (pull request)`, which
+  the owner approves once, after the archive (owner's choice, 2026-10-27)
 
 ## Workflow follow-up
 
-- Archive the change on the branch, rebase onto main's state commit, and ask for the plan approval once (memory:
-  archive before plan approval). The owner merges by rebase, which is the last merge without the queue.
+- Archive the change on the branch, rebase onto main's state commit, and ask for the plan approval once. Check the
+  posted plan matches 7.1's before the owner merges by rebase, the last merge here without the queue.
 - After the owner approves the apply of `main`: check that infrastructure's ruleset on GitHub has the merge queue rule
   with `merge_method: REBASE`, that the delivered `guard.yml` and `guard.py` reached troupe's and website's `main`,
   and that their `guard` runs there passed.
