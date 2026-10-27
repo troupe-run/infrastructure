@@ -39,7 +39,7 @@
 
 ## 3. Docs (proposal, What Changes)
 
-- [ ] 3.1 In README.md's "Running a plan", say that a scheduled or manual plan of `main` waits for CI on `main`, that
+- [x] 3.1 In README.md's "Running a plan", say that a scheduled or manual plan of `main` waits for CI on `main`, that
   a red `main` fails those runs with a summary saying why, and the three ways to recover; and that the drift job
   still runs. Verify `uv run scripts/check.py` is clean (its docs checks included), and grep the README for any
   statement this contradicts ("whatever commit", "daily plan").

@@ -83,6 +83,16 @@ plan of `main`, the `drift (out of band)` job runs `scripts/oob.py --ci`, and fa
 can't manage ([oob/README.md](oob/README.md)). GitHub pauses a public repository's scheduled workflows after 60 days
 without activity in it. `gh workflow enable tofu.yml` turns the daily plan and that check back on.
 
+A daily or manual plan of `main` waits for CI on `main` first (`scripts/main_ci.py`): on the newest commit CI runs on,
+so the App's state commits are looked past. While CI is running it waits, up to 25 minutes. If CI failed, or didn't
+finish in time, the run fails before planning, and its summary names the commit and links the CI run. A red `main`
+fails every daily run until it's green, and no input lets a run skip the wait. The `drift (out of band)` job still
+runs, whatever CI's result. To recover:
+- **Broken code:** merge a fix pull request. Its own run plans and applies once CI passes.
+- **A flaky failure:** re-run the failed CI jobs (`gh run rerun <id> --failed`). When they pass, the merge's own run
+  starts.
+- **Something urgent:** a break-glass apply from your machine (below).
+
 A merge is applied by its own run, the one that starts when CI passes on it. Every plan of `main` reads `main`'s
 current state, not the state of the commit that started the run (`scripts/plan_target.py`). So when another run gets
 there first, such as a daily run while CI is still going, the merge's own run plans the state that apply left. It
