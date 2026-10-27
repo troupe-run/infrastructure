@@ -16,6 +16,11 @@ naming the entry and the field, and SHALL NOT be skipped.
 - **WHEN** the declaration is read
 - **THEN** it lists `troupe-run/website`'s `.github/workflows/links-weekly.yml` with an age limit of 8 days
 
+#### Scenario: The Dependabot issues backstop is watched
+- **WHEN** the declaration is read
+- **THEN** it lists `troupe-run/infrastructure`'s `.github/workflows/dependabot-issues.yml` with an age limit of 2
+  days
+
 #### Scenario: A malformed entry
 - **WHEN** an entry's age limit is not a positive whole number, or the entry has a field the declaration doesn't
   define
