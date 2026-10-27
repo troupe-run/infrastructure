@@ -92,7 +92,7 @@ Then, per open Dependabot pull request:
 Then, per open App issue whose linked pull request is closed: merged → close as completed, with a comment; closed
 unmerged over an hour ago, with no open pull request for its key → close as not planned, with a comment.
 
-Every write goes through `gh api`, with the request's fields passed as arguments or on stdin, never through a shell.
+Every write goes through `gh api`, with the request's fields as JSON on stdin (`--input -`), never through a shell: a description can be larger than one argument may be.
 A failure reading one repository stops the work in that repository only. The run exits 1 at the end, naming it.
 
 ### D3. The issue carries a marker, and the key is repository, ecosystem, directory and dependency
