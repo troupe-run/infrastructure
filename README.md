@@ -233,7 +233,7 @@ Every other managed repository has a ruleset named "protect main" on its default
   change a matrix in troupe or the website, change the list here too, or their pull requests wait for a check that
   never reports.
 - **Where a repository's merge queue is on, a pull request lands through it** (`merge_queue` in
-  `tofu/repositories.tf`; infrastructure first, then website and troupe once their CI runs on the queue). Merging adds
+  `tofu/repositories.tf`; on in infrastructure, website and troupe, each turned on once its CI ran on the queue). Merging adds
   it to the queue, which tests it on top of `main` and the pull requests ahead of it, then lands exactly the commit it
   tested, by rebase. Every required check must report on that commit, so each workflow behind one runs on
   `merge_group`; `plan (pull request)` reports there as skipped, without a second approval, since `main` is planned
