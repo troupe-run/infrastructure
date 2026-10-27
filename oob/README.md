@@ -69,6 +69,7 @@ lists below are checked by hand in each App's settings, by any change that adds,
 | `troupe-run-release` | `troupe` | 2026-10-13, owner |
 | `troupe-run-board` | none | 2026-10-18, by the App's own token (`GET /installation/repositories` returned `[]`) |
 | `troupe-run-docs` | `website` | 2026-10-19, by the App's own token (`GET /installation/repositories` returned `website` only) |
+| `troupe-run-dependabot` | `troupe`, `infrastructure`, `website`, and `infra-probe-dependabot-issues` until it's deleted (dependabot-issues 1.4) | 2026-10-27, by the App's own token (`GET /installation/repositories`) |
 | `troupe-run-review` | `troupe`, `infrastructure`, `website` | 2026-10-26, owner |
 
 A repository the infrastructure App isn't installed on shows only its public view to OpenTofu (merge settings read as
@@ -201,6 +202,52 @@ gh api repos/troupe-run/infrastructure/environments/docs/secrets --jq '.secrets[
 
 **Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run both
 commands above again. Then delete the old key in the App's settings. A run between the two steps still works, because
+both keys are valid until the old one is deleted.
+
+## The Dependabot issues App (set up by hand)
+
+`.github/workflows/dependabot-issues.yml` gives every Dependabot pull request in troupe, website and infrastructure its
+issue, and adds `Closes #<n>` to the pull request's description (spec: dependency-updates, dependabot-issue-credentials,
+#172). `GITHUB_TOKEN` can't write the other repositories, and its edits start no workflow, so the closing line wouldn't
+re-run `guard`. So the run writes with the `troupe-run-dependabot` App's token, which can write issues and pull
+requests' descriptions, and can't push or merge (probed 2026-10-27: both refused with 403). GitHub has no API for
+creating an App, and OpenTofu never holds a secret, so these steps are the owner's. The App's IDs are recorded on
+#172. `tofu/dependabot_issues.tf` declares a `dependabot-issues` environment and the client-ID variable on
+infrastructure. The board card is added with the board App's token, in the `board` environment.
+
+**Creating it** (done 2026-10-27). In the org's settings, under GitHub Apps, create a new App:
+- name `troupe-run-dependabot`, installable only on this account, webhook off. The script trusts only issues by
+  `troupe-run-dependabot[bot]`, so a different name means changing `APP` in `scripts/dependabot_issues.py` too;
+- repository permissions "Issues: read and write" and "Pull requests: read and write", and nothing else: no
+  organisation or account permissions. GitHub adds "Metadata: read". Setting an issue's type needs nothing more;
+- install it with "Only select repositories" and select `troupe`, `infrastructure` and `website`. The run's token
+  names no repositories, so it covers exactly these.
+
+Its installation is checked by `oob.py` against `app-installations.json`. Its client ID goes in
+`tofu/dependabot_issues.tf`.
+
+**Its key.** Generate a private key in the App's settings. Store it in 1Password as an SSH Key item named
+`troupe-run-dependabot` in vault `troupe.run`, by importing the downloaded `.pem`, then delete the file. Once the
+`dependabot-issues` environment exists on infrastructure (after the apply that creates it), set the secret. Nothing
+is printed:
+
+```sh
+export OP_ACCOUNT=l-a-u.1password.com
+# gh runs only once op has read the key, and only if it's PKCS#1 or PKCS#8 (create-github-app-token refuses OpenSSH).
+key=$(op read -n "op://troupe.run/troupe-run-dependabot/private key") &&
+  case "$key" in "-----BEGIN RSA PRIVATE KEY-----"*|"-----BEGIN PRIVATE KEY-----"*) ;; *) false ;; esac &&
+  printf '%s' "$key" | gh secret set DEPENDABOT_APP_PRIVATE_KEY --env dependabot-issues -R troupe-run/infrastructure
+unset key
+```
+
+Check it by name, never by value:
+
+```sh
+gh api repos/troupe-run/infrastructure/environments/dependabot-issues/secrets --jq '.secrets[].name'
+```
+
+**Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run the
+command above again. Then delete the old key in the App's settings. A run between the two steps still works, because
 both keys are valid until the old one is deleted.
 
 ## The review App and the Claude token (set up by hand)

@@ -181,18 +181,23 @@ watch does. Its tests set `GITHUB_ACTIONS` both ways, since CI's check runs them
 - **[Risk] A burst of issues on the first run:** 18 issues on 2026-10-27, one per open pull request, and more each
   Monday.
   → That's the owner's rule: every update has its issue (#170). Batching is deferred (#170, Non-goals).
-- **[Risk] Dependabot rewrites the description and drops the line.** Whether it does on a rebase isn't documented.
-  → Each run restores it (spec). Between the rewrite and the next run, `guard` is red for up to about 20 minutes. The
-  probe records which events rewrite it.
+- **[Risk] Dependabot rewrites the description and drops the line.** It does on a rebase: probed 2026-10-27, an
+  `@dependabot rebase` of a pull request behind `main` replaced the description and the `Closes` line was gone. (On
+  a pull request already up to date it only commented, and changed nothing.) Dependabot rebases on its own when a
+  pull request conflicts.
+  → Each run restores it (spec). Between the rewrite and the next run, `guard` is red for up to about 20 minutes.
 - **[Risk] The successor appears more than an hour later**, and the issue was already closed as not planned.
   → The successor gets a new issue. Nothing is lost, but there are two issues for one dependency. The hour can be
   changed in one place.
 - **[Risk] The update type here and #174's could disagree.**
   → Both follow Dependabot's counting (D4). The type here is advice in an issue. #174 decides what merges, and its
   tests can share these fixtures.
-- **[Risk] Setting the issue type with only Issues write.** The REST API takes `type` on creation, but whether the
-  App needs more for an org's issue types is unconfirmed.
-  → Probed first. If it needs more, the permission is added to the spec and the declaration.
+- **Probed, not a risk: what the App's token can do** (2026-10-27, on `troupe-run/infra-probe-dependabot-issues`).
+  With Issues and Pull requests write alone, it created an issue of type Task with a label and a milestone, and
+  edited a Dependabot pull request's description. That edit started the repository's `pull_request: edited`
+  workflow, triggered by `troupe-run-dependabot[bot]`. Merging and creating a branch were refused with 403. The
+  script itself, run with that token in Actions mode, opened the issue and the line, and a second run found nothing
+  to do.
 - **[Risk] A person closes an issue as not planned while Dependabot's pull request is still open.**
   → The next run reopens it, since that's how a reopened pull request looks. To drop an update, close Dependabot's
   pull request (or tell it `@dependabot ignore`), and the App closes the issue.
