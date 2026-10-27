@@ -10,6 +10,8 @@ name: tofu
 #                                                                  the state to main as the App
 #                         board     env board (main only)          after the apply, set the board's
 #                                                                  descriptions the plan listed
+#   merge queue           pr-plan   skipped: no environment        reports as skipped, so the queue
+#                                                                  lands without a second approval
 #
 # The daily run finds drift in anything OpenTofu manages, a file delivered to troupe included,
 # within a day (spec: ci-apply). Beside each plan of main, the oob job checks what OpenTofu can't
@@ -24,6 +26,10 @@ name: tofu
 # oob/README.md); none is in this file.
 on:
   pull_request:
+  # Only so `plan (pull request)`, a required check, reports on each commit a merge queue tests: it
+  # reports as skipped, asking for no approval and holding no secret. The owner approved the pull
+  # request's plan, and main is planned and approved after the merge (merge-queue design D5).
+  merge_group:
   workflow_run:
     workflows: [CI]
     types: [completed]
@@ -39,8 +45,9 @@ permissions:
 
 # One plan-and-apply on main at a time, never cancelled: a later merge waits, and then plans
 # against the state the earlier run left (design D6). A pull request's plan is replaced by its next.
+# A merge queue's run has a group of its own, so it never waits behind an apply awaiting approval.
 concurrency:
-  group: tofu-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'main' }}
+  group: tofu-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'merge_group' && format('mq-{0}', github.event.merge_group.head_sha) || 'main' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:

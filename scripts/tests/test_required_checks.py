@@ -380,3 +380,59 @@ def test_guard_re_runs_when_a_pull_request_is_renamed_and_runs_on_every_push_but
     on = workflow["on"] if "on" in workflow else workflow[True]
     assert on["pull_request"]["types"] == ["opened", "edited", "synchronize", "reopened"]
     assert on["push"]["branches"] == ["**", "!gh-readonly-queue/**"]
+
+
+# merge-queue design D2: a repository's queue is on only when every check it requires reports on
+# the queue's commits, or the queue waits for a check that can't report until it times out.
+
+
+def merge_queue_modules(text: str | None = None) -> set[str]:
+    """The repositories.tf modules that turn the merge queue on, by module name."""
+    text = REPOSITORIES_TF.read_text(encoding="utf-8") if text is None else text
+    blocks = re.findall(r'^module "(\w+)" \{\n(.*?)^\}', text, re.S | re.M)
+    assert blocks, "repositories.tf declares no module; update this test"
+    return {name for name, body in blocks if re.search(r"^\s*merge_queue\s*=\s*true\b", body, re.M)}
+
+
+def checks_not_on_merge_groups(workflows: dict[str, dict[str, Any]]) -> dict[str, str]:
+    """Each required job a merge queue would wait for in vain, and its workflow: a pull-request
+    job whose workflow isn't triggered by merge_group."""
+    return {
+        name: file
+        for file, workflow in workflows.items()
+        if "merge_group" not in triggers(workflow)
+        for job_id, job in workflow["jobs"].items()
+        if job_id not in NOT_REQUIRED and runs_on_pull_requests(workflow, job_id)
+        for name in job_names(job_id, job)
+    }
+
+
+def test_infrastructure_s_queue_is_on_only_when_its_required_checks_report_on_the_queue() -> None:
+    if "repo_infrastructure" not in merge_queue_modules():
+        pytest.skip("infrastructure's merge queue is off")
+    blockers = checks_not_on_merge_groups(real_workflows())
+    assert {name: blockers[name] for name in required("infrastructure", "github-actions")
+            if name in blockers} == {}  # fmt: skip
+
+
+def test_every_required_check_of_infrastructure_reports_on_merge_groups() -> None:
+    """What a queue needs from this repository's workflows, whether or not its switch is on, so a
+    workflow change that would stall the queue fails before the switch makes it matter."""
+    assert checks_not_on_merge_groups(real_workflows()) == {}
+
+
+def test_a_workflow_without_the_merge_group_trigger_is_named_with_its_checks() -> None:
+    workflows = real_workflows()
+    ci: dict[Any, Any] = workflows["ci.yml"]
+    del ci[True]["merge_group"]  # YAML 1.1 reads the key `on` as true
+    blockers = checks_not_on_merge_groups(workflows)
+    assert blockers == {"check": "ci.yml", "guard tests": "ci.yml"}
+
+
+def test_merge_queue_modules_reads_which_modules_turn_the_queue_on() -> None:
+    text = (
+        'module "repo_a" {\n  source = "./x"\n  merge_queue = true\n}\n'
+        'module "repo_b" {\n  source = "./x"\n  merge_queue = false\n}\n'
+        'module "repo_c" {\n  source = "./x"\n  # merge_queue = true\n}\n'
+    )
+    assert merge_queue_modules(text) == {"repo_a"}

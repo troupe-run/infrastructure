@@ -232,6 +232,13 @@ Every other managed repository has a ruleset named "protect main" on its default
   matrix job reports under its unexpanded name, which no required check could match. A test checks this repository's list against its workflows; when you rename a job or
   change a matrix in troupe or the website, change the list here too, or their pull requests wait for a check that
   never reports.
+- **Where a repository's merge queue is on, a pull request lands through it** (`merge_queue` in
+  `tofu/repositories.tf`; infrastructure first, then website and troupe once their CI runs on the queue). Merging adds
+  it to the queue, which tests it on top of `main` and the pull requests ahead of it, then lands exactly the commit it
+  tested, by rebase. Every required check must report on that commit, so each workflow behind one runs on
+  `merge_group`; `plan (pull request)` reports there as skipped, without a second approval, since `main` is planned
+  again after the merge. Strict up-to-date checks stay off: the queue catches two pull requests that break `main`
+  together, without making every open pull request stale after each state commit or delivery.
 - **The owner's bypass works only on pull requests.** An org admin can merge a PR past a rule that blocks it with
   `gh pr merge --rebase --admin` (or the checkbox in the UI), past failing or missing required checks too, and the
   ruleset's insights record it as a bypass. The bypass doesn't allow a merge commit or a squash, and doesn't allow a

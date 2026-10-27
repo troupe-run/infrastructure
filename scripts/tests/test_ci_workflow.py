@@ -112,3 +112,52 @@ def test_a_dropped_check_args_is_named() -> None:
     for step in workflow["jobs"]["check"]["steps"]:
         step.pop("env", None)
     assert "check doesn't pass the changes job's check-args" in problems(workflow)
+
+
+# merge-queue design D4: each commit a merge queue tests runs in full, as main does.
+
+
+def test_ci_runs_on_every_commit_a_merge_queue_tests() -> None:
+    workflow: dict[Any, Any] = ci()
+    triggers = workflow[True]  # YAML 1.1 reads the key `on` as true
+    assert "merge_group" in triggers
+    assert triggers["merge_group"] is None or "branches" not in triggers["merge_group"]
+
+
+def evaluate(expression: str, values: dict[str, str]) -> bool:
+    """A job condition of the shapes ci.yml uses, evaluated for a run that isn't cancelled: each
+    `needs.*` reference is replaced by its value ('' when a skipped job has no outputs)."""
+    text = expression.replace("!cancelled()", "True").replace("&&", " and ").replace("||", " or ")
+    for name in sorted(values, key=len, reverse=True):
+        text = text.replace(name, repr(values[name]))
+    assert "needs." not in text, text
+    result = eval(text, {"__builtins__": {}}, {})  # noqa: S307 (the workflow's own fixed conditions)
+    assert isinstance(result, bool)
+    return result
+
+
+def test_a_merge_group_runs_the_full_check_and_every_leg() -> None:
+    """On a merge group `changes` doesn't run (its condition names only pull requests), so it is
+    skipped and has no outputs: the check's condition and the legs' both hold, and the check gets
+    no --scope, so it runs in full."""
+    jobs = ci()["jobs"]
+    assert condition(jobs["changes"]) == "github.event_name == 'pull_request'"
+    skipped = {
+        "needs.changes.result": "skipped",
+        "needs.changes.outputs.scope": "",
+        "needs.changes.outputs.guard": "",
+    }
+    assert evaluate(condition(jobs["check"]), skipped)
+    assert evaluate(condition(jobs["guard-tests"]), skipped)
+
+
+def test_the_evaluation_skips_the_check_when_changes_found_only_skipped_paths() -> None:
+    """The evaluation above can say no: it does for a pull request that changes nothing checked."""
+    jobs = ci()["jobs"]
+    answered = {
+        "needs.changes.result": "success",
+        "needs.changes.outputs.scope": "none",
+        "needs.changes.outputs.guard": "false",
+    }
+    assert not evaluate(condition(jobs["check"]), answered)
+    assert not evaluate(condition(jobs["guard-tests"]), answered)

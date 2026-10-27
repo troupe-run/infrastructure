@@ -124,7 +124,7 @@ labels: added later, or without the description, that run would go red and hide 
 description is left out or differs, the plan made at the merge lists it, and the apply's `board` job sets it from
 the label (spec: labels).
 
-Then the owner merges by rebase, reads the `plan (main)` plan, and approves the apply.
+Then the owner merges by rebase, through the merge queue, reads the `plan (main)` plan, and approves the apply.
 
 ### 7. After the apply
 
