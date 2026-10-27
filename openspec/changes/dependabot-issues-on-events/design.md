@@ -146,8 +146,24 @@ otherwise: it runs late either way.
 
 ## Risks / Trade-offs
 
-- **[Risk] `workflow_run` from Dependabot Updates gets no secrets, or doesn't fire.** → Task 1 probes it on a throwaway
-  repository before anything else is built. If it fails, apply stops and asks the owner (D1).
+- **Probed, not a risk: `workflow_run` from Dependabot Updates fires and reads a main-only environment's secret**
+  (task 1.2, 2026-10-27, public `troupe-run/infra-probe-dependabot-events`, `github-actions` ecosystem). Dependabot's
+  first two runs (06:49:54, 06:49:56 UTC) opened #1 and #2. Each started an `on dependabot` run on `refs/heads/main`,
+  with `github.actor` and `github.triggering_actor` both `dependabot[bot]`. The environment admitted it, and its secret
+  was readable (non-empty, 32 characters), so GitHub's Dependabot restrictions don't apply to `workflow_run`. After
+  `main` moved, `@dependabot rebase` on #1 started a Dependabot run at 06:52:31. It rewrote #1 at 06:53:06, and a
+  `workflow_run` started at 06:53:07 with the secret readable again. The pull request is changed before the
+  Dependabot run completes, so a run started on `completed` sees the change.
+- **Probed: what the dispatch token can do** (task 1.3, 2026-10-27). The token was minted for
+  `troupe-run/infra-probe-dependabot-dispatch` only, with `actions: write`. Results:
+  - Starting `workflow_dispatch` there: 204.
+  - Creating a branch or a file: 403.
+  - Commenting on, closing or labelling the owner's issue: 403.
+  - Commenting on a pull request, or starting a workflow, in another repository: 403.
+  - **Opening a new issue: 201**, both there and in a public repository outside the token's scope. GitHub needs no
+    permission for an App to open an issue in a public repository, as for any account. So a leaked key gives no more
+    than an anonymous GitHub account could do. The spec says so, rather than claiming it's refused. The same holds for
+    every App in the org.
 - **[Risk] `workflow_run` doesn't fire in a repository where the workflow file isn't on the default branch yet.**
   After the delivery it is on `main`. → The migration starts a Dependabot run by hand and checks the chain end to end.
 - **[Risk] A dispatch-only token can disable infrastructure's workflows, guard included.** → The key is readable only

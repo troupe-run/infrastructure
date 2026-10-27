@@ -2,21 +2,21 @@
 
 ## 1. The dispatch App, and what GitHub allows (design D1, D2, Migration 1–2)
 
-- [ ] 1.1 Ask the owner to create `troupe-run-dispatch` with Actions read/write and Metadata read, no organisation
+- [x] 1.1 Ask the owner to create `troupe-run-dispatch` with Actions read/write and Metadata read, no organisation
   permission and no webhook, installed on infrastructure and a throwaway `troupe-run/infra-probe-dependabot-dispatch`.
   Verify the installation exists in the org's App list, and record the App's ID and client ID on #195.
-- [ ] 1.2 Probe `workflow_run` of "Dependabot Updates" on a public throwaway `troupe-run/infra-probe-dependabot-events`.
+- [x] 1.2 Probe `workflow_run` of "Dependabot Updates" on a public throwaway `troupe-run/infra-probe-dependabot-events`.
   Set it up with an old `npm` dependency, a `.github/dependabot.yml`, a main-only environment holding a dummy secret,
   and a workflow on `workflow_run: workflows: ["Dependabot Updates"], types: [completed]`. The workflow uses that
   environment and prints only whether the secret is non-empty. Verify with `gh run list` that it runs after
   Dependabot's run, on `main`, and that the secret is readable. Then comment `@dependabot rebase` on a pull request
   that's behind `main`, and verify it runs again. Record the run URLs and results in design.md (Risks). **If it
   doesn't fire or gets no secret, stop and ask the owner with the findings (D1).**
-- [ ] 1.3 Probe the dispatch with the App's token, minted with `repositories: infra-probe-dependabot-dispatch` and
+- [x] 1.3 Probe the dispatch with the App's token, minted with `repositories: infra-probe-dependabot-dispatch` and
   `permission-actions: write`. Verify `gh workflow run` starts a `workflow_dispatch` run there. Verify creating a
   branch, a file and an issue there is refused with 403, and so is starting a workflow in the events probe repository.
   Record the results in design.md (Risks).
-- [ ] 1.4 Remove the probe repositories from the App's installation and delete them. Verify `gh repo view` fails for
+- [x] 1.4 Remove the probe repositories from the App's installation and delete them. Verify `gh repo view` fails for
   both, and the App's installation lists infrastructure only.
 
 ## 2. The credential declarations (spec dependabot-dispatch-credentials; design D2)
