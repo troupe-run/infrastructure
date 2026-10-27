@@ -1,6 +1,7 @@
-# The files every governed repository runs from here: the guard's, and Claude's review workflow
-# (spec: pr-review; claude-pr-review design D6). Their source is this repository (spec:
-# guard-delivery, design D2), and the App commits them straight to main.
+# The files every governed repository runs from here: the guard's, Claude's review workflow (spec:
+# pr-review; claude-pr-review design D6), and the dispatcher that starts dependabot-issues (spec:
+# dependency-updates; dependabot-issues-on-events design D2). Their source is this repository
+# (spec: guard-delivery, design D2), and the App commits them straight to main.
 
 locals {
   # Each governed repository other than this one, which is the source. A repository joins only
@@ -18,6 +19,9 @@ locals {
     ".github/workflows/guard.yml",
     # Claude's pull request review (spec: pr-review).
     ".github/workflows/claude-review.yml",
+    # Starts infrastructure's dependabot-issues when Dependabot acts there (spec:
+    # dependency-updates; dependabot-issues-on-events design D2).
+    ".github/workflows/dependabot-dispatch.yml",
   ])
 
   # The list a receiving repository holds (spec: guard-delivery). Generated from guard_files, so it

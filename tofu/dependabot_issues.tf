@@ -13,9 +13,9 @@ locals {
 }
 
 # Holds DEPENDABOT_APP_PRIVATE_KEY, which the owner sets from 1Password (oob/README.md). Only a run
-# on main may use it, and no admin may bypass that. No reviewers: the workflow runs every 10 minutes,
-# unattended, and each write is reversible (design D7). Removing or weakening it fails
-# scripts/tests/test_main_only_environments.py.
+# on main may use it, and no admin may bypass that. No reviewers: the workflow runs after each
+# Dependabot run and daily, unattended, and each write is reversible (design D7). Removing or
+# weakening it fails scripts/tests/test_main_only_environments.py.
 resource "github_repository_environment" "dependabot_issues" {
   repository          = module.repo_infrastructure.name
   environment         = "dependabot-issues"

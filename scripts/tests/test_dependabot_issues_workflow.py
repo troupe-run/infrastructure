@@ -1,6 +1,7 @@
-"""dependabot-issues.yml runs from main on a schedule, never touches a pull request's code, and only
-its jobs' environments hold the Apps' keys (spec: dependency-updates, dependabot-issue-credentials;
-dependabot-issues design D1, D6, D7).
+"""dependabot-issues.yml runs from main when Dependabot acts and daily, never touches a pull
+request's code, and only its jobs' environments hold the Apps' keys (spec: dependency-updates,
+dependabot-issue-credentials; dependabot-issues design D1, D6, D7; dependabot-issues-on-events
+design D1, D3, D4, D7).
 
 GitHub evaluates the workflow, so these tests pin what it's given: when it runs, what it checks out,
 what each job's token may do, the environment that holds each key, and the check on the URLs the
@@ -87,14 +88,32 @@ def url_pattern(job: dict[str, Any]) -> str | None:
     return found[0] if len(found) == 1 else None
 
 
+TRIGGERS = {"workflow_run", "schedule", "workflow_dispatch"}
+DEPENDABOT_RUNS = {"workflows": ["Dependabot Updates"], "types": ["completed"]}
+DAILY = re.compile(r"\d{1,2} \d{1,2} \* \* \*")
+BACKSTOP_INPUT = {
+    "description": (
+        "Run as the daily backstop: report pull requests an event run should have handled"
+    ),
+    "type": "boolean",
+    "default": False,
+}
+BACKSTOP_CHOICE = '[[ "$GITHUB_EVENT_NAME" == schedule || "$BACKSTOP" == true ]]'
+
+
 def problems(w: dict[str, Any]) -> list[str]:
     found = []
     on = w.get("on") or {}
-    if set(on) != {"schedule", "workflow_dispatch"}:
-        found.append(f"it runs on {sorted(on)}, not a schedule and by hand only")
+    if set(on) != TRIGGERS:
+        found.append(f"it runs on {sorted(on)}, not Dependabot's runs, a schedule and by hand")
+    if on.get("workflow_run") != DEPENDABOT_RUNS:
+        found.append(f"its workflow_run is {on.get('workflow_run')!r}, not Dependabot's runs")
     crons = [entry.get("cron") for entry in on.get("schedule") or []]
-    if crons != ["*/10 * * * *"]:
-        found.append(f"its schedule is {crons}, not every 10 minutes")
+    if len(crons) != 1 or not DAILY.fullmatch(str(crons[0])):
+        found.append(f"its schedule is {crons}, not one daily run")
+    inputs = (on.get("workflow_dispatch") or {}).get("inputs")
+    if inputs != {"backstop": BACKSTOP_INPUT}:
+        found.append(f"its inputs are {inputs!r}, not the boolean backstop")
     if w.get("permissions") != {}:
         found.append(f"the default permissions are {w.get('permissions')!r}, not {{}}")
     if w.get("concurrency") != {"group": "dependabot-issues", "cancel-in-progress": False}:
@@ -138,8 +157,21 @@ def problems(w: dict[str, Any]) -> list[str]:
             found.append("the step that runs the script isn't id issues, so issue-urls isn't read")
         if (step.get("env") or {}).get("GH_TOKEN") != "${{ steps.app-token.outputs.token }}":
             found.append("the script doesn't run with the App's token")
-        if "${{" in str(step.get("run")):
+        command = str(step.get("run"))
+        if "${{" in command:
             found.append("the script's command line holds an expression")
+        if (step.get("env") or {}).get("BACKSTOP") != "${{ inputs.backstop }}":
+            found.append("the step's BACKSTOP isn't the backstop input")
+        lines = [line.strip() for line in command.splitlines() if line.strip()]
+        expected = [
+            f"if {BACKSTOP_CHOICE}; then",
+            "uv run --no-project scripts/dependabot_issues.py --backstop",
+            "else",
+            "uv run --no-project scripts/dependabot_issues.py",
+            "fi",
+        ]
+        if lines != expected:
+            found.append(f"the backstop isn't chosen by the schedule or the input: {lines!r}")
     if (issues.get("outputs") or {}).get("issue-urls") != "${{ steps.issues.outputs.issue-urls }}":
         found.append(f"issues' issue-urls output is {issues.get('outputs')!r}")
 
@@ -193,10 +225,43 @@ Change = Callable[[dict[str, Any]], object]
 @pytest.mark.parametrize(
     ("change", "named"),
     [
-        (lambda w: w["on"].update({"pull_request_target": None}), "not a schedule and by hand"),
-        (lambda w: w["on"].update({"pull_request": None}), "not a schedule and by hand"),
-        (lambda w: w["on"].update({"workflow_run": None}), "not a schedule and by hand"),
-        (lambda w: w["on"].update({"schedule": [{"cron": "0 * * * *"}]}), "every 10 minutes"),
+        (lambda w: w["on"].update({"pull_request_target": None}), "a schedule and by hand"),
+        (lambda w: w["on"].update({"pull_request": None}), "a schedule and by hand"),
+        (lambda w: w["on"].pop("workflow_run"), "a schedule and by hand"),
+        (
+            lambda w: w["on"]["workflow_run"].update({"workflows": ["CI"]}),
+            "not Dependabot's runs",
+        ),
+        (
+            lambda w: w["on"]["workflow_run"].update({"types": ["requested"]}),
+            "not Dependabot's runs",
+        ),
+        (lambda w: w["on"].update({"schedule": [{"cron": "*/10 * * * *"}]}), "not one daily run"),
+        (
+            lambda w: w["on"]["schedule"].append({"cron": "0 12 * * *"}),
+            "not one daily run",
+        ),
+        (lambda w: w["on"].update({"workflow_dispatch": None}), "not the boolean backstop"),
+        (
+            lambda w: w["on"]["workflow_dispatch"]["inputs"]["backstop"].update({"default": True}),
+            "not the boolean backstop",
+        ),
+        (
+            lambda w: w["jobs"]["issues"]["steps"][-1]["env"].pop("BACKSTOP"),
+            "BACKSTOP isn't the backstop input",
+        ),
+        (
+            lambda w: w["jobs"]["issues"]["steps"][-1].update(
+                {"run": w["jobs"]["issues"]["steps"][-1]["run"].replace("schedule", "push")}
+            ),
+            "isn't chosen by the schedule",
+        ),
+        (
+            lambda w: w["jobs"]["issues"]["steps"][-1].update(
+                {"run": w["jobs"]["issues"]["steps"][-1]["run"].replace(" --backstop", "")}
+            ),
+            "isn't chosen by the schedule",
+        ),
         (lambda w: w.update({"permissions": {"issues": "write"}}), "not {}"),
         (lambda w: w["concurrency"].update({"cancel-in-progress": True}), "could overlap"),
         (lambda w: w.pop("concurrency"), "could overlap"),

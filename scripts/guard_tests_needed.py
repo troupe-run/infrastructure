@@ -34,6 +34,8 @@ DEPENDS_ON = (
     # Delivered with the guard, so a change to it runs every leg before it's delivered (spec:
     # pr-review), though the guard's tests don't read it.
     ".github/workflows/claude-review.yml",
+    # The same, for the dispatcher that starts dependabot-issues (spec: dependency-updates).
+    ".github/workflows/dependabot-dispatch.yml",
     # Its tests, what they share, and what they run with.
     "scripts/tests/test_guard_",
     "scripts/tests/conftest.py",
