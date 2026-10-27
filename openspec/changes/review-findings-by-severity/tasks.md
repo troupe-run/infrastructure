@@ -6,11 +6,11 @@
   `review_thread_resolution` (default `false` until 5.1), which sets the `protect main` ruleset's
   `required_review_thread_resolution`, with a merge queue, with run instructions in the file's header comment;
   verify `tofu fmt -check` and `tofu validate` pass in `tofu/probe`
-- [ ] 1.2 Create public `troupe-run/infra-probe-review-threads`, ask the owner to add it to the infrastructure App's
+- [x] 1.2 Create public `troupe-run/infra-probe-review-threads`, ask the owner to add it to the infrastructure App's
   and the review App's installations, then apply the probe after the owner approves its plan; verify
   `gh api repos/troupe-run/infra-probe-review-threads/rules/branches/main` lists the pull request rule with
   conversation resolution required
-- [ ] 1.3 Open a pull request there, and, with a review App token (`contents: read`, `pull_requests: write`), post an
+- [x] 1.3 Open a pull request there, and, with a review App token (`contents: read`, `pull_requests: write`), post an
   inline comment on it; record whether the open conversation blocks `gh pr merge` (into the queue) and a rebase merge,
   and whether the owner's bypass merges past it; verify with each command's response and the pull request's
   `mergeStateStatus`
