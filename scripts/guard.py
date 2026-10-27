@@ -2175,7 +2175,9 @@ GH_MUTATIONS_OWNER_ONLY = {
 # this parser, which scripts/tests/test_claude_review_workflow.py holds equal
 # (review-findings-by-severity design D1).
 REVIEW_TIERS = ("must-fix", "nit", "decision")
-REVIEW_LABEL = re.compile(rf"\*\*({'|'.join(map(re.escape, REVIEW_TIERS))})\*\* · \S.*")
+# The separator is a middle dot, written as an escape: guard.py stays ASCII, so it reads the same
+# whatever a platform's default encoding is (cp1252 on Windows before Python 3.15).
+REVIEW_LABEL = re.compile(rf"\*\*({'|'.join(map(re.escape, REVIEW_TIERS))})\*\* \u00b7 \S.*")
 # How GitHub's GraphQL API names the review App as an author. A person could register the same
 # login, so only a Bot of that name is the review (design D5).
 REVIEW_BOT = {"__typename": "Bot", "login": "troupe-run-review"}

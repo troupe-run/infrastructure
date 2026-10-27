@@ -395,3 +395,11 @@ def test_the_other_ways_to_reply_are_refused(command: str) -> None:
     refused = gh_refusal(command)
     assert refused is not None
     assert refused.rule == "gh-allow-list"
+
+
+def test_the_guard_s_delivered_python_is_ascii_only() -> None:
+    # Copied with a platform's default encoding, a non-ASCII character breaks the import on Windows
+    # before Python 3.15, where that encoding is cp1252, not UTF-8.
+    for name in ("guard.py", "guard_pytest.py"):
+        text = (Path(guard.__file__).parent / name).read_text(encoding="utf-8")
+        assert text.isascii(), [line for line in text.splitlines() if not line.isascii()]
