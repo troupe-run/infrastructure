@@ -89,7 +89,8 @@ request, retitle it with the new versions, and comment naming both pull requests
 ### Requirement: An update closed without merging closes its issue as not planned
 When a Dependabot pull request linked to an open issue is closed without merging, and an hour later no open
 Dependabot pull request for the same dependency exists, the run SHALL close the issue as not planned with a comment
-naming the pull request. A reopened pull request SHALL reopen its issue.
+naming the pull request. A reopened pull request SHALL reopen an issue closed as not planned; an issue closed as
+completed SHALL stay closed.
 
 #### Scenario: Dependabot gives up on an update
 - **WHEN** a Dependabot pull request is closed without merging, and no successor opens within the hour
@@ -102,6 +103,10 @@ naming the pull request. A reopened pull request SHALL reopen its issue.
 #### Scenario: A pull request is reopened
 - **WHEN** a Dependabot pull request whose issue was closed as not planned is reopened
 - **THEN** the next run reopens the issue, and the pull request's description closes it
+
+#### Scenario: A change took the update over
+- **WHEN** a change's pull request that closes the issue merges, while Dependabot's pull request is still open
+- **THEN** the issue stays closed as completed, and no new issue is opened for Dependabot's pull request
 
 #### Scenario: Merged while the issue stays open
 - **WHEN** a Dependabot pull request is merged and its issue is still open

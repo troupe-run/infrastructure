@@ -297,6 +297,11 @@ def plan(
         if issue is not None:
             taken.add(int(issue["number"]))
             if issue.get("state") != "open":
+                # Only the App closes an issue as not planned, when its pull request closed. One
+                # closed as completed was done by a change that took the update over, and stays
+                # closed until Dependabot closes its pull request as up to date.
+                if issue.get("state_reason") != "not_planned":
+                    continue
                 result.actions.append(Action("reopen", pull, issue))
             if not has_closing_line(pull, int(issue["number"])):
                 result.actions.append(Action("line", pull, issue))

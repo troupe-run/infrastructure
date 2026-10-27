@@ -322,16 +322,33 @@ OpenTofu's providers here (`tofu/.terraform.lock.hcl`) get no version updates: D
 proposed nothing for a `registry.opentofu.org` lockfile when probed (deliver-dependabot design D6). Update them by
 hand with `tofu init -upgrade` in a change of their own. Its plan and apply need the owner's approval as usual.
 
+Each Dependabot pull request in troupe, website and this repository gets an issue, from the `dependabot-issues`
+workflow here, which runs every 10 minutes (spec: `dependency-updates`). The issue is opened in the pull request's
+repository by the `troupe-run-dependabot` App: type Task, label `dependencies`, the release in progress (the lowest
+open milestone in `tofu/milestones.json`) as its milestone, and on the troupe roadmap board. Its title names the
+dependency and the versions, and its body links the pull request, whose description has the release notes, and gives
+the update type: patch, minor, major, or unknown when the versions can't be read. The workflow then adds
+`Closes #<n>` to the pull request's description, and puts it back if Dependabot rewrites the description. When
+Dependabot supersedes an update, the open issue is relinked to the new pull request rather than a second one opened.
+A pull request closed without merging closes its issue as not planned, once an hour has passed with no successor,
+and reopening the pull request reopens it. So to drop an update, close Dependabot's pull request, or comment
+`@dependabot ignore this dependency` on it, rather than closing the issue. The
+workflow reads only pull requests by `dependabot[bot]` and issues its App opened, and never checks out a pull
+request. `uv run scripts/dependabot_issues.py` run locally only reads, and prints what it would do.
+
 - **In a governed repository** (troupe, infrastructure, website), Dependabot's pull request is an alert that comes
   with a fix.
-  It can't merge as it is: its `dependabot/...` branch matches no OpenSpec change, and its description closes no
-  issue, so the `guard` check fails on `commit-branch-change` and `pr-closes-issue`. (Its commit is a Conventional
-  Commit, and it's signed off as `dependabot[bot] <support@github.com>`, so those two are what stop it.) Take the fix
-  into an issue and an OpenSpec change like any other change: make the same bump on a branch named after the change,
-  with a pull request that closes the issue. Then close Dependabot's pull request with a comment linking that change.
-  There's no exemption for Dependabot's branches, and a test fails if one appears (security-scanning, design D5).
-- The website has no DCO, so there the branch and the description are the only things that stop it. It's handled
-  the same way (govern-website).
+  It can't merge as it is: its `dependabot/...` branch matches no OpenSpec change, so the `guard` check fails on
+  `commit-branch-change`. (Its commit is a Conventional Commit, signed off as `dependabot[bot] <support@github.com>`,
+  and once its issue is linked its description closes an issue, so that's what stops it.) Until #174's exemption
+  lands, take the fix into an OpenSpec change for its issue like any other change: make the same bump on a branch
+  named after the change, with a pull request that closes the issue. Merge that first: it closes the issue, and
+  Dependabot then closes its own pull request as up to date (or close it yourself, with a comment linking the
+  change). Closing Dependabot's pull request while its issue is still open closes the issue as not planned an hour
+  later. A major or unknown update takes this path even after #174. There's no exemption for Dependabot's branches yet, and a test fails if
+  one appears (security-scanning, design D5).
+- The website has no DCO, so there the branch is the only thing that stops it. It's handled the same way
+  (govern-website).
 
 ## Known gaps
 

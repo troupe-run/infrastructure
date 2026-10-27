@@ -67,7 +67,7 @@
 
 ## 5. Documentation
 
-- [ ] 5.1 Rewrite the "Dependabot pull requests" section of `docs/development-workflow.md`: each pull request gets its
+- [x] 5.1 Rewrite the "Dependabot pull requests" section of `docs/development-workflow.md`: each pull request gets its
   issue and closing line from `dependabot-issues`; the update type; majors need an OpenSpec change; what's left until
   #174. Verify `scripts/check.py`'s doc checks pass and the section names the workflow and the issue's contents.
 
