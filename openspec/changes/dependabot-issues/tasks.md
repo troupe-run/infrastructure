@@ -9,13 +9,13 @@
 - [x] 1.2 Create `troupe-run/infra-probe-dependabot-issues` with an `npm` manifest pinning an old patch release, a
   `.github/dependabot.yml` for it, and a workflow on `pull_request: [edited]` that only echoes. Verify Dependabot
   opens a pull request there (`gh pr list -R troupe-run/infra-probe-dependabot-issues --author app/dependabot`).
-- [ ] 1.3 With an App token, in the probe repository: create an issue with `type: Task`, a label and a milestone; edit
+- [x] 1.3 With an App token, in the probe repository: create an issue with `type: Task`, a label and a milestone; edit
   the Dependabot pull request's description to add `Closes #<n>`; then comment `@dependabot rebase`. Verify and record
   in design.md (Risks):
   - the issue's type is Task (`gh api repos/.../issues/<n> -q .type.name`), or what permission it needed;
   - the edit started the `edited` workflow (`gh run list`);
   - whether the closing line survived the rebase.
-- [ ] 1.4 Remove the probe repository from the App's installation and delete it. Verify
+- [x] 1.4 Remove the probe repository from the App's installation and delete it. Verify
   `gh repo view troupe-run/infra-probe-dependabot-issues` fails.
 
 ## 2. The credential declarations (spec dependabot-issue-credentials)
@@ -25,7 +25,7 @@
   `tofu validate` are clean.
 - [x] 2.2 Add the environment to `scripts/tests/test_main_only_environments.py`. Verify the test passes, and fails
   when the declaration is deleted, widened beyond `main`, or opened to an admin bypass.
-- [ ] 2.3 Declare the App in `oob/app-installations.json`, and document creating it and setting its key in
+- [x] 2.3 Declare the App in `oob/app-installations.json`, and document creating it and setting its key in
   `oob/README.md`, with a command that prints nothing and checks the key's first line (PKCS#1). Verify the oob tests
   pass and the drift check, run locally, reports no difference for the App.
 
