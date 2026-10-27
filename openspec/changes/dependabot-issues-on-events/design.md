@@ -171,6 +171,10 @@ otherwise: it runs late either way.
   by a `main` run in troupe or website, which only the owner's approved changes reach. The same exposure exists for
   `troupe-run-docs` on website. A disabled workflow shows on the next pull request, whose required check never
   reports.
+- **[Risk] The watch reports the backstop on its first day.** Until the first scheduled run, the watch sees a
+  workflow that "has never run on its schedule", and a run by hand doesn't count. The watch runs at 12:00 UTC, before
+  the next day's 04:37 backstop, so it will probably open its tracking issue on the merge day. The next clean watch
+  closes it. → Expected, and noted in the follow-up. It shows the watch works.
 - **[Risk] A person's close of a Dependabot pull request leaves its issue open for up to a day.** → Accepted (spec).
   It isn't reported as a miss.
 - **[Trade-off] Up to two `dependabot-issues` runs per Dependabot run** (dispatch plus concurrency). Each one with

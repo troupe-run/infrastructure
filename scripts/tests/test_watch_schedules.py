@@ -58,6 +58,13 @@ def test_website_s_weekly_check_is_watched_for_8_days() -> None:
     assert WEBSITE in ws.load_declaration(text)
 
 
+def test_the_dependabot_issues_backstop_is_watched_for_2_days() -> None:
+    """Its schedule runs hours late, so 2 days allows one missed day (dependabot-issues-on-events
+    design D6). Event runs don't count, so they can't hide a schedule that stopped."""
+    text = (REPO / "scripts" / "watched-schedules.json").read_text(encoding="utf-8")
+    assert ws.Watched("infrastructure", "dependabot-issues.yml", 2) in ws.load_declaration(text)
+
+
 @pytest.mark.parametrize(
     ("entry", "named"),
     [
