@@ -1,6 +1,6 @@
 name: tofu
 
-# Plans and applies the org from CI (spec: ci-apply; openspec/changes/ci-apply/design.md).
+# Plans and applies the org from CI (spec: ci-apply; ci-apply design).
 #
 #   pull request          changes   no environment                 does it touch what OpenTofu reads?
 #                         pr-plan   env plan-pr (owner approves)   plan posted on the PR, unless not

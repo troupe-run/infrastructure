@@ -1,8 +1,8 @@
 name: milestones-notice
 
 # Rebuilds troupe.run when the release milestones change, so /status/ lists them as declared (spec:
-# milestones; #124; openspec/changes/rebuild-site-on-milestones/design.md). The website's build
-# reads tofu/milestones.json from this repository's main, not the milestones on GitHub, so the file
+# milestones; #124; rebuild-site-on-milestones design). The website's build reads
+# tofu/milestones.json from this repository's main, not the milestones on GitHub, so the file
 # reaching main is the trigger, not the apply (design D2). The state commit after an apply doesn't
 # touch it, so it sends nothing.
 #

@@ -19,12 +19,15 @@
 
 ## 2. Change paths in file headers (#143 comment 2)
 
-- [ ] 2.1 Replace each `openspec/changes/<name>/design.md` with `<name> design`, as `tofu/` files cite a change:
+- [x] 2.1 Replace each `openspec/changes/<name>/design.md` with `<name> design`, as `tofu/` files cite a change:
   `.github/workflows/dependabot-issues.yml:4` and `scripts/dependabot_issues.py:2` (`dependabot-issues`),
   `.github/workflows/milestones-notice.yml:4` (`rebuild-site-on-milestones`), `.github/workflows/schedules.yml:4`
   (`watch-website-link-check`) and `.github/workflows/tofu.yml:3` (`ci-apply`). Rewrap each comment to its file's
-  width. Verify `git grep -nE "openspec/changes/[a-z0-9-]+/design" -- ':!openspec' ':!scripts/tests/fixtures'`
-  prints nothing, and that `uv run scripts/check.py` passes (ruff, mypy and the tests; no workflow linter runs, so read each edited header as YAML/Python comment text)
+  width. Verify `git grep -nE "openspec/changes/[a-z0-9-]+/design" -- ':!openspec' ':!scripts/tests'` prints
+  nothing, and that `uv run scripts/check.py` passes (ruff, mypy and the tests; no workflow linter runs, so read each
+  edited header as comment text). Found doing it: the planned exclusion was `scripts/tests/fixtures`, which left one
+  hit, `test_guard_commit_rules.py:411`'s made-up change `add-thing`, a test input rather than a header
+  citation
 
 ## 3. Integration
 
