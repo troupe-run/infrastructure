@@ -657,9 +657,10 @@ one place.
   rather than printing help
 
 ### Requirement: Each everyday gh write has one way to do it
-An everyday write SHALL be allowed only through its `gh` command, never as a GraphQL mutation, so that each write has
-one way to do it. A refused GraphQL mutation SHALL be named in the refusal. When `gh` has its own command for that
-mutation and the allow-list allows that command, the fix SHALL name it.
+An everyday write SHALL be allowed only through its one way, never also as a GraphQL mutation or another endpoint. Its
+one way is its `gh` command, or, for a write `gh` has no command for, the one `gh api` call the allow-list allows. A
+refused mutation SHALL be named in the refusal. When the refused mutation or endpoint does a write that has an allowed
+way, the fix SHALL name that way and SHALL NOT suggest adding to the allow-list.
 
 #### Scenario: An everyday write sent as a GraphQL mutation
 - **WHEN** an agent sends a GraphQL mutation that sets an issue's type (`updateIssueIssueType`), adds a "blocked by"
@@ -674,8 +675,23 @@ mutation and the allow-list allows that command, the fix SHALL name it.
 #### Scenario: A refused mutation that gh has a command for
 - **WHEN** an agent sends a GraphQL mutation the list doesn't name, such as `addLabelsToLabelable`, and `gh` has an
   allowed command that does the same, here `gh issue edit --add-label`
-- **THEN** the command is refused, the message names `addLabelsToLabelable`, and the fix names
-  `gh issue edit <n> --add-label <name>`
+- **THEN** the command is refused, the message names `addLabelsToLabelable`, the fix names
+  `gh issue edit <n> --add-label <name>`, and the fix doesn't suggest asking the owner or adding to the list
+
+#### Scenario: A review reply sent as a GraphQL mutation
+- **WHEN** an agent replies in a review conversation with `addPullRequestReviewThreadReply`
+- **THEN** the command is refused, the message names `addPullRequestReviewThreadReply`, and the fix names
+  `gh api -X POST repos/<owner>/<repo>/pulls/<n>/comments -F in_reply_to=<comment id> -f body=...`
+
+#### Scenario: A review reply sent to the replies endpoint
+- **WHEN** an agent sends `gh api -X POST repos/troupe-run/troupe/pulls/186/comments/3012345678/replies -f body=...`
+- **THEN** the command is refused, and the fix names
+  `gh api -X POST repos/troupe-run/troupe/pulls/186/comments -F in_reply_to=3012345678 -f body=...`
+
+#### Scenario: Some refused mutations have a way and some don't
+- **WHEN** an agent sends one GraphQL document with `addComment` and `deleteIssue`
+- **THEN** the command is refused, the message names both, and the fix names `gh issue comment <n>` for `addComment`
+  and says to ask the owner for the other
 
 #### Scenario: A refused mutation with no allowed gh command
 - **WHEN** an agent sends a GraphQL mutation the list doesn't name, and `gh` has no command for it or only an
@@ -1415,6 +1431,12 @@ nit. It SHALL read the conversation from GitHub before allowing it. Any other `r
 - **WHEN** the guard can't read the conversation from GitHub, or the mutation names more than one conversation, or
   names one through a variable it can't read
 - **THEN** the command is refused, saying why
+
+#### Scenario: The conversation's id is filled in by the shell
+- **WHEN** an agent resolves a conversation whose id, in the query or in a `-f`/`-F` field, is a shell variable or
+  substitution, such as `threadId: "$TID"` or `-f id="$TID"`
+- **THEN** the command is refused without reading GitHub, and the fix says to write the conversation's id out in the
+  command, not to check gh's login or network
 
 #### Scenario: Reopening a conversation
 - **WHEN** an agent sends `unresolveReviewThread`
