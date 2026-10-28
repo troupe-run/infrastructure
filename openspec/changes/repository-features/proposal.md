@@ -19,8 +19,9 @@ discussions or workflows that are never seen. A feature set by hand drifts witho
   in `.github` still reach the other repositories.
 - **Actions off in `.github`.** It has no workflows, and only the App changes its `main`. Actions is declared for
   all four repositories, so a change by hand shows in the plan.
-- **Private vulnerability reporting on in all four.** The provider can't manage it, so `oob.py` checks it. The
-  owner turns it on in infrastructure, the one repository where it's off.
+- **Private vulnerability reporting on in all four.** The owner sets it to `enabled` in the "troupe-run baseline"
+  code security configuration, which also covers repositories created later. The provider can manage neither, so
+  `oob.py` checks the configuration and each repository's own setting.
 - **Projects on in infrastructure.** The owner links the roadmap (project 1) to infrastructure, the declaration turns
   projects on there, like troupe and website, and `oob/projects.json` lists the link.
 - **Members can't create Pages sites.** `tofu/org.tf` stops members creating public or private Pages sites. The
@@ -57,6 +58,6 @@ None.
 - `org-profile/.github/ISSUE_TEMPLATE/config.yml` and `org-profile/CONTRIBUTING.md`, delivered to `.github` by the
   plan.
 - `oob/README.md`, and `oob/app-installations.json` if the App needs Discussions: read.
-- Owner steps on GitHub before the merge: turn discussions on in troupe and set its categories, turn on private
-  vulnerability reporting in infrastructure, turn pull requests off in `.github`, and link the roadmap to
+- Owner steps on GitHub before the merge: turn discussions on in troupe and set its categories, enable private
+  vulnerability reporting in the baseline configuration, turn pull requests off in `.github`, and link the roadmap to
   infrastructure.

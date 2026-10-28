@@ -19,7 +19,7 @@
       "secret_scanning_generic_secrets": "not_set",
       "secret_scanning_delegated_alert_dismissal": "not_set",
       "secret_scanning_extended_metadata": "not_set",
-      "private_vulnerability_reporting": "not_set"
+      "private_vulnerability_reporting": "enabled"
     }
   ],
   "defaults": [
