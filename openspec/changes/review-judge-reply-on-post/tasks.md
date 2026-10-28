@@ -21,7 +21,7 @@
   D3's alternative in the probe workflow and record that this step passes with it
 - [x] 1.5 Post two replies to the must-fix as the owner ten seconds apart while a `review` sleeps; record that each
   cancels the run before it and the last runs to its end; verify with each run's conclusion
-- [ ] 1.6 Fork the probe into the owner's account, open a pull request from the fork, and reply in a conversation on
+- [x] 1.6 Fork the probe into the owner's account, open a pull request from the fork, and reply in a conversation on
   it; record that `gate` is skipped and that the job outside the `if:` reports `PROBE_SECRET` unset; verify from the
   run's log
 - [ ] 1.7 Reply to the must-fix as an account without write access to the probe (the owner names one); record that
