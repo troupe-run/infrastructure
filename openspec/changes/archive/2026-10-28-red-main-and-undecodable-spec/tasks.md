@@ -67,7 +67,7 @@
 
 ## 5. Evidence
 
-- [ ] 5.1 Run `uv run scripts/check.py` on the branch and record the result. Verify the pull request's plan shows no
+- [x] 5.1 Run `uv run scripts/check.py` on the branch and record the result. Verify the pull request's plan shows no
   changes, since nothing in `tofu/` changes.
 
 ## Workflow follow-up
