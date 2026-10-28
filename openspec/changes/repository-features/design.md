@@ -151,7 +151,7 @@ doesn't need pull requests, which is how the App writes.
 *Alternative:* Sponsorships noted as unmanaged, as the issue guessed. Rejected: it has an API, so it's checked
 like the other features the provider can't set.
 
-### D5. Discussion categories are an `oob.py` check, and the App gets Discussions: read
+### D5. Discussion categories are an `oob.py` check, read with the drift job's token as it is
 
 `oob/discussion-categories.json` declares troupe's categories by `name`, with `slug` and `isAnswerable`. It's a
 `Check` like issue types, reading `repository(owner: "troupe-run", name: "troupe") { discussionCategories }` through
@@ -160,9 +160,12 @@ only which categories there are.
 
 Whether a category is announcement-only can't be read through any API, so it isn't checked. `oob/README.md` says so.
 
-CI's drift job reads as the infrastructure App, which has no Discussions permission. The owner grants
-**Discussions: read** to the App before the merge, and `oob/app-installations.json` declares it, as "Issue types:
-read" was declared (oob/README.md). Without it, the read is refused, which the check reports as an error.
+CI's drift job reads as the infrastructure App, which has no Discussions permission, and its token is minted with
+exactly the permissions `tofu.yml` lists. That's enough: a token minted the same way (same App, repositories and
+permissions, 2026-10-29) read a public repository's categories (`cli/cli`), troupe's (empty, since its discussions
+were still off), `.github`'s `hasPullRequestsEnabled` and `hasSponsorshipsEnabled`, and infrastructure's private
+vulnerability reporting. So the App gains no permission, and `tofu.yml` is unchanged. troupe is public; if it ever
+weren't, the categories read would be refused, which the check reports as an error.
 
 ### D6. Issues off in `.github`, verified on a repository that uses its forms
 
@@ -214,14 +217,11 @@ announcement-only format can't be read.
   it. Turning discussions off hides posts but doesn't delete them; turning them on again restores them.
 - [A category's announcement-only format changed by hand goes unseen] → No API can read it. Noted in
   `oob/README.md`; accepted.
-- [The App gains a permission] → Read-only, used only by the drift check, and declared in
-  `oob/app-installations.json`, where a change shows as drift.
 
 ## Migration Plan
 
-1. Merge order: the probe and then pull requests off in `.github` (D4a), private vulnerability reporting, the project
-   link (D3) and the App's Discussions: read (D5) any time
-   before the merge; troupe's discussions and categories last, immediately before the merge (D3).
+1. Merge order: the probe and then pull requests off in `.github` (D4a), private vulnerability reporting and the project
+   link (D3) any time before the merge; troupe's discussions and categories last, immediately before the merge (D3).
 2. The apply imports the four Actions settings, turns off `.github`'s Actions and issues, turns on infrastructure's
    projects, sets the org's Pages settings, and delivers `config.yml` and `CONTRIBUTING.md` to `.github`.
 3. Checked straight after: D6 (the forms and contact link on infrastructure), D8 (website deploy and a clean plan),

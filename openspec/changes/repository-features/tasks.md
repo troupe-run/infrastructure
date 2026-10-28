@@ -11,8 +11,10 @@ Troupe's discussions are not turned on here: that's task 7.1, immediately before
 - [x] 1.2 Ask the owner to run `gh project link 1 --owner troupe-run --repo troupe-run/infrastructure`. Verify the
   `projects` GraphQL read in `scripts/oob.py` lists `infrastructure` for project 1, then add it to
   `oob/projects.json`.
-- [ ] 1.3 Ask the owner to grant the infrastructure App **Discussions: read**, and declare it in
-  `oob/app-installations.json`. Verify `uv run scripts/oob.py` reports no difference for App installations.
+- [x] 1.3 Check whether CI's drift token can read the new checks without Discussions: read: mint a token as
+  `tofu.yml`'s drift job does (same App, repositories and permissions) and read troupe's and a public repository's
+  categories, `.github`'s features and a repository's reporting. Done 2026-10-29: every read worked, so the App gains
+  no permission and `oob/app-installations.json` is unchanged (design D5).
 
 - [x] 1.4 Create an `infra-probe-*` repository, turn its pull requests off, and commit a file to it through the
   contents API (`gh api -X PUT repos/troupe-run/<probe>/contents/<file>`), as the App writes `.github`'s files.
