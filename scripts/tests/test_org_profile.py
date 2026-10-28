@@ -318,3 +318,61 @@ def test_a_licence_other_than_pyprojects_fails_naming_both() -> None:
     assert guide_table_problems(SOUND_GUIDE, CHECKS, "MIT") == [
         "infrastructure: the guide says 'Apache-2.0', but pyproject.toml declares 'MIT'"
     ]
+
+
+# The guide's sentence listing the issue types, up to its full stop (issue-relationships-rule
+# design D2).
+TYPES_SENTENCE = re.compile(r"^Every issue has a type: ([^.]*)\.", re.MULTILINE)
+NO_TYPES_LIST = (
+    "the guide's list of issue types wasn't found: no line starts 'Every issue has a type:'"
+)
+
+
+def guide_type_problems(guide: str, types: set[str]) -> list[str]:
+    """What the guide's list of issue types gets wrong against the org's enabled types, each naming
+    the type (spec: org-profile; issue-relationships-rule design D2)."""
+    match = TYPES_SENTENCE.search(guide)
+    if match is None:
+        return [NO_TYPES_LIST]
+    listed = {name.strip() for name in re.split(r",|\bor\b", match.group(1)) if name.strip()}
+    problems = [
+        f"{name}: the guide lists it, but it isn't an enabled issue type in oob/issue-types.json"
+        for name in sorted(listed - types)
+    ]
+    problems += [
+        f"{name}: it's an enabled issue type in oob/issue-types.json, but the guide doesn't list it"
+        for name in sorted(types - listed)
+    ]
+    return problems
+
+
+def test_the_guides_issue_types_are_the_orgs_enabled_types() -> None:
+    assert guide_type_problems(GUIDE.read_text(encoding="utf-8"), enabled_types(ISSUE_TYPES)) == []
+
+
+ORG_TYPES = {"Epic", "Feature", "Bug", "Task", "Decision"}
+TYPES_GUIDE = (
+    "## How issues are related\n\nEvery issue has a type: Epic, Feature, Bug, Task or Decision.\n"
+)
+
+
+def test_a_list_matching_the_enabled_types_has_no_problems() -> None:
+    assert guide_type_problems(TYPES_GUIDE, ORG_TYPES) == []
+
+
+def test_a_type_the_org_doesnt_have_fails_naming_it() -> None:
+    guide = TYPES_GUIDE.replace("Task or Decision", "Task, Chore or Decision")
+    assert guide_type_problems(guide, ORG_TYPES) == [
+        "Chore: the guide lists it, but it isn't an enabled issue type in oob/issue-types.json"
+    ]
+
+
+def test_a_type_the_guide_leaves_out_fails_naming_it() -> None:
+    guide = TYPES_GUIDE.replace("Bug, Task or", "Bug or")
+    assert guide_type_problems(guide, ORG_TYPES) == [
+        "Task: it's an enabled issue type in oob/issue-types.json, but the guide doesn't list it"
+    ]
+
+
+def test_a_guide_with_no_list_of_types_fails_saying_so() -> None:
+    assert guide_type_problems("## How issues are related\n", ORG_TYPES) == [NO_TYPES_LIST]
