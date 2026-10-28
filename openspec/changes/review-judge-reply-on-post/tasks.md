@@ -46,7 +46,7 @@
 
 ## 3. Docs (design D5)
 
-- [ ] 3.1 In `docs/development-workflow.md`, say the review runs on each push and on each person's reply in a review
+- [x] 3.1 In `docs/development-workflow.md`, say the review runs on each push and on each person's reply in a review
   conversation, and keep the re-run for a run that failed or was skipped; in `org-profile/CONTRIBUTING.md` step 4,
   `CLAUDE.md` step 5 and `openspec/config.yaml`'s context, drop the instruction to re-run after a reply; verify
   `grep -rn "gh run rerun" CLAUDE.md openspec/config.yaml org-profile/CONTRIBUTING.md` finds nothing that tells anyone
