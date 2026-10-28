@@ -35,13 +35,17 @@
 
 ## 3. The review and the plan
 
-- [ ] 3.1 Act on Claude's review of the last push: fix or answer each must-fix and nit, resolve only nits, and raise
+- [x] 3.1 Act on Claude's review of the last push: fix or answer each must-fix and nit, resolve only nits, and raise
       each decision, and each must-fix in dispute, with the owner. Verify no review conversation is left open with
-      `gh pr view <n> -R troupe-run/infrastructure --json reviewDecision` and the pull request's conversations
-- [ ] 3.2 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it reads
+      `gh pr view <n> -R troupe-run/infrastructure --json reviewDecision` and the pull request's conversations. Done:
+      one must-fix (2.2 unticked), fixed by 318bb28 and resolved by `troupe-run-review[bot]`; the re-review of
+      318bb28 found nothing new, and no conversation on #214 is open
+- [x] 3.2 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it reads
       `0 to add, 1 to change, 0 to destroy`, the one change being
       `github_repository_file.org_profile["CONTRIBUTING.md"]`. If it shows anything else, stop and find out why. Tick
-      this in the same push as the archive, rebased onto `main`'s state commit, so the owner approves one more run
+      this in the same push as the archive, rebased onto `main`'s state commit, so the owner approves one more run.
+      Done: #214's plan for 318bb28 reads `Plan: 0 to add, 1 to change, 0 to destroy.`, the one change being
+      `github_repository_file.org_profile["CONTRIBUTING.md"]` updated in place
 
 ## Workflow follow-up
 
