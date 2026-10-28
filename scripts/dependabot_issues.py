@@ -1,5 +1,5 @@
 """Gives every Dependabot pull request its issue, and links the pull request to it (spec:
-dependency-updates; #172; openspec/changes/dependabot-issues/design.md).
+dependency-updates; #172; dependabot-issues design).
 
 Usage: uv run scripts/dependabot_issues.py
 

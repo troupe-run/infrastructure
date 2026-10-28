@@ -1,7 +1,7 @@
 name: schedules
 
 # Notices when a watched scheduled workflow in the org stops running (spec: schedule-watch; #60;
-# openspec/changes/watch-website-link-check/design.md).
+# watch-website-link-check design).
 #
 # GitHub turns off a public repository's scheduled workflows after 60 days without activity in it.
 # Then nothing runs, so nothing fails and no issue opens. A watcher in that repository would stop
