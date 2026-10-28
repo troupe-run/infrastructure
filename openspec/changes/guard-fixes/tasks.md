@@ -40,13 +40,20 @@ issue when it reaches `main`. The pull request closes all three.
 
 ## 4. Pull request and delivery plan
 
-- [ ] 4.1 Validate with `openspec validate guard-fixes --strict`, push the branch and open one pull request whose
+- [x] 4.1 Validate with `openspec validate guard-fixes --strict`, push the branch and open one pull request whose
   description closes #204, #205 and #206 (body written to a file, passed with `--body-file`). Verify this
   repository's `guard` run on the pull request passes, and the plan comment changes only `scripts/guard.py`, in troupe
-  and in website. Record the PR, the run and the plan here
-- [ ] 4.2 Before asking for the plan's approval, list the open Dependabot pull requests in troupe, infrastructure and
+  and in website. Record the PR, the run and the plan here. Result: PR #209. On ec14aca the push's and the pull
+  request's `guard` runs pass, as do every other check, the guard tests on all three OSes and Claude's review ("I found
+  nothing to fix"). The plan for ec14aca (run 40648526972, approved by the owner) is 0 to add, 2 to change, 0 to
+  destroy: `github_repository_file.guard` for `scripts/guard.py` in troupe and in website, content and commit message
+  in place, with no modes to set. The archive push re-makes the plan for the same two files
+- [x] 4.2 Before asking for the plan's approval, list the open Dependabot pull requests in troupe, infrastructure and
   website, and check each for a merge commit or a workflow line beginning `--` or `++` that it changes. Record the
-  list and the result here; if any would go red, raise it with the owner
+  list and the result here; if any would go red, raise it with the owner. Result, on 2026-10-28: troupe #173, #174,
+  #181, #182; infrastructure #182, #183, #184, #185, #186; website #54, #55, #56, #57, #58, #59, #73. Each carries
+  one commit with one parent, and no workflow patch among them adds or removes a line beginning `--` or `++`
+  (`gh api .../pulls/<n>/commits` and `.../files`). None goes red from this change
 
 ## Workflow follow-up
 
