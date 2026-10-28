@@ -3641,7 +3641,8 @@ def declared_labels(
     )
     token = os.environ.get("GITHUB_TOKEN")
     if token:
-        request.add_header("Authorization", f"Bearer {token}")
+        # Unredirected: urllib doesn't carry it to a redirect's request, wherever it points (#206).
+        request.add_unredirected_header("Authorization", f"Bearer {token}")
     try:
         body = send(request, CAPABILITY_LABELS_TIMEOUT_SECONDS)
     except urllib.error.HTTPError as error:

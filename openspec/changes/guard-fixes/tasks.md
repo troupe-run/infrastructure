@@ -28,13 +28,13 @@ issue when it reaches `main`. The pull request closes all three.
 
 ## 3. #206: the labels' token isn't re-sent on a redirect (design D3)
 
-- [ ] 3.1 Write the test first in `scripts/tests/test_guard_capability_labels.py`: with `GITHUB_TOKEN` set, a `send`
+- [x] 3.1 Write the test first in `scripts/tests/test_guard_capability_labels.py`: with `GITHUB_TOKEN` set, a `send`
   stub that passes the request to `urllib.request.HTTPRedirectHandler().redirect_request` with a 302 to
   `https://elsewhere.example/` records a redirected request with no `Authorization` header. Verify it fails on the
   current `declared_labels` (the header is carried)
-- [ ] 3.2 Add the header with `add_unredirected_header`. Verify the 3.1 test and
+- [x] 3.2 Add the header with `add_unredirected_header`. Verify the 3.1 test and
   `test_the_run_s_token_is_sent_when_there_is_one` pass
-- [ ] 3.3 Say in the docs' `capability-label` row that the token is sent only to GitHub's API, never on to a
+- [x] 3.3 Say in the docs' `capability-label` row that the token is sent only to GitHub's API, never on to a
   redirect. Verify `uv run scripts/check.py` passes (mypy `--strict`, ruff, the full suite with `GITHUB_ACTIONS` set
   and unset), then commit with `Part of #206`
 

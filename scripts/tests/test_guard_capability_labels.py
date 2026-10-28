@@ -2,6 +2,8 @@
 labels troupe-run/infrastructure declares on main (guard-capability-label-at-proposal)."""
 
 import email.message
+import http.client
+import io
 import os
 import urllib.error
 import urllib.request
@@ -372,6 +374,33 @@ def test_the_run_s_token_is_sent_when_there_is_one(monkeypatch: pytest.MonkeyPat
     sent: list[urllib.request.Request] = []
     guard.declared_labels(answering(b"[]", sent))
     assert sent[0].get_header("Authorization") == "Bearer t0ken"
+
+
+def test_a_redirect_s_request_to_another_host_carries_no_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # urlopen follows a redirect with the request redirect_request makes, which copies the
+    # first request's headers (#206).
+    monkeypatch.setenv("GITHUB_TOKEN", "t0ken")
+    redirected: list[urllib.request.Request] = []
+
+    def redirecting(request: urllib.request.Request, timeout: float) -> bytes:
+        new = urllib.request.HTTPRedirectHandler().redirect_request(
+            request,
+            io.BytesIO(),
+            302,
+            "Found",
+            http.client.HTTPMessage(),
+            "https://elsewhere.example/",
+        )
+        assert new is not None
+        redirected.append(new)
+        return b"[]"
+
+    guard.declared_labels(redirecting)
+    (request,) = redirected
+    assert request.full_url == "https://elsewhere.example/"
+    assert not request.has_header("Authorization")
 
 
 @pytest.mark.parametrize(
