@@ -1,35 +1,37 @@
 # Tasks
 
-## 1. Probe (design D2, D3, D4)
+## 1. Probe (design D2, D2a, D3, D4)
 
 - [ ] 1.1 Create public `troupe-run/infra-probe-review-reply` with `gh repo create` on its own, and push a probe
-  workflow with this design's `pull_request` and `pull_request_review_comment` (`created`) triggers, D2's `if:` and
-  D3's job-level concurrency on two jobs (`review`, then `resolve` needing it). `review` prints the event, the comment's
-  `author_association` and `in_reply_to_id`, the checked-out SHA against `refs/pull/<n>/merge`, whether a repository
-  secret `PROBE_SECRET` is set (never its value), then sleeps 120 seconds; verify the workflow is on the probe's `main`
-  and `gh secret list -R troupe-run/infra-probe-review-reply` names `PROBE_SECRET`
-- [ ] 1.2 Ask the owner to add the probe to the review App's installation, as #194's probe did; open a pull request
-  from a branch of the probe and post an inline comment on it; verify a run starts for the pull request, and the
-  inline comment's run is skipped because it isn't a reply
-- [ ] 1.3 Reply to that comment as the owner; record the reply's `author_association`, whether `review` ran, and that
-  the checked-out SHA is the merge ref's; verify from the run's log
-- [ ] 1.4 While a reply's `review` is sleeping, post an inline comment and a reply with a review App token minted as
-  the workflow mints it (contents read, pull requests write); record that both runs are skipped and the sleeping run
-  finishes, then that its `resolve` runs; verify with `gh run list` and each run's conclusion. If the sleeping run is
-  cancelled, switch to D3's alternative in the probe workflow and record that this probe step passes with it
-- [ ] 1.5 Post two replies as the owner ten seconds apart while a `review` sleeps; record that each cancels the run
-  before it and the last runs to its end; verify with each run's conclusion
+  workflow with this design's `pull_request` and `pull_request_review_comment` (`created`) triggers and its three jobs:
+  `gate` with D2's `if:` and D2a's step as the review workflow has it, then `review` and `resolve` with D3's job-level
+  concurrency. A job outside the `if:` prints the event, the comment's `author_association` and `in_reply_to_id`, the
+  run's SHA, and whether a repository secret `PROBE_SECRET` is set (never its value); `review` prints its checkout's
+  SHA, then sleeps 120 seconds. Verify the workflow is on the probe's `main` and `gh secret list -R
+  troupe-run/infra-probe-review-reply` names `PROBE_SECRET`
+- [ ] 1.2 Ask the owner to add the probe to the review App's installation, as #194's probe did, and to set
+  `REVIEW_APP_PRIVATE_KEY` on the probe from 1Password; open a pull request from a branch of the probe and, with a
+  review App token, post two inline findings, one labelled must-fix and one nit; verify the pull request's run reaches
+  `review`, and each finding's run is skipped at `gate`, as a bot's comment
+- [ ] 1.3 Reply to the must-fix as the owner; record the reply's `author_association`, that `gate` says yes and
+  `review` runs, and that the checked-out SHA is the merge ref's; verify from the run's log
+- [ ] 1.4 While that `review` sleeps, reply to the nit as the owner, and post a comment and a reply with the review
+  App's token; record that the nit reply's `gate` says no, the App's runs skip `gate`, the sleeping run finishes and its
+  `resolve` runs; verify with `gh run list` and each run's conclusion. If the sleeping run is cancelled, switch to
+  D3's alternative in the probe workflow and record that this step passes with it
+- [ ] 1.5 Post two replies to the must-fix as the owner ten seconds apart while a `review` sleeps; record that each
+  cancels the run before it and the last runs to its end; verify with each run's conclusion
 - [ ] 1.6 Fork the probe into the owner's account, open a pull request from the fork, and reply in a conversation on
-  it; record that `review` is skipped and that a step outside the `if:` reports `PROBE_SECRET` unset; verify from the
+  it; record that `gate` is skipped and that the job outside the `if:` reports `PROBE_SECRET` unset; verify from the
   run's log
-- [ ] 1.7 Reply as an account without write access to the probe (the owner names one); record that `review` is
-  skipped, not failed, and the reply's `author_association`; verify from the run's conclusion
+- [ ] 1.7 Reply to the must-fix as an account without write access to the probe (the owner names one); record that
+  `gate` is skipped, not failed, and the reply's `author_association`; verify from the run's conclusion
 - [ ] 1.8 Write what 1.2 to 1.7 showed into design.md as "Probe results", with what each one changes (D2's
   association list, D3 or its alternative); verify by deleting the fork and the probe repository (`gh repo view`
   reports both gone) and the owner removing the probe from the review App's installation (`uv run scripts/oob.py`
   reports no difference)
 
-## 2. The workflow and its tests (design D1 to D3)
+## 2. The workflow and its tests (design D1 to D3, D2a)
 
 - [x] 2.1 Write tests first in `scripts/tests/test_claude_review_workflow.py`: `problems()` accepts `on` holding
   exactly `pull_request` with today's types and `pull_request_review_comment` with `[created]`; pins the review job's
@@ -40,7 +42,17 @@
 - [ ] 2.2 Change `.github/workflows/claude-review.yml` as D1 to D3 say (as the probe confirmed), with the header
   comment saying a reply starts a review and why the group is on the jobs; verify the 2.1 tests and
   `uv run scripts/check.py` pass
-- [x] 2.3 With the changed workflow in place, run website's `npx vitest run tests/unit/workflow-node-version.test.ts`
+- [ ] 2.4 Write tests first for the gate (design D2a): `problems()` pins a `gate` job with D2's `if:`, no concurrency
+  group, `contents: read`, a read-only review App token (contents read, pull requests read) and its one step pinned by
+  hash, and `review` needing it and running only on its yes; it names each of the gate dropped, given a group, its
+  token widened, and `review` not needing it. With the stub `gh`, the gate's step says yes for a `pull_request` event
+  without calling `gh`, and for a reply to an open must-fix the review opened; no for a reply to a nit, a decision, a
+  must-fix re-tiered nit, a must-fix whose only `**must-fix**` is in a person's reply, a person's conversation, a
+  resolved must-fix and a comment on no conversation read; and fails, saying so, when the read fails or isn't a page
+  of conversations. Its `LABEL` and `BOT` equal the resolver's. Verify the new tests fail before the gate exists
+- [ ] 2.5 Add the gate to `.github/workflows/claude-review.yml` as D2a says, moving D2's `if:` to it; verify the 2.4
+  and 2.1 tests and `uv run scripts/check.py` pass
+- [ ] 2.3 With the changed workflow in place, run website's `npx vitest run tests/unit/workflow-node-version.test.ts`
   and troupe's `uv run scripts/check.py` (each on a scratch copy of its `main`, with this file copied in); verify both
   pass
 
@@ -54,9 +66,10 @@
 
 ## 4. Shown end to end (design D4)
 
-- [ ] 4.1 On this change's pull request, after the review's run, reply to one of its findings (or, if it found none,
-  to a review comment the owner posts and the review App answers); verify a `claude review` run starts from the
-  reply, its summary says what became of the finding, and record the run's URL here
+- [ ] 4.1 On this change's pull request, after the review's run, reply to one of its must-fixes, and to a nit if it
+  posted one (if it found no must-fix, record that and rely on 1.3); verify the must-fix reply's run reaches `review`
+  and its summary says what became of the finding, and the nit reply's run stops at `gate`; record both runs' URLs
+  here
 
 ## Workflow follow-up
 

@@ -12,10 +12,12 @@ that would ask for the plan's approval again.
 - The `claude review` workflow also starts on `pull_request_review_comment` (`created`). A run starts the same full
   review a push does, with the same prompt and jobs, so the reply is judged with the rest of the pull request (design
   D1).
-- It runs for a reply only: a comment that answers another in a review conversation, by a person with write access to
-  the repository, on a pull request from one of the repository's own branches. A bot's comment, the review's own
-  findings and re-tier replies included, starts nothing; nor does an outside user's comment, or a new comment that
-  opens a conversation (design D2).
+- It runs for a reply to one of the review's open must-fixes only, by a person with write access to the repository,
+  on a pull request from one of the repository's own branches. A bot's comment, the review's own findings and re-tier
+  replies included, starts nothing; nor does an outside user's comment, a new comment that opens a conversation, or a
+  reply to a nit, a decision or a person's conversation (design D2). A gate job, outside the concurrency group, reads
+  the conversation replied to and decides, so a reply to a nit costs no Claude run and cancels nothing (design D2a,
+  owner 2026-10-28).
 - A run that's skipped can't cancel a review that's running. The review posts its findings while it runs, and each one
   starts a run that's skipped; with the concurrency group as it is, that run would cancel the review posting it. The
   group moves to the jobs, which a skipped job never joins (design D3).
@@ -50,7 +52,8 @@ None.
 - Docs: `docs/development-workflow.md`, `org-profile/CONTRIBUTING.md` (written to troupe-run/.github by the apply),
   `CLAUDE.md`, `openspec/config.yaml`. troupe's and website's `config.yaml` don't mention re-running, so nothing changes
   there.
-- Cost: a reply costs a full Claude review run, as a push does. A narrower run that judges only the conversation
+- Cost: a reply to a must-fix costs a full Claude review run, as a push does; a reply to a nit, which agents post
+  before resolving each one, costs only the gate's few seconds. A narrower run that judges only the conversation
   replied to is cheaper, but needs its own prompt, its own tests and its own concurrency; it stays a follow-up if the
   cost shows (design D1).
 - The Actions list gains a skipped run for each comment the review posts.

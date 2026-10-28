@@ -25,6 +25,7 @@ and a fork's run gets no secrets. The issue asks for both to be shown on a probe
 
 - A person's reply in a review conversation is judged by a run that starts when it's posted.
 - No comment the review posts, and no skipped run, can stop a review that's running.
+- A reply that the review has nothing to do with, such as one to a nit, starts no Claude run.
 
 **Non-Goals:**
 
@@ -45,15 +46,16 @@ the reply with the rest, and reviews the head again.
   in one place. It needs its own tests, and its own concurrency group, since a narrow run in the review's group would
   cancel a full review of a push, and a narrow run outside it could resolve a conversation while a full review is
   deciding about it.
-- **Cost:** a full Claude run per reply. A burst of replies collapses into one run (D3). The look back on #194's
-  labels can count reply runs. A narrow run is a follow-up if the cost shows.
+- **Cost:** a full Claude run per reply that D2a lets through: a reply to one of the review's open must-fixes. A
+  burst of them collapses into one run (D3). A narrow run is a follow-up if the cost shows.
 
-**This is the issue's open trade-off, and the owner's to confirm.** The rest of the design holds either way, except
-that a narrow run adds a prompt, a job and their tests.
+The owner chose this with D2a (2026-10-28), after a side agent pointed out the cost without it: agents reply to every
+nit before resolving it, with the owner's login, so each batch of nit replies would end in a full review that judges
+nothing.
 
 ### D2. The review job runs for a person's reply only
 
-The `review` job's `if:` keeps today's skip for every event, and adds, for a review comment:
+The first job's `if:` (the gate's, D2a) keeps today's skip for every event, and adds, for a review comment:
 
 ```yaml
 if: >-
@@ -79,6 +81,29 @@ The trigger is `pull_request_review_comment: types: [created]`.
 
 `resolve` needs `review`, so it's skipped with it.
 
+### D2a. A gate job lets through only a reply to an open must-fix of the review's
+
+Only a must-fix is the review's to resolve, and only a must-fix's reply changes what it does. A nit is the author's,
+and the docs have the author reply to every nit before resolving it; a decision is the owner's. Agents post those
+replies with the owner's login, so D2's skip lets them through. Without more, each batch of nit replies ends in a full
+review that judges nothing (owner, 2026-10-28).
+
+So a job `gate` runs first, with D2's `if:`, and decides. For a `pull_request` event it says yes without reading
+anything. For a review comment it mints the review App's token read-only (contents read, pull requests read), reads
+the pull request's review conversations with the same query as the snapshot step, and finds the one whose comments
+hold the comment replied to (`in_reply_to_id`). It says yes only when that conversation is open, the review App opened
+it, and its tier, the review's latest label in it, is must-fix. `review` needs `gate` and runs only on its yes.
+
+- **The gate has no concurrency group.** A step inside `review` can't decide this: by the time it runs, the job has
+  joined the group and cancelled the review that's running. The gate is outside the group, so a no costs a few
+  seconds and cancels nothing.
+- **A read that fails fails the gate**, saying so, and no review starts (a malformed answer is an error, not a no).
+  Re-running the run judges the reply.
+- **The tier and the bot are read as the resolving step reads them**: its `LABEL` and `BOT` are copied into the gate,
+  and the tests hold the copies equal, as they do the resolver's and the guard's.
+- **Alternative: agents batch their nit replies, or post them just before a push.** It narrows the cost but doesn't
+  remove it, and it's a convention no check enforces.
+
 ### D3. The concurrency group moves to the jobs
 
 Each comment the review posts starts a run, skipped by D2. With the group at the workflow level, that run joins the
@@ -103,11 +128,12 @@ and a run's own `resolve` waits on its `review` through `needs`, so it never rac
 ### D4. The probe stands in for Claude
 
 The probe repository, `troupe-run/infra-probe-review-reply`, is public and has its own workflow with this design's
-trigger, `if:` and concurrency, and a job that sleeps and reports whether a probe secret is set, standing in for
-Claude. That shows the GitHub behaviour (what starts, what's skipped, what's cancelled, what a fork's run gets, which
-ref is checked out, which association the owner's reply carries) without the org's Claude token or the review App's
-key, which aren't visible to the probe. A bot's comment is posted by the review App, installed on the probe for the
-probe's length as in #194's probe.
+trigger, `if:`, gate (D2a, its step as written for the review workflow) and concurrency, and a job that sleeps and
+reports whether a probe secret is set, standing in for Claude. That shows the GitHub behaviour (what starts, what's
+skipped, what's cancelled, what a fork's run gets, which ref is checked out, which association the owner's reply
+carries, and what the gate lets through) without the org's Claude token, which isn't visible to the probe. The review
+App is installed on the probe for the probe's length, as in #194's probe: it posts the bot's comments, and the gate
+mints its token with the App's key, which the owner sets as a repository secret on the probe from 1Password.
 
 That Claude then judges a reply is shown on this change's own pull request: a `pull_request_review_comment` run uses
 the workflow from the pull request's merge ref, so a reply to one of the review's findings there runs this change's
@@ -122,13 +148,14 @@ to re-run after a reply.
 
 ## Risks / Trade-offs
 
-- [A reply costs a full review] → D1; the concurrency group collapses bursts; a narrow run is a follow-up.
+- [A reply to a must-fix costs a full review] → D1; D2a keeps nit and decision replies out; the concurrency group
+  collapses bursts; a narrow run is a follow-up.
+- [The gate reads the conversations a moment before the review does, and the tier changes in between] → The review
+  reads them afresh and judges what it finds; at worst a review runs that a later reading wouldn't have started.
 - [A reply cancels a push's review part-way, after it posted some findings] → The reply's run reads them in its
   snapshot and doesn't post them again. Today a second push does the same.
 - [A person with read access only, as a collaborator, replies] → The association lets the run start, and the action's
   write check fails it. It's advisory, so nothing is blocked; the failed run says why.
-- [A reply in a person's own conversation, or in a resolved one, starts a review] → Accepted: telling whose
-  conversation it is needs an API call before the `if:`, and a run that has nothing new to judge reviews the same head.
 - [A pull request's text, or a reply, injects instructions] → Unchanged: the review already reads every reply, and a
   reply now reaches it sooner. Only people with write access start a run, and the tools and tokens are the same.
 - [The Actions list fills with skipped runs, one per comment the review posts] → Accepted; they cost no runner time.
