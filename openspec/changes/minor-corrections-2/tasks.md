@@ -31,7 +31,7 @@
 
 ## 3. Integration
 
-- [ ] 3.1 Run `uv run scripts/check.py` and `openspec validate minor-corrections-2 --strict`, and verify both pass.
+- [x] 3.1 Run `uv run scripts/check.py` and `openspec validate minor-corrections-2 --strict`, and verify both pass.
   Verify `git diff origin/main --stat` lists only the files named in groups 1 and 2 and this change
 - [ ] 3.2 Verify the pull request's `plan (pull request)`, once the owner approves it, shows no changes. If the owner
   is away, record that it's waiting rather than ticking it
