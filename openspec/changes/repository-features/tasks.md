@@ -29,7 +29,7 @@ Troupe's discussions are not turned on here: that's task 7.1, immediately before
 - [x] 2.3 In `tofu/repositories.tf`, set `has_discussions = true` on troupe, `has_issues = false` and
   `actions_enabled = false` on `.github`, and `has_projects = true` on infrastructure, each with a comment saying why.
   Verify `tofu validate` passes.
-- [ ] 2.4 Add four `import` blocks in `tofu/imports.tf` adopting each repository's Actions settings by name. Verify
+- [x] 2.4 Add four `import` blocks in `tofu/imports.tf` adopting each repository's Actions settings by name. Verify
   a local plan imports all four, with no change for troupe, infrastructure and website (if `allowed_actions` plans a
   change on `.github`, settle it as design D2 says, and record which).
 
@@ -53,7 +53,7 @@ Troupe's discussions are not turned on here: that's task 7.1, immediately before
 
 ## 4. Org Pages settings (design D8)
 
-- [ ] 4.1 Set `members_can_create_pages`, `members_can_create_public_pages` and `members_can_create_private_pages` to
+- [x] 4.1 Set `members_can_create_pages`, `members_can_create_public_pages` and `members_can_create_private_pages` to
   `false` in `tofu/org.tf`, with a comment citing design D8. Verify `tofu validate` passes and the plan shows only
   those three changing on the org.
 
@@ -66,10 +66,12 @@ Troupe's discussions are not turned on here: that's task 7.1, immediately before
 
 ## 6. Evidence before the pull request
 
-- [ ] 6.1 Run `uv run scripts/check.py` and confirm it passes.
-- [ ] 6.2 Run a local plan against current state (fast-forwarded onto `origin/main`) and confirm it shows only: four
+- [x] 6.1 Run `uv run scripts/check.py` and confirm it passes.
+- [x] 6.2 Run a local plan against current state (fast-forwarded onto `origin/main`) and confirm it shows only: four
   Actions imports, `.github`'s issues and Actions off, infrastructure's projects on, the three org Pages settings, and
-  the two `.github` file updates. Quote it in the pull request.
+  the two `.github` file updates. Quote it in the pull request. (Run 2026-10-29 on `9e7f179`: 4 to import, 7 to
+  change, 0 to destroy. It also showed troupe's `has_discussions` false → true, which stays in the plan until 7.1
+  turns discussions on by hand.)
 - [ ] 6.3 Run `uv run scripts/oob.py` and confirm its only differences are the three discussion categories missing
   from troupe (discussions are still off until 7.1), with the new checks among those it ran. Quote it in the pull
   request.
