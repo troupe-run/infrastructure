@@ -2,7 +2,7 @@
 
 ## 1. Probe (design D2, D2a, D3, D4)
 
-- [ ] 1.1 Create public `troupe-run/infra-probe-review-reply` with `gh repo create` on its own, and push a probe
+- [x] 1.1 Create public `troupe-run/infra-probe-review-reply` with `gh repo create` on its own, and push a probe
   workflow with this design's `pull_request` and `pull_request_review_comment` (`created`) triggers and its three jobs:
   `gate` with D2's `if:` and D2a's step as the review workflow has it, then `review` and `resolve` with D3's job-level
   concurrency. A job outside the `if:` prints the event, the comment's `author_association` and `in_reply_to_id`, the
