@@ -25,10 +25,11 @@
       `## Milestones`. Verify the real-guide test from 1.1 now passes, that dropping `Task` from the list makes it
       fail naming Task, and that adding `Chore` makes it fail naming Chore (revert both). Done: it passes,
       then fails naming Task, then Chore; both reverted
-- [ ] 2.2 Make D1's two smaller edits: the sentence in "How work flows" step 1, and the link from the Milestones
+- [x] 2.2 Make D1's two smaller edits: the sentence in "How work flows" step 1, and the link from the Milestones
       section's "the work it arose from" to `#how-issues-are-related`. Verify with `git diff` that the source note is
       still the first line and that no other section changed, and, once the pull request is open, that the anchor
-      resolves in GitHub's rendering of the file on the branch
+      resolves in GitHub's rendering of the file on the branch. Done: the diff leaves the note and other sections
+      alone, and on #214's branch GitHub renders `id="user-content-how-issues-are-related"` with the link to it
 - [x] 2.3 Run `uv run scripts/check.py` and `openspec validate issue-relationships-rule --strict`, and verify both
       pass. Done: "check: all gates passed" and "Change 'issue-relationships-rule' is valid"
 
