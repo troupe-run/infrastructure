@@ -19,7 +19,7 @@ Troupe's discussions are not turned on here: that's task 7.1, immediately before
 - [x] 1.4 Create an `infra-probe-*` repository, turn its pull requests off, and commit a file to it through the
   contents API (`gh api -X PUT repos/troupe-run/<probe>/contents/<file>`), as the App writes `.github`'s files.
   Verify the commit lands on `main`, record the result in design D4a, then delete the probe repository.
-- [ ] 1.5 If 1.4 passed, ask the owner to turn pull requests off in `.github`. Verify
+- [x] 1.5 If 1.4 passed, ask the owner to turn pull requests off in `.github`. Verify
   `gh api graphql` reads `hasPullRequestsEnabled: false` for `.github`.
 
 ## 2. Repository features in the module (design D1, D2)
@@ -76,7 +76,7 @@ Troupe's discussions are not turned on here: that's task 7.1, immediately before
   the two `.github` file updates. Quote it in the pull request. (Run 2026-10-29 on `9e7f179`: 4 to import, 7 to
   change, 0 to destroy. It also showed troupe's `has_discussions` false → true, which stays in the plan until 7.1
   turns discussions on by hand.)
-- [ ] 6.3 Run `uv run scripts/oob.py` and confirm its only differences are the three discussion categories missing
+- [x] 6.3 Run `uv run scripts/oob.py` and confirm its only differences are the three discussion categories missing
   from troupe (discussions are still off until 7.1), with the new checks among those it ran. Quote it in the pull
   request.
 
