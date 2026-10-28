@@ -116,8 +116,8 @@ jobs:
 
 
           def fail(reason):
-              print(f"::error title=Review conversations unread::{reason}, so the review can't "
-                    "see its earlier findings.")
+              print(f"::error title=Review conversations unread::{reason}, so this run can't "
+                    "see the conversations already on the pull request.")
               sys.exit(1)
 
 
@@ -372,8 +372,8 @@ jobs:
 
 
           def fail(reason):
-              print(f"::error title=Review conversations unread::{reason}, so the review can't "
-                    "see its earlier findings.")
+              print(f"::error title=Review conversations unread::{reason}, so this run can't "
+                    "see the conversations already on the pull request.")
               sys.exit(1)
 
 

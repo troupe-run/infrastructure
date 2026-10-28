@@ -128,7 +128,7 @@ STEP_ENV = {
 # Before Claude: the pull request's review conversations, for Claude and for the resolving step.
 SNAPSHOT_NAME = "Read the pull request's review conversations"
 SNAPSHOT = {"shell": "python3 {0}", "env": STEP_ENV}
-SNAPSHOT_SHA256 = "04ae3e81dc1951dcf13691262dedbad071bef9282c04f62f1b140c96fd4b69b0"
+SNAPSHOT_SHA256 = "881c6b51fbc892399d33e02bcfc14f93611d0f293eab577dd415b1bd6e5757c9"
 # After Claude, in a job of its own, only when the review succeeded: resolve and re-tier what Claude
 # names, checked against conversations read again in that job (design D4, D4a).
 RESOLVER_NAME = "Resolve and re-tier what Claude named"
