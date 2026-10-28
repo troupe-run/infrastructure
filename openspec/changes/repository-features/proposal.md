@@ -57,7 +57,7 @@ None.
 - `scripts/oob.py` and its tests, with new declarations in `oob/` and an updated `oob/projects.json`.
 - `org-profile/.github/ISSUE_TEMPLATE/config.yml` and `org-profile/CONTRIBUTING.md`, delivered to `.github` by the
   plan.
-- `oob/README.md`, and `oob/app-installations.json` if the App needs Discussions: read.
+- `oob/README.md`.
 - Owner steps on GitHub before the merge: turn discussions on in troupe and set its categories, enable private
   vulnerability reporting in the baseline configuration, turn pull requests off in `.github`, and link the roadmap to
   infrastructure.
