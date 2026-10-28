@@ -123,9 +123,9 @@ website's weekly link check opens its "Broken external links" issue, and this re
 Dependabot pull request with the `troupe-run-dependabot` App's token. Neither token can write to an org project. In
 each, a job of its own adds the issue to the troupe roadmap board with the `troupe-run-board` App's token instead
 (spec: board-credentials, #59, #60, #172). `tofu.yml`'s board job uses the same token to set the board's `Capability`
-options' descriptions after an approved apply (spec: labels). GitHub has no API for creating an App, and OpenTofu never holds a secret, so these steps
-are the owner's. The App's IDs are recorded on #59. `tofu/board.tf` declares a `board` environment and the client-ID
-variable on website and on infrastructure.
+options' descriptions after an approved apply (spec: labels). GitHub has no API for creating an App, and OpenTofu never
+holds a secret, so these steps are the owner's. The App's IDs are recorded on #59. `tofu/board.tf` declares a `board`
+environment and the client-ID variable on website and on infrastructure.
 
 **Creating it** (done 2026-10-18). In the org's settings, under GitHub Apps, create a new App:
 - name `troupe-run-board`, installable only on this account, webhook off;
