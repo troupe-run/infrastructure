@@ -376,6 +376,36 @@ def test_a_lookup_that_fails_refuses_the_resolve(
     assert said in refused.problem
 
 
+# A thread id the shell fills in can't be read before the command runs, so it's refused for that,
+# not sent to GitHub as text (guard-names-thread-reply-route design D4)
+
+BY_VARIABLE = (
+    "gh api graphql -f query='mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) "
+    "{ thread { isResolved } } }'"
+)
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'gh api graphql -f query="mutation { resolveReviewThread(input: {threadId: \\"$TID\\"}) '
+        '{ thread { isResolved } } }"',
+        f"{BY_VARIABLE} -f id=$TID",
+        f'{BY_VARIABLE} -F id="$(cat thread.txt)"',
+    ],
+)
+def test_a_thread_id_the_shell_fills_in_is_refused_without_a_lookup(
+    lookup: list[str], command: str
+) -> None:
+    refused = gh_refusal(command)
+    assert refused is not None
+    assert refused.rule == "gh-allow-list"
+    assert "filled in by the shell" in refused.problem
+    assert "Write the conversation's id out" in refused.fix
+    assert "login" not in refused.fix
+    assert lookup == []
+
+
 def test_a_lookup_that_outlives_its_timeout_refuses_the_resolve(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
