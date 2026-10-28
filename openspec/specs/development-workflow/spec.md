@@ -538,7 +538,7 @@ supports.
 ### Requirement: Agents don't act as the owner
 In a Claude Code session, a `gh` command that performs an act reserved for the owner SHALL be refused, in any
 repository, with a fix naming the owner, or this repository for anything OpenTofu manages. The acts are:
-- merging past a pull request's rules;
+- merging a pull request, by any route;
 - approving or rejecting a deployment;
 - changing a ruleset, branch protection or an environment;
 - org and repository administration;
@@ -548,8 +548,15 @@ repository, with a fix naming the owner, or this repository for anything OpenTof
 - **WHEN** an agent runs `gh pr merge 17 --rebase --admin`
 - **THEN** the command is refused, and the message says to ask the owner to merge it
 
+#### Scenario: A plain merge
+- **WHEN** an agent runs `gh pr merge 32 --rebase` or `gh pr merge 32 --auto`, in a repository outside the throwaway
+  ones
+- **THEN** the command is refused, and the message says the owner merges once every conversation is resolved: on a
+  blocked pull request `gh pr merge` turns on auto-merge, which would land it later without the owner looking again
+
 #### Scenario: A merge through the API
-- **WHEN** an agent merges a pull request with `gh api` (REST `pulls/<n>/merge`, or GraphQL `mergePullRequest`)
+- **WHEN** an agent merges a pull request with `gh api` (REST `pulls/<n>/merge`, or GraphQL `mergePullRequest`,
+  `enablePullRequestAutoMerge` or `enqueuePullRequest`)
 - **THEN** the command is refused
 
 #### Scenario: Approving a deployment
@@ -601,8 +608,7 @@ one place.
 - **THEN** the command is allowed
 
 #### Scenario: A workflow write
-- **WHEN** an agent runs `gh pr create`, `gh issue comment`, `gh pr merge` without `--admin`, or `gh project
-  item-add`
+- **WHEN** an agent runs `gh pr create`, `gh issue comment`, `gh pr ready`, or `gh project item-add`
 - **THEN** the command is allowed
 
 #### Scenario: An unknown subcommand
@@ -687,7 +693,7 @@ person's own `deny` and `ask` rules SHALL still apply to a granted command.
 - **THEN** the command runs without a prompt, in auto mode as well
 
 #### Scenario: A command the guard allows but doesn't grant
-- **WHEN** an agent runs `gh pr merge 32 --rebase`, `gh workflow run tofu.yml`, `gh api repos/troupe-run/troupe`, or a
+- **WHEN** an agent runs `gh pr checkout 32`, `gh workflow run tofu.yml`, `gh api repos/troupe-run/troupe`, or a
   write to `troupe-run/infra-probe-20261013`
 - **THEN** the guard doesn't grant it, and Claude Code decides as it does today
 
@@ -1356,3 +1362,46 @@ the check can't fail them for having no matching change.
 #### Scenario: The queue creates its branch
 - **WHEN** the merge queue pushes its `gh-readonly-queue/main/pr-<n>-<sha>` branch
 - **THEN** no `guard` run starts for that push, and the merge group's own `guard` run reports on the commit
+
+### Requirement: An agent resolves only a nit
+The guard SHALL allow an agent the GraphQL mutation `resolveReviewThread`, which `gh` has no command for, only for a
+conversation that `troupe-run-review[bot]` opened and whose tier, the label on the review's latest comment in it, is
+nit. It SHALL read the conversation from GitHub before allowing it. Any other `resolveReviewThread`, and
+`unresolveReviewThread`, SHALL be refused.
+
+#### Scenario: A nit
+- **WHEN** an agent resolves a conversation the review opened as a nit, or later re-labelled nit
+- **THEN** the command is allowed
+
+#### Scenario: A must-fix
+- **WHEN** an agent resolves a conversation whose tier is must-fix, including a nit the review later re-labelled
+  must-fix, or one where only the author's own reply says nit
+- **THEN** the command is refused, and the fix says the review resolves it once it's addressed, and to raise a dispute
+  with the owner
+
+#### Scenario: A decision, an unlabelled finding, or a person's conversation
+- **WHEN** an agent resolves a conversation labelled decision, one whose label doesn't parse, or one a person opened
+- **THEN** the command is refused, and the fix says to ask the owner
+
+#### Scenario: The conversation can't be read
+- **WHEN** the guard can't read the conversation from GitHub, or the mutation names more than one conversation, or
+  names one through a variable it can't read
+- **THEN** the command is refused, saying why
+
+#### Scenario: Reopening a conversation
+- **WHEN** an agent sends `unresolveReviewThread`
+- **THEN** the command is refused
+
+### Requirement: Review findings are acted on before a change is archived
+The org's contributing guide and each governed repository's `openspec/config.yaml` context SHALL say that, before the
+change is archived, the session that owns it waits for the review of its last push and acts on each finding by its
+tier: it fixes or answers each must-fix and nit, resolves only nits, and raises each decision, and each must-fix it
+disputes, with the owner.
+
+#### Scenario: A change's tasks
+- **WHEN** a change is proposed in troupe, infrastructure or website
+- **THEN** its tasks include acting on the review's findings before the archive
+
+#### Scenario: A nit the author won't fix
+- **WHEN** the session decides a nit isn't worth fixing
+- **THEN** it replies saying why, or links the follow-up issue it raised, then resolves the conversation
