@@ -54,8 +54,9 @@ status; OpenSpec holds what the system does and how each change will do it.
    it's about, labelled for who resolves it. A **must-fix** is fixed, or answered with a reason, and the review
    resolves it on its next run once it's addressed. A **nit** is fixed, or answered (a follow-up issue, or why it
    isn't worth it), and the author resolves it. A **decision** is the maintainer's, and so is a must-fix still in
-   dispute after the re-review. The review runs again on each push; a must-fix answered with a reply alone is
-   judged once the last `claude review` run is re-run. The pull request can't merge while any conversation is open.
+   dispute after the re-review. The review runs again on each push, and on each reply in one of its
+   conversations, so a must-fix answered with a reply alone is judged when the reply is posted. The pull request
+   can't merge while any conversation is open.
 5. **Before the merge,** the change is archived on its branch, which updates `openspec/specs/`, so the pull
    request lands code, tests and specs together. It's merged once every conversation is resolved, by rebase, through
    the repository's merge queue where it has one: the queue tests it on top of `main` and whatever is queued ahead of
