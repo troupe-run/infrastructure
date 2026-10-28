@@ -46,9 +46,15 @@ Only a `completed` run with conclusion `cancelled` triggers the check. The gate 
 | `behind`, `diverged`, or anything else | red, naming the status: an unknown value is an error (learned rule: malformed input is an error) |
 | the read fails, or isn't the shape expected | red, with the error |
 
-The commit named in the summary is `main`'s head as GitHub reports it, read from the same answer: the last entry
-of `commits`, whose `sha` is the newer head. The compare lists at most 250 commits; when `total_commits` is more
-than it lists, the summary says "`main`'s head" without a sha rather than name the wrong one. Probed read-only on this repository's real `main`: `a1e39ab...main` gives
+The commit named in the summary is the newest one since that CI runs on, so the owner knows whose run to watch.
+`main`'s head may be the App's state commit after that merge's apply, and CI never runs on that. So the gate walks the
+listed `commits` from the newest, reading each one's files (`gh api repos/<repository>/commits/<sha>`, keeping the
+file names), and names the first that changes more than `tofu/terraform.tfstate`. That's usually one or two reads,
+and only after a cancel. A failed read, or an answer of the wrong shape, fails the run as for red CI. If no listed
+commit changes more than the state file, the run fails too, rather than name a guess. That can only happen when the
+compare's `files` (the net change) disagrees with its commits. The compare lists at most 250 commits. When
+`total_commits` is more than it lists, the newest commits aren't listed, so it reads none and the summary says "the
+newest merge on `main`" without a sha. Probed read-only on this repository's real `main`: `a1e39ab...main` gives
 `ahead`, with files `["tofu/terraform.tfstate"]` (the App's state commit only), `8038320...main` gives `ahead` with
 spec and state files, and `9d29f66...main` gives `identical` with no files.
 
@@ -61,8 +67,9 @@ cap on `files` doesn't matter: a file appears at most once, so a list that's ful
 ### D2. The superseded result, and how the workflow skips the rest of the plan
 
 `Result` gains a `superseded: bool = False` field. A superseded result is `passed=True, superseded=True`. Its summary is
-one section headed with no plan made: CI on `<short sha> (<subject>)` was cancelled, a newer merge `<short sha>` is on
-`main`, and the run after CI on it plans `main`, so nothing was planned here. It links the cancelled run.
+one section headed with no plan made: CI on `<short sha> (<subject>)` was cancelled, `main` has since moved on to the
+newer merge `<short sha>` (D1), and the run that starts when CI passes on it plans `main`, so nothing was planned here.
+It links the cancelled run.
 
 `main()` prints exactly one line to stdout, `superseded=true` or `superseded=false`, and the gate step appends stdout to
 `$GITHUB_OUTPUT` (as `plan_target.py` does). The current "CI passed on <sha>" line moves to stderr, because

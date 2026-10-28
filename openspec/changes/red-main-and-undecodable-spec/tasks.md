@@ -50,6 +50,13 @@
   `uv run pytest scripts/tests/test_main_ci_workflow.py scripts/tests/test_plan_target_workflow.py` passes, and
   `uv run scripts/check.py` is clean (it runs actionlint if the repository does), then commit.
 
+- [x] 3.3 Name the newer merge, not `main`'s head (design D1, after 2.4 found the App's state commit `9d29f66` named as
+  the commit whose run plans `main`). Tests first, in `scripts/tests/test_main_ci.py`: a merge then the App's state
+  commit since names the merge and not the state commit; a failed read of a commit's files fails as red; an answer of
+  the wrong shape fails; no listed commit changing more than the state file fails; more commits than listed reads no
+  commit and says "the newest merge on `main`". Verify they fail first, then that `uv run pytest
+  scripts/tests/test_main_ci.py` passes, and rerun 2.4's `60b5253` check to verify it now names a merge. Commit.
+
 ## 4. Specs and docs (spec ci-apply; design D1)
 
 - [ ] 4.1 README "Running a plan": after the paragraph on the CI wait, say that a run whose CI a newer merge

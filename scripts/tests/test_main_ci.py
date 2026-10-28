@@ -36,6 +36,7 @@ def run(number: int, status: str, conclusion: str = "") -> dict[str, Any]:
 
 IDENTICAL = {"status": "identical", "total_commits": 0, "commits": [], "files": []}
 NEWER = "b496971" + "0" * 33
+STATE_COMMIT = "9d29f66" + "0" * 33
 
 
 def ahead(*files: str, commits: list[str] | None = None, total: int | None = None) -> Any:  # noqa: ANN401 (JSON)
@@ -52,19 +53,31 @@ def ahead(*files: str, commits: list[str] | None = None, total: int | None = Non
 class FakeCI:
     """CI's push runs on main, by commit. A commit's list is what each poll sees in turn; the last
     one stays. A commit not listed has no run. compare is GitHub's answer to comparing a commit
-    with main (main unmoved, unless a test says otherwise), or what that read raises."""
+    with main (main unmoved, unless a test says otherwise), or what that read raises. files is
+    what reading a commit's files answers, by commit (NEWER changes a script, unless a test says
+    otherwise), or what that read raises."""
 
     def __init__(
         self,
         runs: dict[str, list[dict[str, Any] | None]],
         compare: Any = IDENTICAL,  # noqa: ANN401 (JSON)
+        files: dict[str, Any] | None = None,
     ) -> None:
         self.runs = runs
         self.compare = compare
+        self.files = {NEWER: ["scripts/main_ci.py"]} if files is None else files
         self.asked: list[str] = []
         self.compared: list[str] = []
+        self.read_files: list[str] = []
 
     def __call__(self, args: list[str]) -> Any:  # noqa: ANN401 (JSON)
+        if args[0] == "api" and "/commits/" in args[1]:
+            sha = args[1].rsplit("/", 1)[1]
+            self.read_files.append(sha)
+            answer = self.files[sha]
+            if isinstance(answer, BaseException):
+                raise answer
+            return answer
         if args[0] == "api":
             assert args[1].endswith("...main")
             self.compared.append(args[1])
@@ -280,13 +293,60 @@ def test_a_compare_answer_of_the_wrong_shape_fails(history: History, answer: Any
     assert not result.superseded
 
 
-def test_more_commits_than_compare_lists_names_mains_head_without_a_sha(history: History) -> None:
+def test_more_commits_than_compare_lists_reads_none_and_names_no_sha(history: History) -> None:
     head = history.merge()
     answer = ahead("scripts/main_ci.py", total=300)
-    result = gate(history, FakeCI({head: [run(7, "completed", "cancelled")]}, answer))
+    ci = FakeCI({head: [run(7, "completed", "cancelled")]}, answer)
+    result = gate(history, ci)
     assert result.superseded
-    assert "`main`'s head" in result.summary
+    assert "the newest merge on `main`" in result.summary
     assert NEWER[:7] not in result.summary
+    assert ci.read_files == []
+
+
+def test_a_merge_then_the_apps_state_commit_since_names_the_merge(history: History) -> None:
+    head = history.merge()
+    answer = ahead("scripts/main_ci.py", "tofu/terraform.tfstate", commits=[NEWER, STATE_COMMIT])
+    files = {NEWER: ["scripts/main_ci.py"], STATE_COMMIT: ["tofu/terraform.tfstate"]}
+    ci = FakeCI({head: [run(7, "completed", "cancelled")]}, answer, files)
+    result = gate(history, ci)
+    assert result.superseded
+    assert NEWER[:7] in result.summary
+    assert STATE_COMMIT[:7] not in result.summary
+    assert ci.read_files == [STATE_COMMIT, NEWER]
+
+
+def test_a_failed_read_of_a_commits_files_fails_as_red(history: History) -> None:
+    head = history.merge()
+    files = {NEWER: main_ci.ReadError("HTTP 502: Bad Gateway")}
+    ci = FakeCI({head: [run(7, "completed", "cancelled")]}, ahead("scripts/main_ci.py"), files)
+    result = gate(history, ci)
+    assert not result.passed
+    assert not result.superseded
+    assert "HTTP 502: Bad Gateway" in result.summary
+
+
+@pytest.mark.parametrize(
+    "answer", [{}, "scripts/main_ci.py", [1]], ids=["object", "text", "number"]
+)
+def test_a_commits_files_of_the_wrong_shape_fail_as_red(history: History, answer: Any) -> None:  # noqa: ANN401 (JSON)
+    head = history.merge()
+    ci = FakeCI(
+        {head: [run(7, "completed", "cancelled")]}, ahead("scripts/main_ci.py"), {NEWER: answer}
+    )
+    result = gate(history, ci)
+    assert not result.passed
+    assert not result.superseded
+
+
+def test_no_listed_commit_changing_more_than_the_state_file_fails_as_red(history: History) -> None:
+    """The compare's net files and its commits disagree: no guess at which merge plans it."""
+    head = history.merge()
+    files = {NEWER: ["tofu/terraform.tfstate"]}
+    ci = FakeCI({head: [run(7, "completed", "cancelled")]}, ahead("scripts/main_ci.py"), files)
+    result = gate(history, ci)
+    assert not result.passed
+    assert not result.superseded
 
 
 @pytest.mark.parametrize("conclusion", ["failure", "timed_out", "startup_failure", "skipped"])

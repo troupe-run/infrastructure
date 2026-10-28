@@ -24,8 +24,9 @@ doesn't know fails, never counting as "still running". It waits up to LIMIT_SECO
 A cancelled run is the one exception. CI on main cancels an older run when a newer push lands, and
 the walk reads main as fetched when this run started, so a merge during the wait isn't seen (#202).
 So on a cancel it asks GitHub to compare the commit with main now. Ahead by a commit that changes
-more than the state file: superseded, and the newer merge's own run plans main. Identical, ahead
-only by state commits, any other answer, or a read that fails: red, as for any other conclusion.
+more than the state file: superseded, and the newer merge's own run plans main; the summary names
+the newest such commit, read from GitHub. Identical, ahead only by state commits, any other answer,
+or a read that fails: red, as for any other conclusion.
 
 Standard library, git and gh only: the job runs it with the runner's python3, before uv is set up.
 """
@@ -115,6 +116,19 @@ def compare(gh_: Gh, repository: str | None, sha: str) -> dict[str, Any]:
     return found
 
 
+def newest_ci_commit(gh_: Gh, repository: str | None, commits: list[str]) -> str:
+    """The newest of these that changes more than the state file: main's head may be the App's
+    state commit after the newer merge's apply, and CI never runs on that."""
+    where = repository or "{owner}/{repo}"
+    for sha in reversed(commits):
+        files = gh_(["api", f"repos/{where}/commits/{sha}", "--jq", "[.files[]?.filename]"])
+        if not (isinstance(files, list) and all(isinstance(name, str) for name in files)):
+            raise ReadError(f"GitHub's files for {short(sha)} aren't the shape expected")
+        if any(name != STATE_PATH for name in files):
+            return sha
+    raise ReadError(f"no commit since changes more than {STATE_PATH}, though the comparison does")
+
+
 def state_only(repo: Path, sha: str) -> bool:
     return git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", sha) == STATE_PATH
 
@@ -178,16 +192,23 @@ def after_cancel(
             " which CI doesn't run on",
         )
     commits = moved["commits"]
-    head = (
-        f"`{short(commits[-1])}`"
-        if commits and moved["total_commits"] == len(commits)
-        else "`main`'s head"
-    )
+    if moved["total_commits"] == len(commits):
+        try:
+            newer = f"`{short(newest_ci_commit(gh_, repository, commits))}`"
+        except ReadError as error:
+            return red(
+                repo,
+                sha,
+                found,
+                f"{cancelled}, and which newer merge plans `main` couldn't be read: {error}",
+            )
+    else:  # the compare lists only the oldest commits since: none of them is the newest merge
+        newer = "the newest merge on `main`"
     summary = (
         "### A newer merge superseded this run, so nothing was planned\n\n"
-        f"CI on {describe(repo, sha)} was cancelled, and `main` has since moved on to {head}."
+        f"CI on {describe(repo, sha)} was cancelled, and `main` has since moved on to {newer}."
         f" [The cancelled run]({found['url']}).\n\n"
-        f"The run that starts when CI passes on {head} plans `main`. This run planned nothing and"
+        f"The run that starts when CI passes on {newer} plans `main`. This run planned nothing and"
         " asks for no approval.\n\n"
     )
     return Result(True, sha, summary, superseded=True)
