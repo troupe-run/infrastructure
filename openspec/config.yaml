@@ -55,8 +55,8 @@ context: |
   - Commit in small steps with messages that say why.
   - Before archiving, wait for Claude's review of the last push and act on each finding by its tier: fix or answer
     every must-fix and nit, resolve only nits, and raise decisions and disputed must-fixes with the owner. The
-    review resolves its own must-fixes (docs/development-workflow.md, "Claude's review"), and judges a reply when
-    it's posted; if that run fails, re-run it (`gh run rerun <id>`).
+    review resolves its own must-fixes (docs/development-workflow.md, "Claude's review"), and judges a reply to one
+    when it's posted; if that run fails, re-run it (`gh run rerun <id>`).
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

@@ -61,12 +61,13 @@ which says who resolves it (spec: pr-review; review-findings-by-severity design 
 A conversation's tier is the latest label the review gave in it: only the review re-tiers, by replying with a new label
 and its reason. A label in anyone else's reply counts for nothing.
 
-**The review runs on each push and on each reply.** When someone with write access replies in one of the pull
-request's review conversations, a review starts and judges the reply with the rest, so a must-fix answered with a reply
-alone needs no push. A bot's comment, an outside user's, a comment that opens a conversation rather than replying, and
-an edit start nothing. A newer push or reply cancels a review still running for the pull request. If a reply's run
-fails, re-run it (`gh run rerun <id>`, which the guard allows, or "Re-run jobs" on GitHub): both jobs read the
-conversations afresh, so the reply is judged.
+**The review runs on each push and on each reply to one of its must-fixes.** When someone with write access replies in
+an open must-fix the review opened, a review starts and judges the reply with the rest, so a must-fix answered with a
+reply alone needs no push. A reply to a nit or a decision starts none, since the review has nothing to do with it, so
+replying to each nit before resolving it costs no review. Nor do a bot's comment, an outside user's, a reply in a
+person's conversation or a resolved one, a comment that opens a conversation, or an edit. A newer push or reply cancels
+a review still running for the pull request. If a reply's run fails, re-run it (`gh run rerun <id>`, which the guard
+allows, or "Re-run jobs" on GitHub): each job reads the conversations afresh, so the reply is judged.
 
 **Before the change is archived**, the session that owns it waits for the review of its last push and acts on each
 finding by its tier (spec: development-workflow, "Review findings are acted on before a change is archived"). The `main`

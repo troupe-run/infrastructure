@@ -164,6 +164,25 @@ RESOLVE_TOKEN_INPUTS = {
     "permission-contents": "write",
 }
 RESOLVER_SHA256 = "0edb8face669593a9f3bff916607df894a1eddb85579f0dd4604c9275ba68269"
+# The gate: before the review, outside its concurrency group, with D2's skip, it decides whether
+# the event needs a review: a pull request event always, a reply only in an open must-fix the
+# review opened. A no there costs no Claude run and cancels nothing (review-judge-reply-on-post
+# design D2a).
+GATE_NAME = "Decide whether this event needs a review"
+GATE = {
+    "id": "gate",
+    "shell": "python3 {0}",
+    "env": {
+        **STEP_ENV,
+        "EVENT": "${{ github.event_name }}",
+        "REPLY_TO": "${{ github.event.comment.in_reply_to_id }}",
+    },
+}
+GATE_SHA256 = "c735098b479c20afc4b4865c37288c186422ffedd07422a8b462bd72f9e15b9f"
+GATE_OUTPUTS = {"review": "${{ steps.gate.outputs.review }}"}
+GATE_TOKEN_INPUTS = {**TOKEN_INPUTS, "permission-pull-requests": "read"}
+REVIEW_NEEDS = "gate"
+REVIEW_IF = "needs.gate.outputs.review == 'true'"
 OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME}
 # What Claude returns, and all the resolving step reads from it (design D4).
 SCHEMA = {
@@ -295,6 +314,55 @@ def resolve_job_problems(job: dict[str, Any]) -> list[str]:
     return found
 
 
+def gate_job_problems(job: dict[str, Any]) -> list[str]:
+    """The gate: D2's skip, no concurrency group, minting a read-only token, then its one step
+    (design D2a)."""
+    found = []
+    if job.get("if") != SKIP:
+        found.append(
+            f"gate runs when {job.get('if')!r}, not skipping bots, forks, outsiders and "
+            "comments that aren't replies"
+        )
+    if "concurrency" in job:
+        found.append(
+            "gate is in a concurrency group, so a reply it turns away would cancel a running review"
+        )
+    if "needs" in job:
+        found.append(f"gate needs {job['needs']!r}; it runs first")
+    if job.get("permissions") != PERMISSIONS:
+        found.append(
+            f"gate's GITHUB_TOKEN permissions are {job.get('permissions')!r}, not {PERMISSIONS!r}"
+        )
+    if "environment" in job:
+        found.append(f"gate runs in environment {job['environment']!r}; it needs none")
+    if not isinstance(job.get("timeout-minutes"), int):
+        found.append("gate has no timeout-minutes")
+    if job.get("outputs") != GATE_OUTPUTS:
+        found.append(f"gate's outputs are {job.get('outputs')!r}, not {GATE_OUTPUTS!r}")
+    steps = job.get("steps") or []
+    shape = [
+        "token"
+        if str(s.get("uses", "")).startswith(f"{MINTER}@")
+        else s.get("name") or s.get("uses")
+        for s in steps
+    ]
+    if shape != ["token", GATE_NAME]:
+        return [*found, f"gate's steps are {shape!r}, not the token and {GATE_NAME!r}"]
+    minted, deciding = steps
+    if not PINNED.match(str(minted.get("uses"))):
+        found.append(f"{minted.get('uses')!r} isn't pinned to a full commit SHA")
+    if minted.get("id") != "app-token":
+        found.append(f"gate's token step's id is {minted.get('id')!r}, not app-token")
+    given = dict(minted.get("with") or {})
+    client_id = str(given.pop("client-id", ""))
+    if not REVIEW_APP_CLIENT_ID.match(client_id):
+        found.append(f"gate's client ID is {client_id!r}, not one written here")
+    if given != GATE_TOKEN_INPUTS:
+        found.append(f"gate's token is minted with {given!r}, not {GATE_TOKEN_INPUTS!r}")
+    found += own_step_problems(deciding, GATE, GATE_SHA256, repr(GATE_NAME))
+    return found
+
+
 def problems(workflow: dict[str, Any]) -> list[str]:
     found = []
     on = workflow.get("on") or {}
@@ -312,18 +380,18 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         )
 
     jobs = workflow.get("jobs") or {}
-    if set(jobs) != {"review", "resolve"}:
-        return [*found, f"its jobs are {sorted(jobs)}, not review and resolve"]
+    if set(jobs) != {"gate", "review", "resolve"}:
+        return [*found, f"its jobs are {sorted(jobs)}, not gate, review and resolve"]
     job = jobs["review"]
+    found += gate_job_problems(jobs["gate"])
     found += resolve_job_problems(jobs["resolve"])
+    if job.get("needs") != REVIEW_NEEDS:
+        found.append(f"review needs {job.get('needs')!r}, not {REVIEW_NEEDS!r}")
     if job.get("outputs") != REVIEW_OUTPUTS:
         found.append(f"review's outputs are {job.get('outputs')!r}, not {REVIEW_OUTPUTS!r}")
 
-    if job.get("if") != SKIP:
-        found.append(
-            f"review runs when {job.get('if')!r}, not skipping bots, forks, outsiders and "
-            "comments that aren't replies"
-        )
+    if job.get("if") != REVIEW_IF:
+        found.append(f"review runs when {job.get('if')!r}, not only on the gate's yes")
     if job.get("permissions") != PERMISSIONS:
         found.append(
             f"review's GITHUB_TOKEN permissions are {job.get('permissions')!r}, not {PERMISSIONS!r}"
@@ -335,10 +403,10 @@ def problems(workflow: dict[str, Any]) -> list[str]:
             "its concurrency group is at the workflow level, where a run whose review is skipped "
             "joins it and cancels a running review"
         )
-    for name, each in jobs.items():
-        if each.get("concurrency") != CONCURRENCY:
+    for name in ("review", "resolve"):
+        if jobs[name].get("concurrency") != CONCURRENCY:
             found.append(
-                f"{name}'s concurrency is {each.get('concurrency')!r}, not one run per pull "
+                f"{name}'s concurrency is {jobs[name].get('concurrency')!r}, not one run per pull "
                 "request, cancelling the last"
             )
     if not isinstance(job.get("timeout-minutes"), int):
@@ -464,6 +532,19 @@ def job(w: dict[str, Any]) -> dict[str, Any]:
     return w["jobs"]["review"]  # type: ignore[no-any-return]
 
 
+def gate_job(w: dict[str, Any]) -> dict[str, Any]:
+    return w["jobs"]["gate"]  # type: ignore[no-any-return]
+
+
+def gate(w: dict[str, Any]) -> dict[str, Any]:
+    step = next(s for s in gate_job(w)["steps"] if s.get("name") == GATE_NAME)
+    return step  # type: ignore[no-any-return]
+
+
+def gate_token(w: dict[str, Any]) -> dict[str, Any]:
+    return gate_job(w)["steps"][0]  # type: ignore[no-any-return]
+
+
 def action_step(w: dict[str, Any]) -> dict[str, Any]:
     step = next(s for s in job(w)["steps"] if str(s.get("uses", "")).startswith(ACTION))
     return step  # type: ignore[no-any-return]
@@ -517,8 +598,8 @@ def tools(w: dict[str, Any], change: str) -> None:
 
 
 def unskip(w: dict[str, Any], part: str, to: str = "") -> None:
-    assert part in str(job(w)["if"]), part
-    job(w)["if"] = str(job(w)["if"]).replace(part, to)
+    assert part in str(gate_job(w)["if"]), part
+    gate_job(w)["if"] = str(gate_job(w)["if"]).replace(part, to)
 
 
 def sources(w: dict[str, Any], change: str) -> None:
@@ -548,10 +629,45 @@ def sources(w: dict[str, Any], change: str) -> None:
         (lambda w: w["on"]["pull_request"]["types"].remove("ready_for_review"), "not ['opened'"),
         (lambda w: w.update({"permissions": {"contents": "write"}}), "default permissions"),
         (lambda w: w.pop("permissions"), "default permissions"),
-        (lambda w: job(w).pop("if"), "not skipping bots, forks, outsiders"),
+        (lambda w: gate_job(w).pop("if"), "not skipping bots, forks, outsiders"),
         (
-            lambda w: job(w).update({"if": "github.event.pull_request.user.type != 'Bot'"}),
+            lambda w: gate_job(w).update({"if": "github.event.pull_request.user.type != 'Bot'"}),
             "not skipping bots, forks, outsiders",
+        ),
+        (lambda w: job(w).pop("if"), "not only on the gate's yes"),
+        (lambda w: job(w).update({"if": "always()"}), "not only on the gate's yes"),
+        (lambda w: job(w).pop("needs"), "review needs None"),
+        (lambda w: w["jobs"].pop("gate"), "not gate, review and resolve"),
+        (
+            lambda w: gate_job(w).update({"concurrency": copy.deepcopy(CONCURRENCY)}),
+            "gate is in a concurrency group",
+        ),
+        (lambda w: gate_job(w).update({"needs": "review"}), "it runs first"),
+        (
+            lambda w: gate_job(w)["permissions"].update({"pull-requests": "read"}),
+            "gate's GITHUB_TOKEN permissions",
+        ),
+        (
+            lambda w: gate_token(w)["with"].update({"permission-pull-requests": "write"}),
+            "gate's token is minted with",
+        ),
+        (
+            lambda w: gate_token(w)["with"].update({"permission-contents": "write"}),
+            "gate's token is minted with",
+        ),
+        (lambda w: gate_job(w).pop("outputs"), "gate's outputs are None"),
+        (lambda w: gate_job(w).pop("timeout-minutes"), "gate has no timeout-minutes"),
+        (
+            lambda w: gate(w).update({"run": str(gate(w)["run"]) + "\nprint()\n"}),
+            "script isn't the one this test pins",
+        ),
+        (
+            lambda w: gate(w)["env"].update({"REPLY_TO": "${{ github.event.comment.id }}"}),
+            f"{GATE_NAME!r} is given",
+        ),
+        (
+            lambda w: gate_job(w)["steps"].append({"run": "echo hi"}),
+            "gate's steps are",
         ),
         (
             lambda w: unskip(w, "github.event.comment.in_reply_to_id != null && "),
@@ -635,7 +751,7 @@ def sources(w: dict[str, Any], change: str) -> None:
             "at the workflow level",
         ),
         (lambda w: job(w).pop("timeout-minutes"), "no timeout-minutes"),
-        (lambda w: w["jobs"].update({"other": {}}), "not review and resolve"),
+        (lambda w: w["jobs"].update({"other": {}}), "not gate, review and resolve"),
         (
             lambda w: job(w)["steps"].append({"run": "git push"}),
             "runs a command of its own",
@@ -765,7 +881,7 @@ def sources(w: dict[str, Any], change: str) -> None:
         ),
         (lambda w: job(w)["steps"].remove(snapshot(w)), '0 steps named "Read the pull'),
         (lambda w: resolve_job(w)["steps"].remove(resolver(w)), "resolve's steps are"),
-        (lambda w: w["jobs"].pop("resolve"), "not review and resolve"),
+        (lambda w: w["jobs"].pop("resolve"), "not gate, review and resolve"),
         (lambda w: resolve_job(w).pop("needs"), "resolve needs None"),
         (lambda w: resolve_job(w).update({"if": "always()"}), "resolve runs when 'always()'"),
         (
@@ -962,9 +1078,10 @@ def test_an_input_that_holds_a_workflow_command_stays_inside_one_warning(tmp_pat
 # The resolving step's copy of the guard's tier parser (design D1)
 
 
-def resolver_constants() -> tuple[re.Pattern[str], object]:
-    """The LABEL and BOT the resolving step's script defines, read without running it."""
-    tree = ast.parse(str(resolver(review())["run"]))
+def resolver_constants(step: dict[str, Any] | None = None) -> tuple[re.Pattern[str], object]:
+    """The LABEL and BOT the resolving step's script, or another step's, defines, read without
+    running it."""
+    tree = ast.parse(str((step or resolver(review()))["run"]))
     found: dict[str, Any] = {}
     for node in tree.body:
         if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
@@ -1248,3 +1365,102 @@ def test_a_hostile_id_stays_inside_one_warning(tmp_path: Path) -> None:
     lines = done.stdout.splitlines()
     assert len(lines) == 1
     assert lines[0].startswith("::warning title=A review conversation was left as it is::x%0A")
+
+
+def test_the_gate_reads_a_label_and_the_review_as_the_resolving_step_does() -> None:
+    label, bot = resolver_constants(gate(review()))
+    assert (label.pattern, bot) == (resolver_constants()[0].pattern, resolver_constants()[1])
+
+
+def run_gate(
+    tmp_path: Path, answers: dict[str, Any], env: dict[str, str]
+) -> tuple[subprocess.CompletedProcess[str], str | None, list[list[str]]]:
+    """Run the gate's step against the stub gh, and read what it wrote to GITHUB_OUTPUT."""
+    output = tmp_path / "github-output"
+    output.write_text("", encoding="utf-8")
+    bin_dir = stub_gh(tmp_path / "bin", answers)
+    done = run_step(gate(review()), tmp_path, bin_dir, {"GITHUB_OUTPUT": str(output), **env})
+    said = [
+        line.partition("=")[2]
+        for line in output.read_text(encoding="utf-8").splitlines()
+        if line.startswith("review=")
+    ]
+    assert len(said) <= 1, said
+    return done, said[0] if said else None, gh_calls(bin_dir)
+
+
+REPLY = {"EVENT": "pull_request_review_comment", "REPLY_TO": "100"}
+
+
+def test_the_gate_lets_every_pull_request_event_through_without_reading_anything(
+    tmp_path: Path,
+) -> None:
+    done, said, calls = run_gate(tmp_path, {}, {"EVENT": "pull_request", "REPLY_TO": ""})
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert said == "true"
+    assert calls == []
+
+
+def resolved_conversation(thread: Any) -> Any:  # noqa: ANN401
+    return {**thread, "isResolved": True}
+
+
+B, P = BOT_AUTHOR, PERSON
+MUST_FIX, NIT, DECISION = "**must-fix** · x", "**nit** · x", "**decision** · x"
+GATE_CASES = [
+    ("must-fix", conversation("T", B, (B, MUST_FIX), (P, "it's right")), "true"),
+    ("nit made must-fix", conversation("T", B, (B, NIT), (P, "r"), (B, MUST_FIX)), "true"),
+    ("nit", conversation("T", B, (B, NIT), (P, "fixed")), "false"),
+    ("decision", conversation("T", B, (B, DECISION), (P, "a or b?")), "false"),
+    ("must-fix made nit", conversation("T", B, (B, MUST_FIX), (P, "r"), (B, NIT)), "false"),
+    ("a person's label", conversation("T", B, (B, NIT), (P, MUST_FIX)), "false"),
+    ("a person's conversation", conversation("T", P, (P, MUST_FIX), (P, "r")), "false"),
+    ("resolved", resolved_conversation(conversation("T", B, (B, MUST_FIX))), "false"),
+]
+
+
+@pytest.mark.parametrize(("what", "thread", "expected"), GATE_CASES, ids=[c[0] for c in GATE_CASES])
+def test_the_gate_lets_through_only_a_reply_to_an_open_must_fix_of_the_review_s(
+    tmp_path: Path,
+    what: str,
+    thread: dict[str, Any],
+    expected: str,
+) -> None:
+    other = conversation("U", PERSON, (PERSON, "elsewhere"))
+    other["opened"]["nodes"][0]["databaseId"] = 200
+    other["comments"]["nodes"][0]["databaseId"] = 200
+    pages = [page([other], True, "C1"), page([thread], False, None)]
+    done, said, calls = run_gate(tmp_path, {"pages": pages}, REPLY)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert said == expected, what
+    assert len(calls) == 2
+    assert all(call[:2] == ["api", "graphql"] for call in calls)
+    query = next(arg for arg in calls[0] if arg.startswith("query=")).partition("=")[2]
+    assert guard.graphql_mutations(query) == []
+
+
+def test_a_reply_to_a_comment_in_no_conversation_read_starts_no_review(tmp_path: Path) -> None:
+    thread = conversation("T", BOT_AUTHOR, (BOT_AUTHOR, "**must-fix** · x"))
+    done, said, _ = run_gate(tmp_path, {"pages": [page([thread], False, None)]},
+                             {**REPLY, "REPLY_TO": "999"})  # fmt: skip
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert said == "false"
+
+
+@pytest.mark.parametrize(
+    ("answers", "env"),
+    [
+        ({"status": 1}, REPLY),
+        ({"pages": ["not a page"]}, REPLY),
+        ({"pages": [{"data": None}]}, REPLY),
+        ({}, {**REPLY, "REPLY_TO": ""}),
+        ({}, {**REPLY, "REPLY_TO": "12a"}),
+    ],
+)
+def test_a_gate_that_can_t_tell_fails_and_says_nothing(
+    tmp_path: Path, answers: dict[str, Any], env: dict[str, str]
+) -> None:
+    done, said, _ = run_gate(tmp_path, answers, env)
+    assert done.returncode == 1
+    assert done.stdout.startswith("::error title=")
+    assert said is None
