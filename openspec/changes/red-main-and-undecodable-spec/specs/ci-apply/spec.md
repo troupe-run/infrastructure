@@ -29,14 +29,19 @@ apply from the owner's machine.
 ### Requirement: A scheduled or manual plan superseded by a newer merge plans nothing
 When CI on the commit a scheduled or manual run checked was cancelled, the run SHALL check whether `main` on GitHub
 has since moved past that commit with a commit CI runs on. If it has, the run SHALL plan nothing, ask for no approval
-and not fail, and its summary SHALL name the commit checked and `main`'s newer head, whose own run plans it. A check
-that can't be read, or answers anything else, SHALL fail the run as for red CI.
+and not fail. Its summary SHALL name the commit checked and the newest commit since that CI runs on, whose own run
+plans it. A check that can't be read, or answers anything else, SHALL fail the run as for red CI.
 
 #### Scenario: A merge during the wait cancels the CI it waited for
 - **WHEN** a manual run is waiting for CI on `main`'s head, and a newer merge lands and CI's concurrency cancels that
   CI run
 - **THEN** the run doesn't plan, ask for approval or fail, its summary names both commits and says the newer one's run
   plans it, and the drift job still runs
+
+#### Scenario: The App's state commit has landed on top of the newer merge
+- **WHEN** a run's CI was cancelled, and since then a merge and then the App's state commit after its apply have landed
+- **THEN** the run is superseded, and its summary names the merge, not the state commit, as the one whose run plans
+  `main`
 
 #### Scenario: A cancel with main unmoved still fails
 - **WHEN** CI on the commit checked was cancelled and `main` on GitHub is still at that commit
