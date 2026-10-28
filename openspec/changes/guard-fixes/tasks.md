@@ -17,13 +17,13 @@ issue when it reaches `main`. The pull request closes all three.
 
 ## 2. #205: a merge commit isn't exempt (design D2)
 
-- [ ] 2.1 Write the test first: on `dependabot/npm_and_yarn/x` in `troupe-run/website`, a patch update of
+- [x] 2.1 Write the test first: on `dependabot/npm_and_yarn/x` in `troupe-run/website`, a patch update of
   `package-lock.json`, then a `--no-ff` merge of a side Dependabot commit whose merge also changes `src/index.ts`,
   committed with a Dependabot patch-update subject, is refused under `commit-branch-change`, and the refusal names the
   merge commit's short sha and says it's a merge commit. Verify it fails on the current guard (the branch passes)
-- [ ] 2.2 Make `dependabot_ineligibility` read each commit's parents with its message and add D2's reason for any
+- [x] 2.2 Make `dependabot_ineligibility` read each commit's parents with its message and add D2's reason for any
   commit with more than one parent. Verify the 2.1 test and the rest of `test_guard_dependabot.py` pass
-- [ ] 2.3 Add the merge commit to the docs' list of what isn't exempt (the `commit-branch-change` row and "Anything
+- [x] 2.3 Add the merge commit to the docs' list of what isn't exempt (the `commit-branch-change` row and "Anything
   else takes an OpenSpec change"). Verify `uv run scripts/check.py` passes, then commit with `Part of #205`
 
 ## 3. #206: the labels' token isn't re-sent on a redirect (design D3)

@@ -487,6 +487,28 @@ def test_a_workflow_line_that_begins_like_a_diff_header_fails_naming_the_workflo
     assert "aren't dependency files: .github/workflows/tofu.yml." in refusal.problem
 
 
+def test_a_merge_commit_fails_naming_it_whatever_its_subject(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    # A merge's paths aren't listed by diff-tree, so one that also changes src/index.ts, with a
+    # Dependabot subject, passed as dependency files only (#205).
+    repo, base = dependabot_repo(make_repo, tmp_path)
+    branch = "dependabot/npm_and_yarn/x"
+    repo.switch(branch)
+    bump(repo, ZOD, "package-lock.json")
+    git(repo.path, "switch", "-q", "-c", "side", base)
+    bump(repo, ZOD, "package.json")
+    git(repo.path, "switch", "-q", branch)
+    git(repo.path, "merge", "-q", "--no-ff", "--no-commit", "side")
+    repo.write("src/index.ts", "export const evil = 1;\n")
+    merge = commit(repo, ZOD)
+    assert len(git(repo.path, "log", "-1", "--format=%P", merge).stdout.split()) == 2
+    refusal = refused_for(ci(repo, base, branch))
+    assert f"{merge[:7]} is a merge commit, and Dependabot doesn't make merge commits" in (
+        refusal.problem
+    )
+
+
 ECOSYSTEM_FILES = {
     "npm": {"package.json", "package-lock.json"},
     "uv": {"pyproject.toml", "uv.lock"},

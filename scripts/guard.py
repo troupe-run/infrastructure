@@ -3161,7 +3161,13 @@ def dependabot_ineligibility(root: Path, commits: Sequence[str]) -> str | None:
     if not commits:
         reasons.append("it carries no commits")
     for sha in commits:
-        message = git(root, "log", "-1", "--format=%B", sha)
+        # NUL, not a newline: git() strips, and a root commit's parents are empty.
+        parents, _, message = git(root, "log", "-1", "--format=%P%x00%B", sha).partition("\0")
+        if len(parents.split()) > 1:
+            # diff-tree lists no paths for a merge, and Dependabot never makes one (#205).
+            reasons.append(
+                f"{sha[:7]} is a merge commit, and Dependabot doesn't make merge commits"
+            )
         subject = message.splitlines()[0] if message else ""
         kind = dependabot_subject_kind(subject)
         if kind == "unknown":
