@@ -118,8 +118,8 @@ concurrency:
   cancel-in-progress: true
 ```
 
-A job whose `if:` is false is expected to be skipped without joining its group, so only a run that reviews can
-cancel one. That's an expectation, not something read in GitHub's docs, and the probe checks it (D4). Both jobs
+A job whose `if:` is false is skipped without joining its group, so only a run that reviews can cancel one. GitHub's
+docs don't say so; the probe showed it (Probe results). Both jobs
 share the group: a new review cancels an earlier run's review or its resolving job, as the workflow-level group did,
 and a run's own `resolve` waits on its `review` through `needs`, so it never races it.
 
@@ -148,6 +148,33 @@ and each reply"; a re-run (`gh run rerun <id>`) stays as the way to judge again 
 skipped. `org-profile/CONTRIBUTING.md`, `CLAUDE.md` step 5 and `openspec/config.yaml`'s context lose the instruction
 to re-run after a reply.
 
+## Probe results
+
+On `troupe-run/infra-probe-review-reply`, 2026-10-28 (D4), with the probe workflow's gate copied from this change's
+`claude-review.yml`, and the review App installed with its key set on the probe for the probe's length.
+
+- **The owner's reply carries `CONTRIBUTOR` (task 1.3).** troupe-run has no public members, and the owner, an org admin
+  whose membership is private, replied with `author_association` `CONTRIBUTOR`. D2's first skip, by association
+  (`OWNER`, `MEMBER`, `COLLABORATOR`), turned that reply away (run 40679686164 skipped every job). **This changed D2:**
+  the gate's step now asks the permission API, which answered `admin` with the gate's read-only token (owner,
+  2026-10-28).
+- **A reply to a must-fix starts a review of the merge commit (1.3).** The owner's reply ran the gate, which said
+  "an open must-fix of the review's", then `review` and `resolve` (run 40680285006). The checkout was `12cc5a3`, the
+  pull request's `refs/pull/1/merge` and `merge_commit_sha`. The same run cancelled the review of a push made six
+  seconds before it.
+- **The review's own comments start nothing, and a skipped run cancels nothing (1.2, 1.4).** Comments posted with the
+  review App's token carry `user.type` `Bot` and association `NONE`, and their runs skip every job. While a reply's
+  review slept, the owner's reply to a nit (the gate said "a nit, not a must-fix": no review) and the App's reply both
+  ran, and the sleeping review still ran to its end, then its `resolve` (run 40680934904). So a job skipped by its
+  `if:` doesn't join a job-level group, and D3 holds without its alternative.
+- **A burst runs only the last review (1.5).** Three replies 19 and 12 seconds apart: the first review was cancelled,
+  the second was cancelled while still waiting, and only the third ran to its end. No two reviews overlapped. The
+  first took about 75 seconds to stop after the next was queued (cancelled at 11:41:05), so a cancelled review can
+  run, and use Claude, for that long.
+- **A fork's pull request gets no review and no secret (1.6).** On a pull request from the owner's fork, the opening
+  run, an inline comment's run and the owner's reply's run each skipped the gate, though the owner is an admin, and
+  each reported `PROBE_SECRET` unset.
+
 ## Risks / Trade-offs
 
 - [A reply to a must-fix costs a full review] → D1; D2a keeps nit and decision replies out; the concurrency group
@@ -159,8 +186,8 @@ to re-run after a reply.
 - [A pull request's text, or a reply, injects instructions] → Unchanged: the review already reads every reply, and a
   reply now reaches it sooner. Only people with write access start a run, and the tools and tokens are the same.
 - [The Actions list fills with skipped runs, one per comment the review posts] → Accepted; they cost no runner time.
-- [The job-level group behaves differently from the docs] → The probe (D4) checks a skipped job cancels nothing
-  before the workflow depends on it; D3's alternative is the fallback.
+- [A cancelled review keeps running for a while] → The probe saw about 75 seconds (Probe results). It's bounded,
+  and each must-fix reply in a burst costs at most that.
 
 ## Migration Plan
 
