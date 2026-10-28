@@ -34,15 +34,15 @@
 ## 2. The workflow and its tests (design D1 to D3, D2a)
 
 - [x] 2.1 Write tests first in `scripts/tests/test_claude_review_workflow.py`: `problems()` accepts `on` holding
-  exactly `pull_request` with today's types and `pull_request_review_comment` with `[created]`; pins the review job's
-  `if:` to D2's condition; pins the concurrency group on both jobs and none at the workflow level; and names each of:
+  exactly `pull_request` with today's types and `pull_request_review_comment` with `[created]`; pins the first job's
+  `if:` (the gate's, D2a) to D2's condition; pins the concurrency group on both jobs and none at the workflow level; and names each of:
   `issue_comment` or `pull_request_review` added, `edited` added to the comment types, the reply, bot, association or
   pull request skip dropped, an association added, and the group moved back to the workflow. Verify the new
   parametrised cases fail against the workflow on `main`
 - [ ] 2.2 Change `.github/workflows/claude-review.yml` as D1 to D3 say (as the probe confirmed), with the header
   comment saying a reply starts a review and why the group is on the jobs; verify the 2.1 tests and
   `uv run scripts/check.py` pass
-- [ ] 2.4 Write tests first for the gate (design D2a): `problems()` pins a `gate` job with D2's `if:`, no concurrency
+- [x] 2.4 Write tests first for the gate (design D2a): `problems()` pins a `gate` job with D2's `if:`, no concurrency
   group, `contents: read`, a read-only review App token (contents read, pull requests read) and its one step pinned by
   hash, and `review` needing it and running only on its yes; it names each of the gate dropped, given a group, its
   token widened, and `review` not needing it. With the stub `gh`, the gate's step says yes for a `pull_request` event
@@ -50,16 +50,16 @@
   must-fix re-tiered nit, a must-fix whose only `**must-fix**` is in a person's reply, a person's conversation, a
   resolved must-fix and a comment on no conversation read; and fails, saying so, when the read fails or isn't a page
   of conversations. Its `LABEL` and `BOT` equal the resolver's. Verify the new tests fail before the gate exists
-- [ ] 2.5 Add the gate to `.github/workflows/claude-review.yml` as D2a says, moving D2's `if:` to it; verify the 2.4
+- [x] 2.5 Add the gate to `.github/workflows/claude-review.yml` as D2a says, moving D2's `if:` to it; verify the 2.4
   and 2.1 tests and `uv run scripts/check.py` pass
-- [ ] 2.3 With the changed workflow in place, run website's `npx vitest run tests/unit/workflow-node-version.test.ts`
+- [x] 2.3 With the changed workflow in place, run website's `npx vitest run tests/unit/workflow-node-version.test.ts`
   and troupe's `uv run scripts/check.py` (each on a scratch copy of its `main`, with this file copied in); verify both
   pass
 
 ## 3. Docs (design D5)
 
-- [x] 3.1 In `docs/development-workflow.md`, say the review runs on each push and on each person's reply in a review
-  conversation, and keep the re-run for a run that failed or was skipped; in `org-profile/CONTRIBUTING.md` step 4,
+- [x] 3.1 In `docs/development-workflow.md`, say the review runs on each push and on each person's reply to one of
+  its open must-fixes, and that a reply to a nit or a decision starts none, and keep the re-run for a run that failed or was skipped; in `org-profile/CONTRIBUTING.md` step 4,
   `CLAUDE.md` step 5 and `openspec/config.yaml`'s context, drop the instruction to re-run after a reply; verify
   `grep -rn "gh run rerun" CLAUDE.md openspec/config.yaml org-profile/CONTRIBUTING.md` finds nothing that tells anyone
   to re-run after a reply, and `uv run scripts/check.py` passes

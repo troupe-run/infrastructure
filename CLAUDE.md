@@ -16,8 +16,8 @@ Every change, however small, follows one path. The full guide is the org's
 4. **A pull request** closes the issue (`Closes #n`). CI posts its plan as evidence, once the owner approves that run.
 5. **Claude's review is acted on**, after the review of the last push: fix or answer each finding, resolve only nits,
    and raise decisions and disputed must-fixes with the owner. The review resolves its own must-fixes once they're
-   addressed, judging a reply when it's posted; if that run fails, re-run it (`gh run rerun <id>`). A merge needs every
-   conversation resolved ([docs/development-workflow.md](docs/development-workflow.md)).
+   addressed, judging a reply to one when it's posted; if that run fails, re-run it (`gh run rerun <id>`). A merge
+   needs every conversation resolved ([docs/development-workflow.md](docs/development-workflow.md)).
 6. **`/opsx:archive`** runs on the branch before merging. The owner merges by rebase, through the merge queue.
 7. **After the merge**, comment on the issue with the PR and the archived change.
 
