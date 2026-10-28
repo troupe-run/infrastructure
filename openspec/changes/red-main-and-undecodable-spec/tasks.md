@@ -63,7 +63,7 @@
   cancelled plans nothing and fails nothing, that its summary names both commits, and that the newer merge's run
   plans `main` once CI passes on it. Verify the paragraph matches D1's cases (state-only and unmoved still fail),
   and `uv run scripts/check.py` is clean, then commit.
-- [ ] 4.2 Run `openspec validate red-main-and-undecodable-spec --strict` and verify it passes.
+- [x] 4.2 Run `openspec validate red-main-and-undecodable-spec --strict` and verify it passes.
 
 ## 5. Evidence
 
