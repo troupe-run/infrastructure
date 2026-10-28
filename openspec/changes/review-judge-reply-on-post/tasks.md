@@ -31,7 +31,7 @@
 
 ## 2. The workflow and its tests (design D1 to D3)
 
-- [ ] 2.1 Write tests first in `scripts/tests/test_claude_review_workflow.py`: `problems()` accepts `on` holding
+- [x] 2.1 Write tests first in `scripts/tests/test_claude_review_workflow.py`: `problems()` accepts `on` holding
   exactly `pull_request` with today's types and `pull_request_review_comment` with `[created]`; pins the review job's
   `if:` to D2's condition; pins the concurrency group on both jobs and none at the workflow level; and names each of:
   `issue_comment` or `pull_request_review` added, `edited` added to the comment types, the reply, bot, association or

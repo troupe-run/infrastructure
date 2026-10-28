@@ -1,8 +1,9 @@
 # Source: troupe-run/infrastructure. Change it there; copies in other repositories are delivered.
 name: claude review
 
-# Claude reviews each member's pull request when it's opened and on each update, drafts included,
-# and posts each finding as a conversation, labelled must-fix, nit or decision for who resolves it
+# Claude reviews each member's pull request when it's opened, on each update, drafts included, and
+# when a person with write access replies in one of its review conversations, so a reply is judged
+# when it's posted (review-judge-reply-on-post design D1, D2, #208). It posts each finding as a conversation, labelled must-fix, nit or decision for who resolves it
 # (spec: pr-review, #154, #194). It isn't a required check, and it can't approve, request changes
 # or push; what blocks a merge is an unresolved conversation, through the ruleset. A job after the
 # review resolves the review's own must-fixes that Claude found addressed, and posts the re-tiers it
@@ -21,19 +22,33 @@ name: claude review
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  # A reply, not an edit; the review job's `if:` says whose.
+  pull_request_review_comment:
+    types: [created]
 
 permissions:
   contents: read
 
-# A new push replaces a review still running for the pull request's earlier head.
-concurrency:
-  group: claude-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 jobs:
   review:
     name: claude review
-    if: github.event.pull_request.user.type != 'Bot' && github.event.pull_request.head.repo.full_name == github.repository
+    # Bots' and forks' pull requests are skipped. A review comment starts the review only when it's
+    # a reply, not a bot's (each of the review's own comments starts a run) and by someone with
+    # write access, so anyone else's is skipped rather than failed by the action's own check
+    # (review-judge-reply-on-post design D2).
+    if: >-
+      github.event.pull_request.user.type != 'Bot' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event_name == 'pull_request' ||
+      (github.event.comment.in_reply_to_id != null &&
+      github.event.comment.user.type != 'Bot' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)))
+    # A new push or reply replaces a review still running for the pull request. The group is on
+    # the jobs, not the workflow, so a run whose review is skipped never joins it, and can't cancel
+    # the review whose comment started it (design D3).
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # What Claude names to resolve or re-tier, for the resolve job (design D4a).
@@ -320,6 +335,10 @@ jobs:
     name: resolve review conversations
     needs: review
     if: needs.review.result == 'success'
+    # The review's group: a later run's review cancels this one, as it would the review (D3).
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
