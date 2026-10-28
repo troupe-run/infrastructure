@@ -2,8 +2,8 @@
 
 ## ADDED Requirements
 
-### Requirement: The review judges a reply in a review conversation when it's posted
-When a person with write access to the repository replies in one of a pull request's review conversations, a review
+### Requirement: The review judges a reply to one of its must-fixes when it's posted
+When a person with write access to the repository replies in an open must-fix conversation the review opened, a review
 run SHALL start for the pull request, with no push and nothing re-run by hand. It SHALL be the same review a push
 starts, of the pull request's current head, so it judges the reply with the rest of the conversations. Re-running a
 review run by hand SHALL still work.
@@ -14,11 +14,11 @@ review run by hand SHALL still work.
   says which
 
 #### Scenario: A burst of replies
-- **WHEN** the author replies in three conversations within a minute
+- **WHEN** the author replies in three must-fix conversations within a minute
 - **THEN** each reply cancels the run the one before it started, and the last reply's run judges all three
 
 #### Scenario: A reply while a review is running
-- **WHEN** a person replies in a conversation while a review of the pull request is running
+- **WHEN** a person replies to a must-fix while a review of the pull request is running
 - **THEN** that review is cancelled, and the reply's run reviews the pull request as a push's run would
 
 #### Scenario: A push after a reply
@@ -29,10 +29,27 @@ review run by hand SHALL still work.
 - **WHEN** a reply's review run fails
 - **THEN** re-running it, or the pull request's last `claude review` run, judges the reply
 
-### Requirement: Only a person's reply starts a review
-A review comment SHALL start a review only when it replies to another comment in a conversation, its author is not a
-bot and has write access to the repository, and the pull request isn't from a fork or opened by a bot. Any other review
-comment SHALL start no review, SHALL NOT fail its run, and SHALL get no secret when it comes from a fork.
+### Requirement: Only a person's reply to an open must-fix starts a review
+A review comment SHALL start a review only when it replies in an open conversation the review opened whose tier is
+must-fix, its author is not a bot and has write access to the repository, and the pull request isn't from a fork or
+opened by a bot. Any other review comment SHALL start no review, SHALL NOT fail its run, and SHALL get no secret when it
+comes from a fork.
+
+#### Scenario: The author answers a nit
+- **WHEN** the author, or an agent with the author's login, replies to a nit saying what it did
+- **THEN** no review starts, and the nit is the author's to resolve
+
+#### Scenario: A reply to a decision
+- **WHEN** someone replies in a conversation labelled decision
+- **THEN** no review starts, since no review resolves a decision
+
+#### Scenario: A reply in a person's own conversation, or a resolved one
+- **WHEN** someone replies in a conversation a person opened, or in a must-fix that's already resolved
+- **THEN** no review starts until the next push or must-fix reply
+
+#### Scenario: The conversation replied to can't be read
+- **WHEN** a reply's run can't read the pull request's review conversations
+- **THEN** no review starts, the run fails saying so, and re-running it once they can be read judges the reply
 
 #### Scenario: The review's own comments
 - **WHEN** `troupe-run-review[bot]` posts a finding, or a reply that re-tiers one
@@ -102,6 +119,7 @@ SHALL be limited to reading the pull request and commenting. The run SHALL NOT u
 
 #### Scenario: The reply trigger is widened
 - **WHEN** a change starts the review on another event, such as `issue_comment` or `pull_request_review`, or on another
-  review comment action, drops the reply-only, bot, write-access or fork skip, or moves the concurrency group back to
-  the workflow, where a skipped run joins it
+  review comment action, drops the reply-only, bot, write-access or fork skip, lets the review start without the check
+  that the reply is to an open must-fix of the review's, puts that check in the concurrency group, or moves the group
+  back to the workflow, where a skipped run joins it
 - **THEN** `scripts/check.py` fails, naming what changed
