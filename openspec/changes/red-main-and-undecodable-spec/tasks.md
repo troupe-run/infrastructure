@@ -31,7 +31,7 @@
   stdout that isn't `name=value`, and exits 1 with the annotation as now. Update `main()`, moving "CI passed on" to
   stderr. Verify `uv run pytest scripts/tests/test_main_ci.py` passes and `uv run scripts/check.py` is clean
   (mypy --strict, ruff), then commit.
-- [ ] 2.4 Run the gate read-only against this repository's real `main` after a fetch
+- [x] 2.4 Run the gate read-only against this repository's real `main` after a fetch
   (`GH_TOKEN` from `gh auth token`, `python3 scripts/main_ci.py --main origin/main --repository
   troupe-run/infrastructure --summary <scratch file>`). Verify stdout is one `superseded=` line and the summary
   names the right commit (compare with `gh run list --workflow ci.yml --branch main --event push -L 3`). Also run the
@@ -40,12 +40,12 @@
 
 ## 3. The workflow skips the plan on a superseded run (#202; design D2, D3)
 
-- [ ] 3.1 In `scripts/tests/test_main_ci_workflow.py`, extend `problems()` first: the gate has `id: ci` and appends
+- [x] 3.1 In `scripts/tests/test_main_ci_workflow.py`, extend `problems()` first: the gate has `id: ci` and appends
   stdout to `$GITHUB_OUTPUT`; every plan step after the gate, except `Keep the saved plan for the apply job`, has
   `steps.ci.outputs.superseded != 'true'` in its `if:`. Add mutations, each caught: the gate's id dropped, its
   output not redirected, and the condition taken off `Plan` and off the guard wait. Update the module docstring.
   Verify the new checks fail on the current `tofu.yml`.
-- [ ] 3.2 Update `.github/workflows/tofu.yml`: give the gate `id: ci` and `>> "$GITHUB_OUTPUT"`, add the condition to
+- [x] 3.2 Update `.github/workflows/tofu.yml`: give the gate `id: ci` and `>> "$GITHUB_OUTPUT"`, add the condition to
   each later step's `if:`, and update the gate's comment and the header table's line about a red `main`. Verify
   `uv run pytest scripts/tests/test_main_ci_workflow.py scripts/tests/test_plan_target_workflow.py` passes, and
   `uv run scripts/check.py` is clean (it runs actionlint if the repository does), then commit.
