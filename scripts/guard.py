@@ -2560,6 +2560,16 @@ def review_resolve_decision(rest: Sequence[str], cwd: Path) -> Decision:
             "the conversation this resolveReviewThread names can't be read before it runs.",
             'Name it in the query (threadId: "PRRT_...") or with -f <variable>=<id>.',
         )
+    # The guard reads the command's text, not the shell's values, so $TID would reach GitHub as
+    # the text "$TID" and fail as if the read did (guard-names-thread-reply-route design D4).
+    if SHELL_EXPANSION.search(thread_id):
+        return Decision(
+            "gh-allow-list",
+            f"the conversation's id ({thread_id}) is filled in by the shell, so the guard can't "
+            "read it before it runs.",
+            'Write the conversation\'s id out in the command: threadId: "PRRT_..." in the query, '
+            "or a field on the command (-f <variable>=PRRT_...).",
+        )
     try:
         node = read_review_thread(thread_id)
     except ReviewLookupError as error:

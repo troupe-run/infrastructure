@@ -29,13 +29,13 @@ issue when it reaches `main`. The pull request closes #210.
 
 ## 2. A thread id the shell fills in is refused for what it is (design D4)
 
-- [ ] 2.1 Write the test first in `scripts/tests/test_guard_review_threads.py`, parametrized over `threadId: "$TID"` in
+- [x] 2.1 Write the test first in `scripts/tests/test_guard_review_threads.py`, parametrized over `threadId: "$TID"` in
   a double-quoted query, `threadId: $id` with `-f id=$TID`, and `-F id="$(cat f)"`: the resolve is refused under
   `gh-allow-list`, the fix says to write the id out and doesn't mention gh's login, and the `lookup` fixture records no
   call. Verify it fails on the current guard (the refusal says "couldn't be read" and a lookup is made)
-- [ ] 2.2 In `review_resolve_decision`, refuse an id `SHELL_EXPANSION` matches before calling `read_review_thread`.
+- [x] 2.2 In `review_resolve_decision`, refuse an id `SHELL_EXPANSION` matches before calling `read_review_thread`.
   Verify the 2.1 test and every existing test in `test_guard_review_threads.py` pass
-- [ ] 2.3 Add to "Resolving a nit" in `docs/development-workflow.md` that the id is written out in the command, since a
+- [x] 2.3 Add to "Resolving a nit" in `docs/development-workflow.md` that the id is written out in the command, since a
   shell variable's value can't be read before it runs. Verify `uv run scripts/check.py` passes (mypy `--strict`, ruff,
   the full suite with `GITHUB_ACTIONS` set and unset), then commit with `Part of #210`
 

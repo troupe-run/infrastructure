@@ -84,11 +84,13 @@ body=...`. A top-level `gh pr comment` isn't in the conversation. The `.../comme
 **Resolving a nit** is the one GraphQL mutation an agent may send (spec: development-workflow, "An agent resolves only a
 nit"; `GH_MUTATIONS_CONDITIONAL` in `scripts/guard.py`): `gh` and GitHub's REST API have no way to resolve a
 conversation. The guard allows `resolveReviewThread` only for one conversation per command, named in the query
-(`threadId: "PRRT_..."`) or by a `-f` field, after it has read the conversation from GitHub with your `gh` login: the
-review (`troupe-run-review`, a Bot) opened it, and the review's latest label among its last 100 comments is nit. A
-must-fix, a decision, an unlabelled finding and a person's conversation are refused, and so is a resolve when the read
-fails or takes more than 20 seconds. `unresolveReviewThread` is refused: reopening a conversation is the owner's. This
-is enforced only here, locally: GitHub can't tell an agent's resolve from the owner's, since they share one login (#47).
+(`threadId: "PRRT_..."`) or by a `-f` field, written out: the guard reads the command's text, not the shell's values, so
+an id passed through a shell variable or substitution (`"$TID"`, `$(...)`) is refused before any lookup, with a fix that
+says to write it out. It allows it after it has read the conversation from GitHub with your `gh` login: the review
+(`troupe-run-review`, a Bot) opened it, and the review's latest label among its last 100 comments is nit. A must-fix, a
+decision, an unlabelled finding and a person's conversation are refused, and so is a resolve when the read fails or
+takes more than 20 seconds. `unresolveReviewThread` is refused: reopening a conversation is the owner's. This is
+enforced only here, locally: GitHub can't tell an agent's resolve from the owner's, since they share one login (#47).
 
 ## Rules
 
