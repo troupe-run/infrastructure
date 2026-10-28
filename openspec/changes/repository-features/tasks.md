@@ -1,0 +1,87 @@
+# Tasks
+
+## 1. The owner's steps on GitHub (design D3, D5)
+
+Troupe's discussions are not turned on here: that's task 7.1, immediately before the merge (design D3).
+
+- [ ] 1.1 Ask the owner to turn on private vulnerability reporting in infrastructure. Verify
+  `gh api repos/troupe-run/infrastructure/private-vulnerability-reporting` returns `{"enabled":true}`.
+- [ ] 1.2 Ask the owner to run `gh project link 1 --owner troupe-run --repo troupe-run/infrastructure`. Verify the
+  `projects` GraphQL read in `scripts/oob.py` lists `infrastructure` for project 1, then add it to
+  `oob/projects.json`.
+- [ ] 1.3 Ask the owner to grant the infrastructure App **Discussions: read**, and declare it in
+  `oob/app-installations.json`. Verify `uv run scripts/oob.py` reports no difference for App installations.
+
+## 2. Repository features in the module (design D1, D2)
+
+- [ ] 2.1 Add `has_discussions` (default `false`), `has_issues` (default `true`) and `actions_enabled` (default
+  `true`) to `tofu/modules/repository/variables.tf`, and use the first two in `github_repository.this` in place of
+  the hard-coded values. Verify `tofu fmt -check` and `tofu validate` pass.
+- [ ] 2.2 Add `github_actions_repository_permissions.this` to the module (`enabled = var.actions_enabled`,
+  `allowed_actions` `"all"` when on, `sha_pinning_required = false`), with a comment citing design D2. Verify
+  `tofu validate` passes.
+- [ ] 2.3 In `tofu/repositories.tf`, set `has_discussions = true` on troupe, `has_issues = false` and
+  `actions_enabled = false` on `.github`, and `has_projects = true` on infrastructure, each with a comment saying why.
+  Verify `tofu validate` passes.
+- [ ] 2.4 Add four `import` blocks in `tofu/imports.tf` adopting each repository's Actions settings by name. Verify
+  a local plan imports all four, with no change for troupe, infrastructure and website (if `allowed_actions` plans a
+  change on `.github`, settle it as design D2 says, and record which).
+
+## 3. Out-of-band checks (design D4, D5, D9)
+
+- [ ] 3.1 Add `oob/private-vulnerability-reporting.json` (all four repositories, `enabled: true`) and a check in
+  `scripts/oob.py` that reads each repository's setting, reports one that's off, and treats a refused read as an
+  error naming the repository. Add tests to `scripts/tests/test_oob.py` for match, off, missing repository and a
+  refused read, each failing when its behaviour breaks. Verify `uv run pytest scripts/tests/test_oob.py` passes.
+- [ ] 3.2 Add `oob/discussion-categories.json` (Q&A, Ideas, Announcements: `name`, `slug`, `isAnswerable`) and a
+  `Check` reading troupe's categories through GraphQL. Add tests for match, a category added by hand, discussions
+  off (no categories), and a refused read. Verify the tests pass and `uv run scripts/oob.py` reports no difference.
+- [ ] 3.3 Add rows for both files to `oob/README.md`'s table, and a "Not managed" section listing the home page's
+  Releases, Packages and Deployments panels, Sponsorships, forking on a public repository, and a category's
+  announcement-only format, each with why. Verify the README's checks in `uv run scripts/check.py` pass.
+
+## 4. Org Pages settings (design D8)
+
+- [ ] 4.1 Set `members_can_create_pages`, `members_can_create_public_pages` and `members_can_create_private_pages` to
+  `false` in `tofu/org.tf`, with a comment citing design D8. Verify `tofu validate` passes and the plan shows only
+  those three changing on the org.
+
+## 5. Questions go to troupe's discussions (design D7)
+
+- [ ] 5.1 Add the "Ask a question" contact link to `org-profile/.github/ISSUE_TEMPLATE/config.yml`. Verify
+  `uv run pytest scripts/tests/test_org_profile.py` passes and the file parses as YAML.
+- [ ] 5.2 Add a "Questions" section to `org-profile/CONTRIBUTING.md`, before "How work flows", pointing to troupe's
+  discussions. Verify `uv run pytest scripts/tests/test_org_profile.py` passes.
+
+## 6. Evidence before the pull request
+
+- [ ] 6.1 Run `uv run scripts/check.py` and confirm it passes.
+- [ ] 6.2 Run a local plan against current state (fast-forwarded onto `origin/main`) and confirm it shows only: four
+  Actions imports, `.github`'s issues and Actions off, infrastructure's projects on, the three org Pages settings, and
+  the two `.github` file updates. Quote it in the pull request.
+- [ ] 6.3 Run `uv run scripts/oob.py` and confirm its only differences are the three discussion categories missing
+  from troupe (discussions are still off until 7.1), with the new checks among those it ran. Quote it in the pull
+  request.
+
+## 7. Immediately before the merge (design D3)
+
+This group is done after review and archive, as the last thing before the owner merges. Until the merge, every plan
+of `main` shows troupe's discussions turning back off, so the window is kept to minutes.
+
+- [ ] 7.1 Ask the owner to turn discussions on in troupe and trim its categories to Q&A, Ideas and Announcements
+  (Announcements announcement-only), then merge. Verify with `gh api graphql` (`repository(owner:"troupe-run",
+  name:"troupe") { hasDiscussionsEnabled discussionCategories(first:20) { nodes { name slug isAnswerable } } }`):
+  discussions on, exactly those three, only Q&A answerable; and `uv run scripts/oob.py` reports no differences.
+- [ ] 7.2 Before the merge lands, check that no apply of `main` is waiting for approval; if one is, tell the owner its
+  plan turns troupe's discussions off, so they don't approve it until this change's apply.
+
+## Workflow follow-up
+
+- After the apply, open infrastructure's new-issue page and confirm it offers the Feature, Bug and Decision forms and
+  "Ask a question" (design D6). If the forms are gone, open a pull request setting `.github`'s `has_issues` back to
+  `true` and raise it with the owner.
+- After the apply, re-run the website's deploy on `main` and confirm https://troupe.run serves it, and that the next
+  plan shows no change to `github_repository_pages` (design D8). If either fails, revert the Pages settings by pull
+  request and raise it with the owner.
+- Confirm the drift job of the next plan of `main` is green.
+- Comment on #136 with the pull request and the archived change, and check its roadmap card says Done.
