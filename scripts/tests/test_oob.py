@@ -100,10 +100,12 @@ def fake_github(
     milestones: dict[str, Any] | None = None,
     failures: dict[str, BaseException] | None = None,
     board: dict[str, Any] | BaseException = BOARD,
+    raw_spec_content: dict[str, str] | None = None,
 ) -> oob.Fetch:
     """GitHub as declared. attachments maps a repository to its attachment (None: 204, nothing
     attached); graphs maps a repository to what reading its dependency graph raises; failures
-    maps a piece of a read's path (or "graphql") to what that read raises."""
+    maps a piece of a read's path (or "graphql") to what that read raises; raw_spec_content maps
+    a spec to the content GitHub answers for its spec.md, as is, not base64-encoded here."""
     docs = {"cli": CLI_SPEC} if spec_docs is None else spec_docs
     configs = [BASELINE] if configurations is None else configurations
     attached = attachments or {}
@@ -137,6 +139,8 @@ def fake_github(
             return 3
         if args[1].endswith("/spec.md"):
             name = args[1].split("/")[-2]
+            if raw_spec_content and name in raw_spec_content:
+                return {"content": raw_spec_content[name]}
             return {"content": base64.b64encode(docs[name].encode()).decode()}
         if args[1].endswith("/contents/openspec/specs"):
             return specs
@@ -326,6 +330,29 @@ def test_a_failed_spec_read_is_unreadable_naming_the_spec(oob_dir: Path) -> None
     assert report.differences == []
     assert report.unreadable == [
         "troupe specs: couldn't read 'cli''s spec.md (gh: Bad Gateway (HTTP 502))",
+        "troupe label descriptions: not checked, since troupe's specs couldn't be read",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("content", "why"),
+    [
+        ("abc", "Incorrect padding"),
+        (
+            base64.b64encode(b"\xff\xfe").decode(),
+            "'utf-8' codec can't decode byte 0xff in position 0: invalid start byte",
+        ),
+    ],
+    ids=["not-base64", "not-utf-8"],
+)
+def test_an_undecodable_spec_is_unreadable_naming_the_spec(
+    oob_dir: Path, content: str, why: str
+) -> None:
+    fetch = fake_github(TYPES, PROJECTS, [], raw_spec_content={"cli": content})
+    report = REPORT(fetch, oob_dir)
+    assert report.differences == []
+    assert report.unreadable == [
+        f"troupe specs: couldn't read 'cli''s spec.md ({why})",
         "troupe label descriptions: not checked, since troupe's specs couldn't be read",
     ]
 
