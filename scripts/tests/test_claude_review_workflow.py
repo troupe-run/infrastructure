@@ -33,6 +33,13 @@ FIXTURES = Path(__file__).parent / "fixtures"
 DENIED = FIXTURES / "claude-execution-denied.json"
 CLEAN = FIXTURES / "claude-execution-clean.json"
 EVENTS = ["opened", "synchronize", "reopened", "ready_for_review"]
+# A person's reply in a review conversation starts the review too, when it's posted
+# (review-judge-reply-on-post design D2). Only `created`: an edit is judged on the next run.
+COMMENT_EVENTS = ["created"]
+TRIGGERS = {
+    "pull_request": {"types": EVENTS},
+    "pull_request_review_comment": {"types": COMMENT_EVENTS},
+}
 # The run's own token only checks out the code (design D1). No id-token: without it the action can't
 # swap OIDC for a Claude App token that writes contents.
 PERMISSIONS = {"contents": "read"}
@@ -48,11 +55,22 @@ TOKEN_INPUTS = {
     "permission-contents": "read",
     "permission-pull-requests": "write",
 }
-# Bots' pull requests and forks' are skipped, not failed (design D2).
+# Bots' pull requests and forks' are skipped, not failed (design D2). A review comment starts
+# the review only when it's a reply, not a bot's (the review's own comments would start it
+# again), and by someone with write access; anyone else's is skipped, not failed
+# (review-judge-reply-on-post design D2).
 SKIP = (
     "github.event.pull_request.user.type != 'Bot' && "
-    "github.event.pull_request.head.repo.full_name == github.repository"
+    "github.event.pull_request.head.repo.full_name == github.repository && "
+    "(github.event_name == 'pull_request' || "
+    "(github.event.comment.in_reply_to_id != null && "
+    "github.event.comment.user.type != 'Bot' && "
+    'contains(fromJSON(\'["OWNER","MEMBER","COLLABORATOR"]\'), '
+    "github.event.comment.author_association)))"
 )
+# On each job, never the workflow: a run whose review is skipped, such as the one each of the
+# review's own comments starts, mustn't join the group and cancel the review that posted it
+# (review-judge-reply-on-post design D3).
 CONCURRENCY = {
     "group": "claude-review-${{ github.event.pull_request.number }}",
     "cancel-in-progress": True,
@@ -280,11 +298,14 @@ def resolve_job_problems(job: dict[str, Any]) -> list[str]:
 def problems(workflow: dict[str, Any]) -> list[str]:
     found = []
     on = workflow.get("on") or {}
-    if set(on) != {"pull_request"}:
-        found.append(f"it runs on {sorted(on)}, not on pull_request only")
-    types = (on.get("pull_request") or {}).get("types")
-    if types != EVENTS:
-        found.append(f"it runs on pull_request {types!r}, not {EVENTS!r}")
+    if set(on) != set(TRIGGERS):
+        found.append(
+            f"it runs on {sorted(on)}, not on pull_request and pull_request_review_comment only"
+        )
+    for event, wanted in TRIGGERS.items():
+        types = (on.get(event) or {}).get("types")
+        if types != wanted["types"]:
+            found.append(f"it runs on {event} {types!r}, not {wanted['types']!r}")
     if workflow.get("permissions") != PERMISSIONS:
         found.append(
             f"the default permissions are {workflow.get('permissions')!r}, not {PERMISSIONS!r}"
@@ -299,18 +320,27 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         found.append(f"review's outputs are {job.get('outputs')!r}, not {REVIEW_OUTPUTS!r}")
 
     if job.get("if") != SKIP:
-        found.append(f"review runs when {job.get('if')!r}, not skipping bots and forks")
+        found.append(
+            f"review runs when {job.get('if')!r}, not skipping bots, forks, outsiders and "
+            "comments that aren't replies"
+        )
     if job.get("permissions") != PERMISSIONS:
         found.append(
             f"review's GITHUB_TOKEN permissions are {job.get('permissions')!r}, not {PERMISSIONS!r}"
         )
     if "environment" in job:
         found.append(f"review runs in environment {job['environment']!r}; it needs none")
-    concurrency = workflow.get("concurrency")
-    if concurrency != CONCURRENCY:
+    if "concurrency" in workflow:
         found.append(
-            f"its concurrency is {concurrency!r}, not one run per pull request, cancelling the last"
+            "its concurrency group is at the workflow level, where a run whose review is skipped "
+            "joins it and cancels a running review"
         )
+    for name, each in jobs.items():
+        if each.get("concurrency") != CONCURRENCY:
+            found.append(
+                f"{name}'s concurrency is {each.get('concurrency')!r}, not one run per pull "
+                "request, cancelling the last"
+            )
     if not isinstance(job.get("timeout-minutes"), int):
         found.append("review has no timeout-minutes")
 
@@ -486,6 +516,11 @@ def tools(w: dict[str, Any], change: str) -> None:
     action(w)["claude_args"] = str(action(w)["claude_args"]).replace("Bash(gh pr view:*)", change)
 
 
+def unskip(w: dict[str, Any], part: str, to: str = "") -> None:
+    assert part in str(job(w)["if"]), part
+    job(w)["if"] = str(job(w)["if"]).replace(part, to)
+
+
 def sources(w: dict[str, Any], change: str) -> None:
     action(w)["claude_args"] = str(action(w)["claude_args"]).replace(
         "--setting-sources user", change
@@ -495,17 +530,50 @@ def sources(w: dict[str, Any], change: str) -> None:
 @pytest.mark.parametrize(
     ("change", "named"),
     [
-        (lambda w: w.update({"on": {"pull_request_target": None}}), "not on pull_request only"),
-        (lambda w: w["on"].update({"push": None}), "not on pull_request only"),
+        (lambda w: w.update({"on": {"pull_request_target": None}}), "not on pull_request and"),
+        (lambda w: w["on"].update({"push": None}), "not on pull_request and"),
+        (lambda w: w["on"].update({"issue_comment": None}), "not on pull_request and"),
+        (lambda w: w["on"].update({"pull_request_review": None}), "not on pull_request and"),
+        (lambda w: w["on"].pop("pull_request_review_comment"), "not on pull_request and"),
+        (
+            lambda w: w["on"]["pull_request_review_comment"]["types"].append("edited"),
+            "pull_request_review_comment ['created', 'edited'], not ['created']",
+        ),
+        (
+            lambda w: w["on"]["pull_request_review_comment"].pop("types"),
+            "pull_request_review_comment None",
+        ),
         (lambda w: w["on"]["pull_request"]["types"].append("edited"), "not ['opened'"),
         (lambda w: w["on"]["pull_request"]["types"].remove("synchronize"), "not ['opened'"),
         (lambda w: w["on"]["pull_request"]["types"].remove("ready_for_review"), "not ['opened'"),
         (lambda w: w.update({"permissions": {"contents": "write"}}), "default permissions"),
         (lambda w: w.pop("permissions"), "default permissions"),
-        (lambda w: job(w).pop("if"), "not skipping bots and forks"),
+        (lambda w: job(w).pop("if"), "not skipping bots, forks, outsiders"),
         (
             lambda w: job(w).update({"if": "github.event.pull_request.user.type != 'Bot'"}),
-            "not skipping bots and forks",
+            "not skipping bots, forks, outsiders",
+        ),
+        (
+            lambda w: unskip(w, "github.event.comment.in_reply_to_id != null && "),
+            "not skipping bots, forks, outsiders",
+        ),
+        (
+            lambda w: unskip(w, "github.event.comment.user.type != 'Bot' && "),
+            "not skipping bots, forks, outsiders",
+        ),
+        (
+            lambda w: unskip(w, '"COLLABORATOR"', '"COLLABORATOR","CONTRIBUTOR"'),
+            "not skipping bots, forks, outsiders",
+        ),
+        (
+            lambda w: unskip(
+                w, "github.event.pull_request.head.repo.full_name == github.repository && "
+            ),
+            "not skipping bots, forks, outsiders",
+        ),
+        (
+            lambda w: unskip(w, "github.event_name == 'pull_request' || "),
+            "not skipping bots, forks, outsiders",
         ),
         (
             lambda w: job(w)["permissions"].update({"id-token": "write"}),
@@ -552,8 +620,20 @@ def sources(w: dict[str, Any], change: str) -> None:
         ),
         (lambda w: job(w).pop("permissions"), "review's GITHUB_TOKEN permissions"),
         (lambda w: job(w).update({"environment": "plan-pr"}), "it needs none"),
-        (lambda w: w.pop("concurrency"), "one run per pull request"),
-        (lambda w: w["concurrency"].update({"cancel-in-progress": False}), "cancelling the last"),
+        (lambda w: job(w).pop("concurrency"), "review's concurrency is None"),
+        (lambda w: resolve_job(w).pop("concurrency"), "resolve's concurrency is None"),
+        (
+            lambda w: job(w)["concurrency"].update({"cancel-in-progress": False}),
+            "review's concurrency",
+        ),
+        (
+            lambda w: resolve_job(w)["concurrency"].update({"group": "claude-resolve"}),
+            "resolve's concurrency",
+        ),
+        (
+            lambda w: w.update({"concurrency": job(w).pop("concurrency")}),
+            "at the workflow level",
+        ),
         (lambda w: job(w).pop("timeout-minutes"), "no timeout-minutes"),
         (lambda w: w["jobs"].update({"other": {}}), "not review and resolve"),
         (
