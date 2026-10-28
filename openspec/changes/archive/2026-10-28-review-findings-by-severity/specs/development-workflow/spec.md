@@ -3,8 +3,7 @@
 ### Requirement: Agents don't act as the owner
 In a Claude Code session, a `gh` command that performs an act reserved for the owner SHALL be refused, in any
 repository, with a fix naming the owner, or this repository for anything OpenTofu manages. The acts are:
-- merging a pull request, which includes adding it to a merge queue, turning on auto-merge, and merging past its
-  rules;
+- merging a pull request, by any route;
 - approving or rejecting a deployment;
 - changing a ruleset, branch protection or an environment;
 - org and repository administration;

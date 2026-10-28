@@ -42,7 +42,7 @@
   or timed-out lookup, a query that names two conversations, a `threadId` from `-F field=@file` or stdin, and
   `unresolveReviewThread` are each refused saying why. Stub the lookup's `gh` call on PATH (memory: real-shell stub
   tests); verify they fail on main's `guard.py`
-- [ ] 3.2 Implement the condition and lookup under `gh-allow-list`, and give `GH_MUTATIONS_ALLOWED`'s comment the
+- [x] 3.2 Implement the condition and lookup under `gh-allow-list`, and give `GH_MUTATIONS_ALLOWED`'s comment the
   reason this one is allowed; verify the 3.1 tests, the full suite on all three OSes in CI, `mypy --strict` and ruff
 - [x] 3.3 Run the branch's `guard.py` hook over a fresh scratch clone of troupe with a stubbed lookup (memory: probe
   the guard on a troupe clone); verify a nit's resolve is allowed and a must-fix's is refused there too
@@ -81,7 +81,7 @@
   `scripts/tests/` that fails when the setting is false or missing; verify `tofu fmt -check`, `tofu validate`, the
   test, and a local plan (fast-forwarded onto origin/main first) showing the one in-place change on each of the three
   `protect main` rulesets
-- [ ] 5.2 List every open pull request's unresolved conversations in troupe, infrastructure and website
+- [x] 5.2 List every open pull request's unresolved conversations in troupe, infrastructure and website
   (`reviewThreads` with `isResolved: false`), and post the list on the pull request for the owner before approving
   the plan; verify the comment is there
 
