@@ -2,8 +2,11 @@
 
 ## Purpose
 
-Declares the credential an automated run uses to put an issue it opened on the troupe roadmap board: the App's
-installation, the main-only environment on troupe-run/website that holds its key, and the variable that names the App.
+Declares the credential the org's automated runs use to write to the troupe roadmap board: the App's installation,
+the main-only `board` environments on troupe-run/website and troupe-run/infrastructure that hold its key, and the
+variable that names the App. A run uses it to put an issue it opened on the board (website's weekly link check, and
+infrastructure's schedule watch and `dependabot-issues`), and to set the board's `Capability` options' descriptions
+after an approved apply (spec: labels).
 
 ## Requirements
 

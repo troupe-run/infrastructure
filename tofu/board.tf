@@ -1,9 +1,11 @@
-# What the org's automated runs need to put an issue they opened on the troupe roadmap board
-# (spec: board-credentials): website's weekly link check (#59), and infrastructure's watch of the
-# org's scheduled workflows (#60, spec: schedule-watch). Each opens its issue with GITHUB_TOKEN, which
-# can't write an org project, so a separate job adds it with the troupe-run-board App's token. The
-# App itself is created by hand and declared in oob/app-installations.json (add-link-issue-to-board
-# design D1, D4). Both repositories get the same environment and variable.
+# What the org's automated runs need to write to the troupe roadmap board (spec: board-credentials).
+# website's weekly link check (#59), and infrastructure's watch of the org's scheduled workflows
+# (#60, spec: schedule-watch) and dependabot-issues (#172), each open an issue with a token that
+# can't write an org project, so a separate job adds it with the troupe-run-board App's token.
+# tofu.yml's board job uses the same token to set the board's Capability options' descriptions
+# after an approved apply (spec: labels). The App itself is created by hand and declared in
+# oob/app-installations.json (add-link-issue-to-board design D1, D4). Both repositories get the
+# same environment and variable.
 
 locals {
   # Not a secret: it names the App, and minting a token also needs the key. The App's IDs are

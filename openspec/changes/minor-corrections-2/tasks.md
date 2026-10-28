@@ -2,7 +2,7 @@
 
 ## 1. The board key's description (#143 comment 1)
 
-- [ ] 1.1 In `openspec/specs/board-credentials/spec.md`, rewrite the Purpose: the credential the org's automated
+- [x] 1.1 In `openspec/specs/board-credentials/spec.md`, rewrite the Purpose: the credential the org's automated
   runs use to write to the troupe roadmap board, which is the App's installation, the main-only `board` environments
   on troupe-run/website and troupe-run/infrastructure that hold its key, and the variable that names the App. Name
   both uses: putting an issue a run opened on the board (website's weekly link check, infrastructure's schedule watch
@@ -10,10 +10,10 @@
   (spec: labels). Verify by reading it against `tofu/board.tf` and every workflow that reads `BOARD_APP_PRIVATE_KEY`
   (`git grep -n BOARD_APP_PRIVATE_KEY -- .github`), and that `openspec validate board-credentials --type spec
   --strict` passes
-- [ ] 1.2 Make `README.md:28` (the `tofu/board.tf` row), `tofu/board.tf:1-6` and `oob/README.md:121-126` say the
+- [x] 1.2 Make `README.md:28` (the `tofu/board.tf` row), `tofu/board.tf:1-6` and `oob/README.md:121-126` say the
   same, naming `dependabot-issues` and the board's descriptions. Verify `tofu fmt -check` and `tofu validate` are
   clean (run by `uv run scripts/check.py`), and that the three read consistently with the Purpose
-- [ ] 1.3 Check the delta `specs/board-credentials/spec.md` renames "The board key is readable from website's main
+- [x] 1.3 Check the delta `specs/board-credentials/spec.md` renames "The board key is readable from website's main
   only" to "The board key is readable from main only", and nothing else. Verify `openspec validate
   minor-corrections-2 --strict` passes
 
