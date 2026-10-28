@@ -61,6 +61,11 @@ which says who resolves it (spec: pr-review; review-findings-by-severity design 
 A conversation's tier is the latest label the review gave in it: only the review re-tiers, by replying with a new label
 and its reason. A label in anyone else's reply counts for nothing.
 
+**The review runs on each push, not on a reply.** A must-fix answered with a reply alone stays open until the review
+runs again: re-run the pull request's last `claude review` run (`gh run rerun <id>`, which the guard allows, or "Re-run
+jobs" on GitHub). Both jobs read the conversations afresh, so the reply is judged. In infrastructure that's cheaper than
+a push, which asks for the plan's approval again.
+
 **Before the change is archived**, the session that owns it waits for the review of its last push and acts on each
 finding by its tier (spec: development-workflow, "Review findings are acted on before a change is archived"). The `main`
 ruleset refuses a merge, and the merge queue, while any conversation is unresolved (spec: rulesets), and the owner
