@@ -14,7 +14,7 @@
 
 ## 2. The gate's superseded outcome (#202; spec ci-apply, "A scheduled or manual plan superseded by a newer merge plans nothing", "A red main fails ..."; design D1, D2)
 
-- [ ] 2.1 In `scripts/tests/test_main_ci.py`, extend `FakeCI` to answer `api repos/.../compare/<sha>...main` from a
+- [x] 2.1 In `scripts/tests/test_main_ci.py`, extend `FakeCI` to answer `api repos/.../compare/<sha>...main` from a
   given answer (or raise `ReadError`), recording that it was asked. Write tests first, each named for what its body
   checks: a cancel with `main` ahead by a merge is superseded (passed, `superseded`, summary names both short shas
   and the cancelled run's link, no "isn't green" heading); a cancel with `main` identical fails as red; a cancel with
@@ -23,10 +23,10 @@
   listed names "`main`'s head" with no sha; `failure`, `timed_out` and the other non-success conclusions fail
   **without** asking compare. Change `test_every_conclusion_but_success_fails` so its `cancelled` case has `main`
   unmoved, and say so in its name or a comment. Verify the new tests fail before 2.2.
-- [ ] 2.2 Add the compare read and `Result.superseded` to `scripts/main_ci.py` per D1 and D2, `STATE_PATH` still from
+- [x] 2.2 Add the compare read and `Result.superseded` to `scripts/main_ci.py` per D1 and D2, `STATE_PATH` still from
   `plan_target`, and update its module docstring (the outcomes and the stdout line). Verify
   `uv run pytest scripts/tests/test_main_ci.py` passes.
-- [ ] 2.3 Write tests of `main()` first: a pass prints exactly `superseded=false` on stdout and exits 0; a superseded
+- [x] 2.3 Write tests of `main()` first: a pass prints exactly `superseded=false` on stdout and exits 0; a superseded
   run prints exactly `superseded=true`, appends its summary and exits 0 with no `::error::`; red prints nothing to
   stdout that isn't `name=value`, and exits 1 with the annotation as now. Update `main()`, moving "CI passed on" to
   stderr. Verify `uv run pytest scripts/tests/test_main_ci.py` passes and `uv run scripts/check.py` is clean

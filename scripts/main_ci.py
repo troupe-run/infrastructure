@@ -4,9 +4,12 @@ Usage (in .github/workflows/tofu.yml's `plan` job, after a checkout of main with
     python3 scripts/main_ci.py --main origin/main --repository "$GITHUB_REPOSITORY" \
         --summary "$GITHUB_STEP_SUMMARY"
 
-Exits 0 once CI has passed, adding one line to the summary. Otherwise exits 1 with an error
-annotation, and the summary names the commit, links the CI run and says how to recover. Spec:
-ci-apply ("A scheduled or manual plan of main waits for green CI"); plans-wait-for-ci design D1-D4.
+Prints `superseded=true` or `superseded=false` on stdout, for "$GITHUB_OUTPUT". Exits 0 once CI
+has passed, adding one line to the summary, or when a newer merge superseded the run (below), saying
+so. Otherwise exits 1 with an error annotation, and the summary names the commit, links the CI run
+and says how to recover. Spec: ci-apply ("A scheduled or manual plan of main waits for green CI",
+"A scheduled or manual plan superseded by a newer merge plans nothing"); plans-wait-for-ci design
+D1-D4; red-main-and-undecodable-spec design D1, D2.
 
 Which commit's CI: the one CI runs on for main's head. CI's push trigger ignores a push that changes
 only the state file (ci.yml's paths-ignore), so, walking main's first-parent history from its head:
@@ -17,6 +20,12 @@ The walk runs again at every poll, so a run appearing on a later commit of the s
 
 The newest run on that commit decides: success passes; any other conclusion fails; a status this
 doesn't know fails, never counting as "still running". It waits up to LIMIT_SECONDS.
+
+A cancelled run is the one exception. CI on main cancels an older run when a newer push lands, and
+the walk reads main as fetched when this run started, so a merge during the wait isn't seen (#202).
+So on a cancel it asks GitHub to compare the commit with main now. Ahead by a commit that changes
+more than the state file: superseded, and the newer merge's own run plans main. Identical, ahead
+only by state commits, any other answer, or a read that fails: red, as for any other conclusion.
 
 Standard library, git and gh only: the job runs it with the runner's python3, before uv is set up.
 """
@@ -57,6 +66,7 @@ class Result:
     sha: str | None
     summary: str
     error: str = ""
+    superseded: bool = False
 
 
 def gh(args: list[str]) -> Any:  # noqa: ANN401 (JSON)
@@ -79,6 +89,30 @@ def ci_run(gh_: Gh, repository: str | None, sha: str) -> dict[str, Any] | None:
     if not isinstance(found, list):
         raise ReadError(f"gh run list printed {type(found).__name__}, not a list")
     return found[0] if found else None
+
+
+def compare(gh_: Gh, repository: str | None, sha: str) -> dict[str, Any]:
+    """GitHub's comparison of this commit with main now: its status, how many commits main has
+    since, the newest it lists, and the files they change. A shape this doesn't expect is a failed
+    read, never "moved" or "not moved"."""
+    where = repository or "{owner}/{repo}"
+    found = gh_(
+        [
+            "api", f"repos/{where}/compare/{sha}...main", "--jq",
+            "{status, total_commits, commits: [.commits[].sha], files: [.files[]?.filename]}",
+        ]
+    )  # fmt: skip
+    if not (
+        isinstance(found, dict)
+        and isinstance(found.get("status"), str)
+        and isinstance(found.get("total_commits"), int)
+        and isinstance(found.get("commits"), list)
+        and all(isinstance(commit, str) for commit in found["commits"])
+        and isinstance(found.get("files"), list)
+        and all(isinstance(name, str) for name in found["files"])
+    ):
+        raise ReadError(f"GitHub's compare of {short(sha)} with main isn't the shape expected")
+    return found
 
 
 def state_only(repo: Path, sha: str) -> bool:
@@ -114,6 +148,51 @@ def red(repo: Path, sha: str, found: dict[str, Any] | None, why: str) -> Result:
     return Result(False, sha, summary, f"CI on {sha} {why}; not planning.")
 
 
+def after_cancel(
+    repo: Path, sha: str, found: dict[str, Any], gh_: Gh, repository: str | None
+) -> Result:
+    """Superseded when main has moved past the cancelled commit by one CI runs on; red otherwise."""
+    cancelled = "concluded **cancelled**"
+    try:
+        moved = compare(gh_, repository, sha)
+    except ReadError as error:
+        return red(
+            repo,
+            sha,
+            found,
+            f"{cancelled}, and whether `main` has moved past it couldn't be read: {error}",
+        )
+    status = moved["status"]
+    if status == "identical":
+        return red(repo, sha, found, cancelled)
+    if status != "ahead":
+        return red(
+            repo, sha, found, f"{cancelled}, and GitHub compares `main` with it as **{status}**"
+        )
+    if all(name == STATE_PATH for name in moved["files"]):
+        return red(
+            repo,
+            sha,
+            found,
+            f"{cancelled}, and `main` has moved past it only by commits that change {STATE_PATH},"
+            " which CI doesn't run on",
+        )
+    commits = moved["commits"]
+    head = (
+        f"`{short(commits[-1])}`"
+        if commits and moved["total_commits"] == len(commits)
+        else "`main`'s head"
+    )
+    summary = (
+        "### A newer merge superseded this run, so nothing was planned\n\n"
+        f"CI on {describe(repo, sha)} was cancelled, and `main` has since moved on to {head}."
+        f" [The cancelled run]({found['url']}).\n\n"
+        f"The run that starts when CI passes on {head} plans `main`. This run planned nothing and"
+        " asks for no approval.\n\n"
+    )
+    return Result(True, sha, summary, superseded=True)
+
+
 def wait_for_ci(
     repo: Path,
     main: str,
@@ -139,6 +218,8 @@ def wait_for_ci(
                 return Result(
                     True, sha, f"CI passed on {describe(repo, sha)}: [run]({found['url']}).\n\n"
                 )
+            if found["conclusion"] == "cancelled":
+                return after_cancel(repo, sha, found, gh_, repository)
             return red(repo, sha, found, f"concluded **{found['conclusion']}**")
         if found is not None and found["status"] not in WAITING:
             return red(repo, sha, found, f"has a status this doesn't know: **{found['status']}**")
@@ -160,10 +241,18 @@ def main(argv: list[str]) -> int:
     result = wait_for_ci(args.repo, args.main, gh, repository=args.repository)
     with args.summary.open("a", encoding="utf-8") as summary:
         summary.write(result.summary)
+    # Only name=value lines on stdout: the workflow appends it to $GITHUB_OUTPUT.
+    print(f"superseded={'true' if result.superseded else 'false'}")
     if not result.passed:
         print(f"::error::main_ci.py: {result.error}", file=sys.stderr)
         return 1
-    print(f"CI passed on {result.sha}")
+    if result.superseded:
+        print(
+            f"CI on {result.sha} was cancelled and main has moved past it; not planning",
+            file=sys.stderr,
+        )
+    else:
+        print(f"CI passed on {result.sha}", file=sys.stderr)
     return 0
 
 
