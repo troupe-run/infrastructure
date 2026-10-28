@@ -9,11 +9,11 @@
   run's SHA, and whether a repository secret `PROBE_SECRET` is set (never its value); `review` prints its checkout's
   SHA, then sleeps 120 seconds. Verify the workflow is on the probe's `main` and `gh secret list -R
   troupe-run/infra-probe-review-reply` names `PROBE_SECRET`
-- [ ] 1.2 Ask the owner to add the probe to the review App's installation, as #194's probe did, and to set
+- [x] 1.2 Ask the owner to add the probe to the review App's installation, as #194's probe did, and to set
   `REVIEW_APP_PRIVATE_KEY` on the probe from 1Password; open a pull request from a branch of the probe and, with a
   review App token, post two inline findings, one labelled must-fix and one nit; verify the pull request's run reaches
   `review`, and each finding's run is skipped at `gate`, as a bot's comment
-- [ ] 1.3 Reply to the must-fix as the owner; record the reply's `author_association`, that `gate` says yes and
+- [x] 1.3 Reply to the must-fix as the owner; record the reply's `author_association`, that `gate` says yes and
   `review` runs, and that the checked-out SHA is the merge ref's; verify from the run's log
 - [ ] 1.4 While that `review` sleeps, reply to the nit as the owner, and post a comment and a reply with the review
   App's token; record that the nit reply's `gate` says no, the App's runs skip `gate`, the sleeping run finishes and its
@@ -25,9 +25,10 @@
   it; record that `gate` is skipped and that the job outside the `if:` reports `PROBE_SECRET` unset; verify from the
   run's log
 - [ ] 1.7 Reply to the must-fix as an account without write access to the probe (the owner names one); record that
-  `gate` is skipped, not failed, and the reply's `author_association`; verify from the run's conclusion
+  `gate` says no from the permission API, the run doesn't fail, and the reply's `author_association`; verify from the
+  run's log and conclusion
 - [ ] 1.8 Write what 1.2 to 1.7 showed into design.md as "Probe results", with what each one changes (D2's
-  association list, D3 or its alternative); verify by deleting the fork and the probe repository (`gh repo view`
+  write-access check, D3 or its alternative); verify by deleting the fork and the probe repository (`gh repo view`
   reports both gone) and the owner removing the probe from the review App's installation (`uv run scripts/oob.py`
   reports no difference)
 
@@ -36,8 +37,8 @@
 - [x] 2.1 Write tests first in `scripts/tests/test_claude_review_workflow.py`: `problems()` accepts `on` holding
   exactly `pull_request` with today's types and `pull_request_review_comment` with `[created]`; pins the first job's
   `if:` (the gate's, D2a) to D2's condition; pins the concurrency group on both jobs and none at the workflow level; and names each of:
-  `issue_comment` or `pull_request_review` added, `edited` added to the comment types, the reply, bot, association or
-  pull request skip dropped, an association added, and the group moved back to the workflow. Verify the new
+  `issue_comment` or `pull_request_review` added, `edited` added to the comment types, the reply, bot or
+  pull request skip dropped, an association check added, and the group moved back to the workflow. Verify the new
   parametrised cases fail against the workflow on `main`
 - [ ] 2.2 Change `.github/workflows/claude-review.yml` as D1 to D3 say (as the probe confirmed), with the header
   comment saying a reply starts a review and why the group is on the jobs; verify the 2.1 tests and
@@ -46,10 +47,12 @@
   group, `contents: read`, a read-only review App token (contents read, pull requests read) and its one step pinned by
   hash, and `review` needing it and running only on its yes; it names each of the gate dropped, given a group, its
   token widened, and `review` not needing it. With the stub `gh`, the gate's step says yes for a `pull_request` event
-  without calling `gh`, and for a reply to an open must-fix the review opened; no for a reply to a nit, a decision, a
+  without calling `gh`, and for a reply to an open must-fix the review opened by someone the permission API says can
+  push (admin, write), asking that before reading any conversation; no, reading nothing more, for read, none and any
+  other value, such as a literal triage or maintain, which the API reports as read and write; no for a reply to a nit, a decision, a
   must-fix re-tiered nit, a must-fix whose only `**must-fix**` is in a person's reply, a person's conversation, a
-  resolved must-fix and a comment on no conversation read; and fails, saying so, when the read fails or isn't a page
-  of conversations. Its `LABEL` and `BOT` equal the resolver's. Verify the new tests fail before the gate exists
+  resolved must-fix and a comment on no conversation read; and fails, saying so, when either read fails or isn't an
+  answer, or the reply's ID or author isn't one. Its `LABEL` and `BOT` equal the resolver's. Verify the new tests fail before the gate exists
 - [x] 2.5 Add the gate to `.github/workflows/claude-review.yml` as D2a says, moving D2's `if:` to it; verify the 2.4
   and 2.1 tests and `uv run scripts/check.py` pass
 - [x] 2.3 With the changed workflow in place, run website's `npx vitest run tests/unit/workflow-node-version.test.ts`

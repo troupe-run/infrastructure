@@ -38,15 +38,15 @@ jobs:
   gate:
     name: does this need a review
     # Bots' and forks' pull requests are skipped. A review comment goes on only when it's a reply,
-    # not a bot's (each of the review's own comments starts a run) and by someone with write
-    # access, so anyone else's is skipped rather than failed by the action's own check (design D2).
+    # and not a bot's: each of the review's own comments starts a run (design D2). Whether its
+    # author has write access is the step's to ask: the comment's author_association can't say,
+    # since a member whose membership is private comments as a CONTRIBUTOR (Probe results).
     if: >-
       github.event.pull_request.user.type != 'Bot' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (github.event_name == 'pull_request' ||
       (github.event.comment.in_reply_to_id != null &&
-      github.event.comment.user.type != 'Bot' &&
-      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)))
+      github.event.comment.user.type != 'Bot'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -76,6 +76,7 @@ jobs:
           NUMBER: ${{ github.event.pull_request.number }}
           EVENT: ${{ github.event_name }}
           REPLY_TO: ${{ github.event.comment.in_reply_to_id }}
+          COMMENTER: ${{ github.event.comment.user.login }}
         run: |
           import json
           import os
@@ -86,6 +87,9 @@ jobs:
 
           # Copies of the resolving step's LABEL and BOT, which this step can't import;
           # scripts/tests/test_claude_review_workflow.py holds them equal (design D2a).
+          # The permissions that can push, as GitHub's permission API names them; maintain reads as
+          # write there.
+          WRITE = {"admin", "write"}
           LABEL = re.compile(r"\*\*(must-fix|nit|decision)\*\* · \S.*")
           BOT = {"__typename": "Bot", "login": "troupe-run-review"}
           QUERY = """
@@ -141,9 +145,23 @@ jobs:
           reply_to = os.environ.get("REPLY_TO", "")
           if not reply_to.isdigit():
               fail("Reply unnamed", f"The comment replied to isn't named by an ID ({reply_to!r})")
+          commenter = os.environ.get("COMMENTER", "")
+          if not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})", commenter):
+              fail("Commenter unnamed", f"The reply's author isn't a login ({commenter!r})")
           gh = shutil.which("gh")
           if gh is None:
               fail("Review conversations unread", "gh wasn't found")
+          done = subprocess.run(
+              [gh, "api", f"repos/{os.environ['REPOSITORY']}/collaborators/{commenter}/permission"],
+              capture_output=True, text=True, check=False)
+          try:
+              permission = json.loads(done.stdout)["permission"] if done.returncode == 0 else None
+          except (ValueError, KeyError, TypeError):
+              permission = None
+          if not isinstance(permission, str):
+              fail("Permission unknown", f"{commenter}'s permission on the repository can't be read")
+          if permission not in WRITE:
+              say(False, f"{commenter} can't push here ({permission}): no review.")
           owner, _, name = os.environ["REPOSITORY"].partition("/")
           threads = []
           cursor = None
