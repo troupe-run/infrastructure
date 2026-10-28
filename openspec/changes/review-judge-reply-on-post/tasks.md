@@ -15,11 +15,11 @@
   `review`, and each finding's run is skipped at `gate`, as a bot's comment
 - [x] 1.3 Reply to the must-fix as the owner; record the reply's `author_association`, that `gate` says yes and
   `review` runs, and that the checked-out SHA is the merge ref's; verify from the run's log
-- [ ] 1.4 While that `review` sleeps, reply to the nit as the owner, and post a comment and a reply with the review
+- [x] 1.4 While that `review` sleeps, reply to the nit as the owner, and post a comment and a reply with the review
   App's token; record that the nit reply's `gate` says no, the App's runs skip `gate`, the sleeping run finishes and its
   `resolve` runs; verify with `gh run list` and each run's conclusion. If the sleeping run is cancelled, switch to
   D3's alternative in the probe workflow and record that this step passes with it
-- [ ] 1.5 Post two replies to the must-fix as the owner ten seconds apart while a `review` sleeps; record that each
+- [x] 1.5 Post two replies to the must-fix as the owner ten seconds apart while a `review` sleeps; record that each
   cancels the run before it and the last runs to its end; verify with each run's conclusion
 - [ ] 1.6 Fork the probe into the owner's account, open a pull request from the fork, and reply in a conversation on
   it; record that `gate` is skipped and that the job outside the `if:` reports `PROBE_SECRET` unset; verify from the
@@ -40,7 +40,7 @@
   `issue_comment` or `pull_request_review` added, `edited` added to the comment types, the reply, bot or
   pull request skip dropped, an association check added, and the group moved back to the workflow. Verify the new
   parametrised cases fail against the workflow on `main`
-- [ ] 2.2 Change `.github/workflows/claude-review.yml` as D1 to D3 say (as the probe confirmed), with the header
+- [x] 2.2 Change `.github/workflows/claude-review.yml` as D1 to D3 say (as the probe confirmed), with the header
   comment saying a reply starts a review and why the group is on the jobs; verify the 2.1 tests and
   `uv run scripts/check.py` pass
 - [x] 2.4 Write tests first for the gate (design D2a): `problems()` pins a `gate` job with D2's `if:`, no concurrency
