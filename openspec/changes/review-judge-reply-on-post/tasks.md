@@ -24,7 +24,7 @@
 - [x] 1.6 Fork the probe into the owner's account, open a pull request from the fork, and reply in a conversation on
   it; record that `gate` is skipped and that the job outside the `if:` reports `PROBE_SECRET` unset; verify from the
   run's log
-- [ ] 1.7 Reply to the must-fix as an account without write access to the probe (the owner names one); record that
+- [x] 1.7 Reply to the must-fix as an account without write access to the probe (the owner names one); record that
   `gate` says no from the permission API, the run doesn't fail, and the reply's `author_association`; verify from the
   run's log and conclusion
 - [ ] 1.8 Write what 1.2 to 1.7 showed into design.md as "Probe results", with what each one changes (D2's

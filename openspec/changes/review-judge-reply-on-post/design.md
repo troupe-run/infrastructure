@@ -174,6 +174,9 @@ On `troupe-run/infra-probe-review-reply`, 2026-10-28 (D4), with the probe workfl
 - **A fork's pull request gets no review and no secret (1.6).** On a pull request from the owner's fork, the opening
   run, an inline comment's run and the owner's reply's run each skipped the gate, though the owner is an admin, and
   each reported `PROBE_SECRET` unset.
+- **An outsider's reply costs the gate only (1.7).** A reply to the must-fix from `martinlau`, an account with no access
+  to the probe, carried association `NONE`; the gate asked the permission API, said "martinlau can't push here
+  (read): no review", and the run succeeded with `review` and `resolve` skipped (run 40683961789).
 
 ## Risks / Trade-offs
 
