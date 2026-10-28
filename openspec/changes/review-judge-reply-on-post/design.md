@@ -62,9 +62,8 @@ if: >-
   github.event.pull_request.user.type != 'Bot'
   && github.event.pull_request.head.repo.full_name == github.repository
   && (github.event_name == 'pull_request'
-      || (github.event.comment.in_reply_to_id
-          && github.event.comment.user.type != 'Bot'
-          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)))
+      || (github.event.comment.in_reply_to_id != null
+          && github.event.comment.user.type != 'Bot'))
 ```
 
 The trigger is `pull_request_review_comment: types: [created]`.
@@ -73,10 +72,13 @@ The trigger is `pull_request_review_comment: types: [created]`.
   that opens a conversation is a person's own, which the review never resolves, so it can wait for the next push.
 - **Not a bot**: the review's own findings and re-tier replies are posted with an App token, and an App token's events
   start workflows (a `GITHUB_TOKEN`'s don't). Without the skip, each finding would start another review.
-- **Write access**, by `author_association`: anyone can comment on a public repository's pull request. The action's
-  own check refuses an actor without write access, but by failing the step. Skipping by association means an outside
-  user's comment skips the run, not fails it, and costs nothing. The action's check stays the fence; the association
-  is only the skip. What association the owner's reply carries (`OWNER` or `MEMBER`) is checked on the probe.
+- **Write access is asked, not read from the comment.** Anyone can comment on a public repository's pull request. The
+  design first skipped by the comment's `author_association` (`OWNER`, `MEMBER`, `COLLABORATOR`), but the probe showed
+  the owner's reply carries `CONTRIBUTOR`: troupe-run's memberships are private, and GitHub then labels a member as
+  any past contributor (Probe results). So the gate's step asks GitHub for the commenter's permission on the
+  repository (`repos/<repo>/collaborators/<login>/permission`) and says no unless it's `admin` or `write`, which is
+  how that API reports maintain too. An outsider's reply costs the gate's few seconds and no Claude run, and its run
+  doesn't fail. The action's own write check stays behind it (owner, 2026-10-28).
 - **The pull request's own skip** stays first, so a fork's pull request and a bot's are skipped whatever the comment.
 
 `resolve` needs `review`, so it's skipped with it.
@@ -89,8 +91,8 @@ replies with the owner's login, so D2's skip lets them through. Without more, ea
 review that judges nothing (owner, 2026-10-28).
 
 So a job `gate` runs first, with D2's `if:`, and decides. For a `pull_request` event it says yes without reading
-anything. For a review comment it mints the review App's token read-only (contents read, pull requests read), reads
-the pull request's review conversations with the same query as the snapshot step, and finds the one whose comments
+anything. For a review comment it mints the review App's token read-only (contents read, pull requests read), asks
+the commenter's permission (D2), then reads the pull request's review conversations with the same query as the snapshot step, and finds the one whose comments
 hold the comment replied to (`in_reply_to_id`). It says yes only when that conversation is open, the review App opened
 it, and its tier, the review's latest label in it, is must-fix. `review` needs `gate` and runs only on its yes.
 
@@ -154,8 +156,6 @@ to re-run after a reply.
   reads them afresh and judges what it finds; at worst a review runs that a later reading wouldn't have started.
 - [A reply cancels a push's review part-way, after it posted some findings] → The reply's run reads them in its
   snapshot and doesn't post them again. Today a second push does the same.
-- [A person with read access only, as a collaborator, replies] → The association lets the run start, and the action's
-  write check fails it. It's advisory, so nothing is blocked; the failed run says why.
 - [A pull request's text, or a reply, injects instructions] → Unchanged: the review already reads every reply, and a
   reply now reaches it sooner. Only people with write access start a run, and the tools and tokens are the same.
 - [The Actions list fills with skipped runs, one per comment the review posts] → Accepted; they cost no runner time.

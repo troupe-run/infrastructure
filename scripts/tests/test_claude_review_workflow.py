@@ -55,18 +55,17 @@ TOKEN_INPUTS = {
     "permission-contents": "read",
     "permission-pull-requests": "write",
 }
-# Bots' pull requests and forks' are skipped, not failed (design D2). A review comment starts
-# the review only when it's a reply, not a bot's (the review's own comments would start it
-# again), and by someone with write access; anyone else's is skipped, not failed
-# (review-judge-reply-on-post design D2).
+# Bots' pull requests and forks' are skipped, not failed (design D2). A review comment goes on
+# to the gate only when it's a reply, not a bot's (the review's own comments would start it
+# again). Write access is the gate's step to ask: a comment's author_association can't say, since
+# a member whose membership is private comments as a CONTRIBUTOR (review-judge-reply-on-post
+# design D2, Probe results).
 SKIP = (
     "github.event.pull_request.user.type != 'Bot' && "
     "github.event.pull_request.head.repo.full_name == github.repository && "
     "(github.event_name == 'pull_request' || "
     "(github.event.comment.in_reply_to_id != null && "
-    "github.event.comment.user.type != 'Bot' && "
-    'contains(fromJSON(\'["OWNER","MEMBER","COLLABORATOR"]\'), '
-    "github.event.comment.author_association)))"
+    "github.event.comment.user.type != 'Bot'))"
 )
 # On each job, never the workflow: a run whose review is skipped, such as the one each of the
 # review's own comments starts, mustn't join the group and cancel the review that posted it
@@ -176,9 +175,10 @@ GATE = {
         **STEP_ENV,
         "EVENT": "${{ github.event_name }}",
         "REPLY_TO": "${{ github.event.comment.in_reply_to_id }}",
+        "COMMENTER": "${{ github.event.comment.user.login }}",
     },
 }
-GATE_SHA256 = "c735098b479c20afc4b4865c37288c186422ffedd07422a8b462bd72f9e15b9f"
+GATE_SHA256 = "508cbf7979901b76813676b9704755dd06954a5097aaf2d45360dc526227ba35"
 GATE_OUTPUTS = {"review": "${{ steps.gate.outputs.review }}"}
 GATE_TOKEN_INPUTS = {**TOKEN_INPUTS, "permission-pull-requests": "read"}
 REVIEW_NEEDS = "gate"
@@ -674,12 +674,21 @@ def sources(w: dict[str, Any], change: str) -> None:
             "not skipping bots, forks, outsiders",
         ),
         (
-            lambda w: unskip(w, "github.event.comment.user.type != 'Bot' && "),
+            lambda w: unskip(w, " && github.event.comment.user.type != 'Bot'"),
             "not skipping bots, forks, outsiders",
         ),
         (
-            lambda w: unskip(w, '"COLLABORATOR"', '"COLLABORATOR","CONTRIBUTOR"'),
+            lambda w: unskip(
+                w,
+                "github.event.comment.user.type != 'Bot'",
+                "github.event.comment.user.type != 'Bot' && "
+                "github.event.comment.author_association != 'NONE'",
+            ),
             "not skipping bots, forks, outsiders",
+        ),
+        (
+            lambda w: gate(w)["env"].update({"COMMENTER": "${{ github.actor }}"}),
+            f"{GATE_NAME!r} is given",
         ),
         (
             lambda w: unskip(
@@ -1389,7 +1398,8 @@ def run_gate(
     return done, said[0] if said else None, gh_calls(bin_dir)
 
 
-REPLY = {"EVENT": "pull_request_review_comment", "REPLY_TO": "100"}
+REPLY = {"EVENT": "pull_request_review_comment", "REPLY_TO": "100", "COMMENTER": "martin-at-hpsgd"}
+PUSHER = {"permission": "admin"}
 
 
 def test_the_gate_lets_every_pull_request_event_through_without_reading_anything(
@@ -1429,19 +1439,41 @@ def test_the_gate_lets_through_only_a_reply_to_an_open_must_fix_of_the_review_s(
     other = conversation("U", PERSON, (PERSON, "elsewhere"))
     other["opened"]["nodes"][0]["databaseId"] = 200
     other["comments"]["nodes"][0]["databaseId"] = 200
-    pages = [page([other], True, "C1"), page([thread], False, None)]
+    pages = [PUSHER, page([other], True, "C1"), page([thread], False, None)]
     done, said, calls = run_gate(tmp_path, {"pages": pages}, REPLY)
     assert done.returncode == 0, done.stdout + done.stderr
     assert said == expected, what
-    assert len(calls) == 2
-    assert all(call[:2] == ["api", "graphql"] for call in calls)
-    query = next(arg for arg in calls[0] if arg.startswith("query=")).partition("=")[2]
+    assert calls[0] == [
+        "api", "repos/troupe-run/infrastructure/collaborators/martin-at-hpsgd/permission"
+    ]  # fmt: skip
+    assert len(calls) == 3
+    assert all(call[:2] == ["api", "graphql"] for call in calls[1:])
+    query = next(arg for arg in calls[1] if arg.startswith("query=")).partition("=")[2]
     assert guard.graphql_mutations(query) == []
+
+
+@pytest.mark.parametrize("permission", ["admin", "write"])
+def test_a_pusher_s_reply_to_a_must_fix_is_reviewed(tmp_path: Path, permission: str) -> None:
+    thread = conversation("T", B, (B, MUST_FIX), (P, "it's right"))
+    pages = [{"permission": permission}, page([thread], False, None)]
+    done, said, _ = run_gate(tmp_path, {"pages": pages}, REPLY)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert said == "true"
+
+
+@pytest.mark.parametrize("permission", ["read", "none", "triage", "maintain"])
+def test_a_reply_by_someone_who_can_t_push_starts_no_review_and_reads_nothing_more(
+    tmp_path: Path, permission: str
+) -> None:
+    done, said, calls = run_gate(tmp_path, {"pages": [{"permission": permission}]}, REPLY)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert said == "false"
+    assert len(calls) == 1
 
 
 def test_a_reply_to_a_comment_in_no_conversation_read_starts_no_review(tmp_path: Path) -> None:
     thread = conversation("T", BOT_AUTHOR, (BOT_AUTHOR, "**must-fix** · x"))
-    done, said, _ = run_gate(tmp_path, {"pages": [page([thread], False, None)]},
+    done, said, _ = run_gate(tmp_path, {"pages": [PUSHER, page([thread], False, None)]},
                              {**REPLY, "REPLY_TO": "999"})  # fmt: skip
     assert done.returncode == 0, done.stdout + done.stderr
     assert said == "false"
@@ -1451,10 +1483,16 @@ def test_a_reply_to_a_comment_in_no_conversation_read_starts_no_review(tmp_path:
     ("answers", "env"),
     [
         ({"status": 1}, REPLY),
-        ({"pages": ["not a page"]}, REPLY),
-        ({"pages": [{"data": None}]}, REPLY),
+        ({"pages": [PUSHER, "not a page"]}, REPLY),
+        ({"pages": [PUSHER, {"data": None}]}, REPLY),
+        ({"pages": [PUSHER], "fail_when": "query="}, REPLY),
+        ({"pages": [{"permission": None}]}, REPLY),
+        ({"pages": ["not an answer"]}, REPLY),
+        ({"fail_when": "/permission"}, REPLY),
         ({}, {**REPLY, "REPLY_TO": ""}),
         ({}, {**REPLY, "REPLY_TO": "12a"}),
+        ({}, {**REPLY, "COMMENTER": ""}),
+        ({}, {**REPLY, "COMMENTER": "a/../../x"}),
     ],
 )
 def test_a_gate_that_can_t_tell_fails_and_says_nothing(

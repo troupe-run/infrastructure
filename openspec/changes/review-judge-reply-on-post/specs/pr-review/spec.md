@@ -60,8 +60,12 @@ comes from a fork.
 - **THEN** no review starts until the next push or reply
 
 #### Scenario: An outside user replies
-- **WHEN** someone without write access to the repository replies in a review conversation
-- **THEN** no review starts, and the run it causes is skipped, not failed
+- **WHEN** someone without write access to the repository replies to one of the review's must-fixes
+- **THEN** no review starts, and the run it causes doesn't fail
+
+#### Scenario: A member whose membership is private replies
+- **WHEN** an org member with write access, whose membership isn't public, replies to an open must-fix
+- **THEN** a review starts, though GitHub labels the comment's author a contributor
 
 #### Scenario: A reply on a fork's pull request
 - **WHEN** someone replies in a review conversation on a pull request from a fork
@@ -119,7 +123,8 @@ SHALL be limited to reading the pull request and commenting. The run SHALL NOT u
 
 #### Scenario: The reply trigger is widened
 - **WHEN** a change starts the review on another event, such as `issue_comment` or `pull_request_review`, or on another
-  review comment action, drops the reply-only, bot, write-access or fork skip, lets the review start without the check
+  review comment action, drops the reply-only, bot or fork skip or the write-access check, judges write access by the comment's
+  author association, lets the review start without the check
   that the reply is to an open must-fix of the review's, puts that check in the concurrency group, or moves the group
   back to the workflow, where a skipped run joins it
 - **THEN** `scripts/check.py` fails, naming what changed
