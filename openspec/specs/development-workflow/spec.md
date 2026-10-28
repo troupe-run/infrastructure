@@ -1151,6 +1151,19 @@ name, saying which and how to fix it. It SHALL NOT pass a spec whose labels it c
 - **WHEN** the labels read back as something other than a JSON list of objects with a string `name`
 - **THEN** the `guard` check fails under `capability-label`, saying the declared labels couldn't be read
 
+### Requirement: The capability label read sends its token to GitHub's API only
+When the capability label check reads the declared labels with the run's token, it SHALL send the token only in the
+request to GitHub's contents API. If GitHub answers with a redirect, the request that follows it SHALL NOT carry the
+token, wherever it points.
+
+#### Scenario: A redirect to another host
+- **WHEN** `GITHUB_TOKEN` is set and the labels' request is answered with a redirect to another host
+- **THEN** the request to that host carries no `Authorization` header
+
+#### Scenario: The first request
+- **WHEN** `GITHUB_TOKEN` is set
+- **THEN** the request to GitHub's contents API carries it as a bearer token
+
 ### Requirement: Pull requests close an issue, checked on GitHub
 For every pull request in a governed repository, the GitHub check SHALL refuse it under `pr-closes-issue` unless its
 description closes an issue, read the same way as the local rule: `Closes`, `Fixes` or `Resolves` (or another form of
@@ -1294,6 +1307,21 @@ with any other changed line SHALL leave the branch to the branch rule.
 #### Scenario: A workflow line that isn't `uses:`
 - **WHEN** a Dependabot patch-update branch changes a workflow's `uses:` line and also a `run:` line
 - **THEN** the GitHub check fails on the branch-change rule, naming the workflow
+
+#### Scenario: A workflow line that begins with `--`
+- **WHEN** a Dependabot patch-update branch changes a workflow's `uses:` line and also removes a line that begins with
+  `--`, such as a YAML `---`, or adds one that begins with `++`
+- **THEN** the GitHub check fails on the branch-change rule, naming the workflow
+
+### Requirement: An exempt Dependabot branch has no merge commits
+A Dependabot branch SHALL NOT be exempt when any of its commits is a merge commit, whatever its subject and whatever
+files it changes. Dependabot doesn't make merge commits. The refusal SHALL name the merge commit and say that's why.
+
+#### Scenario: A merge commit with a Dependabot subject
+- **WHEN** a Dependabot branch `dependabot/npm_and_yarn/x` in `troupe-run/website` carries a patch update of
+  `package-lock.json`, and then a merge commit whose subject is a Dependabot patch-update subject and which also
+  changes `src/index.ts`
+- **THEN** the GitHub check fails on the branch-change rule, naming the merge commit and saying it's a merge commit
 
 ### Requirement: An exempt Dependabot branch is a single minor or patch update
 A Dependabot branch SHALL be exempt only when every commit's subject is Dependabot's for one dependency moving from
