@@ -162,12 +162,11 @@ def spec_documents(fetch: Fetch) -> dict[str, str]:
     documents: dict[str, str] = {}
     for spec in fetch(SPECS_GH_ARGS):
         try:
-            content = fetch(spec_md_gh_args(spec))["content"]
-        except Exception as error:
+            documents[spec] = base64.b64decode(fetch(spec_md_gh_args(spec))["content"]).decode()
+        except Exception as error:  # a failed fetch, or content that isn't base64 or UTF-8
             raise UnreadableError(
                 f"troupe specs: couldn't read {spec!r}'s spec.md ({reason(error)})"
             ) from error
-        documents[spec] = base64.b64decode(content).decode()
     return documents
 
 

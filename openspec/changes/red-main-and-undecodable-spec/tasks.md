@@ -2,14 +2,14 @@
 
 ## 1. An undecodable troupe spec is unreadable by name (#203; spec labels, "A troupe spec that can't be read is reported by name"; design D4)
 
-- [ ] 1.1 In `scripts/tests/test_oob.py`, let `fake_github` serve a spec's raw `content` unencoded (a `raw_spec_content`
+- [x] 1.1 In `scripts/tests/test_oob.py`, let `fake_github` serve a spec's raw `content` unencoded (a `raw_spec_content`
   map, name to content). Then write two tests named for what they check, next to
   `test_a_failed_spec_read_is_unreadable_naming_the_spec`: content that isn't valid base64 (`"abc"`, bad padding),
   and base64 of bytes that aren't UTF-8 (`base64.b64encode(b"\xff\xfe")`). Each asserts no difference, and
   `report.unreadable` is exactly `troupe specs: couldn't read 'cli''s spec.md (<the decode error's words>)` followed
   by the "label descriptions: not checked" line. Verify both fail on `main`'s code with the unnamed `troupe specs:
   couldn't read it (...)` message.
-- [ ] 1.2 Move the decode in `scripts/oob.py`'s `spec_documents` inside the fetch's `try`. Verify
+- [x] 1.2 Move the decode in `scripts/oob.py`'s `spec_documents` inside the fetch's `try`. Verify
   `uv run pytest scripts/tests/test_oob.py` passes, the existing fetch-failure test unchanged, and commit.
 
 ## 2. The gate's superseded outcome (#202; spec ci-apply, "A scheduled or manual plan superseded by a newer merge plans nothing", "A red main fails ..."; design D1, D2)
