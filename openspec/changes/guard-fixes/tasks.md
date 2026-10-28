@@ -5,13 +5,13 @@ issue when it reaches `main`. The pull request closes all three.
 
 ## 1. #204: a workflow line that begins with `--` counts (design D1)
 
-- [ ] 1.1 Write the test first in `scripts/tests/test_guard_dependabot.py`: on a workflow whose base starts with a
+- [x] 1.1 Write the test first in `scripts/tests/test_guard_dependabot.py`: on a workflow whose base starts with a
   `---` line, a Dependabot commit that bumps its `uses:` line and removes the `---` is refused under
   `commit-branch-change`, naming the workflow; parametrized also for removing a column-0 `--force` line and adding a
   `++` line. Verify it fails on the current `_only_uses_lines` (the branch passes as exempt)
-- [ ] 1.2 Make `_only_uses_lines` keep `+`/`-` lines only inside a hunk (after `@@`, before the next `diff --git`).
+- [x] 1.2 Make `_only_uses_lines` keep `+`/`-` lines only inside a hunk (after `@@`, before the next `diff --git`).
   Verify the 1.1 test and the existing action-bump and `run:`-line tests pass
-- [ ] 1.3 Update `docs/development-workflow.md`'s `commit-branch-change` row and "Dependabot pull requests" section to
+- [x] 1.3 Update `docs/development-workflow.md`'s `commit-branch-change` row and "Dependabot pull requests" section to
   say every added and removed workflow line counts, whatever it begins with. Verify `uv run scripts/check.py` passes,
   then commit `fix(guard): …` with `Part of #204`
 
