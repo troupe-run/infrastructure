@@ -27,7 +27,7 @@
 - [x] 1.7 Reply to the must-fix as an account without write access to the probe (the owner names one); record that
   `gate` says no from the permission API, the run doesn't fail, and the reply's `author_association`; verify from the
   run's log and conclusion
-- [ ] 1.8 Write what 1.2 to 1.7 showed into design.md as "Probe results", with what each one changes (D2's
+- [x] 1.8 Write what 1.2 to 1.7 showed into design.md as "Probe results", with what each one changes (D2's
   write-access check, D3 or its alternative); verify by deleting the fork and the probe repository (`gh repo view`
   reports both gone) and the owner removing the probe from the review App's installation (`uv run scripts/oob.py`
   reports no difference)
