@@ -347,7 +347,7 @@ jobs:
         id: board-token
         if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         continue-on-error: true
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: 5272634
           private-key: ${{ secrets.TF_VAR_github_app_pem }}
@@ -455,7 +455,7 @@ jobs:
       # isn't one of the action's declared inputs, and the runner warns "Unexpected input".
       - name: A read-only token
         id: token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: 5272634
           private-key: ${{ secrets.TF_VAR_github_app_pem }}
@@ -512,7 +512,7 @@ jobs:
       - name: Token for setting modes
         id: mode-token
         if: steps.apply.outcome == 'success' && needs.plan.outputs.mode_repositories != ''
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: 5272634
           private-key: ${{ secrets.TF_VAR_github_app_pem }}
@@ -536,7 +536,7 @@ jobs:
       - name: Token for the state commit
         id: token
         if: always() && steps.apply.outcome != 'skipped'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: 5272634
           private-key: ${{ secrets.TF_VAR_github_app_pem }}
@@ -583,7 +583,7 @@ jobs:
           path: tofu
       - name: Token for the board
         id: token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ vars.BOARD_APP_CLIENT_ID }}
           private-key: ${{ secrets.BOARD_APP_PRIVATE_KEY }}
