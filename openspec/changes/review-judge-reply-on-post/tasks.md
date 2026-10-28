@@ -40,7 +40,7 @@
 - [ ] 2.2 Change `.github/workflows/claude-review.yml` as D1 to D3 say (as the probe confirmed), with the header
   comment saying a reply starts a review and why the group is on the jobs; verify the 2.1 tests and
   `uv run scripts/check.py` pass
-- [ ] 2.3 With the changed workflow in place, run website's `npx vitest run tests/unit/workflow-node-version.test.ts`
+- [x] 2.3 With the changed workflow in place, run website's `npx vitest run tests/unit/workflow-node-version.test.ts`
   and troupe's `uv run scripts/check.py` (each on a scratch copy of its `main`, with this file copied in); verify both
   pass
 
