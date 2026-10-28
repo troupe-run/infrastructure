@@ -209,3 +209,25 @@ import {
   to = cloudflare_universal_ssl_setting.troupe_run
   id = "f716f063a26f15bcfcecd62791cdd202"
 }
+
+# Each repository's Actions settings, adopted as they are (on, every action allowed), so the first
+# plan imports them and changes only .github's (repository-features design D2).
+import {
+  to = module.repo_troupe.github_actions_repository_permissions.this
+  id = "troupe"
+}
+
+import {
+  to = module.repo_github.github_actions_repository_permissions.this
+  id = ".github"
+}
+
+import {
+  to = module.repo_infrastructure.github_actions_repository_permissions.this
+  id = "infrastructure"
+}
+
+import {
+  to = module.repo_website.github_actions_repository_permissions.this
+  id = "website"
+}

@@ -66,6 +66,33 @@ manage SHALL report a repository that has it off. A repository whose setting can
 - **WHEN** GitHub refuses the read of a repository's private vulnerability reporting
 - **THEN** the drift check exits non-zero with an error naming the repository and saying its state is unknown
 
+### Requirement: Pull requests are off in .github only
+`.github` SHALL have pull requests turned off, since only the App changes its `main` and its files are written from
+this repository. Every other managed repository SHALL have them on. OpenTofu can't manage the setting, so the drift
+check for what OpenTofu can't manage SHALL report a repository whose setting differs. A read GitHub refuses SHALL be
+an error naming the repository.
+
+#### Scenario: Nothing can be proposed in .github
+- **WHEN** someone opens `.github` on GitHub
+- **THEN** pull requests are turned off there, and none can be opened
+
+#### Scenario: The App still writes .github
+- **WHEN** the App delivers a changed file to `.github` after pull requests are off
+- **THEN** its commit lands on `main`
+
+#### Scenario: Pull requests turned on by hand are reported
+- **WHEN** an owner turns pull requests on in `.github`, or off in another managed repository
+- **THEN** the drift check reports that repository and exits non-zero, and GitHub is unchanged
+
+### Requirement: Sponsorships is off everywhere
+Every managed repository SHALL have Sponsorships (the Sponsor button) turned off. OpenTofu can't manage it, so the
+drift check for what OpenTofu can't manage SHALL report a repository that has it on. A read GitHub refuses SHALL be an
+error naming the repository.
+
+#### Scenario: Sponsorships turned on by hand is reported
+- **WHEN** an owner turns Sponsorships on in a managed repository
+- **THEN** the drift check reports that repository and exits non-zero, and GitHub is unchanged
+
 ### Requirement: troupe's discussion categories are declared
 `troupe`'s discussion categories SHALL be declared: Q&A, Ideas and Announcements, each with its slug and whether it
 takes answers (only Q&A does). OpenTofu can't manage them, so the drift check for what OpenTofu can't manage SHALL

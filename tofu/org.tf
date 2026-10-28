@@ -23,12 +23,14 @@ resource "github_organization_settings" "org" {
   members_can_create_private_repositories  = true
   members_can_create_internal_repositories = false
   members_can_fork_private_repositories    = false
-  members_can_create_pages                 = true
-  members_can_create_public_pages          = true
-  members_can_create_private_pages         = true
-  has_organization_projects                = true
-  has_repository_projects                  = true
-  web_commit_signoff_required              = false
+  # Members can't create Pages sites: the website's is the org's only one, and its own declaration
+  # manages it (spec: org-settings; repository-features design D8, owner 2026-10-28).
+  members_can_create_pages         = false
+  members_can_create_public_pages  = false
+  members_can_create_private_pages = false
+  has_organization_projects        = true
+  has_repository_projects          = true
+  web_commit_signoff_required      = false
 
   # These don't decide what new repositories get. The "troupe-run baseline" code security
   # configuration does: it's the default for new public repositories, and turns on the dependency

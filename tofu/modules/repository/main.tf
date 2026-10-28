@@ -15,8 +15,8 @@ resource "github_repository" "this" {
   topics       = var.topics
   visibility   = "public"
 
-  has_issues      = true
-  has_discussions = false
+  has_issues      = var.has_issues
+  has_discussions = var.has_discussions
   has_wiki        = var.has_wiki
   has_projects    = var.has_projects
   allow_forking   = true
@@ -79,6 +79,17 @@ resource "github_repository_pages" "this" {
   lifecycle {
     prevent_destroy = true
   }
+}
+
+# Whether Actions runs here, declared for every repository so a change by hand shows in the plan
+# (spec: repositories; repository-features design D2). Every action is allowed and none needs a SHA
+# pin (owner, 2026-10-16). Destroying it resets Actions to on with every action allowed, which loses
+# nothing, so it can be destroyed.
+resource "github_actions_repository_permissions" "this" {
+  repository           = github_repository.this.name
+  enabled              = var.actions_enabled
+  allowed_actions      = var.actions_enabled ? "all" : null
+  sha_pinning_required = false
 }
 
 # Dependabot alerts, and the security updates that answer them (spec: repositories;
