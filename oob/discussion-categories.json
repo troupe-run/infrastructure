@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Announcements",
+    "slug": "announcements",
+    "isAnswerable": false
+  },
+  {
+    "name": "Ideas",
+    "slug": "ideas",
+    "isAnswerable": false
+  },
+  {
+    "name": "Q&A",
+    "slug": "q-a",
+    "isAnswerable": true
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "repository": "troupe",
+    "hasPullRequestsEnabled": true,
+    "hasSponsorshipsEnabled": false
+  },
+  {
+    "repository": ".github",
+    "hasPullRequestsEnabled": false,
+    "hasSponsorshipsEnabled": false
+  },
+  {
+    "repository": "infrastructure",
+    "hasPullRequestsEnabled": true,
+    "hasSponsorshipsEnabled": false
+  },
+  {
+    "repository": "website",
+    "hasPullRequestsEnabled": true,
+    "hasSponsorshipsEnabled": false
+  }
+]

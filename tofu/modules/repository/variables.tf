@@ -58,6 +58,24 @@ variable "has_projects" {
   default = false
 }
 
+# Features each repository has only if it uses them (spec: repositories; repository-features design
+# D1). The defaults are what most repositories have; a repository that differs says why.
+variable "has_issues" {
+  type    = bool
+  default = true
+}
+
+variable "has_discussions" {
+  type    = bool
+  default = false
+}
+
+variable "actions_enabled" {
+  description = "Whether GitHub Actions runs in the repository."
+  type        = bool
+  default     = true
+}
+
 # Which ruleset covers main (spec: rulesets; required-checks design D4):
 #   pull-request  changes arrive by pull request, merged by rebase once the required checks pass
 #   app-only      only the App in app_bypass_id changes main (.github)

@@ -25,9 +25,14 @@ discussions or workflows that are never seen. A feature set by hand drifts witho
   projects on there, like troupe and website, and `oob/projects.json` lists the link.
 - **Members can't create Pages sites.** `tofu/org.tf` stops members creating public or private Pages sites. The
   website's site, which already exists, keeps serving and deploying.
-- **What can't be managed is noted.** The home page's Releases, Packages and Deployments panels and Sponsorships
-  have no API. They're listed as unmanaged in `oob/README.md`, with the reason. Forking can't be turned off for a
-  public repository.
+- **Pull requests off in `.github`.** Only the App changes its `main`, through API commits, so a pull request
+  there could never merge, and a fix to its files belongs in `org-profile/` here. The provider can't set it, so the
+  owner turns it off by hand and `oob.py` checks it, with pull requests on everywhere else.
+- **Sponsorships checked.** It's off in all four. GraphQL reads it, though the provider can't set it, so `oob.py`
+  checks it stays off.
+- **What can't be managed is noted.** The home page's Releases, Packages and Deployments panels have no API.
+  They're listed as unmanaged in `oob/README.md`, with the reason. Forking can't be turned off for a public
+  repository.
 
 ## Capabilities
 
@@ -38,8 +43,9 @@ None.
 ### Modified Capabilities
 
 - `repositories`: each repository has only the features it uses (discussions in troupe only, no issues or Actions
-  in `.github`, projects wherever the roadmap is linked), private vulnerability reporting is on everywhere and
-  checked out of band, and troupe's discussion categories are checked for drift.
+  in `.github`, projects wherever the roadmap is linked), private vulnerability reporting is on everywhere, pull
+  requests are off in `.github` only, Sponsorships is off everywhere, each checked out of band, and troupe's
+  discussion categories are checked for drift.
 - `org-settings`: members can't create Pages sites.
 - `org-profile`: the issue chooser and the contributing guide send questions to troupe's discussions.
 
@@ -52,4 +58,5 @@ None.
   plan.
 - `oob/README.md`, and `oob/app-installations.json` if the App needs Discussions: read.
 - Owner steps on GitHub before the merge: turn discussions on in troupe and set its categories, turn on private
-  vulnerability reporting in infrastructure, and link the roadmap to infrastructure.
+  vulnerability reporting in infrastructure, turn pull requests off in `.github`, and link the roadmap to
+  infrastructure.

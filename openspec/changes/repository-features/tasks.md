@@ -12,15 +12,21 @@ Troupe's discussions are not turned on here: that's task 7.1, immediately before
 - [ ] 1.3 Ask the owner to grant the infrastructure App **Discussions: read**, and declare it in
   `oob/app-installations.json`. Verify `uv run scripts/oob.py` reports no difference for App installations.
 
+- [x] 1.4 Create an `infra-probe-*` repository, turn its pull requests off, and commit a file to it through the
+  contents API (`gh api -X PUT repos/troupe-run/<probe>/contents/<file>`), as the App writes `.github`'s files.
+  Verify the commit lands on `main`, record the result in design D4a, then delete the probe repository.
+- [ ] 1.5 If 1.4 passed, ask the owner to turn pull requests off in `.github`. Verify
+  `gh api graphql` reads `hasPullRequestsEnabled: false` for `.github`.
+
 ## 2. Repository features in the module (design D1, D2)
 
-- [ ] 2.1 Add `has_discussions` (default `false`), `has_issues` (default `true`) and `actions_enabled` (default
+- [x] 2.1 Add `has_discussions` (default `false`), `has_issues` (default `true`) and `actions_enabled` (default
   `true`) to `tofu/modules/repository/variables.tf`, and use the first two in `github_repository.this` in place of
   the hard-coded values. Verify `tofu fmt -check` and `tofu validate` pass.
-- [ ] 2.2 Add `github_actions_repository_permissions.this` to the module (`enabled = var.actions_enabled`,
+- [x] 2.2 Add `github_actions_repository_permissions.this` to the module (`enabled = var.actions_enabled`,
   `allowed_actions` `"all"` when on, `sha_pinning_required = false`), with a comment citing design D2. Verify
   `tofu validate` passes.
-- [ ] 2.3 In `tofu/repositories.tf`, set `has_discussions = true` on troupe, `has_issues = false` and
+- [x] 2.3 In `tofu/repositories.tf`, set `has_discussions = true` on troupe, `has_issues = false` and
   `actions_enabled = false` on `.github`, and `has_projects = true` on infrastructure, each with a comment saying why.
   Verify `tofu validate` passes.
 - [ ] 2.4 Add four `import` blocks in `tofu/imports.tf` adopting each repository's Actions settings by name. Verify
@@ -29,15 +35,20 @@ Troupe's discussions are not turned on here: that's task 7.1, immediately before
 
 ## 3. Out-of-band checks (design D4, D5, D9)
 
-- [ ] 3.1 Add `oob/private-vulnerability-reporting.json` (all four repositories, `enabled: true`) and a check in
+- [x] 3.1 Add `oob/private-vulnerability-reporting.json` (all four repositories, `enabled: true`) and a check in
   `scripts/oob.py` that reads each repository's setting, reports one that's off, and treats a refused read as an
   error naming the repository. Add tests to `scripts/tests/test_oob.py` for match, off, missing repository and a
   refused read, each failing when its behaviour breaks. Verify `uv run pytest scripts/tests/test_oob.py` passes.
-- [ ] 3.2 Add `oob/discussion-categories.json` (Q&A, Ideas, Announcements: `name`, `slug`, `isAnswerable`) and a
+- [x] 3.1a Add `oob/repository-features.json` (`hasPullRequestsEnabled` false for `.github` only,
+  `hasSponsorshipsEnabled` false everywhere) and a check reading each declared repository through GraphQL. Add tests
+  for match, pull requests turned on in `.github`, Sponsorships turned on, and a refused read naming the repository.
+  Verify the tests pass and `uv run scripts/oob.py` reads all four.
+- [x] 3.2 Add `oob/discussion-categories.json` (Q&A, Ideas, Announcements: `name`, `slug`, `isAnswerable`) and a
   `Check` reading troupe's categories through GraphQL. Add tests for match, a category added by hand, discussions
-  off (no categories), and a refused read. Verify the tests pass and `uv run scripts/oob.py` reports no difference.
-- [ ] 3.3 Add rows for both files to `oob/README.md`'s table, and a "Not managed" section listing the home page's
-  Releases, Packages and Deployments panels, Sponsorships, forking on a public repository, and a category's
+  off (no categories), and a refused read. Verify the tests pass and `uv run scripts/oob.py` reads the categories,
+  reporting only the three as missing while troupe's discussions are off (until 7.1).
+- [x] 3.3 Add rows for both files to `oob/README.md`'s table, and a "Not managed" section listing the home page's
+  Releases, Packages and Deployments panels, forking on a public repository, and a category's
   announcement-only format, each with why. Verify the README's checks in `uv run scripts/check.py` pass.
 
 ## 4. Org Pages settings (design D8)
@@ -48,9 +59,9 @@ Troupe's discussions are not turned on here: that's task 7.1, immediately before
 
 ## 5. Questions go to troupe's discussions (design D7)
 
-- [ ] 5.1 Add the "Ask a question" contact link to `org-profile/.github/ISSUE_TEMPLATE/config.yml`. Verify
+- [x] 5.1 Add the "Ask a question" contact link to `org-profile/.github/ISSUE_TEMPLATE/config.yml`. Verify
   `uv run pytest scripts/tests/test_org_profile.py` passes and the file parses as YAML.
-- [ ] 5.2 Add a "Questions" section to `org-profile/CONTRIBUTING.md`, before "How work flows", pointing to troupe's
+- [x] 5.2 Add a "Questions" section to `org-profile/CONTRIBUTING.md`, before "How work flows", pointing to troupe's
   discussions. Verify `uv run pytest scripts/tests/test_org_profile.py` passes.
 
 ## 6. Evidence before the pull request

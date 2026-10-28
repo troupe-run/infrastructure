@@ -90,6 +90,8 @@ approved shows only what OpenTofu changes, and the drift check is green on the f
    comes after review, archive and the other evidence, immediately before the merge, and the owner checks any plan
    of `main` in between for that change before approving it.
 2. **Private vulnerability reporting in infrastructure.** The owner turns it on (Settings → Code security).
+   **Pull requests in `.github`** are turned off by the owner too, once the probe in D4a has passed (Settings →
+   General → Features). Neither is managed by OpenTofu, so no plan of `main` undoes them.
 3. **The roadmap linked to infrastructure.** The owner runs
    `gh project link 1 --owner troupe-run --repo troupe-run/infrastructure`. With projects still off there, the link
    exists but isn't shown, until the apply turns projects on.
@@ -110,6 +112,33 @@ caught by review, as `code-security.json`'s list is.
 
 *Alternative:* derive the repository list from `tofu/repositories.tf`. Rejected: `oob.py` reads no HCL today, and
 the list of four changes rarely.
+
+### D4a. Pull requests and Sponsorships are an `oob.py` check, read through GraphQL
+
+GraphQL's `Repository` has `hasPullRequestsEnabled` and `hasSponsorshipsEnabled`, and `updateRepository` sets both;
+provider 6.13.0 has neither (read 2026-10-28, when both read `true` and `false` respectively in all four).
+`oob/repository-features.json` declares, for each managed repository, `hasPullRequestsEnabled` (`false` for
+`.github` only) and `hasSponsorshipsEnabled` (`false` everywhere). The check reads each declared repository with one
+GraphQL query, so a refused read is an error naming the repository, never "off".
+
+**Why pull requests are off in `.github`:** its "app only" ruleset lets only the infrastructure App change `main`,
+by commits through the contents API, and every file there is written from `org-profile/` here (spec: org-profile,
+rulesets). A pull request opened there could never merge, and an apply would overwrite it if it did. A fix to those
+files is a pull request to `org-profile/` in this repository.
+
+The owner turns it off by hand (D3). Before that, the App's way of writing (a commit through the contents API) is
+tried on an `infra-probe-*` repository with pull requests off, to show it doesn't depend on pull requests. If it does,
+`.github` keeps them on and the declaration says why.
+
+**Probe result (2026-10-28, `infra-probe-20261028-prs`, since deleted):** REST's `has_pull_requests=false` turned
+pull requests off (GraphQL then read `hasPullRequestsEnabled: false`). A commit through the contents API
+(`PUT .../contents/probe.txt`) then landed on `main`. A branch pushed with git could not be proposed:
+`gh pr create` was refused with "does not have the correct permissions to execute `CreatePullRequest`", for the org
+owner too. The commit was made with the owner's login, not the App's: what it shows is that a contents-API commit
+doesn't need pull requests, which is how the App writes.
+
+*Alternative:* Sponsorships noted as unmanaged, as the issue guessed. Rejected: it has an API, so it's checked
+like the other features the provider can't set.
 
 ### D5. Discussion categories are an `oob.py` check, and the App gets Discussions: read
 
@@ -157,9 +186,9 @@ pull request restores the public setting, and the choice goes back to the owner.
 
 ### D9. What can't be managed is listed in `oob/README.md`
 
-A new section, "Not managed", lists the repository home page's Releases, Packages and Deployments panels, and
-Sponsorships: each is a setting on GitHub's website only, with no API, so neither OpenTofu nor `oob.py` can see
-it. It also notes that forking can't be turned off for a public repository, and that a discussion category's
+A new section, "Not managed", lists the repository home page's Releases, Packages and Deployments panels: each is a
+setting on GitHub's website only, with no API field (GraphQL's `Repository` and `UpdateRepositoryInput` checked
+2026-10-28), so neither OpenTofu nor `oob.py` can see it. It also notes that forking can't be turned off for a public repository, and that a discussion category's
 announcement-only format can't be read.
 
 ## Risks / Trade-offs
@@ -179,7 +208,8 @@ announcement-only format can't be read.
 
 ## Migration Plan
 
-1. Merge order: private vulnerability reporting, the project link (D3) and the App's Discussions: read (D5) any time
+1. Merge order: the probe and then pull requests off in `.github` (D4a), private vulnerability reporting, the project
+   link (D3) and the App's Discussions: read (D5) any time
    before the merge; troupe's discussions and categories last, immediately before the merge (D3).
 2. The apply imports the four Actions settings, turns off `.github`'s Actions and issues, turns on infrastructure's
    projects, sets the org's Pages settings, and delivers `config.yml` and `CONTRIBUTING.md` to `.github`.

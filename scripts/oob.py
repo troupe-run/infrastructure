@@ -131,6 +131,23 @@ CHECKS = [
             " | .repositories = ([.repositories.nodes[].name] | sort)]",
         ],
     ),
+    # troupe's discussion categories: no API creates or edits them, so they're set by hand. With
+    # discussions off there are none, so each declared one reads as missing. Whether a category is
+    # announcement-only can't be read (spec: repositories; repository-features design D5).
+    Check(
+        name="discussion categories",
+        declaration="discussion-categories.json",
+        key="name",
+        gh_args=[
+            "api",
+            "graphql",
+            "-f",
+            f'query={{repository(owner:"{ORG}",name:"troupe")'
+            "{discussionCategories(first:100){nodes{name slug isAnswerable}}}}",
+            "--jq",
+            "[.data.repository.discussionCategories.nodes[]]",
+        ],
+    ),
 ]
 
 
@@ -352,6 +369,79 @@ def code_security(fetch: Fetch, oob_dir: Path) -> list[str]:
     return found
 
 
+# Private vulnerability reporting, which the provider has no resource for: the org's security policy
+# asks for reports through it, so it's on in every managed repository (spec: repositories;
+# repository-features design D4).
+VULNERABILITY_REPORTING = "private-vulnerability-reporting.json"
+
+
+def vulnerability_reporting_gh_args(repository: str) -> list[str]:
+    return ["api", f"repos/{ORG}/{repository}/private-vulnerability-reporting"]
+
+
+def vulnerability_reporting(fetch: Fetch, oob_dir: Path) -> list[str]:
+    """Each declared repository's setting. One that can't be read, or reads back without a
+    setting, is an error naming the repository: never "off" or "on"."""
+    declared = json.loads((oob_dir / VULNERABILITY_REPORTING).read_text())
+    actual: list[Record] = []
+    for repo in declared:
+        name = repo["repository"]
+        try:
+            enabled = (fetch(vulnerability_reporting_gh_args(name)) or {}).get("enabled")
+        except Exception as error:
+            raise UnreadableError(
+                f"private vulnerability reporting: couldn't read {name!r}'s setting "
+                f"({reason(error)})"
+            ) from error
+        if not isinstance(enabled, bool):
+            raise UnreadableError(
+                f"private vulnerability reporting: {name!r} came back with no setting, so its "
+                "state is unknown"
+            )
+        actual.append({"repository": name, "enabled": enabled})
+    return differences("private vulnerability reporting", "repository", declared, actual)
+
+
+# Features the provider can't set but GraphQL reads: pull requests, off in .github only, whose main
+# only the App changes; and Sponsorships, off everywhere (spec: repositories; repository-features
+# design D4a).
+REPOSITORY_FEATURES = "repository-features.json"
+FEATURE_FIELDS = ["hasPullRequestsEnabled", "hasSponsorshipsEnabled"]
+
+
+def features_gh_args(repository: str) -> list[str]:
+    return [
+        "api",
+        "graphql",
+        "-f",
+        f'query={{repository(owner:"{ORG}",name:"{repository}"){{{" ".join(FEATURE_FIELDS)}}}}}',
+        "--jq",
+        ".data.repository",
+    ]
+
+
+def repository_features(fetch: Fetch, oob_dir: Path) -> list[str]:
+    """Each declared repository's features. One that can't be read, or reads back without them,
+    is an error naming the repository: never "off" or "on"."""
+    declared = json.loads((oob_dir / REPOSITORY_FEATURES).read_text())
+    actual: list[Record] = []
+    for repo in declared:
+        name = repo["repository"]
+        try:
+            read = fetch(features_gh_args(name)) or {}
+        except Exception as error:
+            raise UnreadableError(
+                f"repository features: couldn't read {name!r} ({reason(error)})"
+            ) from error
+        if not all(isinstance(read.get(field), bool) for field in FEATURE_FIELDS):
+            raise UnreadableError(
+                f"repository features: {name!r} came back without its features, so their state "
+                "is unknown"
+            )
+        actual.append({"repository": name, **{field: read[field] for field in FEATURE_FIELDS}})
+    return differences("repository features", "repository", declared, actual)
+
+
 # The release milestones, which OpenTofu manages only as declared: a milestone made by hand on a
 # listed repository never shows in a plan (spec: milestones; release-milestones design D5). One way,
 # like the spec labels: a declared milestone that's missing or different is the plan's business.
@@ -557,6 +647,10 @@ def run(fetch: Fetch, oob_dir: Path, root: Path = ROOT) -> Report:
             "troupe label descriptions: not checked, since troupe's specs couldn't be read"
         )
     report.attempt("code security", lambda: code_security(fetch, oob_dir))
+    report.attempt(
+        "private vulnerability reporting", lambda: vulnerability_reporting(fetch, oob_dir)
+    )
+    report.attempt("repository features", lambda: repository_features(fetch, oob_dir))
     report.attempt("milestones", lambda: undeclared_milestones(fetch, root))
     report.attempt("board capabilities", lambda: board_capabilities(fetch, root))
     return report

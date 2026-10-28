@@ -38,6 +38,11 @@ your branch.
 Members of the troupe-run organisation don't need the sign-off on commits they author and sign
 cryptographically. Their work already belongs to the project's owner, HPS.GD PTY LTD.
 
+## Questions
+
+Ask them in [troupe's discussions](https://github.com/troupe-run/troupe/discussions/categories/q-a), not in an
+issue, whichever repository they're about. An issue is for work: a feature, a bug or a decision.
+
 ## How work flows
 
 troupe is built with [OpenSpec](https://github.com/Fission-AI/OpenSpec). GitHub holds what we want and its

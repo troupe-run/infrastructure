@@ -73,6 +73,9 @@ module "repo_troupe" {
   # The org's roadmap (project 1) is linked here, and turning projects off would hide it from the
   # repository (required-checks design D8, finding 8).
   has_projects = true
+  # The only repository with discussions: questions about troupe, or about contributing, are asked
+  # here, and the org's issue chooser and contributing guide send them here (repository-features D7).
+  has_discussions = true
   # troupe receives the guard from this repository (guard_delivery.tf).
   app_bypass_id   = local.infrastructure_app_id
   required_checks = local.checks_for["troupe"]
@@ -88,7 +91,12 @@ module "repo_github" {
   # org-profile; required-checks design D4).
   main_ruleset  = "app-only"
   app_bypass_id = local.infrastructure_app_id
-  description   = "Org-wide defaults for troupe-run repositories: DCO config, contributing, security policy, org profile"
+  # Nothing is tracked here: org-wide work goes in infrastructure. The org's issue forms, which live
+  # here, still reach the other repositories (repository-features D6). No workflow runs here either,
+  # so one added by hand would never run (D2).
+  has_issues      = false
+  actions_enabled = false
+  description     = "Org-wide defaults for troupe-run repositories: DCO config, contributing, security policy, org profile"
   labels = concat(
     local.github_default_labels,
     local.workflow_labels,
@@ -109,6 +117,9 @@ module "repo_infrastructure" {
     local.kind_labels,
     local.dependabot_labels["infrastructure"],
   )
+  # The org's roadmap (project 1) holds infrastructure's issues and is linked here, as in troupe and
+  # website, so it shows on the repository (repository-features D3).
+  has_projects = true
   # CI commits the state here after an apply (spec: ci-apply, design D4).
   app_bypass_id   = local.infrastructure_app_id
   required_checks = local.checks_for["infrastructure"]

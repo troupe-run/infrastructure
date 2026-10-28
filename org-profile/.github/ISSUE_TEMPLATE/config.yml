@@ -1,2 +1,6 @@
 # Source: troupe-run/infrastructure (org-profile/.github/ISSUE_TEMPLATE/config.yml). Change it there; this copy is written by the App.
 blank_issues_enabled: true
+contact_links:
+  - name: Ask a question
+    url: https://github.com/troupe-run/troupe/discussions/categories/q-a
+    about: "Questions about troupe, or how to contribute: ask in troupe's discussions."

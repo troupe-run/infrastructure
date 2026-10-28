@@ -212,6 +212,16 @@ def test_a_security_advisories_link_counts_as_the_security_policy(tmp_path: Path
     assert len(security_link_problems(config)) == 1
 
 
+# Where questions go: troupe's Q&A discussions (spec: org-profile; repository-features design D7).
+QUESTIONS_URL = "https://github.com/troupe-run/troupe/discussions/categories/q-a"
+
+
+def test_the_chooser_offers_a_question_link_to_troupes_q_and_a() -> None:
+    loaded: Any = yaml.safe_load(CHOOSER_CONFIG.read_text(encoding="utf-8"))
+    links = [(link["name"], link["url"]) for link in loaded["contact_links"]]
+    assert ("Ask a question", QUESTIONS_URL) in links
+
+
 GUIDE = ORG_PROFILE / "CONTRIBUTING.md"
 REQUIRED_CHECKS = REPO / "tofu" / "required-checks.json"
 PYPROJECT = REPO / "pyproject.toml"
@@ -376,3 +386,10 @@ def test_a_type_the_guide_leaves_out_fails_naming_it() -> None:
 
 def test_a_guide_with_no_list_of_types_fails_saying_so() -> None:
     assert guide_type_problems("## How issues are related\n", ORG_TYPES) == [NO_TYPES_LIST]
+
+
+def test_the_guide_sends_questions_to_troupes_discussions() -> None:
+    guide = GUIDE.read_text(encoding="utf-8")
+    section = guide.split("## Questions\n", 1)[1].split("\n## ", 1)[0]
+    assert QUESTIONS_URL in section
+    assert "not in an\nissue" in section

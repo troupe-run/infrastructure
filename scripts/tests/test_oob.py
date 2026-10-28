@@ -56,6 +56,15 @@ MILESTONES = {
     ],
 }
 DECLARED_MILESTONES = ["0.1.0", "0.2.0"]
+FEATURES = [
+    {"repository": ".github", "hasPullRequestsEnabled": False, "hasSponsorshipsEnabled": False},
+    {"repository": "troupe", "hasPullRequestsEnabled": True, "hasSponsorshipsEnabled": False},
+]
+REPORTING = [{"repository": r, "enabled": True} for r in ("troupe", "website")]
+CATEGORIES = [
+    {"name": "Ideas", "slug": "ideas", "isAnswerable": False},
+    {"name": "Q&A", "slug": "q-a", "isAnswerable": True},
+]
 BOARD: dict[str, Any] = {
     "__typename": "ProjectV2SingleSelectField",
     "options": [
@@ -81,6 +90,9 @@ def oob_dir(tmp_path: Path) -> Path:
     (tmp_path / "troupe-spec-purposes.json").write_text(json.dumps(PURPOSES))
     (tmp_path / "code-security.json").write_text(json.dumps(CODE_SECURITY))
     (tmp_path / "tofu" / "milestones.json").write_text(json.dumps(MILESTONES))
+    (tmp_path / "private-vulnerability-reporting.json").write_text(json.dumps(REPORTING))
+    (tmp_path / "discussion-categories.json").write_text(json.dumps(CATEGORIES))
+    (tmp_path / "repository-features.json").write_text(json.dumps(FEATURES))
     return tmp_path
 
 
@@ -101,11 +113,17 @@ def fake_github(
     failures: dict[str, BaseException] | None = None,
     board: dict[str, Any] | BaseException = BOARD,
     raw_spec_content: dict[str, str] | None = None,
+    reporting: dict[str, Any] | None = None,
+    categories: list[Any] = CATEGORIES,
+    features: dict[str, Any] | None = None,
 ) -> oob.Fetch:
     """GitHub as declared. attachments maps a repository to its attachment (None: 204, nothing
     attached); graphs maps a repository to what reading its dependency graph raises; failures
     maps a piece of a read's path (or "graphql") to what that read raises; raw_spec_content maps
-    a spec to the content GitHub answers for its spec.md, as is, not base64-encoded here."""
+    a spec to the content GitHub answers for its spec.md, as is, not base64-encoded here; reporting
+    maps a repository to what reading its private vulnerability reporting answers or raises;
+    features maps a repository to what reading its pull request and Sponsorships settings answers
+    or raises."""
     docs = {"cli": CLI_SPEC} if spec_docs is None else spec_docs
     configs = [BASELINE] if configurations is None else configurations
     attached = attachments or {}
@@ -121,6 +139,24 @@ def fake_github(
             if isinstance(board, BaseException):
                 raise board
             return board
+        if args[1] == "graphql" and "hasSponsorshipsEnabled" in " ".join(args):
+            queried = re.search(r'name:"([^"]+)"', " ".join(args))
+            assert queried is not None
+            repo = queried[1]
+            declared = {f["repository"]: f for f in FEATURES}.get(repo, {})
+            answer = (features or {}).get(
+                repo, {k: v for k, v in declared.items() if k != "repository"}
+            )
+            if isinstance(answer, BaseException):
+                raise answer
+            return answer
+        if args[1] == "graphql" and "discussionCategories" in " ".join(args):
+            return categories
+        if args[1].endswith("/private-vulnerability-reporting"):
+            answer = (reporting or {}).get(args[1].split("/")[2], {"enabled": True})
+            if isinstance(answer, BaseException):
+                raise answer
+            return answer
         if "/milestones?" in args[1]:
             found = milestone_titles.get(args[1].split("/")[2], DECLARED_MILESTONES)
             if isinstance(found, BaseException):
@@ -684,8 +720,14 @@ def test_a_projects_read_gh_fails_for_a_graphql_error_is_unreadable(oob_dir: Pat
     error = refused("gh: Resource not accessible by integration")
     report = REPORT(fake_github(TYPES, PROJECTS, [], failures={"graphql": error}), oob_dir)
     assert report.differences == []
-    # The board's Capability field is read through GraphQL too, so it is unreadable alongside.
-    assert [line.split(":")[0] for line in report.unreadable] == ["projects", "board capabilities"]
+    # troupe's discussion categories and the board's Capability field are read through GraphQL
+    # too, so they're unreadable alongside.
+    assert [line.split(":")[0] for line in report.unreadable] == [
+        "projects",
+        "discussion categories",
+        "repository features",
+        "board capabilities",
+    ]
     assert all("Resource not accessible by integration" in line for line in report.unreadable)
 
 
@@ -764,9 +806,12 @@ EVERY_CHECK = [
     "App installations",
     "issue types",
     "projects",
+    "discussion categories",
     "troupe specs",
     "troupe label descriptions",
     "code security",
+    "private vulnerability reporting",
+    "repository features",
     "milestones",
     "board capabilities",
 ]
@@ -961,3 +1006,127 @@ def test_an_option_with_no_label_gets_only_the_no_label_difference(oob_dir: Path
 
 def test_the_board_query_reads_each_option_s_description() -> None:
     assert "options{name description}" in oob.BOARD_GH_ARGS[3]
+
+
+# repository-features design D4: private vulnerability reporting, one read per repository.
+
+
+def test_private_vulnerability_reporting_turned_off_is_reported(oob_dir: Path) -> None:
+    found = RUN(
+        fake_github(TYPES, PROJECTS, [], reporting={"website": {"enabled": False}}), oob_dir
+    )
+    assert found == [
+        "private vulnerability reporting: 'website' enabled is False on GitHub, declared True"
+    ]
+
+
+def test_private_vulnerability_reporting_is_read_for_each_declared_repository(
+    oob_dir: Path,
+) -> None:
+    calls: list[list[str]] = []
+    RUN(fake_github(TYPES, PROJECTS, calls), oob_dir)
+    read = [c[1] for c in calls if c[1].endswith("/private-vulnerability-reporting")]
+    assert read == [
+        "repos/troupe-run/troupe/private-vulnerability-reporting",
+        "repos/troupe-run/website/private-vulnerability-reporting",
+    ]
+
+
+def test_refused_private_vulnerability_reporting_is_an_error_never_off(oob_dir: Path) -> None:
+    reporting: dict[str, Any] = {"troupe": refused("gh: Forbidden (HTTP 403)")}
+    report = REPORT(fake_github(TYPES, PROJECTS, [], reporting=reporting), oob_dir)
+    assert report.differences == []
+    assert len(report.unreadable) == 1
+    assert re.search(r"private vulnerability reporting.*'troupe'.*HTTP 403", report.unreadable[0])
+
+
+def test_private_vulnerability_reporting_with_no_setting_is_an_error(oob_dir: Path) -> None:
+    report = REPORT(fake_github(TYPES, PROJECTS, [], reporting={"website": {}}), oob_dir)
+    assert report.differences == []
+    assert len(report.unreadable) == 1
+    assert "'website'" in report.unreadable[0]
+
+
+def test_every_managed_repository_declares_private_vulnerability_reporting_on() -> None:
+    declared = json.loads((oob.OOB / "private-vulnerability-reporting.json").read_text())
+    assert declared == [
+        {"repository": r, "enabled": True}
+        for r in ("troupe", ".github", "infrastructure", "website")
+    ]
+
+
+# repository-features design D5: troupe's discussion categories.
+
+
+def test_a_discussion_category_added_by_hand_is_reported(oob_dir: Path) -> None:
+    extra = [*CATEGORIES, {"name": "General", "slug": "general", "isAnswerable": False}]
+    found = RUN(fake_github(TYPES, PROJECTS, [], categories=extra), oob_dir)
+    assert found == ["discussion categories: 'General' is on GitHub but not declared"]
+
+
+def test_discussions_turned_off_report_every_declared_category_missing(oob_dir: Path) -> None:
+    found = RUN(fake_github(TYPES, PROJECTS, [], categories=[]), oob_dir)
+    assert found == [
+        "discussion categories: 'Ideas' is declared but missing on GitHub",
+        "discussion categories: 'Q&A' is declared but missing on GitHub",
+    ]
+
+
+def test_a_category_that_stops_taking_answers_is_reported(oob_dir: Path) -> None:
+    changed = [CATEGORIES[0], {**CATEGORIES[1], "isAnswerable": False}]
+    found = RUN(fake_github(TYPES, PROJECTS, [], categories=changed), oob_dir)
+    assert found == ["discussion categories: 'Q&A' isAnswerable is False on GitHub, declared True"]
+
+
+def test_the_discussion_categories_query_reads_troupe_s_name_slug_and_answers() -> None:
+    """Checks the query's text only: the fake above stands in for what gh returns."""
+    (categories,) = [c for c in oob.CHECKS if c.name == "discussion categories"]
+    query = next(a for a in categories.gh_args if a.startswith("query="))
+    assert 'repository(owner:"troupe-run",name:"troupe")' in query
+    assert "nodes{name slug isAnswerable}" in query
+
+
+# repository-features design D4a: pull requests off in .github only, Sponsorships off everywhere.
+
+
+def test_pull_requests_turned_on_in_github_are_reported(oob_dir: Path) -> None:
+    on = {".github": {"hasPullRequestsEnabled": True, "hasSponsorshipsEnabled": False}}
+    found = RUN(fake_github(TYPES, PROJECTS, [], features=on), oob_dir)
+    assert found == [
+        "repository features: '.github' hasPullRequestsEnabled is True on GitHub, declared False"
+    ]
+
+
+def test_sponsorships_turned_on_is_reported(oob_dir: Path) -> None:
+    on = {"troupe": {"hasPullRequestsEnabled": True, "hasSponsorshipsEnabled": True}}
+    found = RUN(fake_github(TYPES, PROJECTS, [], features=on), oob_dir)
+    assert found == [
+        "repository features: 'troupe' hasSponsorshipsEnabled is True on GitHub, declared False"
+    ]
+
+
+def test_refused_repository_features_are_an_error_naming_the_repository(oob_dir: Path) -> None:
+    features: dict[str, Any] = {"troupe": refused("gh: Could not resolve to a Repository")}
+    report = REPORT(fake_github(TYPES, PROJECTS, [], features=features), oob_dir)
+    assert report.differences == []
+    assert len(report.unreadable) == 1
+    assert re.search(r"repository features.*'troupe'.*Could not resolve", report.unreadable[0])
+
+
+def test_repository_features_read_back_without_a_field_are_an_error(oob_dir: Path) -> None:
+    features: dict[str, Any] = {".github": {"hasPullRequestsEnabled": False}}
+    report = REPORT(fake_github(TYPES, PROJECTS, [], features=features), oob_dir)
+    assert report.differences == []
+    assert len(report.unreadable) == 1
+    assert "'.github'" in report.unreadable[0]
+
+
+def test_only_github_declares_pull_requests_off_and_none_declares_sponsorships() -> None:
+    declared = json.loads((oob.OOB / "repository-features.json").read_text())
+    assert {d["repository"]: d["hasPullRequestsEnabled"] for d in declared} == {
+        "troupe": True,
+        ".github": False,
+        "infrastructure": True,
+        "website": True,
+    }
+    assert all(d["hasSponsorshipsEnabled"] is False for d in declared)
