@@ -41,10 +41,13 @@ issue when it reaches `main`. The pull request closes #210.
 
 ## 3. Pull request and delivery plan
 
-- [ ] 3.1 Validate with `openspec validate guard-names-thread-reply-route --strict`, push the branch and open one pull
+- [x] 3.1 Validate with `openspec validate guard-names-thread-reply-route --strict`, push the branch and open one pull
   request whose description closes #210 (body written to a file, passed with `--body-file`). Verify this repository's
   `guard` run on the pull request passes, and the plan comment changes only `scripts/guard.py`, in troupe and in
-  website. Record the PR, the run and the plan here
+  website. Record the PR, the run and the plan here. Result: PR #212. On 93cd523 both `guard` runs pass, as do every
+  other check, the guard tests on all three OSes and Claude's review ("no new findings"). The plan for 93cd523 (run
+  40680839210) is 0 to add, 2 to change, 0 to destroy: `github_repository_file.guard` for `scripts/guard.py` in troupe
+  and in website, content and commit message in place, with no modes to set
 
 ## Workflow follow-up
 
