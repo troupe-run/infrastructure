@@ -7,7 +7,9 @@ name: tofu
 #   CI green on main  --> plan      env plan-main (main only)      plan in the run summary, with the
 #   or a manual run                                                board's descriptions to set; a
 #   or daily at 06:00 UTC                                          daily or manual run waits for green
-#                                                                  CI on main, and fails if it's red
+#                                                                  CI on main, and fails if it's red,
+#                                                                  or plans nothing if a newer merge
+#                                                                  cancelled that CI
 #                         apply     env apply (owner approves)     apply that saved plan, then commit
 #                                                                  the state to main as the App
 #                         board     env board (main only)          after the apply, set the board's
@@ -247,15 +249,18 @@ jobs:
       # main's head, the App's state commits looked past. It waits while CI runs, up to its limit,
       # and fails with the ways to recover when CI isn't green. No input skips it. A run after CI on
       # a merge already follows CI's success (scripts/main_ci.py; plans-wait-for-ci design D1-D6).
+      # When a newer merge cancelled that CI, it says superseded=true and every later step is
+      # skipped: that merge's own run plans main (red-main-and-undecodable-spec design D1, D2).
       - name: Wait for green CI on main
+        id: ci
         if: github.event_name != 'workflow_run' && steps.target.outputs.plan == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           python3 scripts/main_ci.py --main origin/main --repository "$GITHUB_REPOSITORY"
-          --summary "$GITHUB_STEP_SUMMARY"
+          --summary "$GITHUB_STEP_SUMMARY" >> "$GITHUB_OUTPUT"
       - name: Wait for the guard check on this commit
-        if: steps.target.outputs.plan == 'true'
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.target.outputs.sha }}
@@ -276,17 +281,17 @@ jobs:
           echo "::error::guard didn't finish on $SHA within 10 minutes."
           exit 1
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-        if: steps.target.outputs.plan == 'true'
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         with:
           python-version: "3.12"
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
-        if: steps.target.outputs.plan == 'true'
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         with:
           tofu_version: ${{ env.OPENTOFU_VERSION }}
           tofu_wrapper: false
       - name: Plan
         id: plan
-        if: steps.target.outputs.plan == 'true'
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         run: |
           uv run --no-project scripts/tofu.py init -input=false -no-color
           set +e
@@ -302,14 +307,14 @@ jobs:
       # No rendering of the plan holds a key: the App's, the DNS token or the state passphrase
       # (spec: state-and-apply; ephemeral-state-passphrase D2). Before anything else reads plan.json.
       - name: The plan holds no key
-        if: steps.target.outputs.plan == 'true'
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         run: |
           uv run --no-project scripts/tofu.py show -json main.tfplan > "$RUNNER_TEMP/plan.json"
           uv run --no-project scripts/plan_secrets.py "$RUNNER_TEMP/plan.txt" "$RUNNER_TEMP/plan.json"
       # As in pr-plan: the whole plan, linked from the summary when it's too long to show.
       - name: Keep the full plan
         id: full-plan
-        if: steps.target.outputs.plan == 'true'
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           path: ${{ runner.temp }}/plan.txt
@@ -319,7 +324,7 @@ jobs:
       # guard-delivery; executable-hooks design D1-D3). It only reads; the apply job sets them.
       - name: Modes to set after the apply
         id: modes
-        if: steps.target.outputs.plan == 'true'
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -340,7 +345,7 @@ jobs:
       # and the oob job fails on the same read (design D9).
       - name: A read-only token for the board
         id: board-token
-        if: steps.target.outputs.plan == 'true'
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         continue-on-error: true
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -350,7 +355,7 @@ jobs:
           permission-organization-projects: read
       - name: Board descriptions to set after the apply
         id: board
-        if: steps.target.outputs.plan == 'true'
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         env:
           GH_TOKEN: ${{ steps.board-token.outputs.token }}
         run: |
@@ -364,12 +369,12 @@ jobs:
           fi
       # As in pr-plan: a failed check block becomes an annotation and a line in the summary.
       - name: Check warnings
-        if: steps.target.outputs.plan == 'true'
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         run: |
           uv run --no-project scripts/plan_checks.py --plan-json "$RUNNER_TEMP/plan.json" \
             --summary "$RUNNER_TEMP/checks.md"
       - name: Show the plan for approval
-        if: steps.target.outputs.plan == 'true'
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         env:
           CHANGES: ${{ steps.plan.outputs.changes }}
           MODE_CHANGES: ${{ steps.modes.outputs.changes }}

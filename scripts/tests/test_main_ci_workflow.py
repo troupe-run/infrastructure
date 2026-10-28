@@ -1,11 +1,13 @@
 """tofu.yml runs scripts/main_ci.py before a scheduled or manual plan of main, so a red main holds
-it (spec: ci-apply, "A scheduled or manual plan of main waits for green CI"; plans-wait-for-ci
-design D1, D3, D5, D6).
+it, and a run a newer merge superseded plans nothing (spec: ci-apply, "A scheduled or manual plan
+of main waits for green CI", "A scheduled or manual plan superseded by a newer merge plans
+nothing"; plans-wait-for-ci design D1, D3, D5, D6; red-main-and-undecodable-spec design D2, D3).
 
 GitHub runs the workflow, so these tests pin what it's given: the gate in one step of the plan job,
-after the target and before the guard wait and the plan, skipped only after CI on a merge; a job
-timeout the gate's limit fits in; ci.yml skipping exactly the file the gate looks past; no input
-that skips it; and the drift job left out of it. test_main_ci.py tests the gate itself."""
+after the target and before the guard wait and the plan, skipped only after CI on a merge; its
+`superseded` output in $GITHUB_OUTPUT, and every later step skipped on it; a job timeout the gate's
+limit fits in; ci.yml skipping exactly the file the gate looks past; no input that skips it; and
+the drift job left out of it. test_main_ci.py tests the gate itself."""
 
 import copy
 from collections.abc import Callable
@@ -25,6 +27,9 @@ CI = REPO / ".github" / "workflows" / "ci.yml"
 GATE_IF = "github.event_name != 'workflow_run' && steps.target.outputs.plan == 'true'"
 GUARD_WAIT = "Wait for the guard check on this commit"
 GUARD_WAIT_MINUTES = 10
+NOT_SUPERSEDED = "steps.ci.outputs.superseded != 'true'"
+# Gated on the plan's own outputs, which a superseded run never sets.
+SAVED_PLAN = "Keep the saved plan for the apply job"
 
 
 def load(path: Path) -> dict[Any, Any]:
@@ -71,6 +76,16 @@ def problems(tofu: dict[str, Any], ci: dict[str, Any]) -> list[str]:
         found.append("the gate isn't given GH_TOKEN")
     if gate.get("continue-on-error"):
         found.append("the gate's failure doesn't stop the plan")
+    if gate.get("id") != "ci":
+        found.append("the gate's id isn't ci, so its superseded output can't be read")
+    if '>> "$GITHUB_OUTPUT"' not in run:
+        found.append("the gate's stdout isn't appended to $GITHUB_OUTPUT")
+    for step in steps[at + 1 :]:
+        if step.get("name") != SAVED_PLAN and NOT_SUPERSEDED not in str(step.get("if", "")):
+            found.append(
+                f"{step.get('name') or step.get('uses')} runs on a superseded run: its if lacks"
+                f" {NOT_SUPERSEDED!r}"
+            )
 
     limit = main_ci.LIMIT_SECONDS // 60 + GUARD_WAIT_MINUTES
     if int(plan.get("timeout-minutes", 0)) <= limit:
@@ -156,6 +171,23 @@ def drift_waits_for_the_plan(tofu: dict[str, Any], ci: dict[str, Any]) -> None:
     tofu["jobs"]["oob"]["needs"] = "plan"
 
 
+def gate_without_its_id(tofu: dict[str, Any], ci: dict[str, Any]) -> None:
+    del gate(tofu)["id"]
+
+
+def gate_output_not_kept(tofu: dict[str, Any], ci: dict[str, Any]) -> None:
+    gate(tofu)["run"] = gate(tofu)["run"].replace('>> "$GITHUB_OUTPUT"', "")
+
+
+def unskip(name: str) -> Callable[[dict[str, Any], dict[str, Any]], None]:
+    def mutate(tofu: dict[str, Any], ci: dict[str, Any]) -> None:
+        step = next(s for s in plan_steps(tofu) if s.get("name") == name)
+        step["if"] = "steps.target.outputs.plan == 'true'"
+
+    mutate.__name__ = f"{name.lower().replace(' ', '_')}_runs_when_superseded"
+    return mutate
+
+
 def ci_ignores_more(tofu: dict[str, Any], ci: dict[str, Any]) -> None:
     triggers(ci)["push"]["paths-ignore"].append("docs/**")
 
@@ -175,6 +207,10 @@ def ci_ignores_more(tofu: dict[str, Any], ci: dict[str, Any]) -> None:
         a_skip_input,
         drift_waits_for_the_plan,
         ci_ignores_more,
+        gate_without_its_id,
+        gate_output_not_kept,
+        unskip("Plan"),
+        unskip(GUARD_WAIT),
     ],
 )
 def test_each_way_of_breaking_it_is_caught(
