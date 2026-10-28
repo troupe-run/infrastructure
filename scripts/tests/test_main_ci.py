@@ -5,6 +5,7 @@ Each test builds a real repository shaped like main's history (conftest.History)
 come from a fake `gh`, and time from a fake clock, so nothing waits for real.
 """
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -33,15 +34,43 @@ def run(number: int, status: str, conclusion: str = "") -> dict[str, Any]:
     }
 
 
+IDENTICAL = {"status": "identical", "total_commits": 0, "commits": [], "files": []}
+NEWER = "b496971" + "0" * 33
+
+
+def ahead(*files: str, commits: list[str] | None = None, total: int | None = None) -> Any:  # noqa: ANN401 (JSON)
+    """GitHub's compare of the commit checked with main, as main_ci.py's --jq shapes it."""
+    listed = [NEWER] if commits is None else commits
+    return {
+        "status": "ahead",
+        "total_commits": len(listed) if total is None else total,
+        "commits": listed,
+        "files": list(files),
+    }
+
+
 class FakeCI:
     """CI's push runs on main, by commit. A commit's list is what each poll sees in turn; the last
-    one stays. A commit not listed has no run."""
+    one stays. A commit not listed has no run. compare is GitHub's answer to comparing a commit
+    with main (main unmoved, unless a test says otherwise), or what that read raises."""
 
-    def __init__(self, runs: dict[str, list[dict[str, Any] | None]]) -> None:
+    def __init__(
+        self,
+        runs: dict[str, list[dict[str, Any] | None]],
+        compare: Any = IDENTICAL,  # noqa: ANN401 (JSON)
+    ) -> None:
         self.runs = runs
+        self.compare = compare
         self.asked: list[str] = []
+        self.compared: list[str] = []
 
     def __call__(self, args: list[str]) -> Any:  # noqa: ANN401 (JSON)
+        if args[0] == "api":
+            assert args[1].endswith("...main")
+            self.compared.append(args[1])
+            if isinstance(self.compare, BaseException):
+                raise self.compare
+            return self.compare
         assert args[:2] == ["run", "list"]
         assert args[args.index("--workflow") + 1] == "ci.yml"
         assert args[args.index("--event") + 1] == "push"
@@ -164,11 +193,112 @@ def test_running_then_failure_fails(history: History) -> None:
         "something_new",
     ],
 )
-def test_every_conclusion_but_success_fails(history: History, conclusion: str) -> None:
+def test_every_conclusion_but_success_fails_with_main_unmoved(
+    history: History, conclusion: str
+) -> None:
+    """FakeCI's compare answers identical, so a cancel here is one with main unmoved: by hand."""
     head = history.merge()
     result = gate(history, FakeCI({head: [run(7, "completed", conclusion)]}))
     assert not result.passed
     assert f"**{conclusion}**" in result.summary
+
+
+def test_a_cancel_with_main_ahead_by_a_merge_is_superseded_naming_both_commits(
+    history: History,
+) -> None:
+    head = history.merge()
+    ci = FakeCI(
+        {head: [run(7, "completed", "cancelled")]},
+        compare=ahead("scripts/main_ci.py", "tofu/terraform.tfstate"),
+    )
+    result = gate(history, ci)
+    assert result.passed
+    assert result.superseded
+    assert result.error == ""
+    assert head[:7] in result.summary
+    assert NEWER[:7] in result.summary
+    assert f"{URL}7" in result.summary
+    assert "isn't green" not in result.summary
+    assert ci.compared == [f"repos/{{owner}}/{{repo}}/compare/{head}...main"]
+
+
+def test_a_cancel_with_main_unmoved_fails_as_red(history: History) -> None:
+    head = history.merge()
+    result = gate(history, FakeCI({head: [run(7, "completed", "cancelled")]}, IDENTICAL))
+    assert not result.passed
+    assert not result.superseded
+    assert "**cancelled**" in result.summary
+    assert "isn't green" in result.summary
+
+
+def test_a_cancel_with_only_state_commits_since_fails_as_red(history: History) -> None:
+    head = history.merge()
+    ci = FakeCI({head: [run(7, "completed", "cancelled")]}, ahead("tofu/terraform.tfstate"))
+    result = gate(history, ci)
+    assert not result.passed
+    assert not result.superseded
+    assert "tofu/terraform.tfstate" in result.summary
+
+
+@pytest.mark.parametrize("status", ["behind", "diverged", "something_new"])
+def test_a_cancel_compared_as_anything_but_ahead_or_identical_fails_naming_it(
+    history: History, status: str
+) -> None:
+    head = history.merge()
+    answer = {**ahead("scripts/main_ci.py"), "status": status}
+    result = gate(history, FakeCI({head: [run(7, "completed", "cancelled")]}, answer))
+    assert not result.passed
+    assert not result.superseded
+    assert f"**{status}**" in result.summary
+
+
+def test_a_failed_compare_read_fails_with_its_error(history: History) -> None:
+    head = history.merge()
+    broken = main_ci.ReadError("HTTP 502: Bad Gateway")
+    result = gate(history, FakeCI({head: [run(7, "completed", "cancelled")]}, broken))
+    assert not result.passed
+    assert not result.superseded
+    assert "HTTP 502: Bad Gateway" in result.summary
+    assert "HTTP 502: Bad Gateway" in result.error
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        [],
+        {"status": "ahead"},
+        {**ahead("scripts/main_ci.py"), "files": "scripts/main_ci.py"},
+        {**ahead("scripts/main_ci.py"), "total_commits": "1"},
+        {**ahead("scripts/main_ci.py"), "commits": [1]},
+    ],
+    ids=["a-list", "no-files", "files-not-a-list", "total-not-a-number", "commit-not-a-sha"],
+)
+def test_a_compare_answer_of_the_wrong_shape_fails(history: History, answer: Any) -> None:  # noqa: ANN401 (JSON)
+    head = history.merge()
+    result = gate(history, FakeCI({head: [run(7, "completed", "cancelled")]}, answer))
+    assert not result.passed
+    assert not result.superseded
+
+
+def test_more_commits_than_compare_lists_names_mains_head_without_a_sha(history: History) -> None:
+    head = history.merge()
+    answer = ahead("scripts/main_ci.py", total=300)
+    result = gate(history, FakeCI({head: [run(7, "completed", "cancelled")]}, answer))
+    assert result.superseded
+    assert "`main`'s head" in result.summary
+    assert NEWER[:7] not in result.summary
+
+
+@pytest.mark.parametrize("conclusion", ["failure", "timed_out", "startup_failure", "skipped"])
+def test_conclusions_other_than_cancelled_fail_without_asking_whether_main_moved(
+    history: History, conclusion: str
+) -> None:
+    head = history.merge()
+    ci = FakeCI({head: [run(7, "completed", conclusion)]}, ahead("scripts/main_ci.py"))
+    result = gate(history, ci)
+    assert not result.passed
+    assert not result.superseded
+    assert ci.compared == []
 
 
 def test_an_unknown_status_fails_naming_it(history: History) -> None:
@@ -252,6 +382,65 @@ def test_main_exits_0_and_appends_the_summary_on_green_ci(
     text = summary.read_text(encoding="utf-8")
     assert text.startswith("before\n")
     assert head[:7] in text
+
+
+def args_for(history: History, summary: Path) -> list[str]:
+    return [
+        "--repo", str(history.path), "--main", "main",
+        "--repository", "troupe-run/infrastructure", "--summary", str(summary),
+    ]  # fmt: skip
+
+
+def test_main_prints_only_superseded_false_on_stdout_on_green_ci(
+    history: History,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    head = history.merge()
+    monkeypatch.setattr(main_ci, "gh", FakeCI({head: [run(1, "completed", "success")]}))
+    assert main_ci.main(args_for(history, tmp_path / "summary.md")) == 0
+    assert capsys.readouterr().out == "superseded=false\n"
+
+
+def test_main_exits_0_printing_superseded_true_and_its_summary_when_a_merge_supersedes_it(
+    history: History,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    head = history.merge()
+    ci = FakeCI({head: [run(7, "completed", "cancelled")]}, ahead("scripts/main_ci.py"))
+    monkeypatch.setattr(main_ci, "gh", ci)
+    summary = tmp_path / "summary.md"
+    assert main_ci.main(args_for(history, summary)) == 0
+    out = capsys.readouterr()
+    assert out.out == "superseded=true\n"
+    assert "::error::" not in out.err
+    assert NEWER[:7] in summary.read_text(encoding="utf-8")
+
+
+def test_main_prints_only_name_value_lines_on_stdout_on_red_ci(
+    history: History,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    head = history.merge()
+    monkeypatch.setattr(main_ci, "gh", FakeCI({head: [run(1, "completed", "failure")]}))
+    assert main_ci.main(args_for(history, tmp_path / "summary.md")) == 1
+    out = capsys.readouterr().out
+    assert all(re.fullmatch(r"[a-z_]+=[a-z]*", line) for line in out.splitlines())
+
+
+def test_main_compares_with_main_in_the_repository_given(
+    history: History, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    head = history.merge()
+    ci = FakeCI({head: [run(7, "completed", "cancelled")]}, IDENTICAL)
+    monkeypatch.setattr(main_ci, "gh", ci)
+    main_ci.main(args_for(history, tmp_path / "summary.md"))
+    assert ci.compared == [f"repos/troupe-run/infrastructure/compare/{head}...main"]
 
 
 def test_main_exits_1_with_an_error_annotation_on_red_ci(
