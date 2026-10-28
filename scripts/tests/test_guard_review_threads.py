@@ -250,6 +250,22 @@ def test_something_that_isn_t_a_conversation_is_refused(lookup: list[str]) -> No
         ),
         # Through --input, whose variables the guard doesn't read.
         ("--input mutation.json", "can't be read"),
+        # The variable given twice: gh sends the last, so the guard can't check the first.
+        (
+            "-f query='mutation($t: ID!) { resolveReviewThread(input: {threadId: $t}) { "
+            "thread { id } } }' -f t=PRRT_nit -f t=PRRT_mustfix",
+            "can't be read",
+        ),
+        (
+            "-f query='mutation($t: ID!) { resolveReviewThread(input: {threadId: $t}) { "
+            "thread { id } } }' -f t=PRRT_nit -F t=PRRT_decision",
+            "can't be read",
+        ),
+        (
+            "-f query='mutation($t: ID!) { resolveReviewThread(input: {threadId: $t}) { "
+            "thread { id } } }' --raw-field t=PRRT_nit --field=t=PRRT_mustfix",
+            "can't be read",
+        ),
     ],
 )
 def test_a_resolve_the_guard_can_t_pin_to_one_conversation_is_refused(

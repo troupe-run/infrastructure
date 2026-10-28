@@ -2498,11 +2498,18 @@ def _resolved_thread_id(rest: Sequence[str], cwd: Path) -> str | None:
     if literal is not None:
         value = json.loads(literal)
         return value if isinstance(value, str) else None
-    for field, typed in _api_fields(rest):
-        key, equals, value = field.partition("=")
-        if key == variable and equals:
-            return None if typed and value.startswith("@") else value
-    return None
+    # gh sends the last of a repeated field, so a variable given twice can't be pinned to the one
+    # the guard would read: it names no single conversation.
+    given = [
+        (value, typed)
+        for field, typed in _api_fields(rest)
+        for key, equals, value in [field.partition("=")]
+        if key == variable and equals
+    ]
+    if len(given) != 1:
+        return None
+    value, typed = given[0]
+    return None if typed and value.startswith("@") else value
 
 
 def _owner_resolves(problem: str) -> Decision:
