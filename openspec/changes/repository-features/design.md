@@ -89,7 +89,8 @@ approved shows only what OpenTofu changes, and the drift check is green on the f
    discussions turning off, and an approved apply of `main` would turn them off, hiding any posts. So this step
    comes after review, archive and the other evidence, immediately before the merge, and the owner checks any plan
    of `main` in between for that change before approving it.
-2. **Private vulnerability reporting in infrastructure.** The owner turns it on (Settings → Code security).
+2. **Private vulnerability reporting in the baseline.** The owner sets it to `enabled` in the "troupe-run baseline"
+   code security configuration (D4), which turns it on in all four and in each repository created later.
    **Pull requests in `.github`** are turned off by the owner too, once the probe in D4a has passed (Settings →
    General → Features). Neither is managed by OpenTofu, so no plan of `main` undoes them.
 3. **The roadmap linked to infrastructure.** The owner runs
@@ -103,6 +104,16 @@ private vulnerability reporting and the project link, OpenTofu doesn't manage ei
 them, and they can be done any time before the merge.
 
 ### D4. Private vulnerability reporting is an `oob.py` check, one read per repository
+
+It's turned on by the "troupe-run baseline" code security configuration, not repository by repository (owner,
+2026-10-29). The baseline had it `not_set`, which leaves each repository's own setting alone: troupe, website and
+`.github` had it on by hand, and infrastructure didn't. Set to `enabled`, the baseline turns it on in every attached
+repository, all four, and in each new public repository, which it's the default for. The provider has no resource
+for configurations, so the owner sets it on GitHub, and `oob/code-security.json` declares it, so `oob.py` checks the
+configuration too.
+
+The baseline is unenforced, so a repository can still turn it off by itself. So each repository's own setting is
+checked as well:
 
 `oob/private-vulnerability-reporting.json` lists each managed repository with `enabled: true`. The check reads
 `GET repos/troupe-run/<repo>/private-vulnerability-reporting` for each declared repository, as `code_security` reads

@@ -4,9 +4,11 @@
 
 Troupe's discussions are not turned on here: that's task 7.1, immediately before the merge (design D3).
 
-- [ ] 1.1 Ask the owner to turn on private vulnerability reporting in infrastructure. Verify
-  `gh api repos/troupe-run/infrastructure/private-vulnerability-reporting` returns `{"enabled":true}`.
-- [ ] 1.2 Ask the owner to run `gh project link 1 --owner troupe-run --repo troupe-run/infrastructure`. Verify the
+- [x] 1.1 Ask the owner to set private vulnerability reporting to `enabled` in the "troupe-run baseline" code
+  security configuration (design D4), and change `oob/code-security.json` to match. Verify
+  `gh api repos/troupe-run/<repo>/private-vulnerability-reporting` returns `{"enabled":true}` for all four, and
+  `uv run scripts/oob.py` reports no difference for code security or private vulnerability reporting.
+- [x] 1.2 Ask the owner to run `gh project link 1 --owner troupe-run --repo troupe-run/infrastructure`. Verify the
   `projects` GraphQL read in `scripts/oob.py` lists `infrastructure` for project 1, then add it to
   `oob/projects.json`.
 - [ ] 1.3 Ask the owner to grant the infrastructure App **Discussions: read**, and declare it in

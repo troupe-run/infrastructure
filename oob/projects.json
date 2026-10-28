@@ -6,6 +6,7 @@
     "shortDescription": null,
     "title": "troupe roadmap",
     "repositories": [
+      "infrastructure",
       "troupe",
       "website"
     ]
