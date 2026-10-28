@@ -3117,12 +3117,19 @@ def dependabot_subject_kind(subject: str) -> str:
 
 
 def _only_uses_lines(root: Path, sha: str, path: str) -> bool:
+    """Whether every line the commit adds or removes in ``path`` is a uses: line. Only lines inside
+    a hunk count, so a file's ---/+++ headers are skipped by where they are, not by how they begin,
+    and a changed line that begins with -- or ++ is judged like any other (#204)."""
     diff = git(root, "diff-tree", "-p", "-U0", "--no-commit-id", "--no-color", sha, "--", path)
-    changed = [
-        line[1:]
-        for line in diff.splitlines()
-        if line[:1] in ("+", "-") and not line.startswith(("+++", "---"))
-    ]
+    changed: list[str] = []
+    in_hunk = False
+    for line in diff.splitlines():
+        if line.startswith("diff --git "):
+            in_hunk = False
+        elif line.startswith("@@"):
+            in_hunk = True
+        elif in_hunk and line[:1] in ("+", "-"):
+            changed.append(line[1:])
     return bool(changed) and all(USES_LINE.match(line) for line in changed)
 
 

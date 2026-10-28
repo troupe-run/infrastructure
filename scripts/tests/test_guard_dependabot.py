@@ -439,6 +439,54 @@ def test_a_workflow_line_that_isn_t_uses_fails_naming_the_workflow(
     assert "aren't dependency files: .github/workflows/tofu.yml." in refusal.problem
 
 
+# A diff prints a removed "---" as "----" and an added "++x" as "+++x", like its file headers
+# (#204).
+LEADING_DASHES_WORKFLOW = (
+    "---\njobs:\n  plan:\n    steps:\n"
+    "      - uses: actions/download-artifact@v8.0.1\n"
+    "      - run: >\n          tofu plan\n--force\n"
+)
+
+
+def leading_dashes_bump(
+    make_repo: Callable[[], Repo], tmp_path: Path, old: str = "", new: str = ""
+) -> tuple[Repo, str, str]:
+    """An action bump of LEADING_DASHES_WORKFLOW's uses: line that also replaces ``old`` with
+    ``new``, on main's remote and a Dependabot branch."""
+    repo, _ = dependabot_repo(make_repo, tmp_path)
+    repo.write(".github/workflows/tofu.yml", LEADING_DASHES_WORKFLOW)
+    git(repo.path, "commit", "-q", "--no-verify", "-am", "chore: start the workflow with ---")
+    git(repo.path, "push", "-q", "origin", "main")
+    base = repo.head()
+    branch = "dependabot/github_actions/actions/download-artifact-8.0.2"
+    repo.switch(branch)
+    edit(repo, ".github/workflows/tofu.yml", "download-artifact@v8.0.1", "download-artifact@v8.0.2")
+    if old:
+        edit(repo, ".github/workflows/tofu.yml", old, new)
+    commit(repo, DOWNLOAD_ARTIFACT)
+    return repo, base, branch
+
+
+def test_an_action_bump_of_a_workflow_with_lines_that_begin_with_dashes_passes(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base, branch = leading_dashes_bump(make_repo, tmp_path)
+    assert ci(repo, base, branch, "troupe-run/infrastructure") == []
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [("---\njobs:", "jobs:"), ("--force\n", ""), ("--force\n", "--force\n++x\n")],
+    ids=["removed-document-marker", "removed-flag", "added-plus-plus"],
+)
+def test_a_workflow_line_that_begins_like_a_diff_header_fails_naming_the_workflow(
+    make_repo: Callable[[], Repo], tmp_path: Path, old: str, new: str
+) -> None:
+    repo, base, branch = leading_dashes_bump(make_repo, tmp_path, old, new)
+    refusal = refused_for(ci(repo, base, branch, "troupe-run/infrastructure"))
+    assert "aren't dependency files: .github/workflows/tofu.yml." in refusal.problem
+
+
 ECOSYSTEM_FILES = {
     "npm": {"package.json", "package-lock.json"},
     "uv": {"pyproject.toml", "uv.lock"},
