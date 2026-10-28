@@ -206,7 +206,8 @@ SAMPLES = {
     "<n>": "29", "<m>": "63", "<number>": "2", "<name>": "Feature", "<login>": "octocat",
     "<org>": "troupe-run", "<url>": "https://github.com/troupe-run/troupe/issues/1",
     "<item>": "PVTI_1", "<field>": "PVTF_1", "<project>": "PVT_1", "<value>": "x",
-    "<title>": "t", "<file>": "body.md",
+    "<title>": "t", "<file>": "body.md", "<owner>": "troupe-run", "<repo>": "troupe",
+    "<comment id>": "3012345678", "<text>": "Fixed.",
 }  # fmt: skip
 
 
@@ -229,6 +230,28 @@ def test_a_refused_label_mutation_s_fix_names_gh_issue_edit_add_label() -> None:
     found = refusal(graphql("addLabelsToLabelable"))
     assert found is not None
     assert "gh issue edit <n> --add-label <name>" in found.fix
+
+
+# A fix that names a way doesn't also invite an addition to the list: that's what sent a session to
+# the owner for a second way to reply (guard-names-thread-reply-route design D3).
+
+
+def test_a_refused_mutation_with_a_way_doesn_t_invite_adding_it_to_the_list() -> None:
+    found = refusal(graphql("addLabelsToLabelable"))
+    assert found is not None
+    assert "add it to the list" not in found.fix
+    assert "Ask the owner" not in found.fix
+
+
+def test_mutations_with_and_without_a_way_ask_the_owner_only_for_those_without() -> None:
+    found = refusal(graphql("addComment", "deleteIssue"))
+    assert found is not None
+    assert "For addComment, run gh issue comment <n>" in found.fix
+    assert found.fix.endswith(
+        "For deleteIssue, ask the owner, or add it to the list in troupe-run/infrastructure "
+        "(scripts/guard.py)."
+    )
+    assert "addComment, ask" not in found.fix
 
 
 @pytest.mark.parametrize("mutation", ["deleteIssue", "addPullRequestReview"])
@@ -276,6 +299,7 @@ def filled(command: str) -> str:
 
 def test_every_gh_command_the_hints_name_is_allowed() -> None:
     commands = [c for cs in guard.GH_MUTATION_EQUIVALENTS.values() for c in cs]
+    commands += [template for _, _, template in guard.GH_API_EQUIVALENTS]
     assert commands
     assert [c for c in commands if rule(filled(c)) is not None] == []
 
