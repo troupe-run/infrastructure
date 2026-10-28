@@ -69,10 +69,13 @@
 
 ## 4. Shown end to end (design D4)
 
-- [ ] 4.1 On this change's pull request, after the review's run, reply to one of its must-fixes, and to a nit if it
+- [x] 4.1 On this change's pull request, after the review's run, reply to one of its must-fixes, and to a nit if it
   posted one (if it found no must-fix, record that and rely on 1.3); verify the must-fix reply's run reaches `review`
   and its summary says what became of the finding, and the nit reply's run stops at `gate`; record both runs' URLs
-  here
+  here. Done 2026-10-28: the review of #215's first push (run 40685129918:
+  gate, claude review and resolve all succeeded, so the gate let a `pull_request` event through on the live workflow)
+  posted no findings and opened no conversation, so there was no must-fix or nit to reply to; the reply path rests on
+  probe step 1.3, which ran this gate unchanged
 
 ## Workflow follow-up
 
