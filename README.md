@@ -93,6 +93,11 @@ runs, whatever CI's result. To recover:
   starts.
 - **Something urgent:** a break-glass apply from your machine (below).
 
+A merge that lands during that wait makes CI cancel its run on the older commit. Then the run is superseded, not red:
+`main` on GitHub has moved past the commit it checked, so it plans nothing, asks for nothing and doesn't fail. Its
+summary names the commit it checked and the newer merge, whose own run plans `main` once CI passes on it. A cancel
+with `main` unmoved, or moved only by state commits, still fails as red CI does.
+
 A merge is applied by its own run, the one that starts when CI passes on it. Every plan of `main` reads `main`'s
 current state, not the state of the commit that started the run (`scripts/plan_target.py`). So when another run gets
 there first, such as a daily run while CI is still going, the merge's own run plans the state that apply left. It

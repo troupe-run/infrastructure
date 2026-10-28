@@ -59,7 +59,7 @@
 
 ## 4. Specs and docs (spec ci-apply; design D1)
 
-- [ ] 4.1 README "Running a plan": after the paragraph on the CI wait, say that a run whose CI a newer merge
+- [x] 4.1 README "Running a plan": after the paragraph on the CI wait, say that a run whose CI a newer merge
   cancelled plans nothing and fails nothing, that its summary names both commits, and that the newer merge's run
   plans `main` once CI passes on it. Verify the paragraph matches D1's cases (state-only and unmoved still fail),
   and `uv run scripts/check.py` is clean, then commit.
