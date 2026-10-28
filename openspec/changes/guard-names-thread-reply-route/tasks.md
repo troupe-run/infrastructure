@@ -5,24 +5,24 @@ issue when it reaches `main`. The pull request closes #210.
 
 ## 1. A refused reply names the allowed reply (design D1, D2, D3)
 
-- [ ] 1.1 Write the tests first in `scripts/tests/test_guard_review_threads.py`: extend
+- [x] 1.1 Write the tests first in `scripts/tests/test_guard_review_threads.py`: extend
   `test_the_other_ways_to_reply_are_refused` so the `addPullRequestReviewThreadReply` refusal's fix names
   `gh api -X POST repos/<owner>/<repo>/pulls/<n>/comments -F in_reply_to=<comment id>`, the
   `.../comments/3012345678/replies` refusal's fix names
   `gh api -X POST repos/troupe-run/infrastructure/pulls/7/comments -F in_reply_to=3012345678`, and neither fix says
   "add it to the list". Verify both fail on the current guard
-- [ ] 1.2 Write the tests first in `scripts/tests/test_guard_gh.py`: the `addLabelsToLabelable` refusal's fix doesn't say
+- [x] 1.2 Write the tests first in `scripts/tests/test_guard_gh.py`: the `addLabelsToLabelable` refusal's fix doesn't say
   "add it to the list"; one document with `addComment` and `deleteIssue` names `gh issue comment <n>` and ends asking
   the owner for `deleteIssue` only; and every command in `GH_MUTATION_EQUIVALENTS` and `GH_API_EQUIVALENTS`, with its
   `<...>` placeholders filled in (`troupe-run/troupe` for owner and repo, `1` for the rest), is allowed by
   `gh_decision`. Verify the first two fail on the current guard (the third errors until `GH_API_EQUIVALENTS` exists)
-- [ ] 1.3 In `scripts/guard.py`, add the reply entry to `GH_MUTATION_EQUIVALENTS` and widen its comment (D1); add
+- [x] 1.3 In `scripts/guard.py`, add the reply entry to `GH_MUTATION_EQUIVALENTS` and widen its comment (D1); add
   `GH_API_EQUIVALENTS` with the replies endpoint and use it in `gh_decision`'s unlisted-endpoint refusal (D2); end
   `_not_listed_mutations`' fix with the hints alone when every mutation has one, and name only those without one in
   the "ask the owner" tail otherwise (D3). Verify the 1.1 and 1.2 tests and the rest of `test_guard_gh.py` and
   `test_guard_review_threads.py` pass, and `grep -rn "add it to the list" scripts docs` finds no other text that
   quotes the old tail (`scripts/tests/fixtures/plan-pr96.txt` is an old plan, left as it is)
-- [ ] 1.4 Update `docs/development-workflow.md`'s "Replying in a conversation" to say the refusal of the other two ways
+- [x] 1.4 Update `docs/development-workflow.md`'s "Replying in a conversation" to say the refusal of the other two ways
   names the allowed command, and the fix column of its `gh-allow-list` row, which quotes the old tail, to say a refused
   mutation or endpoint with an allowed way names it (now a `gh` command or the reply's `gh api` call), and only the
   rest ask the owner (D3). Verify `uv run scripts/check.py` passes, then commit `fix(guard): …` with `Part of #210`

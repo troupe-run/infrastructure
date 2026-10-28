@@ -413,6 +413,40 @@ def test_the_other_ways_to_reply_are_refused(command: str) -> None:
     assert refused.rule == "gh-allow-list"
 
 
+# A refused reply names the one allowed reply, and doesn't invite adding a second way to the list
+# (guard-names-thread-reply-route design D1-D3)
+
+
+def test_a_graphql_reply_s_fix_names_the_allowed_reply() -> None:
+    refused = gh_refusal(
+        "gh api graphql -f query='mutation { addPullRequestReviewThreadReply(input: "
+        '{pullRequestReviewThreadId: "PRRT_nit", body: "Fixed."}) { comment { id } } }\''
+    )
+    assert refused is not None
+    assert (
+        "gh api -X POST repos/<owner>/<repo>/pulls/<n>/comments -F in_reply_to=<comment id>"
+        in refused.fix
+    )
+    assert "add it to the list" not in refused.fix
+
+
+def test_a_reply_to_the_replies_endpoint_s_fix_names_the_allowed_reply_filled_in() -> None:
+    refused = gh_refusal(
+        "gh api -X POST repos/troupe-run/infrastructure/pulls/7/comments/3012345678/replies "
+        "-f body='Fixed in 9d01b6e.'"
+    )
+    assert refused is not None
+    assert refused.problem == (
+        "gh api POST repos/troupe-run/infrastructure/pulls/7/comments/3012345678/replies "
+        "isn't on the guard's gh allow-list."
+    )
+    assert (
+        "gh api -X POST repos/troupe-run/infrastructure/pulls/7/comments "
+        "-F in_reply_to=3012345678" in refused.fix
+    )
+    assert "add it to the list" not in refused.fix
+
+
 def test_the_guard_s_delivered_python_is_ascii_only() -> None:
     # Copied with a platform's default encoding, a non-ASCII character breaks the import on Windows
     # before Python 3.15, where that encoding is cp1252, not UTF-8.
