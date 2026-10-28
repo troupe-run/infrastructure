@@ -34,7 +34,7 @@ selection SHALL be checked by the drift check, and its repository list by hand (
 - **WHEN** the board App has exactly the declared permission and repository selection
 - **THEN** the drift check reports no difference for it
 
-### Requirement: The board key is readable from website's main only
+### Requirement: The board key is readable from main only
 troupe-run/website and troupe-run/infrastructure SHALL each have an environment named `board` whose deployment
 branches are limited to `main`, and which no admin can bypass. The App's private key SHALL be held only as those
 environments' secret `BOARD_APP_PRIVATE_KEY`, so a workflow run on any other branch, or in any other repository, can't
