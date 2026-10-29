@@ -823,6 +823,27 @@ def test_a_subject_whose_ranges_disagree_with_the_diff_fails_naming_both(
     )
 
 
+@pytest.mark.parametrize(
+    ("dependency", "line", "named"),
+    [
+        ("zod", '    "zod": "^3.0.0",', True),
+        ("@axe-core/playwright", '    "@axe-core/playwright": "^4.13.0",', True),
+        ("ruamel.yaml", '    "ruamel_yaml>=0.19.1,<0.20",', True),
+        ("zod", '    "@evil/zod": "^3.0.0",', False),  # a scoped lookalike (review on #221)
+        ("zod", '    "evil/zod": "^3.0.0",', False),
+        ("zod", '    "zod/extra": "^3.0.0",', False),
+        ("uv-build", '    "uv-build-extra>=1.0,<2",', False),
+        ("uv-build", '    "my-uv-build>=1.0,<2",', False),
+    ],
+)
+def test_a_line_names_the_dependency_only_as_a_whole_name(
+    dependency: str, line: str, named: bool
+) -> None:
+    moved = re.sub(r"(\d+)\.0(?=\D*$)", r"\1.1", line, count=1)
+    _, why = guard.dependabot_line_kind(dependency, line, moved)
+    assert (why != f"doesn't name {dependency}") is named
+
+
 def test_a_line_for_a_dependency_whose_name_only_starts_alike_fails(
     make_repo: Callable[[], Repo], tmp_path: Path
 ) -> None:
