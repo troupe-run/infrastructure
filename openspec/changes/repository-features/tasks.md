@@ -85,11 +85,11 @@ Troupe's discussions are not turned on here: that's task 7.1, immediately before
 This group is done after review and archive, as the last thing before the owner merges. Until the merge, every plan
 of `main` shows troupe's discussions turning back off, so the window is kept to minutes.
 
-- [ ] 7.1 Ask the owner to turn discussions on in troupe and trim its categories to Q&A, Ideas and Announcements
+- [x] 7.1 Ask the owner to turn discussions on in troupe and trim its categories to Q&A, Ideas and Announcements
   (Announcements announcement-only), then merge. Verify with `gh api graphql` (`repository(owner:"troupe-run",
   name:"troupe") { hasDiscussionsEnabled discussionCategories(first:20) { nodes { name slug isAnswerable } } }`):
   discussions on, exactly those three, only Q&A answerable; and `uv run scripts/oob.py` reports no differences.
-- [ ] 7.2 Before the merge lands, check that no apply of `main` is waiting for approval; if one is, tell the owner its
+- [x] 7.2 Before the merge lands, check that no apply of `main` is waiting for approval; if one is, tell the owner its
   plan turns troupe's discussions off, so they don't approve it until this change's apply.
 
 ## Workflow follow-up
