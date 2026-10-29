@@ -27,7 +27,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -58,6 +58,15 @@ TITLE = re.compile(
     r"(?:[a-z]+(?:\([^)]*\))?!?:\s*)?(?:[Bb]ump|[Uu]pdate)\s+(?P<dependency>.+?)"
     r"(?:\s+requirement)?\s+from\s+(?P<old>\S+)\s+to\s+(?P<new>\S+)(?:\s+in\s+(?P<directory>\S+))?"
 )
+# A requirement update: Dependabot moves a range, so its versions are ranges
+# (guard-requirement-range design D2). A commit's subject stops at "requirement"; a pull
+# request's title goes on.
+REQUIREMENT = re.compile(
+    r"(?:[a-z]+(?:\([^)]*\))?!?:\s*)?[Uu]pdate\s+(?P<dependency>.+?)\s+requirement"
+    r"(?:\s+from\s+(?P<old>\S+)\s+to\s+(?P<new>\S+))?(?:\s+in\s+(?P<directory>\S+))?"
+)
+# One bound of a range: an operator, or none, and a version (design D4).
+SPECIFIER = re.compile(r"(?P<operator><=|>=|==|!=|~=|<|>|\^|~|=)?(?P<version>.+)")
 PREFIX = re.compile(r"[a-z]+(?:\([^)]*\))?!?:\s*")
 BRANCH = re.compile(r"dependabot/(?P<ecosystem>[a-z0-9_-]+)/.+")
 VERSION = re.compile(r"v?(\d+(?:\.\d+)*)")
@@ -153,6 +162,62 @@ def update_type(old: str | None, new: str | None) -> str:
     return "unknown"
 
 
+KINDS = ("patch", "minor", "major")
+
+
+def _raised(old: str, new: str) -> bool:
+    """Whether ``new`` is a later version than ``old``, both dotted digits, missing parts zero."""
+    a, b = VERSION.fullmatch(old), VERSION.fullmatch(new)
+    if not a or not b:
+        return False
+    left = [int(part) for part in a.group(1).split(".")]
+    right = [int(part) for part in b.group(1).split(".")]
+    width = max(len(left), len(right))
+    return right + [0] * (width - len(right)) > left + [0] * (width - len(left))
+
+
+def pairs_kind(pairs: Iterable[tuple[str, str]]) -> str:
+    """The kind of a requirement update from its versions' moves: each version that changes is
+    counted by update_type and must go up, and the largest move is the kind. A version that goes
+    down, or none changing, is unknown (guard-requirement-range design D3, D4)."""
+    largest = -1
+    for old, new in pairs:
+        if old == new:
+            continue
+        kind = update_type(old, new)
+        if kind == "unknown" or not _raised(old, new):
+            return "unknown"
+        largest = max(largest, KINDS.index(kind))
+    return KINDS[largest] if largest >= 0 else "unknown"
+
+
+def _specifiers(text: str) -> dict[str, str] | None:
+    """A range's bounds by operator, or None when a bound isn't an operator and a version, or an
+    operator comes twice."""
+    found: dict[str, str] = {}
+    for part in re.split(r"[,\s]+", text.strip()):
+        match = SPECIFIER.fullmatch(part)
+        if not match or not VERSION.fullmatch(match.group("version")):
+            return None
+        operator = match.group("operator") or ""
+        if operator in found:
+            return None
+        found[operator] = match.group("version")
+    return found
+
+
+def range_kind(old: str | None, new: str | None) -> str:
+    """The kind of a move from one range to another, as a title gives them: the bounds are paired
+    by operator, since Dependabot reorders them, and counted by pairs_kind. Ranges whose operators
+    differ are unknown (design D4)."""
+    if old is None or new is None:
+        return "unknown"
+    a, b = _specifiers(old), _specifiers(new)
+    if a is None or b is None or a.keys() != b.keys():
+        return "unknown"
+    return pairs_kind((a[operator], b[operator]) for operator in a)
+
+
 def read_update(pull: Mapping[str, Any]) -> Update:
     title = str(pull.get("title") or "")
     branch = str((pull.get("head") or {}).get("ref") or "")
@@ -166,7 +231,9 @@ def read_update(pull: Mapping[str, Any]) -> Update:
         key = Key(
             ecosystem.group("ecosystem"), match.group("directory") or "/", match.group("dependency")
         )
-    return Update(key, old, new, update_type(old, new))
+    requirement = REQUIREMENT.fullmatch(title.strip())
+    kind = range_kind(old, new) if requirement else update_type(old, new)
+    return Update(key, old, new, kind)
 
 
 def issue_title(pull: Mapping[str, Any], update: Update) -> str:

@@ -82,7 +82,8 @@ def just_changed(p: dict[str, Any]) -> dict[str, Any]:
         ("website-54", "npm_and_yarn", "/", "postcss-selector-parser", "6.1.4", "6.1.5", "patch"),
         ("infrastructure-184", "github_actions", "/", "actions/download-artifact", "8.0.1",
          "8.0.2", "patch"),
-        ("troupe-175", "uv", "/", "uv-build", "<0.14,>=0.13.0", ">=0.13.2,<0.14", "unknown"),
+        ("troupe-175", "uv", "/", "uv-build", "<0.14,>=0.13.0", ">=0.13.2,<0.14", "patch"),
+        ("troupe-181", "uv", "/", "uv-build", "<0.14,>=0.13.0", ">=0.13.5,<0.14", "patch"),
     ],
 )  # fmt: skip
 def test_each_real_title_gives_its_dependency_versions_and_type(
@@ -107,6 +108,62 @@ def test_each_real_title_gives_its_dependency_versions_and_type(
 )
 def test_update_type_counts_as_dependabot_does(old: str, new: str, kind: str) -> None:
     assert di.update_type(old, new) == kind
+
+
+# A requirement update's ranges (guard-requirement-range design D4)
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "kind"),
+    [
+        ("<0.14,>=0.13.0", ">=0.13.5,<0.14", "patch"),  # troupe #181, bounds reordered
+        ("<9.6,>=9.5.6", ">=9.6.0,<9.7", "minor"),
+        ("<5,>=4.26", ">=4.26,<6", "major"),
+        ("^4.6.5", "^4.7.0", "minor"),
+        (">=1.2 <2", ">=1.3 <2", "minor"),  # npm separates bounds with a space
+        ("<0.14,>=0.13.5", ">=0.13.0,<0.14", "unknown"),  # a bound that goes down
+        ("<0.14,>=0.13.0", ">=0.13.0,<0.14", "unknown"),  # nothing moves
+        ("<0.14,>=0.13.0", "~=0.13.5", "unknown"),  # the operators change
+        ("<0.14,>=0.13.0", ">=0.13.5", "unknown"),  # a bound is dropped
+        ("<0.14,>=0.13.0", ">=0.13.5,<0.14,!=0.13.6", "unknown"),  # a bound is added
+        ("4.x", "5.x", "unknown"),
+        (">=1,>=2", ">=1,>=3", "unknown"),  # an operator twice
+    ],
+)
+def test_a_range_counts_by_its_bounds_paired_by_operator(old: str, new: str, kind: str) -> None:
+    assert di.range_kind(old, new) == kind
+
+
+def test_a_requirement_title_counts_its_ranges() -> None:
+    p = pull("troupe-181", title="Update jsonschema requirement from <5,>=4.26 to >=4.26,<6")
+    assert di.read_update(p).kind == "major"
+
+
+def test_a_bump_title_with_ranges_is_still_unknown() -> None:
+    # Only a requirement title is read as ranges; a bump's versions are versions.
+    p = pull("website-44", title="chore(deps): Bump zod from <5,>=4.6.5 to >=4.6.7,<5")
+    assert di.read_update(p).kind == "unknown"
+
+
+def test_a_requirement_issue_within_a_minor_series_doesnt_need_a_change() -> None:
+    p = pull("troupe-181")
+    body = di.issue_body(p, di.read_update(p))
+    assert "Update type: **patch**." in body
+    assert "OpenSpec change" not in body
+
+
+def test_a_requirement_issue_admitting_a_new_major_needs_a_change() -> None:
+    p = pull("troupe-181", title="Update jsonschema requirement from <5,>=4.26 to >=4.26,<6")
+    body = di.issue_body(p, di.read_update(p))
+    assert "Update type: **major**." in body
+    assert "needs an OpenSpec change" in body
+
+
+def test_a_requirement_issue_whose_bounds_dont_match_needs_a_change() -> None:
+    p = pull("troupe-181", title="Update uv-build requirement from <0.14,>=0.13.0 to ~=0.13.5")
+    body = di.issue_body(p, di.read_update(p))
+    assert "Update type: **unknown**." in body
+    assert "needs an OpenSpec change" in body
 
 
 def test_a_directory_in_the_title_is_part_of_the_key_and_the_issue_title() -> None:
