@@ -37,7 +37,7 @@
   {
     "name": "cap:development",
     "color": "1D76DB",
-    "description": "How troupe itself is built, tested and released: the check, flaky tests, Python versions, releases"
+    "description": "How troupe itself is built, tested, released and installed: the check, flaky tests, Python versions"
   },
   {
     "name": "cap:effects",
