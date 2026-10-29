@@ -601,6 +601,72 @@ def test_credentials_aren_t_exempt_on_a_throwaway_repository() -> None:
     assert rule("GH_REPO=troupe-run/infra-probe-x gh auth token") == "owner-only"
 
 
+# A throwaway repository is judged by the name the command writes (probe-repositories D1, D4)
+
+SHELL_BUILT_NAMES = [
+    ("gh repo create troupe-run/$P --public", "owner-only"),
+    ('gh repo create "troupe-run/$P" --public', "owner-only"),
+    ("gh repo create troupe-run/${P} --public", "owner-only"),
+    ("gh repo create troupe-run/$(echo infra-probe-x) --public", "owner-only"),
+    ("gh repo create troupe-run/`echo infra-probe-x` --public", "owner-only"),
+    ("gh repo create troupe-run/infra-probe-$N --public", "owner-only"),
+    ("gh secret set X -R troupe-run/$P --body y", "owner-only"),
+    ("GH_REPO=troupe-run/$P gh secret set X --body y", "owner-only"),
+    ("gh api -X POST repos/troupe-run/$P/git/refs -f ref=refs/heads/x -f sha=abc", "gh-allow-list"),
+]
+
+
+@pytest.mark.parametrize(("command", "expected"), SHELL_BUILT_NAMES)
+def test_a_name_built_by_the_shell_is_judged_as_a_live_repository(
+    command: str, expected: str
+) -> None:
+    assert rule(command) == expected
+
+
+def test_a_read_of_a_name_built_by_the_shell_is_still_allowed() -> None:
+    assert rule("gh repo view troupe-run/$P") is None
+
+
+ISSUE_216_COMMAND = (
+    'gh repo edit --help | grep -i "pull\\|sponsor" ; P=infra-probe-20261028-prs; '
+    'gh repo create troupe-run/$P --public --add-readme --description "x"'
+)
+
+
+def test_216_s_chained_command_is_refused_only_for_its_repo_create() -> None:
+    refused = [d for d in guard.shell_decisions(ISSUE_216_COMMAND, Path.cwd()) if d.refused]
+    assert [d.rule for d in refused] == ["owner-only"]
+    assert rule('gh repo edit --help | grep -i "pull\\|sponsor"') is None
+    assert (
+        rule("gh repo edit --help ; gh repo create troupe-run/infra-probe-20261028-prs --public")
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh api -X POST repos/troupe-run/infra-probe-x/git/refs -f ref=refs/heads/x -f sha=abc",
+        "gh api -X PATCH repos/troupe-run/infra-probe-x -F has_pull_requests=false",
+        "gh api -X PUT repos/troupe-run/infra-probe-x/contents/a.txt -f message=m -f content=YQ==",
+        "gh pr create -R troupe-run/infra-probe-x --title t --body x",
+    ],
+)
+def test_a_probe_named_out_takes_217_s_writes(command: str) -> None:
+    assert [d for d in guard.shell_decisions(command, Path.cwd()) if d.refused] == []
+
+
+def test_a_graphql_mutation_isn_t_exempt_on_a_probe() -> None:
+    query = (
+        'mutation { updateRepository(input: {repositoryId: "R_probe", hasIssuesEnabled: false}) '
+        "{ clientMutationId } }"
+    )
+    found = refusal(f"gh api graphql -f query={shlex.quote(query)}")
+    assert found is not None
+    assert found.rule == "gh-allow-list"
+    assert "updateRepository" in found.problem
+
+
 # Mentions and chains
 
 

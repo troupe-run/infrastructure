@@ -2,13 +2,13 @@
 
 ## 1. Pin what must not change (design D4)
 
-- [ ] 1.1 Before touching `scripts/guard.py`, add tests to `scripts/tests/test_guard_gh.py`: a repository name built
+- [x] 1.1 Before touching `scripts/guard.py`, add tests to `scripts/tests/test_guard_gh.py`: a repository name built
   by the shell (`troupe-run/$P`, `${P}`, `$(echo infra-probe-x)`, backticks, `infra-probe-$N`, through the
   `gh repo create` positional, `-R`, `GH_REPO=` and a `gh api` `repos/troupe-run/$P/git/refs` endpoint) is refused
   with the same rule as a live repository (`owner-only`, or `gh-allow-list` for the endpoint); #216's exact chained
   command is refused only for its `gh repo create`, and its `gh repo edit --help | grep ...` part goes ahead;
   `gh repo view troupe-run/$P` is allowed. Run them on the unchanged guard and verify they pass
-- [ ] 1.2 Add tests that a literal probe's writes #217 names are allowed (`gh api -X POST
+- [x] 1.2 Add tests that a literal probe's writes #217 names are allowed (`gh api -X POST
   repos/troupe-run/infra-probe-x/git/refs`, `gh api -X PATCH repos/troupe-run/infra-probe-x -F
   has_pull_requests=false`, `gh api -X PUT .../contents/<file>`, `gh pr create -R troupe-run/infra-probe-x` with no
   closing reference), and that `gh api graphql` with an `updateRepository` mutation is refused as an unlisted
