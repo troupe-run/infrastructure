@@ -41,9 +41,9 @@
 
 ## 4. Checks and plan
 
-- [ ] 4.1 Run `uv run scripts/check.py` (ruff, mypy --strict, pytest, OpenSpec strict validation including this
+- [x] 4.1 Run `uv run scripts/check.py` (ruff, mypy --strict, pytest, OpenSpec strict validation including this
   change) and verify it passes
-- [ ] 4.2 Fast-forward onto `origin/main`, run a local plan, and verify it changes only the delivered
+- [x] 4.2 Fast-forward onto `origin/main`, run a local plan, and verify it changes only the delivered
   `scripts/guard.py` in troupe and website
 
 ## Workflow follow-up
