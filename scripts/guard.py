@@ -3281,7 +3281,9 @@ def dependabot_line_kind(dependency: str, removed: str, added: str) -> tuple[str
     if VERSION_NUMBER.sub("0", removed) != VERSION_NUMBER.sub("0", added):
         return "unknown", "changes more than version numbers"
     name = re.escape(_package_name(dependency))
-    if not re.search(rf"(?<![a-z0-9-]){name}(?![a-z0-9-])", _package_name(removed)):
+    # A whole name: no name character, scope (@) or path (/) beside it, so neither @evil/zod nor
+    # zod/extra names zod (review on #221).
+    if not re.search(rf"(?<![a-z0-9@/-]){name}(?![a-z0-9/-])", _package_name(removed)):
         return "unknown", f"doesn't name {dependency}"
     pairs = list(zip(VERSION_NUMBER.findall(removed), VERSION_NUMBER.findall(added), strict=True))
     if any(old != new and _dependabot_raised(new, old) for old, new in pairs):
