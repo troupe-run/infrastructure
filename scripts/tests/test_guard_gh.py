@@ -3,6 +3,7 @@
 
 import io
 import json
+import re
 import shlex
 import subprocess
 import sys
@@ -413,7 +414,10 @@ def test_each_owner_only_act_is_refused_with_its_message(command: str, group: st
     found = refusal(command)
     assert found is not None
     assert found.rule == "owner-only"
-    assert (found.problem, found.fix) == guard.OWNER_ONLY_MESSAGES[group]
+    problem, fix = guard.OWNER_ONLY_MESSAGES[group]
+    # A name built by the shell ($OWNER/$REPO) adds why it isn't a throwaway one after these.
+    assert found.problem.startswith(problem)
+    assert found.fix.startswith(fix)
 
 
 @pytest.mark.parametrize(
@@ -665,6 +669,45 @@ def test_a_graphql_mutation_isn_t_exempt_on_a_probe() -> None:
     assert found is not None
     assert found.rule == "gh-allow-list"
     assert "updateRepository" in found.problem
+
+
+@pytest.mark.parametrize(("command", "expected"), SHELL_BUILT_NAMES)
+def test_a_name_built_by_the_shell_says_why_it_isn_t_a_throwaway_repository(
+    command: str, expected: str
+) -> None:
+    found = refusal(command)
+    assert found is not None
+    assert found.rule == expected
+    base = guard._owner_only("admin") if expected == "owner-only" else None
+    if base is not None:
+        assert found.problem.startswith(base.problem)
+    assert found.fix.startswith(base.fix if base else guard.NOT_LISTED_FIX)
+    named = re.search(r"named by the shell \((troupe-run/[^)]*\)?)\)", found.problem)
+    assert named is not None
+    assert named.group(1) in command
+    assert "judges it as a live one" in found.problem
+    assert found.fix.endswith("write its name out.")
+
+
+@pytest.mark.parametrize(
+    "command",
+    ["gh repo create $R --public", "gh api -X PUT repos/$OWNER/$REPO/pulls/1/merge"],
+)
+def test_a_name_whose_owner_is_built_by_the_shell_says_why_too(command: str) -> None:
+    found = refusal(command)
+    assert found is not None
+    assert "named by the shell" in found.problem
+
+
+def test_another_owner_s_name_built_by_the_shell_gets_the_plain_refusal() -> None:
+    assert refusal("gh repo create someone-else/$P --public") == guard._owner_only("admin")
+
+
+def test_a_live_repository_s_refusal_is_unchanged() -> None:
+    assert refusal("gh repo create troupe-run/my-repo --public") == guard._owner_only("admin")
+    assert refusal("gh api -X POST repos/troupe-run/troupe/git/refs -f ref=x") == guard._not_listed(
+        "gh api POST repos/troupe-run/troupe/git/refs"
+    )
 
 
 # Mentions and chains

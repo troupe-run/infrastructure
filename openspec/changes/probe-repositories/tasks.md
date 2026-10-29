@@ -16,12 +16,12 @@
 
 ## 2. The refusal says why (design D1)
 
-- [ ] 2.1 Add tests for the spec scenario "A probe named through a variable": each shell-built case from 1.1 that's
+- [x] 2.1 Add tests for the spec scenario "A probe named through a variable": each shell-built case from 1.1 that's
   refused has a problem naming the word and saying the guard judges it as a live repository, and a fix that keeps
   the rule's own fix first and then says to write a throwaway repository's name out. Add the scenario "A live
   repository's refusal is unchanged": `gh repo create troupe-run/my-repo --public` has today's `owner-only`
   message exactly. Verify the new tests fail on the unchanged guard
-- [ ] 2.2 In `scripts/guard.py`, add `_named_by_shell(repository)` (true when the name holds `$` or a backtick,
+- [x] 2.2 In `scripts/guard.py`, add `_named_by_shell(repository)` (true when the name holds `$` or a backtick,
   with a docstring citing GitHub's name rules and this design) and apply it to a refusal at the end of
   `gh_decision`, for both the `gh api` and subcommand paths, keeping the rule. Verify 2.1's tests and 1.1-1.2's pins
   pass, and that `uv run pytest scripts/tests/test_guard_grants.py` still passes (the guard grants nothing new)
