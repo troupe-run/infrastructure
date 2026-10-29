@@ -17,6 +17,8 @@ from test_guard_push_and_ci import TOFU, _blocks, commit_as, release_repo
 import dependabot_issues
 import guard
 
+FIXTURES = Path(__file__).parent / "fixtures" / "dependabot-issues"
+
 DEPENDABOT_BOT = "dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>"
 WEBSITE = "troupe-run/website"
 
@@ -339,6 +341,40 @@ def test_any_pair_of_ranges_is_the_same_kind_for_the_guard_and_the_issue(
     assert guard.dependabot_range_kind(old, new) == dependabot_issues.range_kind(old, new)
 
 
+# guard-requirement-range task 3.5: a requirement update read from its manifest line, as the
+# guard reads it, and from its title, as the issue reads it, is the same kind (design D4).
+# Dependabot keeps the file's order of bounds but reorders the old range in the title, so the
+# title's is shuffled.
+DIGITS = st.lists(st.integers(0, 12), min_size=1, max_size=4).map(lambda p: ".".join(map(str, p)))
+MOVES = st.lists(
+    st.tuples(st.sampled_from(["<", "<=", ">", ">=", "==", "!=", "~=", "^", "~"]), DIGITS, DIGITS),
+    min_size=1,
+    max_size=3,
+    unique_by=lambda move: move[0],
+)
+
+
+@given(moves=MOVES, data=st.data())
+def test_a_requirement_s_manifest_line_and_title_are_the_same_kind(
+    moves: list[tuple[str, str, str]], data: st.DataObject
+) -> None:
+    old = [operator + version for operator, version, _ in moves]
+    new = ",".join(operator + version for operator, _, version in moves)
+    titled = ",".join(data.draw(st.permutations(old)))
+    kind, _ = guard.dependabot_line_kind("dep", f'    "dep{",".join(old)}",', f'    "dep{new}",')
+    assert kind == dependabot_issues.range_kind(titled, new)
+
+
+def test_troupe_181_s_line_and_title_are_both_a_patch() -> None:
+    title = json.loads((FIXTURES / "pull-troupe-181.json").read_text(encoding="utf-8"))["title"]
+    match = dependabot_issues.REQUIREMENT.fullmatch(title)
+    assert match is not None
+    line = 'requires = ["uv_build>=0.13.0,<0.14"]'
+    moved = guard.dependabot_line_kind("uv-build", line, line.replace("0.13.0", "0.13.5"))
+    assert moved == ("patch", None)
+    assert dependabot_issues.range_kind(match.group("old"), match.group("new")) == "patch"
+
+
 # Task 4.2: dependency files only (design D4)
 
 
@@ -574,15 +610,263 @@ def test_a_major_update_fails_saying_so(make_repo: Callable[[], Repo], tmp_path:
     assert "update-type: version-update:semver-major" in refusal.problem
 
 
-def test_a_requirement_range_fails_saying_its_versions_can_t_be_read(
+# guard-requirement-range: a requirement update, read from its manifest lines (design D3, D5).
+
+UV_BUILD_BRANCH = "dependabot/uv/uv-build-gte-0.13.3-and-lt-0.14"
+# troupe #181's commit a9fe317 (2026-10-29), trimmed as the others are. Its subject gives no
+# versions, and its metadata's 0.13.3 is stale: the diff writes 0.13.5 (design Context).
+UV_BUILD_181 = message(
+    "chore(deps-dev): Update uv-build requirement",
+    "Updates the requirements on [uv-build](https://github.com/astral-sh/uv) to permit the latest"
+    " version.",
+    "- dependency-name: uv-build\n  dependency-version: 0.13.3\n"
+    "  dependency-type: direct:development\n",
+)
+# The nine packages #181 changed, each with troupe's build-system table.
+UV_BUILD_PACKAGES = [
+    *(
+        f"packages/{name}/pyproject.toml"
+        for name in (
+            "troupe-artifacts-local",
+            "troupe-identity-local",
+            "troupe-stage-local",
+            "troupe-store-text",
+            "troupe-vcs-files",
+            "troupe-vcs-git",
+            "troupe",
+        )
+    ),
+    "plugins/runner-claude-code/pyproject.toml",
+    "plugins/runner-scripted/pyproject.toml",
+]
+UV_BUILD_RANGE = 'requires = ["uv_build>=0.13.0,<0.14"]'
+# packages/troupe/pyproject.toml's ranges on troupe's main, 2026-10-29, trimmed to them.
+TROUPE_PYPROJECT = """[project]
+name = "troupe"
+requires-python = ">=3.12,<3.16"
+dependencies = [
+    "eventsourcing>=9.5.6,<9.6",
+    "jsonschema>=4.26,<5",
+    "pydantic>=2.14,<3",
+    "ruamel.yaml>=0.19.1,<0.20",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14"]
+build-backend = "uv_build"
+"""
+
+
+def requirement_repo(make_repo: Callable[[], Repo], tmp_path: Path) -> tuple[Repo, str]:
+    """A troupe-like repository: the dependency files, and #181's nine packages on main, with
+    packages/troupe/pyproject.toml holding troupe's real ranges."""
+    repo, _ = dependabot_repo(make_repo, tmp_path)
+    for path in UV_BUILD_PACKAGES:
+        repo.write(path, f'[project]\nname = "x"\n\n[build-system]\n{UV_BUILD_RANGE}\n')
+    repo.write("packages/troupe/pyproject.toml", TROUPE_PYPROJECT)
+    git(repo.path, "add", "-A")
+    git(repo.path, "commit", "-q", "--no-verify", "-m", "chore: add the packages")
+    git(repo.path, "push", "-q", "origin", "main")
+    return repo, repo.head()
+
+
+def test_troupe_181_s_requirement_update_passes(
     make_repo: Callable[[], Repo], tmp_path: Path
 ) -> None:
-    repo, base = dependabot_repo(make_repo, tmp_path)
-    branch = "dependabot/uv/uv-build-gte-0.13.2-and-lt-0.14"
-    repo.switch(branch)
-    bump(repo, UV_BUILD, "pyproject.toml", "packages/troupe/pyproject.toml")
-    refusal = refused_for(ci(repo, base, branch, "troupe-run/troupe"))
-    assert "doesn't give one dependency's versions" in refusal.problem
+    repo, base = requirement_repo(make_repo, tmp_path)
+    repo.switch(UV_BUILD_BRANCH)
+    for path in UV_BUILD_PACKAGES:
+        edit(repo, path, "uv_build>=0.13.0,<0.14", "uv_build>=0.13.5,<0.14")
+    commit(repo, UV_BUILD_181)
+    assert ci(repo, base, UV_BUILD_BRANCH, "troupe-run/troupe") == []
+
+
+TROUPE = "packages/troupe/pyproject.toml"
+
+
+def requirement_commit(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    subject: str,
+    edits: list[tuple[str, str, str]],
+) -> tuple[Repo, str]:
+    """A requirement commit with ``subject`` on #181's branch, making each (path, old, new)
+    edit to troupe-like files."""
+    repo, base = requirement_repo(make_repo, tmp_path)
+    repo.switch(UV_BUILD_BRANCH)
+    for path, old, new in edits:
+        edit(repo, path, old, new)
+    commit(repo, UV_BUILD_181.replace("chore(deps-dev): Update uv-build requirement", subject, 1))
+    return repo, base
+
+
+def requirement_refusal(repo: Repo, base: str) -> str:
+    return refused_for(ci(repo, base, UV_BUILD_BRANCH, "troupe-run/troupe")).problem
+
+
+def test_an_upper_bound_raised_a_minor_step_with_its_lockfile_passes(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base = requirement_commit(
+        make_repo,
+        tmp_path,
+        "chore(deps): Update eventsourcing requirement",
+        [
+            (TROUPE, '"eventsourcing>=9.5.6,<9.6"', '"eventsourcing>=9.6.0,<9.7"'),
+            ("uv.lock", 'version = "9.5.5"', 'version = "9.6.0"'),
+        ],
+    )
+    assert ci(repo, base, UV_BUILD_BRANCH, "troupe-run/troupe") == []
+
+
+def test_a_commit_s_kind_is_its_largest_line_s(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    subject = "chore(deps-dev): Update uv-build requirement"
+    repo, base = requirement_commit(
+        make_repo,
+        tmp_path,
+        subject,
+        [
+            (UV_BUILD_PACKAGES[0], "uv_build>=0.13.0,<0.14", "uv_build>=0.13.5,<0.14"),
+            (UV_BUILD_PACKAGES[1], "uv_build>=0.13.0,<0.14", "uv_build>=0.13.0,<1.0"),
+        ],
+    )
+    assert f"{repo.head()[:7]} ('{subject}') is a major update" in requirement_refusal(repo, base)
+
+
+def test_a_range_that_admits_a_new_major_fails_saying_so(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    subject = "chore(deps): Update jsonschema requirement"
+    repo, base = requirement_commit(
+        make_repo, tmp_path, subject, [(TROUPE, '"jsonschema>=4.26,<5"', '"jsonschema>=4.26,<6"')]
+    )
+    assert f"{repo.head()[:7]} ('{subject}') is a major update" in requirement_refusal(repo, base)
+
+
+@pytest.mark.parametrize(
+    ("subject", "edits", "why"),
+    [
+        pytest.param(
+            "chore(deps-dev): Update uv-build requirement",
+            [(TROUPE, "uv_build>=0.13.0,<0.14", "uv_build>=0.12.9,<0.14")],
+            f"{TROUPE} 'requires = [\"uv_build>=0.13.0,<0.14\"]' to "
+            "'requires = [\"uv_build>=0.12.9,<0.14\"]' lowers a version",
+            id="a-bound-that-goes-down",
+        ),
+        pytest.param(
+            "chore(deps-dev): Update uv-build requirement",
+            [(TROUPE, "uv_build>=0.13.0,<0.14", "uv_build~=0.13.5")],
+            "changes more than version numbers",
+            id="more-than-versions",
+        ),
+        pytest.param(
+            "chore(deps-dev): Update uv-build requirement",
+            [
+                (TROUPE, "uv_build>=0.13.0,<0.14", "uv_build>=0.13.5,<0.14"),
+                (TROUPE, '"pydantic>=2.14,<3"', '"pydantic>=2.15,<3"'),
+            ],
+            "'\"pydantic>=2.14,<3\",' to '\"pydantic>=2.15,<3\",' doesn't name uv-build",
+            id="another-dependency",
+        ),
+        pytest.param(
+            "chore(deps-dev): Update uv-build requirement",
+            [("uv.lock", 'version = "9.5.5"', 'version = "9.6.0"')],
+            "it changes no manifest line",
+            id="only-the-lockfile",
+        ),
+    ],
+)
+def test_a_requirement_whose_lines_can_t_be_read_fails_naming_why(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    subject: str,
+    edits: list[tuple[str, str, str]],
+    why: str,
+) -> None:
+    repo, base = requirement_commit(make_repo, tmp_path, subject, edits)
+    problem = requirement_refusal(repo, base)
+    assert f"{repo.head()[:7]}'s requirement versions can't be read as a minor or patch" in problem
+    assert why in problem
+
+
+LONG_UV_BUILD = "chore(deps-dev): Update uv-build requirement from <0.14,>=0.13.0 to >=0.13.5,<0.14"
+
+
+def test_a_subject_whose_ranges_agree_with_the_diff_passes(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base = requirement_commit(
+        make_repo,
+        tmp_path,
+        LONG_UV_BUILD,
+        [(TROUPE, "uv_build>=0.13.0,<0.14", "uv_build>=0.13.5,<0.14")],
+    )
+    assert ci(repo, base, UV_BUILD_BRANCH, "troupe-run/troupe") == []
+
+
+def test_a_subject_whose_ranges_disagree_with_the_diff_fails_naming_both(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    # The subject says a patch; the diff moves the upper bound a minor step too.
+    repo, base = requirement_commit(
+        make_repo,
+        tmp_path,
+        LONG_UV_BUILD,
+        [(TROUPE, "uv_build>=0.13.0,<0.14", "uv_build>=0.13.5,<0.15")],
+    )
+    problem = requirement_refusal(repo, base)
+    assert (
+        f"{repo.head()[:7]}'s subject and diff disagree: the subject's ranges are patch, its diff "
+        "minor" in problem
+    )
+
+
+def test_a_line_for_a_dependency_whose_name_only_starts_alike_fails(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, _ = requirement_repo(make_repo, tmp_path)
+    repo.write(
+        "plugins/extra/pyproject.toml", '[project]\ndependencies = ["uv-build-extra>=1.0,<2"]\n'
+    )
+    git(repo.path, "add", "-A")
+    git(repo.path, "commit", "-q", "--no-verify", "-m", "chore: add a near name")
+    git(repo.path, "push", "-q", "origin", "main")
+    base = repo.head()
+    repo.switch(UV_BUILD_BRANCH)
+    edit(repo, "plugins/extra/pyproject.toml", "uv-build-extra>=1.0", "uv-build-extra>=1.1")
+    commit(repo, UV_BUILD_181)
+    assert "doesn't name uv-build" in requirement_refusal(repo, base)
+
+
+def test_a_manifest_whose_lines_don_t_pair_fails_saying_so(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base = requirement_commit(
+        make_repo,
+        tmp_path,
+        "chore(deps-dev): Update uv-build requirement",
+        [(TROUPE, '    "pydantic>=2.14,<3",\n', "")],
+    )
+    assert f"{TROUPE} doesn't pair line for line" in requirement_refusal(repo, base)
+
+
+def test_a_requirement_commit_changing_another_file_fails_naming_it(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base = requirement_commit(
+        make_repo,
+        tmp_path,
+        "chore(deps-dev): Update uv-build requirement",
+        [
+            (TROUPE, "uv_build>=0.13.0,<0.14", "uv_build>=0.13.5,<0.14"),
+            ("src/index.ts", "export {};", "export { x };"),
+        ],
+    )
+    problem = requirement_refusal(repo, base)
+    assert "src/index.ts isn't a manifest or lock file" in problem
+    assert "aren't dependency files: src/index.ts" in problem
 
 
 def test_an_update_type_that_disagrees_with_the_versions_fails(

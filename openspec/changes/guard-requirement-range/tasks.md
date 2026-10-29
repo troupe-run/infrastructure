@@ -26,25 +26,29 @@
 
 ## 3. Reading a requirement commit from its diff (design D3, D5)
 
-- [ ] 3.1 Add a real troupe #181 fixture: its commit message as Dependabot wrote it (`dependency-version: 0.13.3`),
+- [x] 3.1 Add a real troupe #181 fixture: its commit message as Dependabot wrote it (`dependency-version: 0.13.3`),
   base `pyproject.toml` files holding `requires = ["uv_build>=0.13.0,<0.14"]`, and the commit changing them to
   `>=0.13.5,<0.14` on `dependabot/uv/uv-build-gte-0.13.3-and-lt-0.14` in `troupe-run/troupe`. Rename and rewrite
   `test_a_requirement_range_fails_saying_its_versions_can_t_be_read` into a test that this branch passes `run_ci`
   (spec scenario "A requirement range"), and verify it fails on the current code
-- [ ] 3.2 Implement D3 in `dependabot_ineligibility`: a commit matching `DEPENDABOT_REQUIREMENT` is read from its
+- [x] 3.2 Implement D3 in `dependabot_ineligibility`: a commit matching `DEPENDABOT_REQUIREMENT` is read from its
   manifest lines (steps 1-5), with D5's reasons. Verify 3.1's test and 1.1's pin pass
-- [ ] 3.3 Add a test per spec scenario of "A Dependabot requirement update is read from the manifest lines it
+- [x] 3.3 Add a test per spec scenario of "A Dependabot requirement update is read from the manifest lines it
   changes": an upper bound raised a minor step with `uv.lock` changed (passes), a range admitting a new major (refused,
   major), a lowered bound, a line changing more than versions, a line for another dependency (`pydantic` under a
   `uv-build` subject), only `uv.lock` changed (each refused with its D5 reason and the line), and a near-name line
   (`uv-build-extra` under `uv-build`, refused). Verify each fails before its part of 3.2 exists or by mutation (break
   the step and see it fail), then passes
-- [ ] 3.4 Add D3 step 6: a long requirement subject whose ranges' kind differs from the diff's is refused, naming both
+- [x] 3.4 Add D3 step 6: a long requirement subject whose ranges' kind differs from the diff's is refused, naming both
   kinds; one that agrees passes. Test both and verify they pass
-- [ ] 3.5 Add the differential test of D4: generate ranges, render a `pyproject.toml` line pair and a title (old
+- [x] 3.5 Add the differential test of D4: generate ranges, render a `pyproject.toml` line pair and a title (old
   specifiers shuffled), and assert the guard's diff reading of a commit and `dependabot_issues.read_update` of the
-  title give the same kind. Verify it passes, and fails if the guard's pair counting is changed to ignore direction
-- [ ] 3.6 Update `test_the_real_subjects_kinds` for #181's title (both readers now say patch) and verify the file's
+  title give the same kind. Verify it passes, and fails if the guard's pair counting is changed to ignore direction.
+  Done with one substitution: the property test calls the guard's line reader (`dependabot_line_kind`) and
+  `range_kind` directly, not a git commit and `read_update`, because a commit for every generated example is slow.
+  The commit-level steps (hunk pairing, largest kind) are covered by 3.1's and 3.3's git tests, and
+  `read_update`'s use of `range_kind` by 2.1's. With direction ignored in both of the guard's checks, it fails
+- [x] 3.6 Update `test_the_real_subjects_kinds` for #181's title (both readers now say patch) and verify the file's
   tests pass
 
 ## 4. Docs and checks
