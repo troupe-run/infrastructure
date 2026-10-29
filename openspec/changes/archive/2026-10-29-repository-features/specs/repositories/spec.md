@@ -16,9 +16,7 @@ appear in the plan.
 ### Requirement: Unused features are off
 Every managed repository SHALL have its wiki turned off. Classic projects SHALL be turned off on every managed
 repository, unless turning them off would hide or unlink the org's project from a repository linked to it. Such a
-repository SHALL keep them on, and its declaration SHALL say why. Discussions SHALL be on in `troupe` only. Issues and
-Actions SHALL be off in `.github`, and on in every other managed repository. Where a repository's setting differs
-from the rest, its declaration SHALL say why.
+repository SHALL keep them on, and its declaration SHALL say why.
 
 #### Scenario: No repository has a wiki
 - **WHEN** the managed repositories' settings are read from GitHub
@@ -28,6 +26,12 @@ from the rest, its declaration SHALL say why.
 - **WHEN** the managed repositories' settings have been applied
 - **THEN** the org's project is still linked to `troupe`, `infrastructure` and `website`, each has projects on, and
   the project still holds every item it held before
+
+## ADDED Requirements
+
+### Requirement: Discussions, issues and Actions are on only where they're used
+Discussions SHALL be on in `troupe` only. Issues and Actions SHALL be off in `.github`, and on in every other managed
+repository. Where a repository's setting differs from the rest, its declaration SHALL say why.
 
 #### Scenario: Only troupe has discussions
 - **WHEN** the managed repositories' settings are read from GitHub
@@ -45,8 +49,6 @@ from the rest, its declaration SHALL say why.
 #### Scenario: No workflow runs in .github
 - **WHEN** `.github`'s Actions settings are read from GitHub
 - **THEN** Actions is turned off, so a workflow file added there would never run
-
-## ADDED Requirements
 
 ### Requirement: Private vulnerability reporting is on everywhere
 Every managed repository SHALL have private vulnerability reporting turned on, so the org's security policy, which
