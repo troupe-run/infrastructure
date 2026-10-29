@@ -28,13 +28,13 @@
 
 ## 3. Docs (design D3)
 
-- [ ] 3.1 In `docs/development-workflow.md`, add a "Throwaway repositories" section after "Which commands the guard
+- [x] 3.1 In `docs/development-workflow.md`, add a "Throwaway repositories" section after "Which commands the guard
   reads": the names and which are kept, what an agent may do with the command for each (create, configure, push,
   pull requests and issues, delete), what isn't exempt (credentials, extensions and aliases, GraphQL mutations, a
   name built by the shell), that the name must come from `-R`, `GH_REPO` or the positional, and that installing the
   App on a probe is the owner's. Verify each command it names is allowed by running it through `shell_decisions` in a
   scratch script (not committed), and that each "isn't exempt" example is refused
-- [ ] 3.2 Cut the `owner-only` row's exemption sentence to a pointer to the new section, keeping its exceptions for
+- [x] 3.2 Cut the `owner-only` row's exemption sentence to a pointer to the new section, keeping its exceptions for
   `spike-*` and `bakeoff-*` records and its help sentence; add the same pointer to the `gh-allow-list` row; rewrite
   the "Known gaps" bullet "A throwaway repository is a naming convention" to point there too. Verify
   `uv run pytest scripts/tests/test_guard_docs.py` passes
