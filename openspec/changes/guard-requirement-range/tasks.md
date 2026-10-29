@@ -59,7 +59,7 @@
   section no longer gives `Update uv-build requirement` as an unreadable example
 - [x] 4.2 Run `uv run scripts/check.py` (ruff, mypy --strict, pytest, OpenSpec strict validation including this
   change) and verify it passes
-- [ ] 4.3 Run a local plan (fast-forward onto `origin/main` first) and verify it changes only the delivered
+- [x] 4.3 Run a local plan (fast-forward onto `origin/main` first) and verify it changes only the delivered
   `scripts/guard.py` in troupe and website
 
 ## Workflow follow-up
