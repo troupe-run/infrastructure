@@ -53,11 +53,11 @@
 
 ## 4. Docs and checks
 
-- [ ] 4.1 Rewrite the two Dependabot bullets in `docs/development-workflow.md`: a requirement update is read from the
+- [x] 4.1 Rewrite the two Dependabot bullets in `docs/development-workflow.md`: a requirement update is read from the
   manifest lines it changes, exempt when only version numbers of its dependency go up a minor or patch step; a range
   admitting a new major, a lowered bound, or a line changing more than versions takes an OpenSpec change. Verify the
   section no longer gives `Update uv-build requirement` as an unreadable example
-- [ ] 4.2 Run `uv run scripts/check.py` (ruff, mypy --strict, pytest, OpenSpec strict validation including this
+- [x] 4.2 Run `uv run scripts/check.py` (ruff, mypy --strict, pytest, OpenSpec strict validation including this
   change) and verify it passes
 - [ ] 4.3 Run a local plan (fast-forward onto `origin/main` first) and verify it changes only the delivered
   `scripts/guard.py` in troupe and website
