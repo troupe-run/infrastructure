@@ -14,7 +14,8 @@ Pull requests, each read with
 | `pull-website-55.json` | a major update (typescript 6.0.3 → 7.0.2) |
 | `pull-website-58.json` | a scoped name (`@axe-core/playwright`), whose branch has a `/` inside the dependency |
 | `pull-website-54.json` | a title from before the config, starting `build(deps):` |
-| `pull-troupe-175.json` | `Update … requirement from <range> to <range>`: versions that aren't versions |
+| `pull-troupe-175.json` | `Update … requirement from <range> to <range>`: a requirement update, whose versions are ranges |
+| `pull-troupe-181.json` | the same, read on 2026-10-29 (guard-requirement-range): bounds reordered between the ranges |
 | `pull-infrastructure-184.json` | a `github-actions` update |
 
 Others:

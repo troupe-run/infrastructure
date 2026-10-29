@@ -2,7 +2,7 @@
 
 ## 1. Pin what must not change
 
-- [ ] 1.1 Before touching `scripts/guard.py` or `scripts/dependabot_issues.py`, add a test in
+- [x] 1.1 Before touching `scripts/guard.py` or `scripts/dependabot_issues.py`, add a test in
   `scripts/tests/test_guard_dependabot.py` that runs every existing bump fixture (ZOD, POSTCSS, AXE, TYPESCRIPT,
   EVENTSOURCING, DOWNLOAD_ARTIFACT) through `run_ci` on a reserved branch and records each outcome (pass, or the
   refusal's reason). Run it on the unchanged code and verify it passes, so a later change to a bump's result fails it
@@ -10,16 +10,16 @@
 
 ## 2. One counting for ranges (design D4)
 
-- [ ] 2.1 In `scripts/dependabot_issues.py`, add the pair counting (each pair counted with `update_type`, a pair that
+- [x] 2.1 In `scripts/dependabot_issues.py`, add the pair counting (each pair counted with `update_type`, a pair that
   goes down makes it unknown, the largest kind wins, no differing pair is unknown) and `range_kind(old, new)` (split on
   commas and spaces, operator plus `VERSION`, same operators each once, paired by operator). Use it in `read_update`
   for a requirement title. Add tests to `scripts/tests/test_dependabot_issues.py` for #181's real title (patch),
   `Update jsonschema requirement from <5,>=4.26 to >=4.26,<6` (major), a lowered bound, an operator added or dropped,
   and an `x` wildcard (unknown), and verify they pass
-- [ ] 2.2 Update `issue_body`'s tests so a requirement title counted patch or minor gets no "needs an OpenSpec change"
+- [x] 2.2 Update `issue_body`'s tests so a requirement title counted patch or minor gets no "needs an OpenSpec change"
   line, and one counted major or unknown still does (spec: `dependency-updates`, "The issue says what the update
   is"); verify they pass
-- [ ] 2.3 Copy the pair counting and `range_kind` into `scripts/guard.py` with docstrings naming the original, and
+- [x] 2.3 Copy the pair counting and `range_kind` into `scripts/guard.py` with docstrings naming the original, and
   add `DEPENDABOT_REQUIREMENT`, the requirement-subject pattern (D2), to both files. Extend
   `test_the_guard_s_copies_are_the_issue_workflow_s_patterns` to compare it, and add a property test that generates
   version pairs and ranges and asserts the guard's and the issue's `range_kind` agree; verify both pass

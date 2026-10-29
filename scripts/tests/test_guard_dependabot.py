@@ -279,6 +279,8 @@ def issue_kind(subject: str) -> str:
 def test_the_guard_s_copies_are_the_issue_workflow_s_patterns() -> None:
     assert guard.DEPENDABOT_SUBJECT.pattern == dependabot_issues.TITLE.pattern
     assert guard.DEPENDABOT_VERSION.pattern == dependabot_issues.VERSION.pattern
+    assert guard.DEPENDABOT_REQUIREMENT.pattern == dependabot_issues.REQUIREMENT.pattern
+    assert guard.DEPENDABOT_SPECIFIER.pattern == dependabot_issues.SPECIFIER.pattern
 
 
 @pytest.mark.parametrize("subject", REAL_SUBJECTS)
@@ -290,7 +292,8 @@ def test_each_real_subject_is_the_same_kind_of_update_for_the_guard_and_the_issu
 
 def test_the_real_subjects_kinds() -> None:
     kinds = [guard.dependabot_subject_kind(subject) for subject in REAL_SUBJECTS]
-    assert kinds == ["patch", "patch", "minor", "major", "patch", "unknown", "unknown", "patch"]
+    # The commit's subject gives no versions; the pull request's title gives ranges, a patch apart.
+    assert kinds == ["patch", "patch", "minor", "major", "patch", "unknown", "patch", "patch"]
 
 
 VERSIONS = st.one_of(
@@ -312,6 +315,28 @@ def test_any_bump_subject_is_the_same_kind_for_the_guard_and_the_issue(
 ) -> None:
     subject = f"chore(deps): Bump {dependency} from {old} to {new}"
     assert guard.dependabot_subject_kind(subject) == issue_kind(subject)
+
+
+# guard-requirement-range task 2.3: the guard counts a range as the issue does (design D4)
+
+OPERATORS = ["", "<", "<=", ">", ">=", "==", "!=", "~=", "^", "~", "=", "=>"]
+RANGES = st.lists(st.tuples(st.sampled_from(OPERATORS), VERSIONS), min_size=1, max_size=3).map(
+    lambda bounds: ",".join(operator + version for operator, version in bounds)
+)
+
+
+@given(old=VERSIONS, new=VERSIONS)
+def test_any_pair_of_moves_is_the_same_kind_for_the_guard_and_the_issue(old: str, new: str) -> None:
+    pairs = [(old, new), (new, old)]
+    assert guard.dependabot_pairs_kind(pairs[:1]) == dependabot_issues.pairs_kind(pairs[:1])
+    assert guard.dependabot_pairs_kind(pairs) == dependabot_issues.pairs_kind(pairs)
+
+
+@given(old=RANGES, new=RANGES)
+def test_any_pair_of_ranges_is_the_same_kind_for_the_guard_and_the_issue(
+    old: str, new: str
+) -> None:
+    assert guard.dependabot_range_kind(old, new) == dependabot_issues.range_kind(old, new)
 
 
 # Task 4.2: dependency files only (design D4)
@@ -582,6 +607,55 @@ def test_a_branch_with_one_major_commit_among_patches_fails(
     bump(repo, TYPESCRIPT, "package.json")
     refusal = refused_for(ci(repo, base, ZOD_BRANCH))
     assert "is a major update" in refusal.problem
+
+
+# guard-requirement-range task 1.1: reading requirement updates leaves every bump's result as it
+# was (design D2). Each real bump, with the files its pull request changed, and its outcome on main.
+BUMP_OUTCOMES = [
+    (ZOD, ZOD_BRANCH, WEBSITE, ("package-lock.json",), None),
+    (POSTCSS, ZOD_BRANCH, WEBSITE, ("package-lock.json",), None),
+    (AXE, "dependabot/npm_and_yarn/axe-core/playwright-4.14.0", WEBSITE,
+     ("package.json", "package-lock.json"), None),
+    (TYPESCRIPT, "dependabot/npm_and_yarn/typescript-7.0.2", WEBSITE,
+     ("package.json", "package-lock.json"), "is a major update"),
+    (EVENTSOURCING, "dependabot/uv/eventsourcing-9.5.6", "troupe-run/troupe",
+     ("pyproject.toml", "packages/troupe/pyproject.toml", "uv.lock"), None),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("text", "branch", "repository", "paths", "refused"),
+    BUMP_OUTCOMES,
+    ids=["zod", "postcss", "axe", "typescript", "eventsourcing"],
+)
+def test_each_real_bump_keeps_its_outcome(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    text: str,
+    branch: str,
+    repository: str,
+    paths: tuple[str, ...],
+    refused: str | None,
+) -> None:
+    repo, base = dependabot_repo(make_repo, tmp_path)
+    repo.switch(branch)
+    bump(repo, text, *paths)
+    decisions = ci(repo, base, branch, repository)
+    if refused is None:
+        assert decisions == []
+    else:
+        assert refused in refused_for(decisions).problem
+
+
+def test_the_real_action_bump_keeps_its_outcome(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, base = dependabot_repo(make_repo, tmp_path)
+    branch = "dependabot/github_actions/actions/download-artifact-8.0.2"
+    repo.switch(branch)
+    edit(repo, ".github/workflows/tofu.yml", "download-artifact@v8.0.1", "download-artifact@v8.0.2")
+    commit(repo, DOWNLOAD_ARTIFACT)
+    assert ci(repo, base, branch, "troupe-run/infrastructure") == []
 
 
 # Task 4.4: the exemption in run_ci (design D3, D6)

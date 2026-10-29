@@ -109,6 +109,15 @@ DEPENDABOT_SUBJECT = re.compile(
 )
 """Dependabot's subject for one dependency's update: a copy of TITLE in
 scripts/dependabot_issues.py, which the guard can't import (design D5). A test holds them equal."""
+DEPENDABOT_REQUIREMENT = re.compile(
+    r"(?:[a-z]+(?:\([^)]*\))?!?:\s*)?[Uu]pdate\s+(?P<dependency>.+?)\s+requirement"
+    r"(?:\s+from\s+(?P<old>\S+)\s+to\s+(?P<new>\S+))?(?:\s+in\s+(?P<directory>\S+))?"
+)
+"""Dependabot's subject for a requirement update, which moves a range: a copy of REQUIREMENT in
+scripts/dependabot_issues.py. A commit's subject stops at "requirement", so its versions are read
+from its manifest lines (guard-requirement-range design D2, D3)."""
+DEPENDABOT_SPECIFIER = re.compile(r"(?P<operator><=|>=|==|!=|~=|<|>|\^|~|=)?(?P<version>.+)")
+"""One bound of a range: a copy of SPECIFIER in scripts/dependabot_issues.py (design D4)."""
 DEPENDABOT_VERSION = re.compile(r"v?(\d+(?:\.\d+)*)")
 UPDATE_TYPE = re.compile(r"^\s*update-type:\s*(.*?)\s*$", re.MULTILINE)
 EXEMPT_UPDATE_TYPES = frozenset({"version-update:semver-minor", "version-update:semver-patch"})
@@ -3163,9 +3172,69 @@ def dependabot_update_kind(old: str | None, new: str | None) -> str:
     return "unknown"
 
 
+DEPENDABOT_KINDS = ("patch", "minor", "major")
+
+
+def _dependabot_raised(old: str, new: str) -> bool:
+    """Whether ``new`` is a later version than ``old``, both dotted digits, missing parts zero."""
+    a, b = DEPENDABOT_VERSION.fullmatch(old), DEPENDABOT_VERSION.fullmatch(new)
+    if not a or not b:
+        return False
+    left = [int(part) for part in a.group(1).split(".")]
+    right = [int(part) for part in b.group(1).split(".")]
+    width = max(len(left), len(right))
+    return right + [0] * (width - len(right)) > left + [0] * (width - len(left))
+
+
+def dependabot_pairs_kind(pairs: Iterable[tuple[str, str]]) -> str:
+    """A copy of pairs_kind in scripts/dependabot_issues.py: each version that changes is counted
+    by dependabot_update_kind and must go up, and the largest move is the kind. A version that goes
+    down, or none changing, is unknown (guard-requirement-range design D3, D4)."""
+    largest = -1
+    for old, new in pairs:
+        if old == new:
+            continue
+        kind = dependabot_update_kind(old, new)
+        if kind == "unknown" or not _dependabot_raised(old, new):
+            return "unknown"
+        largest = max(largest, DEPENDABOT_KINDS.index(kind))
+    return DEPENDABOT_KINDS[largest] if largest >= 0 else "unknown"
+
+
+def _dependabot_specifiers(text: str) -> dict[str, str] | None:
+    """A range's bounds by operator, or None when a bound isn't an operator and a version, or an
+    operator comes twice."""
+    found: dict[str, str] = {}
+    for part in re.split(r"[,\s]+", text.strip()):
+        match = DEPENDABOT_SPECIFIER.fullmatch(part)
+        if not match or not DEPENDABOT_VERSION.fullmatch(match.group("version")):
+            return None
+        operator = match.group("operator") or ""
+        if operator in found:
+            return None
+        found[operator] = match.group("version")
+    return found
+
+
+def dependabot_range_kind(old: str | None, new: str | None) -> str:
+    """A copy of range_kind in scripts/dependabot_issues.py: the bounds of two ranges, paired by
+    operator, counted by dependabot_pairs_kind. Ranges whose operators differ are unknown (design
+    D4)."""
+    if old is None or new is None:
+        return "unknown"
+    a, b = _dependabot_specifiers(old), _dependabot_specifiers(new)
+    if a is None or b is None or a.keys() != b.keys():
+        return "unknown"
+    return dependabot_pairs_kind((a[operator], b[operator]) for operator in a)
+
+
 def dependabot_subject_kind(subject: str) -> str:
     """The kind of update a Dependabot subject names: patch, minor, major, or unknown when it
-    doesn't name one dependency moving between two versions."""
+    doesn't name one dependency moving between two versions, or a requirement moving between two
+    ranges (guard-requirement-range design D3 step 6)."""
+    requirement = DEPENDABOT_REQUIREMENT.fullmatch(subject.strip())
+    if requirement:
+        return dependabot_range_kind(requirement.group("old"), requirement.group("new"))
     match = DEPENDABOT_SUBJECT.fullmatch(subject.strip())
     if not match:
         return "unknown"
