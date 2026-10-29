@@ -20,6 +20,12 @@ GraphQL mutation names no repository, so it SHALL NOT be exempt in a throwaway o
   `gh api -X POST repos/troupe-run/infra-probe-x/git/refs` with fields
 - **THEN** the command is allowed
 
+#### Scenario: Another owner's name built by the shell
+- **WHEN** an agent runs `gh repo create someone-else/$P --public`, whose owner is written out and isn't
+  `troupe-run`, so it can't be a throwaway repository whatever `$P` holds
+- **THEN** the command is refused as `owner-only` with the usual message, saying nothing about a name built by the
+  shell
+
 #### Scenario: A live repository's refusal is unchanged
 - **WHEN** an agent runs `gh repo create troupe-run/my-repo --public`, a name with no shell expansion
 - **THEN** the command is refused as `owner-only`, and the message says nothing about a name built by the shell

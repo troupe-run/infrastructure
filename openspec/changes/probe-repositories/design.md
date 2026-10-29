@@ -42,9 +42,15 @@ guard can't tell whether it's a throwaway repository and judges it as a live one
 repository (`troupe-run/infra-probe-*`, `spike-*`, `bakeoff-*`), write its name out." The rule's own fix stays
 first, because the command may target a live repository.
 
-The check is one helper (`_named_by_shell(repository)`, true for `$` or a backtick), applied to the decision at the
-end of `gh_decision` for both the `gh api` path and the subcommand path. It's not applied to a decision that allows,
-or to a refusal with no repository named (GraphQL, `gh auth`).
+The check is one helper (`_named_by_shell(repository)`, true for `$` or a backtick), applied to each refusal
+`gh_decision` makes with a repository named, on both the `gh api` path and the subcommand path. It's not applied to
+a decision that allows, or to a refusal with no repository named (GraphQL, `gh auth`). A name whose owner is written
+out and isn't `troupe-run` (`someone-else/$P`) gets no hint, since it can't be a throwaway one whatever the shell
+fills in. One whose owner is built too (`$OWNER/$REPO`, or `$R` alone) does, since it could be. Found while
+applying: an existing test of `gh api -X PUT repos/$OWNER/$REPO/pulls/$PR/merge` now gets the hint, which is right,
+because a merge in a probe is allowed. So that test checks that the message starts with the merge message. For a
+`gh api` endpoint, the name in the hint is taken from the command as written, case kept, because the guard
+lowercases the endpoint it matches.
 
 *Alternatives:* a new rule, `throwaway-name-unreadable`. That would change which override excuses the command, and
 it adds a rule for what is really an explanation, so no. Refusing such a command as `command-unparseable`
