@@ -53,6 +53,9 @@ an open alert matches it:
   by any update, so it matches nothing. When the new version can't be read (a requirement range, or an unknown title),
   a matching package with a patched version counts as security. A release then waits for a bump it may not need, which
   costs less than shipping a known vulnerability.
+- **A title the run can't read** (no package to match, such as a grouped update) counts as security while the
+  repository has any open alert with a patched version. Found while writing the tests (apply, 2.1). The spec's first
+  draft didn't cover it, and the conservative answer is the same as for a version it can't read.
 - **Directory** isn't compared. An alert's `manifest_path` (`package-lock.json`) and the branch's directory are
   written differently, and the same package in two directories of one repository is rare. If it happens, the
   conservative answer (security) is the one this gives.

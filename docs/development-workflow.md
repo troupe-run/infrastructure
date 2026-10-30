@@ -403,8 +403,13 @@ hand with `tofu init -upgrade` in a change of their own. Its plan and apply need
 
 Each Dependabot pull request in troupe, website and this repository gets an issue, from the `dependabot-issues`
 workflow here (spec: `dependency-updates`). The issue is opened in the pull request's
-repository by the `troupe-run-dependabot` App: type Task, label `dependencies`, the release in progress (the lowest
-open milestone in `tofu/milestones.json`) as its milestone, and on the troupe roadmap board. Its title names the
+repository by the `troupe-run-dependabot` App: type Task, label `dependencies`, and on the troupe roadmap board. A
+security update's issue also gets the release in progress (the lowest open milestone in `tofu/milestones.json`) as its
+milestone, so the release waits for the fix. A version update's issue gets none, since no release needs it
+(the [contributing guide](https://github.com/troupe-run/.github/blob/main/CONTRIBUTING.md#milestones)). A security update is
+one that fixes an open Dependabot alert in its repository, read with the App's "Dependabot alerts: read": the pull
+request itself looks the same either way. If the alerts can't be read, the workflow opens no issue in that repository
+and fails, naming it. It never takes a milestone off an issue, so one you set stays. Its title names the
 dependency and the versions, and its body links the pull request, whose description has the release notes, and gives
 the update type: patch, minor, major, or unknown when the versions can't be read. The workflow then adds
 `Closes #<n>` to the pull request's description, and puts it back if Dependabot rewrites the description. When

@@ -76,6 +76,11 @@ version update, whatever its branch, labels or title say.
   gives no version the run can read
 - **THEN** the run counts the pull request as a security update
 
+#### Scenario: A title that names no package
+- **WHEN** Dependabot's pull request title can't be read for a package, such as `Bump the npm group with 3 updates`
+- **THEN** the run counts it as a security update while the repository has any open alert with a patched version, and
+  as a version update otherwise
+
 ### Requirement: A run that can't read a repository's alerts opens no issue there
 A run SHALL read each repository's open Dependabot alerts before opening or relinking any issue in it. When the alerts
 can't be read, or a pull request's ecosystem has no known alert ecosystem, the run SHALL open and relink no issue that

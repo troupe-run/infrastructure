@@ -5,10 +5,13 @@ Usage: uv run scripts/dependabot_issues.py
 
 For each repository with Dependabot ecosystems in tofu/labels/dependabot.json, this reads the open
 pull requests by dependabot[bot] and the issues the troupe-run-dependabot App opened. Each open pull
-request gets an issue (type Task, label `dependencies`, the release in progress as milestone), or
-reuses the open one for the same dependency, and its description gets `Closes #<n>`. An issue whose
-pull request merged, or closed with no successor after an hour, is closed (design D2, D3). It never
-reads a pull request's files: only the API's metadata, and the description to find its own line.
+request gets an issue (type Task, label `dependencies`), or reuses the open one for the same
+dependency, and its description gets `Closes #<n>`. A security update's issue, told by the
+repository's open Dependabot alerts, gets the release in progress as its milestone; a version
+update's gets none, and no milestone is ever taken off (needed-for-milestones design D1, D3). An
+issue whose pull request merged, or closed with no successor after an hour, is closed (design D2,
+D3). It never reads a pull request's files: only the API's metadata, and the description to find
+its own line.
 
 Dependabot's own runs start it, so a pull request is handled soon after Dependabot changes it
 (spec: dependency-updates; #195; dependabot-issues-on-events design D1, D2). A daily schedule is
@@ -72,6 +75,15 @@ BRANCH = re.compile(r"dependabot/(?P<ecosystem>[a-z0-9_-]+)/.+")
 VERSION = re.compile(r"v?(\d+(?:\.\d+)*)")
 MILESTONE_TITLE = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)")
 MARKER = re.compile(r"<!-- dependabot-issue: (\{.*?\}) -->")
+# A branch's ecosystem, as Dependabot names it, to the ecosystem its alerts name
+# (needed-for-milestones design D1). A branch ecosystem missing here is an error, not a guess.
+ALERT_ECOSYSTEMS = {
+    "npm_and_yarn": "npm",
+    "uv": "pip",
+    "pip": "pip",
+    "github_actions": "actions",
+}
+PYPI_SEPARATORS = re.compile(r"[-_.]+")
 # The missed-event tracking issue, in infrastructure (design D5). It carries no `dependencies` label
 # and no dependabot-issue marker, so it's never taken for an update's issue.
 TRACKING_REPOSITORY = "infrastructure"
@@ -131,6 +143,8 @@ class Action:
     kind: str  # open, relink, reopen, line, close-completed, close-not-planned
     pull: dict[str, Any]
     issue: dict[str, Any] | None = None
+    # Whether the pull request is a security update; read only for open and relink.
+    security: bool = False
 
 
 @dataclass
@@ -141,6 +155,65 @@ class Plan:
 
 
 # --- Reading a pull request ---
+
+
+def _version(text: str) -> list[int] | None:
+    match = VERSION.fullmatch(text)
+    return [int(part) for part in match.group(1).split(".")] if match else None
+
+
+def _at_or_below(patched: str, new: str) -> bool | None:
+    """Whether ``patched`` is at or below ``new``, missing parts zero; None if either can't be
+    read."""
+    a, b = _version(patched), _version(new)
+    if a is None or b is None:
+        return None
+    width = max(len(a), len(b))
+    return a + [0] * (width - len(a)) <= b + [0] * (width - len(b))
+
+
+def package_name(ecosystem: str, name: str) -> str:
+    """A package name as the ecosystem compares it: PyPI normalises, Actions ignores case."""
+    if ecosystem == "pip":
+        return PYPI_SEPARATORS.sub("-", name).lower()
+    return name.lower() if ecosystem == "actions" else name
+
+
+def is_security(pull: Mapping[str, Any], alerts: Iterable[Mapping[str, Any]]) -> bool:
+    """Whether an open alert in the pull request's repository is one its update fixes (design D1).
+
+    A title the run can't read names no package, so any open alert with a fix counts; a version
+    it can't read counts when the package has one. Either way a release waits for a bump rather
+    than shipping a vulnerability."""
+    fixable = []
+    for each in alerts:
+        if each.get("state") != "open":
+            continue
+        patched = (each.get("security_vulnerability") or {}).get("first_patched_version")
+        identifier = (patched or {}).get("identifier")
+        if isinstance(identifier, str):
+            fixable.append((each.get("dependency") or {}, identifier))
+    update = read_update(pull)
+    if update.key is None:
+        return bool(fixable)
+    ecosystem = ALERT_ECOSYSTEMS.get(update.key.ecosystem)
+    if ecosystem is None:
+        raise ReadError(
+            f"#{pull.get('number')}'s ecosystem {update.key.ecosystem} has no alert ecosystem, "
+            "so it can't be told whether it's a security update. Add it to ALERT_ECOSYSTEMS in "
+            "scripts/dependabot_issues.py"
+        )
+    wanted = package_name(ecosystem, update.key.dependency)
+    for dependency, identifier in fixable:
+        package = dependency.get("package") or {}
+        if package.get("ecosystem") != ecosystem:
+            continue
+        if package_name(ecosystem, str(package.get("name"))) != wanted:
+            continue
+        fixed = _at_or_below(identifier, update.new) if update.new is not None else None
+        if fixed is None or fixed:
+            return True
+    return False
 
 
 def update_type(old: str | None, new: str | None) -> str:
@@ -362,10 +435,12 @@ def plan(
     issues: list[dict[str, Any]],
     linked: Mapping[int, dict[str, Any]],
     now: datetime,
+    alerts: Iterable[Mapping[str, Any]] = (),
 ) -> Plan:
     """What to do in one repository. open_pulls are Dependabot's open pull requests; issues are
     the App's, open and recently closed; linked holds each pull request an open issue names that
-    isn't open."""
+    isn't open; alerts are the repository's open Dependabot alerts."""
+    alerts = list(alerts)
     result = Plan()
     pulls = sorted((p for p in open_pulls if is_dependabot(p)), key=lambda p: int(p["number"]))
     mine: list[dict[str, Any]] = []
@@ -385,6 +460,13 @@ def plan(
     open_numbers = {int(p["number"]) for p in pulls}
     open_keys = {u.key for u in (read_update(p) for p in pulls) if u.key is not None}
     taken: set[int] = set()
+
+    def security(pull: dict[str, Any]) -> bool | None:
+        try:
+            return is_security(pull, alerts)
+        except ReadError as error:
+            result.unreadable.append(f"{error}. No issue was opened or relinked for it")
+            return None
 
     for pull in pulls:
         number = int(pull["number"])
@@ -424,12 +506,16 @@ def plan(
                 None,
             )
             if issue is not None:
+                if (fixes := security(pull)) is None:
+                    continue
                 taken.add(int(issue["number"]))
-                result.actions.append(Action("relink", pull, issue))
+                result.actions.append(Action("relink", pull, issue, fixes))
                 if not has_closing_line(pull, int(issue["number"])):
                     result.actions.append(Action("line", pull, issue))
                 continue
-        result.actions.append(Action("open", pull))
+        if (fixes := security(pull)) is None:
+            continue
+        result.actions.append(Action("open", pull, None, fixes))
 
     for issue in mine:
         number = int(issue["number"])
@@ -591,6 +677,8 @@ class Repository:
     open_pulls: list[dict[str, Any]]
     issues: list[dict[str, Any]]
     linked: dict[int, dict[str, Any]]
+    # The open Dependabot alerts, read only when Dependabot has a pull request open.
+    alerts: list[dict[str, Any]] = field(default_factory=list)
 
 
 def read_repository(name: str, title: str, gh: Gh, now: datetime) -> Repository:
@@ -605,6 +693,9 @@ def read_repository(name: str, title: str, gh: Gh, now: datetime) -> Repository:
             "progress declared in tofu/milestones.json"
         )
     pulls = gh_json(gh, f"{base}/pulls?state=open&per_page=100", paginate=True)
+    alerts = []
+    if any(isinstance(p, dict) and is_dependabot(p) for p in pulls):
+        alerts = gh_json(gh, f"{base}/dependabot/alerts?state=open&per_page=100", paginate=True)
     creator = APP.replace("[", "%5B").replace("]", "%5D")
     query = f"{base}/issues?creator={creator}&labels={LABEL}&per_page=100"
     since = (now - CLOSED_LOOKBACK).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -622,7 +713,7 @@ def read_repository(name: str, title: str, gh: Gh, now: datetime) -> Repository:
             continue  # plan() reports it, and leaves it alone
         if pull not in open_numbers and pull not in linked:
             linked[pull] = gh_json(gh, f"{base}/pulls/{pull}")
-    return Repository(name, numbers[0], pulls, issues, linked)
+    return Repository(name, numbers[0], pulls, issues, linked, alerts)
 
 
 # --- Writing (design D2): every field travels as JSON on stdin, never through a shell ---
@@ -631,6 +722,13 @@ def read_repository(name: str, title: str, gh: Gh, now: datetime) -> Repository:
 def describe(action: Action) -> str:
     pull = f"#{action.pull['number']}"
     issue = f"#{action.issue['number']}" if action.issue else "a new issue"
+    if action.kind in ("open", "relink"):
+        kind = "a security update" if action.security else "a version update"
+        return f"{_describe(action, pull, issue)} ({kind})"
+    return _describe(action, pull, issue)
+
+
+def _describe(action: Action, pull: str, issue: str) -> str:
     return {
         "open": f"open the issue “{issue_title(action.pull, read_update(action.pull))}” for "
         f"{pull} and add its closing line",
@@ -655,6 +753,21 @@ def write(gh: Gh, method: str, path: str, payload: Mapping[str, Any]) -> dict[st
     return answer
 
 
+def relink_payload(action: Action, milestone: int) -> dict[str, Any]:
+    """A relinked issue's new title and body, and the release in progress only for a security
+    update whose issue has no milestone: a milestone is never taken off (design D3)."""
+    if action.issue is None:
+        raise ReadError(f"relink for #{action.pull['number']} names no issue")
+    update = read_update(action.pull)
+    payload: dict[str, Any] = {
+        "title": issue_title(action.pull, update),
+        "body": issue_body(action.pull, update),
+    }
+    if action.security and not action.issue.get("milestone"):
+        payload["milestone"] = milestone
+    return payload
+
+
 def comment(gh: Gh, base: str, issue: int, text: str) -> None:
     write(gh, "POST", f"{base}/issues/{issue}/comments", {"body": text})
 
@@ -674,9 +787,9 @@ def act(repo: Repository, action: Action, gh: Gh) -> dict[str, Any] | None:
                 "title": issue_title(pull, update),
                 "body": issue_body(pull, update),
                 "labels": [LABEL],
-                "milestone": repo.milestone,
                 "type": ISSUE_TYPE,
-            },
+            }
+            | ({"milestone": repo.milestone} if action.security else {}),
         )
         write(
             gh,
@@ -690,12 +803,7 @@ def act(repo: Repository, action: Action, gh: Gh) -> dict[str, Any] | None:
     issue_number = int(action.issue["number"])
     if action.kind == "relink":
         old = read_marker(action.issue).pull
-        write(
-            gh,
-            "PATCH",
-            f"{base}/issues/{issue_number}",
-            {"title": issue_title(pull, update), "body": issue_body(pull, update)},
-        )
+        write(gh, "PATCH", f"{base}/issues/{issue_number}", relink_payload(action, repo.milestone))
         comment(
             gh,
             base,
@@ -765,7 +873,7 @@ def run(
     for name in names:
         try:
             repo = read_repository(name, title, gh, now)
-            decided = plan(repo.open_pulls, repo.issues, repo.linked, now)
+            decided = plan(repo.open_pulls, repo.issues, repo.linked, now, repo.alerts)
             found = misses(name, decided, now)
         except ReadError as error:
             print(
