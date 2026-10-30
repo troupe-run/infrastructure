@@ -235,8 +235,10 @@ infrastructure. The board card is added with the board App's token, in the `boar
 **Creating it** (done 2026-10-27). In the org's settings, under GitHub Apps, create a new App:
 - name `troupe-run-dependabot`, installable only on this account, webhook off. The script trusts only issues by
   `troupe-run-dependabot[bot]`, so a different name means changing `APP` in `scripts/dependabot_issues.py` too;
-- repository permissions "Issues: read and write" and "Pull requests: read and write", and nothing else: no
-  organisation or account permissions. GitHub adds "Metadata: read". Setting an issue's type needs nothing more;
+- repository permissions "Issues: read and write", "Pull requests: read and write" and "Dependabot alerts: read",
+  and nothing else: no organisation or account permissions. GitHub adds "Metadata: read". Setting an issue's type
+  needs nothing more. The alerts tell a security update from a version update, since only a security update's issue
+  gets a milestone (added 2026-10-30, needed-for-milestones design D2);
 - install it with "Only select repositories" and select `troupe`, `infrastructure` and `website`. The run's token
   names no repositories, so it covers exactly these.
 
