@@ -81,10 +81,12 @@
 
 ## 6. Whole-change checks
 
-- [ ] 6.1 Run `uv run scripts/check.py` (full) and `openspec validate ci-once-per-commit --strict`; both pass.
-- [ ] 6.2 Open the pull request as a draft (`gh pr create --draft`, `Closes #232`). Verify on its runs that CI's
+- [x] 6.1 Run `uv run scripts/check.py` (full) and `openspec validate ci-once-per-commit --strict`; both pass.
+- [x] 6.2 Open the pull request as a draft (`gh pr create --draft`, `Closes #232`). Verify on its runs that CI's
   `check` and legs are skipped with `guard tests` green, and `plan (pull request)` is skipped without asking for
-  approval. Record the run links here.
+  approval. Record the run links here. Done: #234 opened as a draft. CI run 41063386548 concluded success with
+  `check` and the legs skipped and `guard tests` passing; tofu run 41063386319 skipped `plan (pull request)`, asking
+  no approval. 6.1: the full check and `openspec validate --all --strict` (23) passed.
 - [ ] 6.3 Act on Claude's review of the last push by tier. Once nothing is left to fix, `gh pr ready <n>`. Verify the
   legs run, `plan (pull request)` asks for approval, and no review run starts. Ask the owner to approve the plan, and
   check it shows `claude-review.yml` delivered to troupe and website and `CONTRIBUTING.md` to `.github`.
