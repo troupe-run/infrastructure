@@ -2,29 +2,38 @@
 
 ## 1. Check what the change relies on
 
-- [ ] 1.1 Check the guard allows both commands as it stands: run `uv run scripts/guard.py` on a `gh pr create
+- [x] 1.1 Check the guard allows both commands as it stands: run `uv run scripts/guard.py` on a `gh pr create
   --draft --title … --body-file <file with Closes #232>` and a `gh pr ready 1` tool call (as
   `test_guard_gh.py` does) and record the decisions here. If either is refused, add the rule change and a test that
-  fails without it to group 4 before going on.
-- [ ] 1.2 Confirm a CI run whose `check` and legs are skipped concludes `success` (design Context): find a recent
+  fails without it to group 4 before going on. Done 2026-10-30, through `guard.py claude-pre-tool-use` on this
+  branch: `gh pr create --draft … --body-file <Closes #232>` is allowed (exit 0, no decision, so Claude Code's own
+  check applies), and `gh pr ready 1` is allowed and granted. The same create without a closing reference is denied
+  by `pr-closes-issue`, so the harness reads the guard's decisions. No rule changes.
+- [x] 1.2 Confirm a CI run whose `check` and legs are skipped concludes `success` (design Context): find a recent
   docs-only pull request's CI run with `gh run list --workflow ci.yml --event pull_request --json conclusion,databaseId`
-  and `gh run view <id> --json jobs`, and record the run here.
+  and `gh run view <id> --json jobs`, and record the run here. Done: none of the last 60 skipped `check`, but
+  run 41052435449 (legs skipped, `changes`, `check` and `guard tests` succeeded) concluded `success`. A run with
+  every job skipped concludes `skipped` (tofu's merge-group runs), so the push run keeps `changes` and `guard tests`
+  running; design Context says so.
 
 ## 2. The merge queue's lookup (design D1, D3, D4)
 
-- [ ] 2.1 Write `scripts/queue_passed.py`: given `--repository` and `--sha`, read CI's `merge_group` runs on that
+- [x] 2.1 Write `scripts/queue_passed.py`: given `--repository` and `--sha`, read CI's `merge_group` runs on that
   commit through `gh run list`, print `scope=none`/`check-args=`/`guard=false` when one completed with success,
   and otherwise `scope=full`/`check-args=`/`guard=true`. Poll a run still waiting every 10 s for up to 2 minutes.
   Answer "full" with a `::warning::` naming why on a failed read, unparseable output or an unknown status, and always
   exit 0. Standard library, with an injected `gh` callable, as `main_ci.py` has.
-- [ ] 2.2 Add `scripts/tests/test_queue_passed.py`, each test named for what it checks: a successful queue run skips,
+- [x] 2.2 Add `scripts/tests/test_queue_passed.py`, each test named for what it checks: a successful queue run skips,
   no queue run runs all, a failed or cancelled one runs all, a run that completes during the wait is waited for, one
   still running at the limit runs all, a failed read and unparseable output run all with a warning and exit 0, and
   only `--event merge_group` runs of `ci.yml` are asked for. Verify `uv run pytest scripts/tests/test_queue_passed.py`
   passes, and that mypy --strict and ruff are clean.
-- [ ] 2.3 Run the script against GitHub for real: `python3 scripts/queue_passed.py --repository
+- [x] 2.3 Run the script against GitHub for real: `python3 scripts/queue_passed.py --repository
   troupe-run/infrastructure --sha $(git rev-parse 4a64b25)` answers `scope=none`, and the same for an App state
-  commit (no CI run) answers `scope=full`. Record both outputs here.
+  commit (no CI run) answers `scope=full`. Record both outputs here. Done 2026-10-30: 4a64b25 answered
+  `scope=none`/`guard=false` ("the merge queue passed 4a64b25…"); the state commit 2adb29e answered
+  `scope=full`/`guard=true` ("no merge-queue run of CI tested 2adb29e…"); a repository that doesn't exist answered
+  `scope=full` with a `::warning::` naming the 404. Each exited 0.
 
 ## 3. ci.yml and tofu.yml (design D2)
 

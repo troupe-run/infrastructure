@@ -10,7 +10,9 @@ See proposal.md for why. What the change works with:
   because `changes` succeeded with `guard=false` (run-checks-by-path design D6, D7). A push to `main` or a merge group
   has no `changes`, so everything runs.
 - `tofu.yml`'s `plan (main)` starts on CI's `workflow_run` with `conclusion == 'success'`. A run whose jobs are
-  skipped concludes `success`, as on any docs-only pull request today. `scripts/main_ci.py` (daily and manual plans)
+  skipped concludes `success` while some job ran and none failed, as run 41052435449 did with its legs skipped. A
+  run with every job skipped concludes `skipped` instead, as tofu's merge-group runs do. So the push run must keep
+  `changes` and `guard tests` running, which it does: neither is skipped on a push. `scripts/main_ci.py` (daily and manual plans)
   reads the push run's conclusion, not its jobs, and so does nothing that delivers the guard.
 - Measured 2026-10-30 on 4a64b25: CI's `merge_group` run concluded success at 01:00, the `push` run on the same SHA
   ran the full matrix again from 01:10, and `tofu`'s `workflow_run` started at 01:20. So the commit the queue passes
