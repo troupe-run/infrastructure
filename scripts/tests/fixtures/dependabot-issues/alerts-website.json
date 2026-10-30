@@ -1,0 +1,226 @@
+[
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "undici"
+      }
+    },
+    "number": 15,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "8.12.2"
+      }
+    },
+    "state": "fixed"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "undici"
+      }
+    },
+    "number": 14,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "8.12.2"
+      }
+    },
+    "state": "fixed"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "undici"
+      }
+    },
+    "number": 13,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "8.12.2"
+      }
+    },
+    "state": "fixed"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "undici"
+      }
+    },
+    "number": 12,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "8.12.2"
+      }
+    },
+    "state": "fixed"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "undici"
+      }
+    },
+    "number": 11,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "8.12.2"
+      }
+    },
+    "state": "fixed"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "postcss-selector-parser"
+      }
+    },
+    "number": 10,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "6.1.5"
+      }
+    },
+    "state": "open"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "undici"
+      }
+    },
+    "number": 9,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "8.12.2"
+      }
+    },
+    "state": "fixed"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "undici"
+      }
+    },
+    "number": 8,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "8.12.2"
+      }
+    },
+    "state": "fixed"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "undici"
+      }
+    },
+    "number": 7,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "8.12.2"
+      }
+    },
+    "state": "fixed"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "fast-uri"
+      }
+    },
+    "number": 6,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "3.1.9"
+      }
+    },
+    "state": "open"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "fast-uri"
+      }
+    },
+    "number": 5,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "3.1.9"
+      }
+    },
+    "state": "open"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "fast-uri"
+      }
+    },
+    "number": 4,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "3.1.9"
+      }
+    },
+    "state": "open"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "fast-uri"
+      }
+    },
+    "number": 3,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "3.1.9"
+      }
+    },
+    "state": "open"
+  },
+  {
+    "dependency": {
+      "manifest_path": "package-lock.json",
+      "package": {
+        "ecosystem": "npm",
+        "name": "zod"
+      }
+    },
+    "number": 2,
+    "security_vulnerability": {
+      "first_patched_version": {
+        "identifier": "4.6.6"
+      }
+    },
+    "state": "open"
+  }
+]

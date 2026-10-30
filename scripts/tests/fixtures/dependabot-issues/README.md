@@ -23,4 +23,5 @@ Others:
 | File | Read with |
 |---|---|
 | `issue-website-21.json` | `gh api repos/troupe-run/website/issues/21 --jq '{number,title,state,state_reason,user:{login:.user.login,type:.user.type},body,labels:[.labels[].name],milestone:(.milestone\|if . then {number,title} else null end),closed_at,html_url}'`: an issue a bot opened, whose shape the App's issues share; tests change its author, labels and body |
+| `alerts-website.json` | `gh api 'repos/troupe-run/website/dependabot/alerts?per_page=100' --paginate --jq '[.[]\|{number,state,dependency:{package:{ecosystem:.dependency.package.ecosystem,name:.dependency.package.name},manifest_path:.dependency.manifest_path},security_vulnerability:{first_patched_version:.security_vulnerability.first_patched_version}}]'`, on 2026-10-30 (needed-for-milestones, task 1.3): every alert, open and fixed, so a test reads the open ones as the run's `state=open` does; zod, fast-uri and postcss-selector-parser are open, undici is fixed |
 | `milestones-website.json` | `gh api 'repos/troupe-run/website/milestones?state=open&per_page=100' --jq '[.[]\|{number,title,state}]'`: numbers that don't follow the version |

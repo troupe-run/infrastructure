@@ -437,6 +437,138 @@ def test_the_repositories_are_those_with_dependabot_ecosystems() -> None:
     assert di.repositories(text) == ["infrastructure", "troupe", "website"]
 
 
+# Security updates (spec: dependency-updates, "A security update is told by the repository's open
+# alerts", "A run never takes a milestone off an issue"; needed-for-milestones design D1, D3). The
+# alerts are website's real ones: zod, fast-uri and postcss-selector-parser open, undici fixed.
+
+ALERTS = fixture("alerts-website.json")
+
+
+def bump(dependency: str, old: str, new: str, ecosystem: str = "npm_and_yarn") -> dict[str, Any]:
+    """website #44 retitled and rebranched as Dependabot would for another dependency."""
+    return pull(
+        number=70,
+        title=f"chore(deps): Bump {dependency} from {old} to {new}",
+        head={"ref": f"dependabot/{ecosystem}/{dependency}-{new}"},
+    )
+
+
+def alert(ecosystem: str, name: str, patched: str | None, state: str = "open") -> dict[str, Any]:
+    """website's zod alert, changed to another package (the fixture's shape)."""
+    zod = next(a for a in ALERTS if a["dependency"]["package"]["name"] == "zod")
+    loaded: dict[str, Any] = copy.deepcopy(zod)
+    loaded["state"] = state
+    loaded["dependency"]["package"] = {"ecosystem": ecosystem, "name": name}
+    loaded["security_vulnerability"]["first_patched_version"] = (
+        {"identifier": patched} if patched is not None else None
+    )
+    return loaded
+
+
+def opened(p: dict[str, Any], alerts: list[dict[str, Any]]) -> di.Action:
+    (action,) = di.plan([p], [], {}, NOW, alerts).actions
+    assert action.kind == "open"
+    return action
+
+
+def test_a_pull_request_that_fixes_an_open_alert_is_a_security_update() -> None:
+    assert opened(pull("website-44"), ALERTS).security  # zod 4.6.5 to 4.6.7, fixed in 4.6.6
+
+
+def test_a_pull_request_that_moves_to_the_patched_version_itself_is_a_security_update() -> None:
+    assert opened(bump("fast-uri", "3.1.8", "3.1.9"), ALERTS).security
+
+
+def test_a_version_update_for_a_package_with_no_alert_is_a_version_update() -> None:
+    assert not opened(pull("website-55"), ALERTS).security  # typescript
+
+
+def test_an_alert_that_s_already_fixed_doesn_t_make_a_security_update() -> None:
+    assert not opened(bump("undici", "8.11.2", "8.12.3"), ALERTS).security
+
+
+def test_a_pull_request_that_stops_short_of_the_fix_is_a_version_update() -> None:
+    assert not opened(bump("fast-uri", "3.1.7", "3.1.8"), ALERTS).security
+
+
+def test_the_same_name_in_another_ecosystem_isn_t_a_security_update() -> None:
+    assert not opened(bump("zod", "4.6.5", "4.6.7", "github_actions"), ALERTS).security
+
+
+def test_an_alert_with_no_patched_version_makes_no_security_update() -> None:
+    assert not opened(pull("website-44"), [alert("npm", "zod", None)]).security
+
+
+def test_a_python_name_matches_as_pypi_normalises_it() -> None:
+    assert opened(
+        bump("uv-build", "0.13.0", "0.13.5", "uv"), [alert("pip", "UV_Build", "0.13.2")]
+    ).security
+
+
+def test_an_action_s_name_matches_whatever_its_case() -> None:
+    p = pull("infrastructure-184")  # actions/download-artifact 8.0.1 to 8.0.2
+    assert opened(p, [alert("actions", "Actions/Download-Artifact", "8.0.2")]).security
+
+
+def test_a_range_that_can_t_be_read_as_a_version_counts_as_a_security_update() -> None:
+    p = pull("troupe-175")  # uv-build requirement, <0.14,>=0.13.0 to >=0.13.2,<0.14
+    assert opened(p, [alert("pip", "uv_build", "0.13.1")]).security
+
+
+def test_a_title_that_can_t_be_read_is_a_security_update_while_any_alert_has_a_fix() -> None:
+    p = pull(title="chore(deps): Bump the npm group with 3 updates")
+    assert opened(p, ALERTS).security
+    assert not opened(p, [alert("npm", "zod", "4.6.6", state="fixed")]).security
+
+
+def test_an_ecosystem_with_no_alert_ecosystem_opens_no_issue_and_names_it() -> None:
+    p = pull(head={"ref": "dependabot/cargo/serde-1.0.2"})
+    result = di.plan([p], [], {}, NOW, ALERTS)
+    assert result.actions == []
+    (problem,) = result.unreadable
+    assert "cargo" in problem
+    assert "ALERT_ECOSYSTEMS" in problem
+
+
+def test_an_unknown_ecosystem_doesn_t_stop_a_pull_request_that_already_has_its_issue() -> None:
+    p = pull(head={"ref": "dependabot/cargo/serde-1.0.2"})
+    result = di.plan([lined(p, 100)], [app_issue(p)], {}, NOW, ALERTS)
+    assert (result.actions, result.unreadable) == ([], [])
+
+
+def relinked(old: dict[str, Any], new: dict[str, Any], issue: dict[str, Any]) -> di.Action:
+    linked = {int(old["number"]): closed(old, timedelta(minutes=5))}
+    action = di.plan([new], [issue], linked, NOW, ALERTS).actions[0]
+    assert action.kind == "relink"
+    return action
+
+
+def test_a_security_update_relinked_to_an_issue_with_no_milestone_sets_it() -> None:
+    old, new = bump("zod", "4.6.4", "4.6.5"), pull("website-44")
+    action = relinked(old, new, app_issue(old, milestone=None))
+    assert action.security
+    assert di.relink_payload(action, 1)["milestone"] == 1
+
+
+def test_a_version_update_relinked_to_an_issue_in_a_milestone_keeps_its_milestone() -> None:
+    old, new = bump("vitest", "5.0.3", "5.0.4"), {**bump("vitest", "5.0.3", "5.0.5"), "number": 71}
+    action = relinked(old, new, app_issue(old, milestone={"number": 1, "title": "0.1.0"}))
+    assert not action.security
+    assert "milestone" not in di.relink_payload(action, 1)
+
+
+def test_a_milestone_set_by_hand_stays_when_a_security_update_is_relinked() -> None:
+    old, new = bump("zod", "4.6.4", "4.6.5"), pull("website-44")
+    action = relinked(old, new, app_issue(old, milestone={"number": 3, "title": "0.2.0"}))
+    assert action.security
+    assert "milestone" not in di.relink_payload(action, 1)
+
+
+def test_the_dry_run_says_which_kind_of_update_it_would_open() -> None:
+    assert di.describe(opened(pull("website-44"), ALERTS)).endswith("(a security update)")
+    assert di.describe(opened(pull("website-55"), ALERTS)).endswith("(a version update)")
+
+
 # The run, against a fake GitHub (design D2, D8)
 
 
@@ -468,6 +600,11 @@ class FakeGitHub:
             return di.GhResult(1, "", f"gh: {repo} is down (HTTP 502)")
         if "/milestones" in path:
             return di.GhResult(0, json.dumps([fixture("milestones-website.json")]), "")
+        if "/dependabot/alerts?" in path:
+            if data.get("alerts-fail"):
+                return di.GhResult(1, "", "gh: Resource not accessible by integration (HTTP 403)")
+            found = [a for a in data.get("alerts", []) if a["state"] == "open"]
+            return di.GhResult(0, json.dumps([found]), "")
         if "/pulls?" in path:
             return di.GhResult(0, json.dumps([data.get("pulls", [])]), "")
         if "/issues?" in path:
@@ -517,7 +654,7 @@ def test_in_actions_a_new_pull_request_gets_its_issue_and_line(
     assert issue["title"] == "Update zod from 4.6.5 to 4.6.7"
     assert issue["labels"] == ["dependencies"]
     assert issue["type"] == "Task"
-    assert issue["milestone"] == 1  # website's number for 0.1.0
+    assert "milestone" not in issue  # a version update: website has no alert for zod here
     assert (m2, p2) == ("PATCH", "repos/troupe-run/website/pulls/44")
     assert edit["body"].endswith("\n\nCloses #501")
     assert output.read_text() == 'issue-urls=["https://github.com/troupe-run/website/issues/501"]\n'
@@ -644,6 +781,56 @@ def test_pull_request_text_reaches_github_only_as_json_data(
         json.loads(s or "{}") for a, s in seen if a[-3:-2] == ["repos/troupe-run/website/pulls/44"]
     )
     assert "`whoami` $(id) ${{ secrets.X }}" in edit["body"]
+
+
+def test_in_actions_a_security_update_s_issue_is_in_the_release_in_progress(
+    declarations: tuple[Path, Path],
+) -> None:
+    gh = FakeGitHub({"website": {"pulls": [just_changed(pull())], "alerts": ALERTS}, "troupe": {}})
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 0
+    (_, path, issue), _edit = gh.writes
+    assert path == "repos/troupe-run/website/issues"
+    assert issue["milestone"] == 1  # website's number for 0.1.0
+
+
+def test_in_actions_a_version_update_s_issue_has_no_milestone(
+    declarations: tuple[Path, Path],
+) -> None:
+    gh = FakeGitHub({"website": {"pulls": [just_changed(pull("website-55"))], "alerts": ALERTS},
+                     "troupe": {}})  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 0
+    (_, path, issue), _edit = gh.writes
+    assert path == "repos/troupe-run/website/issues"
+    assert "milestone" not in issue
+
+
+def test_alerts_that_can_t_be_read_open_no_issue_there_and_fail_the_run(
+    declarations: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    gh = FakeGitHub({"website": {"pulls": [just_changed(pull())], "alerts-fail": True},
+                     "troupe": {"pulls": [just_changed(pull("troupe-175"))]}})  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 1
+    assert [p for _, p, _ in gh.writes] == [
+        "repos/troupe-run/troupe/issues",
+        "repos/troupe-run/troupe/pulls/175",
+    ]
+    err = capsys.readouterr().err
+    assert "troupe-run/website" in err
+    assert "dependabot/alerts" in err
+
+
+def test_alerts_are_read_only_where_dependabot_has_a_pull_request_open(
+    declarations: tuple[Path, Path],
+) -> None:
+    gh = FakeGitHub({"website": {"alerts-fail": True}, "troupe": {}})
+    paths: list[str] = []
+
+    def watching(args: list[str], stdin: str | None) -> di.GhResult:
+        paths.append(args[-1])
+        return gh(args, stdin)
+
+    assert di.run(*declarations, ACTIONS, watching, NOW) == 0
+    assert not any("/dependabot/alerts" in p for p in paths)
 
 
 # Missed events (spec: dependency-updates, "A missed event is reported", "The missed-event tracking
