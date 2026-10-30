@@ -87,9 +87,13 @@
   approval. Record the run links here. Done: #234 opened as a draft. CI run 41063386548 concluded success with
   `check` and the legs skipped and `guard tests` passing; tofu run 41063386319 skipped `plan (pull request)`, asking
   no approval. 6.1: the full check and `openspec validate --all --strict` (23) passed.
-- [ ] 6.3 Act on Claude's review of the last push by tier. Once nothing is left to fix, `gh pr ready <n>`. Verify the
+- [x] 6.3 Act on Claude's review of the last push by tier. Once nothing is left to fix, `gh pr ready <n>`. Verify the
   legs run, `plan (pull request)` asks for approval, and no review run starts. Ask the owner to approve the plan, and
   check it shows `claude-review.yml` delivered to troupe and website and `CONTRIBUTING.md` to `.github`.
+  Done: the review of 57ff741 found nothing new, and the nit it raised was fixed there. `gh pr ready 234` started
+  CI run 41064678882 (`check` and all 11 legs ran and passed) and tofu run 41064678476 (`plan (pull request)`
+  waited for approval), and no review run. The owner approved; the plan of 57ff741 is "0 to add, 3 to change, 0 to
+  destroy": `claude-review.yml` to troupe and website, and `CONTRIBUTING.md` to `.github`.
 
 ## Workflow follow-up
 
