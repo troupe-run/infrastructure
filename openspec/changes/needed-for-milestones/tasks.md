@@ -65,16 +65,16 @@
 
 ## 4. The rule in the docs
 
-- [ ] 4.1 Rewrite `org-profile/CONTRIBUTING.md`'s "Milestones" section and the follow-up sentence in "How issues are
+- [x] 4.1 Rewrite `org-profile/CONTRIBUTING.md`'s "Milestones" section and the follow-up sentence in "How issues are
       related" (design D6; org-profile spec, modified and added requirements): the "would that release wait for it?"
       rule, no milestone for everything else open or closed, follow-ups, Decisions unchanged, and the release review
       with its three outcomes and the list on the closing pull request. Remove "Completed work always has a
       milestone". Verify `uv run scripts/check.py` passes (org-profile tests, links, issue types), and
       `grep -n "always has a milestone" org-profile/CONTRIBUTING.md` finds nothing
-- [ ] 4.2 In `docs/standard-changes.md`, say the sub-issue takes the needing issue's milestone because the needing
+- [x] 4.2 In `docs/standard-changes.md`, say the sub-issue takes the needing issue's milestone because the needing
       issue waits for it (it's blocked by the sub-issue). Leave the commands and checklist steps as they are. Verify
       `git diff docs/standard-changes.md` changes wording only, and `uv run scripts/check.py` passes
-- [ ] 4.3 Search for anything else that states the old rule:
+- [x] 4.3 Search for anything else that states the old rule:
       `grep -rn -i "release in progress\|always has a milestone\|when it was done" --include=*.md --include=*.py . | grep -v openspec/changes/archive`.
       Verify each hit agrees with the new rule, or fix it
 
