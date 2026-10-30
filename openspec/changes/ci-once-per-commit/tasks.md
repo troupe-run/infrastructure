@@ -58,20 +58,26 @@
 
 ## 4. Marking ready doesn't start a review (design D5)
 
-- [ ] 4.1 Drop `ready_for_review` from `claude-review.yml`'s `pull_request` types, with a comment citing this
+- [x] 4.1 Drop `ready_for_review` from `claude-review.yml`'s `pull_request` types, with a comment citing this
   change's design D5, and update `EVENTS` and its mutation case in `scripts/tests/test_claude_review_workflow.py`.
   Verify the test passes, and that `guard_tests_needed.py` still lists the file, so every leg runs on this pull
   request.
+  Done 2026-10-30: the test passes, and `.github/workflows/claude-review.yml` is in `DEPENDS_ON`. As the file's
+  header asks before a delivery (#155), fresh clones of troupe and website with it in place pass troupe's
+  `uv run scripts/check.py` (2991 passed) and website's `npx vitest run tests/unit/workflow-node-version.test.ts`
+  (8 passed).
 
 ## 5. The draft-then-ready step in the docs (design D6)
 
-- [ ] 5.1 In `docs/development-workflow.md`, "Claude's review": add the step (open as a draft with `gh pr create
+- [x] 5.1 In `docs/development-workflow.md`, "Claude's review": add the step (open as a draft with `gh pr create
   --draft`, act on the findings, `gh pr ready <n>` once the review of the last push has nothing left to fix), why CI
   and the plan wait for it, and that marking ready starts no review. Verify the docs checks in
   `uv run scripts/check.py` pass.
-- [ ] 5.2 Update `CLAUDE.md`'s "How work happens here", steps 4 and 5, to match, in the same words as 5.1.
-- [ ] 5.3 Update `org-profile/CONTRIBUTING.md`'s "How work flows", steps 3 and 4, to match. Verify the org-profile
-  tests pass, and a local plan shows only `CONTRIBUTING.md`'s content changing in `troupe-run/.github`.
+- [x] 5.2 Update `CLAUDE.md`'s "How work happens here", steps 4 and 5, to match, in the same words as 5.1.
+- [x] 5.3 Update `org-profile/CONTRIBUTING.md`'s "How work flows", steps 3 and 4, to match. Verify the org-profile
+  tests pass, and a local plan shows only `CONTRIBUTING.md`'s content changing in `troupe-run/.github`. The
+  org-profile tests pass. The plan is read from CI's plan on the pull request (6.3) rather than a local one, which
+  would need the 1Password secrets and shows the same thing.
 
 ## 6. Whole-change checks
 
