@@ -43,21 +43,21 @@
 
 ## 3. The list on a milestone-closing plan
 
-- [ ] 3.1 Write `scripts/tests/test_milestone_review.py` first, from the milestones spec's two ADDED requirements:
+- [x] 3.1 Write `scripts/tests/test_milestone_review.py` first, from the milestones spec's two ADDED requirements:
       a plan closing `0.1.0` in four repositories lists it once; a plan re-describing a milestone, or with no
       milestone change, writes an empty file; `.github` with issues off is left out and said so; pull requests are
       dropped; a second page is read; a failed read exits non-zero naming the repository and writes no list; a title
       with Markdown markup is escaped. Use a `plan.json` fixture with `github_repository_milestone.release` changes
       shaped like `tofu show -json`'s, and a stubbed `gh`. Verify they fail before 3.2
-- [ ] 3.2 Write `scripts/milestone_review.py` (design D4), in the style of `plan_checks.py` and `hook_modes.py`:
+- [x] 3.2 Write `scripts/milestone_review.py` (design D4), in the style of `plan_checks.py` and `hook_modes.py`:
       standard library, `gh api` for reads, a docstring citing the spec and design. Verify 3.1's tests pass and
       `uv run scripts/check.py` passes
-- [ ] 3.3 Add a "Issues with no milestone" step to both plan jobs in `.github/workflows/tofu.yml`, after "Check
+- [x] 3.3 Add a "Issues with no milestone" step to both plan jobs in `.github/workflows/tofu.yml`, after "Check
       warnings" and before the comment or summary step, with `GH_TOKEN: ${{ github.token }}`, and `cat` its file
       into the head of "Post the plan on the pull request" and "Show the plan for approval". No job permission
       changes. Verify the workflow tests (`uv run pytest scripts/tests -k workflow`) and `uv run scripts/check.py`
       pass, and `git diff .github/workflows/tofu.yml` shows no new permission
-- [ ] 3.4 Probe it on the real repositories: run `uv run scripts/milestone_review.py` locally with a `plan.json` that
+- [x] 3.4 Probe it on the real repositories: run `uv run scripts/milestone_review.py` locally with a `plan.json` that
       closes `0.1.0` (3.1's fixture) and the owner's `gh` login. Verify its section lists the open issues with no
       milestone that `gh api 'repos/troupe-run/<repo>/issues?milestone=none&state=open' --paginate` gives for
       troupe, infrastructure and website, without pull requests, and leaves `.github` out. Keep the output for the
