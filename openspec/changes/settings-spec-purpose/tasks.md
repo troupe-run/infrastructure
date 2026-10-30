@@ -2,7 +2,7 @@
 
 ## 1. Record the Purpose
 
-- [ ] 1.1 Read the `settings` Purpose from troupe's `main`
+- [x] 1.1 Read the `settings` Purpose from troupe's `main`
       (`gh api repos/troupe-run/troupe/contents/openspec/specs/settings/spec.md`, through `scripts/oob.py`'s
       `purpose()`), and add it to `oob/troupe-spec-purposes.json` where design D1 says. Verify the file has 27
       entries, its keys are sorted (`jq -r 'keys_unsorted[]'` against `sort`), the new entry matches #228's quote,
