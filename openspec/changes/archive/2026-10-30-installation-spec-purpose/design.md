@@ -93,8 +93,8 @@ difference, the board's `development` option still holding `cap:development`'s o
 approved apply of main sets it". That's the labels spec working as written. So:
 
 - On the branch, 2.1 expects exactly that one difference, and nothing about Purposes.
-- The plan of the pull request and of `main` lists the `development` option's description to set, beside the label's
-  in-place update (2.2).
+- The pull request's plan shows only the label's in-place update (2.2). The board's descriptions are planned only by
+  `plan (main)`, which lists the `development` option's description to set beside the label's update.
 - After the merge, the drift job stays red until the owner approves the apply and `board descriptions (main)` runs.
   That job runs after the oob job in the same run, so the merge's own run is likely still red; the next run, or a
   re-run of the oob job, should pass.
