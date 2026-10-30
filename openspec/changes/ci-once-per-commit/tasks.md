@@ -37,20 +37,24 @@
 
 ## 3. ci.yml and tofu.yml (design D2)
 
-- [ ] 3.1 In `ci.yml`: add `ready_for_review` to `pull_request`'s types (written out with opened, synchronize and
+- [x] 3.1 In `ci.yml`: add `ready_for_review` to `pull_request`'s types (written out with opened, synchronize and
   reopened). Run `changes` on `github.event_name != 'merge_group'` with `actions: read`. Give it three exclusive
   steps: a draft (`scope=none`, `guard=false`, and a notice saying the legs run when it's marked ready), a push
   (`queue_passed.py` with `github.sha`), and a ready pull request (the changed paths, unchanged). Keep `check`'s, the
   legs' and `guard tests`' conditions as they are. Rewrite the header comment's D7 sentence and run list to say a
   push to `main` skips a commit the queue passed and a draft runs nothing until ready.
-- [ ] 3.2 Update `scripts/tests/test_ci_workflow.py`: pin `changes`' new condition and permissions, the
+- [x] 3.2 Update `scripts/tests/test_ci_workflow.py`: pin `changes`' new condition and permissions, the
   `pull_request` types, the draft step's answers and the push step's script, and add a mutation case for each (drop
   `ready_for_review`, `changes` only on pull requests, the draft step removed) that the problems list names. Verify
   `uv run pytest scripts/tests/test_ci_workflow.py` passes.
-- [ ] 3.3 In `tofu.yml`: add `ready_for_review` to `pull_request`'s types. Add a step to `changes` that answers
+- [x] 3.3 In `tofu.yml`: add `ready_for_review` to `pull_request`'s types. Add a step to `changes` that answers
   `plan=false` on a draft, with a notice, and skip the paths step for a draft. Leave `pr-plan`'s condition
   unchanged. Update the trigger table in the header comment. Add tests (in the existing tofu workflow test file that
   pins `changes`, or a new one) for the types and the draft answer, and a mutation case for each. Verify they pass.
+  Done in a new `scripts/tests/test_tofu_drafts.py`. `test_required_checks.py`'s `runs_on_pull_requests` read
+  `changes`' new `github.event_name != 'merge_group'` as confining it to other events, which dropped `check` and
+  `guard tests` from the pull request checks. It now treats a condition that only excludes another event as running
+  on pull requests.
 
 ## 4. Marking ready doesn't start a review (design D5)
 

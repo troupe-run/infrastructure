@@ -2,29 +2,40 @@ name: CI
 
 # The repo's check (scripts/check.py, design D8) and the guard's tests. It needs no secret.
 #
-# Each run tests something no other run does (#66, dedupe-ci-runs):
-# - a pull request, once, merged onto main. A branch's own push doesn't run it again: nothing
-#   reaches main without a pull request.
-# - main after every merge. tofu.yml's plan of main follows this run.
+# Each run tests something no other run does (#66, dedupe-ci-runs; #232, ci-once-per-commit):
+# - a pull request that's ready for review, once per update, merged onto main. A branch's own push
+#   doesn't run it again: nothing reaches main without a pull request. A draft runs no tests: an
+#   agent marks it ready once Claude's review of its last push is clean, and `ready_for_review`
+#   runs them then (docs/development-workflow.md).
 # - each commit a merge queue tests: main with the pull requests ahead of it and this one's
 #   commits, in full, as main is (merge-queue design D4). `changes` doesn't run, so nothing skips.
+# - a push to main, unless the merge queue already passed that exact commit
+#   (scripts/queue_passed.py). Then `check` and the legs skip, `guard tests` passes, and the run
+#   is green, so tofu.yml's plan of main follows it as after any green run. A commit the queue
+#   didn't pass runs everything.
 # - not the App's state commit after an apply: it changes only the state file, and tofu.yml's
 #   plan skips it too.
 #
 # A pull request runs what its paths need (#78, run-checks-by-path; spec: ci-apply):
 #
 #   changes      what the changed paths need: guard.py check-scope reads scripts/check-paths.toml,
-#                and scripts/guard_tests_needed.py says whether the guard's legs must run
+#                and scripts/guard_tests_needed.py says whether the guard's legs must run. On a
+#                draft, nothing; on a push to main, nothing or everything (above)
 #   check        skipped when only skipped paths changed, scoped when only scoped ones did, and
 #                otherwise the full check
 #   guard tests  the required check for the legs: it passes when they passed, or were skipped
 #                because nothing they test changed. A skipped matrix job reports under its
 #                unexpanded name, so the legs themselves can't be required (design D6).
 #
-# A failed `changes` runs everything. main runs everything after every merge (design D7): its
-# merged tree may be one no pull request tested, and a guard delivery needs every OS green.
+# A failed `changes` runs everything. Everything runs on main once per commit (design D7, as
+# ci-once-per-commit design D1 changes it): a guard delivery needs every OS green, and the queue's
+# run gave that for the commit it passed. `changes` and `guard tests` run on every push, so the run
+# is never all-skipped, which GitHub concludes `skipped`, not `success`.
 on:
   pull_request:
+    # GitHub's default types, written out because naming one replaces them, and ready_for_review:
+    # marking a draft ready runs what a draft skipped (ci-once-per-commit design D2).
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
     paths-ignore: [tofu/terraform.tfstate]
@@ -40,21 +51,49 @@ concurrency:
 jobs:
   changes:
     name: what does it need?
-    if: github.event_name == 'pull_request'
+    # A pull request and a push to main; a merge group runs everything (ci-once-per-commit
+    # design D2). Exactly one of the three answering steps runs.
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      # queue_passed.py reads CI's merge-queue runs.
+      actions: read
     outputs:
-      scope: ${{ steps.paths.outputs.scope }}
-      check-args: ${{ steps.paths.outputs['check-args'] }}
-      guard: ${{ steps.paths.outputs.guard }}
+      scope: ${{ steps.draft.outputs.scope || steps.main.outputs.scope || steps.paths.outputs.scope }}
+      check-args: ${{ steps.draft.outputs['check-args'] || steps.main.outputs['check-args'] || steps.paths.outputs['check-args'] }}
+      guard: ${{ steps.draft.outputs.guard || steps.main.outputs.guard || steps.paths.outputs.guard }}
     steps:
+      - name: A draft runs nothing until it's ready
+        id: draft
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft
+        run: |
+          echo "::notice::A draft: check and the guard's legs run when it's marked ready for review."
+          printf 'scope=none\ncheck-args=\nguard=false\n' >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'push'
+      # It always exits 0: a failed read answers "everything", with a warning, since a red run here
+      # would hold up the plan of main (ci-once-per-commit design D3).
+      - name: Did the merge queue pass this commit?
+        id: main
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          python3 scripts/queue_passed.py --repository "$GITHUB_REPOSITORY" --sha "$SHA" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request' && !github.event.pull_request.draft
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        if: github.event_name == 'pull_request' && !github.event.pull_request.draft
       - name: The pull request's changed paths
         id: paths
+        if: github.event_name == 'pull_request' && !github.event.pull_request.draft
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
@@ -66,9 +105,9 @@ jobs:
 
   check:
     name: check
-    # A required check. Skipped, which counts as passed, only when `changes` succeeded and found
-    # only skipped paths. With no answer (a push to main, a merge group, or a failed `changes`) it
-    # runs in full.
+    # A required check. Skipped, which counts as passed, only when `changes` succeeded and answered
+    # scope=none: only skipped paths changed, a draft, or a push the merge queue passed. With no
+    # answer (a merge group, or a failed `changes`) it runs in full.
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.scope != 'none' }}
     runs-on: ubuntu-latest

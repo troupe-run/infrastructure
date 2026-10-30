@@ -3,6 +3,7 @@ name: tofu
 # Plans and applies the org from CI (spec: ci-apply; ci-apply design).
 #
 #   pull request          changes   no environment                 does it touch what OpenTofu reads?
+#                                                                  a draft: no, till it's marked ready
 #                         pr-plan   env plan-pr (owner approves)   plan posted on the PR, unless not
 #   CI green on main  --> plan      env plan-main (main only)      plan in the run summary, with the
 #   or a manual run                                                board's descriptions to set; a
@@ -30,6 +31,9 @@ name: tofu
 # oob/README.md); none is in this file.
 on:
   pull_request:
+    # GitHub's default types, written out because naming one replaces them, and ready_for_review:
+    # a draft asks for no plan, and marking it ready does (ci-once-per-commit design D2).
+    types: [opened, synchronize, reopened, ready_for_review]
   # Only so `plan (pull request)`, a required check, reports on each commit a merge queue tests: it
   # reports as skipped, asking for no approval and holding no secret. The owner approved the pull
   # request's plan, and main is planned and approved after the merge (merge-queue design D5).
@@ -62,21 +66,29 @@ env:
 jobs:
   # Whether a pull request changes anything OpenTofu reads (scripts/plan_needed.py, required-checks
   # design D2). No environment and no secrets. Not a required check itself: if it fails, the plan
-  # runs.
+  # runs. A draft needs no plan until it's marked ready (ci-once-per-commit design D2).
   changes:
     name: does it need a plan?
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      plan: ${{ steps.paths.outputs.plan }}
+      plan: ${{ steps.draft.outputs.plan || steps.paths.outputs.plan }}
     steps:
+      - name: A draft is planned once it's ready
+        id: draft
+        if: github.event.pull_request.draft
+        run: |
+          echo "::notice::A draft: it's planned, and the owner asked to approve, when it's marked ready for review."
+          echo "plan=false" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ !github.event.pull_request.draft }}
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
       - name: The pull request's changed paths
         id: paths
+        if: ${{ !github.event.pull_request.draft }}
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}

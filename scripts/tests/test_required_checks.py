@@ -61,12 +61,20 @@ def triggers(workflow: dict[str, Any]) -> list[str]:
 def runs_on_pull_requests(workflow: dict[str, Any], job_id: str) -> bool:
     """Whether a job runs on a pull request: its workflow is triggered by one, its `if` doesn't
     confine it to other events, and every job it needs runs too (a job whose needs are skipped is
-    skipped)."""
+    skipped). A condition that only excludes another event, as ci.yml's `changes` excludes merge
+    groups (ci-once-per-commit design D2), doesn't confine it."""
     if "pull_request" not in triggers(workflow):
         return False
     job = workflow["jobs"][job_id]
     condition = str(job.get("if", ""))
-    if "event_name" in condition and "event_name == 'pull_request'" not in condition:
+    excludes_another = re.fullmatch(
+        r"\s*github\.event_name != '(?!pull_request')[a-z_]+'\s*", condition
+    )
+    if (
+        "event_name" in condition
+        and "event_name == 'pull_request'" not in condition
+        and not excludes_another
+    ):
         return False
     needs = job.get("needs", [])
     return all(
