@@ -53,15 +53,18 @@ status; OpenSpec holds what the system does and how each change will do it.
    recommendation.
 2. **An OpenSpec change says how.** It lives under `openspec/changes/<name>/`, on a branch named `<name>`, with a
    proposal, spec deltas, a design and tasks. Its proposal cites the issue.
-3. **A pull request delivers it.** It names the change and closes the issue (`Closes #12`). Specs, code and tests
-   change together, and the repository's check passes before every commit (its README says how to run it).
+3. **A pull request delivers it.** It's opened as a draft, names the change and closes the issue (`Closes #12`).
+   Specs, code and tests change together, and the repository's check passes before every commit (its README says how
+   to run it).
 4. **Claude's review is acted on.** It reviews each push, and posts every finding as a conversation on the lines
    it's about, labelled for who resolves it. A **must-fix** is fixed, or answered with a reason, and the review
    resolves it on its next run once it's addressed. A **nit** is fixed, or answered (a follow-up issue, or why it
    isn't worth it), and the author resolves it. A **decision** is the maintainer's, and so is a must-fix still in
    dispute after the re-review. The review runs again on each push, and on each reply to one of its
-   open must-fixes, so a must-fix answered with a reply alone is judged when the reply is posted. The pull request
-   can't merge while any conversation is open.
+   open must-fixes, so a must-fix answered with a reply alone is judged when the reply is posted. Once the review of
+   the last push leaves no must-fix or decision open, the pull request is marked ready for review, so CI's full run,
+   and the plan where there is one, test the code the review has finished with. The pull request can't merge while
+   any conversation is open.
 5. **Before the merge,** the change is archived on its branch, which updates `openspec/specs/`, so the pull
    request lands code, tests and specs together. It's merged once every conversation is resolved, by rebase, through
    the repository's merge queue where it has one: the queue tests it on top of `main` and whatever is queued ahead of

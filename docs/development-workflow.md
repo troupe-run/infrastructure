@@ -69,6 +69,16 @@ person's conversation or a resolved one, a comment that opens a conversation, or
 a review still running for the pull request. If a reply's run fails, re-run it (`gh run rerun <id>`, which the guard
 allows, or "Re-run jobs" on GitHub): each job reads the conversations afresh, so the reply is judged.
 
+**A pull request opens as a draft, and is marked ready once its review is clean** (spec: development-workflow, "A
+pull request opens as a draft and is marked ready once its review is clean"). Open it with `gh pr create --draft`.
+Claude's review runs on a draft as on any pull request, but CI's `check` and guard-tests legs don't, and neither does
+the plan: both wait for the pull request to be marked ready, so they don't run on code the review is about to change
+(spec: ci-apply). Act on the review's findings, and once the review of the last push leaves no must-fix or decision
+open, mark it ready with `gh pr ready <n>`. That runs the legs and asks the owner to approve the plan. It starts no
+review: that head was reviewed when it was pushed. It's a documented step, not a guard rule. Marking ready early only
+costs runs, because a draft can't merge or join the queue, and the ruleset refuses a merge while any conversation is
+open.
+
 **Before the change is archived**, the session that owns it waits for the review of its last push and acts on each
 finding by its tier (spec: development-workflow, "Review findings are acted on before a change is archived"). The `main`
 ruleset refuses a merge, and the merge queue, while any conversation is unresolved (spec: rulesets), and the owner
@@ -244,7 +254,9 @@ This repository's `ci.yml` asks in a `changes` job on each pull request. `check`
 on `none`, runs `check.py` with the scopes it's given, and runs the full check when `changes` failed. The same job asks
 `scripts/guard_tests_needed.py` whether the guard's tests must run on every OS and Python: only when a pull request
 changes what they depend on (the guard's files, its tests, the declaration, the Python project or `ci.yml`). One
-`guard tests` job reports for those legs, run or skipped. `main` runs everything after every merge.
+`guard tests` job reports for those legs, run or skipped. A draft runs neither until it's marked ready. A merge queue
+runs everything on the commit it tests, and a push to `main` runs everything again only when the queue didn't pass
+that exact commit (`scripts/queue_passed.py`; spec: ci-apply).
 
 ### A scope is a test tag
 

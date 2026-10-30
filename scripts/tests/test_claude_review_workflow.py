@@ -32,7 +32,9 @@ FIXTURES = Path(__file__).parent / "fixtures"
 # owner's local setup; the result messages are as captured (review-denials-and-guide design D3).
 DENIED = FIXTURES / "claude-execution-denied.json"
 CLEAN = FIXTURES / "claude-execution-clean.json"
-EVENTS = ["opened", "synchronize", "reopened", "ready_for_review"]
+# Not ready_for_review: marking a draft ready doesn't review its head again (ci-once-per-commit
+# design D5).
+EVENTS = ["opened", "synchronize", "reopened"]
 # A person's reply in a review conversation starts the review too, when it's posted
 # (review-judge-reply-on-post design D2). Only `created`: an edit is judged on the next run.
 COMMENT_EVENTS = ["created"]
@@ -626,7 +628,7 @@ def sources(w: dict[str, Any], change: str) -> None:
         ),
         (lambda w: w["on"]["pull_request"]["types"].append("edited"), "not ['opened'"),
         (lambda w: w["on"]["pull_request"]["types"].remove("synchronize"), "not ['opened'"),
-        (lambda w: w["on"]["pull_request"]["types"].remove("ready_for_review"), "not ['opened'"),
+        (lambda w: w["on"]["pull_request"]["types"].append("ready_for_review"), "not ['opened'"),
         (lambda w: w.update({"permissions": {"contents": "write"}}), "default permissions"),
         (lambda w: w.pop("permissions"), "default permissions"),
         (lambda w: gate_job(w).pop("if"), "not skipping bots, forks, outsiders"),
