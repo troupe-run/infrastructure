@@ -57,8 +57,9 @@ gh issue create -R troupe-run/infrastructure --type Task --project "troupe roadm
   --title 'Add the `cap:<name>` capability label' --body-file sub-issue.md --milestone "<milestone>"
 ```
 
-`<milestone>` is the needing issue's (every repository has the same milestones). Leave `--milestone` out if it has
-none, and say so on the sub-issue. Call the new issue `<sub>`. Then link it:
+`<milestone>` is the needing issue's (every repository has the same milestones): the needing issue is blocked by
+the sub-issue, so its release waits for the label too. Leave `--milestone` out if it has none, since then no release
+waits for either, and say so on the sub-issue. Call the new issue `<sub>`. Then link it:
 
 ```sh
 gh issue edit <parent> -R troupe-run/<repo> --add-sub-issue https://github.com/troupe-run/infrastructure/issues/<sub>

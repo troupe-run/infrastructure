@@ -3,9 +3,10 @@ name: dependabot-issues
 # Gives every Dependabot pull request in the org its issue, and links the pull request to it (spec:
 # dependency-updates; #172; dependabot-issues design). For each repository with Dependabot
 # ecosystems in tofu/labels/dependabot.json, the script opens an issue for each open Dependabot
-# pull request (type Task, label dependencies, the release in progress), adds `Closes #<n>` to its
-# description, relinks the issue when Dependabot supersedes the update, and closes it when the pull
-# request merges or closes with no successor.
+# pull request (type Task, label dependencies, and the release in progress for a security update
+# only, told by the repository's open alerts), adds `Closes #<n>` to its description, relinks the
+# issue when Dependabot supersedes the update, and closes it when the pull request merges or closes
+# with no successor.
 #
 #   issues   env dependabot-issues (main only)   runs scripts/dependabot_issues.py with the
 #                                                troupe-run-dependabot App's token

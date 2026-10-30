@@ -93,23 +93,34 @@ repositories it's in. Each relationship answers one question:
 
 Work found while doing a change becomes a sub-issue of the Epic its origin belongs to, so the Epic isn't done until
 that work is, and it gets the "arose from" line too. When the origin has no Epic, or the follow-up isn't needed for
-the outcome (it's parked, optional, or a new outcome of its own), it gets only the "arose from" line.
+the outcome (it's parked, optional, or a new outcome of its own), it gets only the "arose from" line. Which of these a
+follow-up is also decides its [milestone](#milestones).
 
 Every issue has a type: Epic, Feature, Bug, Task or Decision.
 
 ## Milestones
 
 Each milestone is a planned troupe release, and its description says what a user gets from it. Every repository
-has the same milestones, so an issue anywhere is filed under the troupe release it's needed for. When a milestone's
-last issue is closed, that version is released.
+has the same milestones. When a milestone's last issue is closed, that version is released.
 
-- **Planned work** goes in the release it's needed for.
-- **Completed work** always has a milestone: the one of the work it [arose from](#how-issues-are-related) or, when
-  nothing fits, the release that was in progress when it was done. That includes development process, org upkeep and
-  flaky tests.
-- **Open work that isn't planned** has no milestone. 1.0.0 holds only the stability promise.
-- **A Decision** goes in the milestone of the earliest work it blocks or, when it blocks nothing, of the work it
-  shaped.
+An issue goes in a milestone only if that release would wait for it: you can point to the part of the milestone's
+description that needs it. Every other issue has no milestone, open or closed. So a milestone's open issues are what's
+left before its release, and its closed ones are what it needed. When work was done is already recorded by its close
+date, its pull request and the release notes.
+
+- **A follow-up** takes the milestone of the work it [arose from](#how-issues-are-related) only when that work needs
+  it: as a sub-issue of its Epic, or as an issue blocking it. An improvement that arose from the work gets the
+  "arose from" line and no milestone.
+- **Upkeep** has no milestone: development process, org upkeep, flaky tests outside an Epic a release needs, and
+  dependency version bumps. A Dependabot security update's issue is the exception: it goes in the release in
+  progress, so a release doesn't ship a vulnerability it could have fixed.
+- **A Decision** goes in the milestone of the earliest work it blocks, and has none if it blocks nothing.
+- **1.0.0** holds only the stability promise.
+
+**When a milestone closes**, by a pull request setting its `state` to `closed` in `tofu/milestones.json`, every open
+issue with no milestone is looked at, so none is forgotten. Each one gets an outcome: moved into a milestone because
+it's now needed, labelled `parked` with a reason to come back, or closed as not planned. That pull request's plan
+lists them.
 
 Milestones may be renumbered, reordered or re-described as plans change. They're declared in
 [`tofu/milestones.json`](https://github.com/troupe-run/infrastructure/blob/main/tofu/milestones.json), and

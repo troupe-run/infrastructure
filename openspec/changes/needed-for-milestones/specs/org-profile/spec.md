@@ -50,6 +50,10 @@ work always has a milestone.
 - **WHEN** a contributor files a Decision that blocks work in `0.2.0`
 - **THEN** the guide tells them to put it in `0.2.0`, the milestone of the earliest work it blocks
 
+#### Scenario: A Decision that blocks nothing
+- **WHEN** a contributor files a Decision that shaped work but blocks none
+- **THEN** the guide tells them it has no milestone (owner, 2026-10-30, on #229)
+
 ### Requirement: The guide says closing a milestone reviews the issues with no milestone
 The org's contributing guide SHALL say that when a milestone is closed, by a pull request setting its state to `closed`
 in `tofu/milestones.json`, every open issue with no milestone is looked at and given one outcome: moved into a
