@@ -36,7 +36,7 @@ def problems(workflow: dict[Any, Any]) -> list[str]:
     return found
 
 
-def test_a_draft_asks_for_no_plan_and_ready_asks_again() -> None:
+def test_tofu_yml_has_the_draft_step_and_the_ready_trigger() -> None:
     assert problems(tofu()) == []
 
 
@@ -50,6 +50,18 @@ def test_a_draft_s_answer_skips_the_pr_plan() -> None:
         "needs.changes.outputs.plan": "false",
     }
     assert not evaluate(jobs["pr-plan"]["if"], context)
+
+
+def test_a_ready_pull_request_s_answer_runs_the_pr_plan() -> None:
+    """Marked ready, `changes` reads the paths again; when they need a plan, pr-plan runs, so its
+    environment asks the owner to approve it."""
+    jobs = tofu()["jobs"]
+    context = {
+        "github.event_name": "pull_request",
+        "needs.changes.result": "success",
+        "needs.changes.outputs.plan": "true",
+    }
+    assert evaluate(jobs["pr-plan"]["if"], context)
 
 
 @pytest.mark.parametrize(
