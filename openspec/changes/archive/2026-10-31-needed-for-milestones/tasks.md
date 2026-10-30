@@ -83,9 +83,9 @@
 - [x] 5.1 Run `openspec validate needed-for-milestones --strict` and verify it passes
 - [x] 5.2 Fast-forward onto `origin/main`, run `uv run scripts/check.py` and `uv run scripts/oob.py`, and verify both
       are clean (the App's permission matches after 1.2)
-- [ ] 5.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify the plan
+- [x] 5.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify the plan
       shows only `.github`'s `CONTRIBUTING.md` updated in place, and no "Issues with no milestone" section (this
-      pull request closes no milestone). Tick it in the same push as the archive, so the owner approves one more run
+      pull request closes no milestone). Tick it in the same push as the archive, so the owner approves one more run (plan for 35787e4, run 41145490021: 0 to add, 1 to change, 0 to destroy, `CONTRIBUTING.md` only; no list; the step logged "84 milestone changes, none closes a milestone", 4 repositories × 21 milestones, so it reads the real plan shape)
 
 ## Workflow follow-up
 
