@@ -10,13 +10,13 @@
 
 ## 2. Verify
 
-- [ ] 2.1 Fast-forward the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports no
+- [x] 2.1 Fast-forward the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports no
       differences, and keep its output for the pull request. If it reports a changed `settings` Purpose, update the
       record, check design D2 against the new text, and re-run 1.1's checks. Stop and revise the change if it reports
-      anything else
-- [ ] 2.2 Run `git diff --name-only origin/main...HEAD | python3 scripts/plan_needed.py` and verify it prints
+      anything else (7a79ea4, 0 behind `origin/main` 2adb29e: "oob: no differences")
+- [x] 2.2 Run `git diff --name-only origin/main...HEAD | python3 scripts/plan_needed.py` and verify it prints
       `plan=false`, so the pull request asks for no `plan-pr` approval (proposal, Impact)
-- [ ] 2.3 Run `openspec validate settings-spec-purpose --strict` and verify it passes
+- [x] 2.3 Run `openspec validate settings-spec-purpose --strict` and verify it passes
 
 ## Workflow follow-up
 
