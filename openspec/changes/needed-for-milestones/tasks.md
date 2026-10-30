@@ -80,8 +80,8 @@
 
 ## 5. Verify
 
-- [ ] 5.1 Run `openspec validate needed-for-milestones --strict` and verify it passes
-- [ ] 5.2 Fast-forward onto `origin/main`, run `uv run scripts/check.py` and `uv run scripts/oob.py`, and verify both
+- [x] 5.1 Run `openspec validate needed-for-milestones --strict` and verify it passes
+- [x] 5.2 Fast-forward onto `origin/main`, run `uv run scripts/check.py` and `uv run scripts/oob.py`, and verify both
       are clean (the App's permission matches after 1.2)
 - [ ] 5.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify the plan
       shows only `.github`'s `CONTRIBUTING.md` updated in place, and no "Issues with no milestone" section (this
