@@ -166,6 +166,17 @@ jobs:
         run: |
           uv run --no-project scripts/plan_checks.py --plan-json "$RUNNER_TEMP/plan.json" \
             --summary "$RUNNER_TEMP/checks.md"
+      # A plan that closes a milestone lists the open issues with no milestone, so each gets an
+      # outcome before the release closes (spec: milestones; needed-for-milestones design D4). It
+      # reads the public repositories' issues with this job's token, and fails rather than show a
+      # short list.
+      - name: Issues with no milestone
+        if: steps.secrets.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run --no-project scripts/milestone_review.py --plan-json "$RUNNER_TEMP/plan.json" \
+            --summary "$RUNNER_TEMP/review.md"
       - name: Post the plan on the pull request
         if: steps.secrets.outputs.available == 'true'
         env:
@@ -185,6 +196,8 @@ jobs:
             echo "Made in CI on this pull request merged onto \`main\` ([run]($RUN_URL)). The apply happens after the merge, once the owner approves the plan made then."
             echo
             cat "$RUNNER_TEMP/checks.md"
+            echo
+            cat "$RUNNER_TEMP/review.md"
             echo
             cat "$RUNNER_TEMP/modes.md"
             echo
@@ -373,6 +386,14 @@ jobs:
         run: |
           uv run --no-project scripts/plan_checks.py --plan-json "$RUNNER_TEMP/plan.json" \
             --summary "$RUNNER_TEMP/checks.md"
+      # As in pr-plan: the issues with no milestone, when this plan closes one, as they are now.
+      - name: Issues with no milestone
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run --no-project scripts/milestone_review.py --plan-json "$RUNNER_TEMP/plan.json" \
+            --summary "$RUNNER_TEMP/review.md"
       - name: Show the plan for approval
         if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         env:
@@ -395,6 +416,8 @@ jobs:
             fi
             echo
             cat "$RUNNER_TEMP/checks.md"
+            echo
+            cat "$RUNNER_TEMP/review.md"
             echo
             cat "$RUNNER_TEMP/modes.md"
             echo
