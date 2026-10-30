@@ -16,10 +16,11 @@
       difference: the board's `development` option still has `cap:development`'s old description (design D4). Keep
       its output for the pull request. If it reports a changed `installation` Purpose, update the record and design
       D2 together and re-run 1.1 and 1.2's checks. Stop and revise the change if it reports anything else
-- [ ] 2.2 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows
-      only `cap:development`'s description updated in place on troupe-run/troupe and the board's `development`
-      option's description to set (design D4), and nothing else created, changed or deleted. Tick this in the same
-      push as the archive, so the owner approves one more run
+- [x] 2.2 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows
+      only `cap:development`'s description updated in place on troupe-run/troupe, and nothing else created, changed
+      or deleted. The board's `development` option isn't in it: only `plan (main)` plans board descriptions (design
+      D4). Tick this in the same push as the archive, so the owner approves one more run. (Plan for 2021507, run
+      40975339151: 0 to add, 1 to change, 0 to destroy, the one label.)
 - [x] 2.3 Run `openspec validate installation-spec-purpose --strict` and verify it passes
 
 ## 3. The note in troupe
@@ -36,7 +37,8 @@
   comment is 2.2's evidence. Before the second `plan-pr` approval, archive the change and rebase onto `main`'s state
   commit in one push.
 - The owner merges by rebase, through the merge queue.
-- After the merge, the owner reads the `plan (main)` plan and approves the `apply` job. Verify the description with
+- After the merge, the owner reads the `plan (main)` plan, which also lists the `development` option's description
+  to set, and approves the `apply` job. Verify the description with
   `gh label list -R troupe-run/troupe --search cap:development`, check `board descriptions (main)` succeeded, then
   check the next `drift (out of band)` run passes (or re-run that job), since the merge's own run checks before the
   board is set (design D4).
