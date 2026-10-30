@@ -23,7 +23,8 @@
     "permissions": {
       "issues": "write",
       "metadata": "read",
-      "pull_requests": "write"
+      "pull_requests": "write",
+      "vulnerability_alerts": "read"
     },
     "repository_selection": "selected"
   },
