@@ -621,7 +621,11 @@ class FakeGitHub:
 
 
 @pytest.fixture
-def declarations(tmp_path: Path) -> tuple[Path, Path]:
+def declarations(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    # troupe's uv dependencies ship, as tofu/dependabot.json declares (test_dependabot_config.py).
+    policy = tmp_path / "dependabot.json"
+    policy.write_text(json.dumps({"releases": {"troupe": ["uv"]}}))
+    monkeypatch.setattr(di, "POLICY", policy)
     labels = tmp_path / "labels.json"
     labels.write_text(json.dumps({"repositories": {"website": ["npm"], "troupe": ["uv"],
                                                    ".github": []}}))  # fmt: skip
@@ -1089,3 +1093,198 @@ def test_outside_actions_a_miss_only_says_what_it_would_do(
     assert di.run(*declarations, {}, gh, NOW) == 1
     assert gh.writes == []
     assert "would open the tracking issue" in capsys.readouterr().out
+
+
+# A shipped runtime dependency's security update releases a fix (spec: dependency-updates, "A
+# shipped runtime dependency's security update releases a fix", "A run never takes an override
+# away"; security-updates-release design D1, D3, D5). troupe #174 is a real runtime bump; it
+# merged, so it's reopened here without its closing line.
+
+EVENTSOURCING = pull(
+    "troupe-174",
+    state="open",
+    merged_at=None,
+    closed_at=None,
+    body=pull("troupe-174")["body"].replace("\n\nCloses #178", ""),
+)
+EVENTSOURCING_ALERT = alert("pip", "eventsourcing", "9.5.6")
+
+
+def troupe_pull(**changes: Any) -> dict[str, Any]:  # noqa: ANN401
+    return just_changed({**EVENTSOURCING, **changes})
+
+
+def body_writes(gh: "FakeGitHub") -> dict[str, str]:
+    """Each pull request's description as the run wrote it, by path."""
+    return {path: p["body"] for method, path, p in gh.writes if "/pulls/" in path}
+
+
+def test_updates_that_dont_ship_get_only_their_issue_and_line_as_before(
+    declarations: tuple[Path, Path],
+) -> None:
+    # Passes before the change too (security-updates-release task 3.1): whatever doesn't qualify
+    # for an override is handled exactly as it was.
+    version = troupe_pull()
+    dev = troupe_pull(
+        number=180,
+        title="chore(deps-dev): Bump pytest from 9.1.0 to 9.1.1",
+        head={"ref": "dependabot/uv/pytest-9.1.1"},
+    )
+    actions = just_changed(
+        pull("infrastructure-184", number=181, state="open", merged_at=None, closed_at=None)
+    )
+    website = just_changed(pull())
+    gh = FakeGitHub({
+        "troupe": {"pulls": [version, dev, actions],
+                   "alerts": [alert("pip", "pytest", "9.1.1"),
+                              alert("actions", "actions/download-artifact", "8.0.2")]},
+        "website": {"pulls": [website], "alerts": ALERTS},
+    })  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 0
+    posted = [(path, p.get("milestone")) for method, path, p in gh.writes if method == "POST"]
+    assert posted == [
+        ("repos/troupe-run/website/issues", 1),
+        ("repos/troupe-run/troupe/issues", None),
+        ("repos/troupe-run/troupe/issues", 1),
+        ("repos/troupe-run/troupe/issues", 1),
+    ]
+    assert body_writes(gh) == {
+        "repos/troupe-run/website/pulls/44": di.with_closing_line(website, 501),
+        "repos/troupe-run/troupe/pulls/174": di.with_closing_line(version, 502),
+        "repos/troupe-run/troupe/pulls/180": di.with_closing_line(dev, 503),
+        "repos/troupe-run/troupe/pulls/181": di.with_closing_line(actions, 504),
+    }
+
+
+OVERRIDE = (
+    "BEGIN_COMMIT_OVERRIDE\nfix(deps): Bump eventsourcing from 9.5.5 to 9.5.6\nEND_COMMIT_OVERRIDE"
+)
+
+
+def test_the_override_reads_the_title_as_a_fix() -> None:
+    assert di.override_block(EVENTSOURCING) == OVERRIDE
+
+
+def test_a_shipped_security_update_gets_its_override_and_line_in_one_write(
+    declarations: tuple[Path, Path],
+) -> None:
+    p = troupe_pull()
+    gh = FakeGitHub({"troupe": {"pulls": [p], "alerts": [EVENTSOURCING_ALERT]}, "website": {}})
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 0
+    assert body_writes(gh) == {
+        "repos/troupe-run/troupe/pulls/174": f"{p['body'].rstrip()}\n\n{OVERRIDE}\n\nCloses #501"
+    }
+    assert [path for _, path, _ in gh.writes].count("repos/troupe-run/troupe/pulls/174") == 1
+
+
+def test_a_rewritten_description_gets_its_override_back(declarations: tuple[Path, Path]) -> None:
+    p = troupe_pull()
+    lined_p = lined(p, 100)
+    gh = FakeGitHub({"troupe": {"pulls": [lined_p], "issues": [app_issue(p)],
+                                "alerts": [EVENTSOURCING_ALERT]}, "website": {}})  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 0
+    assert body_writes(gh) == {
+        "repos/troupe-run/troupe/pulls/174": f"{lined_p['body']}\n\n{OVERRIDE}"
+    }
+
+
+def test_a_description_missing_both_gets_both_in_one_write(declarations: tuple[Path, Path]) -> None:
+    p = troupe_pull()
+    gh = FakeGitHub({"troupe": {"pulls": [p], "issues": [app_issue(p)],
+                                "alerts": [EVENTSOURCING_ALERT]}, "website": {}})  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 0
+    assert body_writes(gh) == {
+        "repos/troupe-run/troupe/pulls/174": f"{p['body'].rstrip()}\n\n{OVERRIDE}\n\nCloses #100"
+    }
+
+
+@pytest.mark.parametrize(
+    "block",
+    [OVERRIDE, "BEGIN_COMMIT_OVERRIDE\nfix(deps): edited by hand\nEND_COMMIT_OVERRIDE"],
+)
+def test_an_override_already_there_is_left_alone_whatever_it_says(
+    declarations: tuple[Path, Path], block: str
+) -> None:
+    p = troupe_pull()
+    with_block = {**p, "body": f"{lined(p, 100)['body']}\n\n{block}"}
+    gh = FakeGitHub({"troupe": {"pulls": [with_block], "issues": [app_issue(p)],
+                                "alerts": [EVENTSOURCING_ALERT]}, "website": {}})  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 0
+    assert gh.writes == []
+
+
+def test_an_override_stays_when_the_alert_is_dismissed(declarations: tuple[Path, Path]) -> None:
+    p = troupe_pull()
+    with_block = {**p, "body": f"{lined(p, 100)['body']}\n\n{OVERRIDE}"}
+    dismissed = alert("pip", "eventsourcing", "9.5.6", state="dismissed")
+    gh = FakeGitHub({"troupe": {"pulls": [with_block], "issues": [app_issue(p)],
+                                "alerts": [dismissed]}, "website": {}})  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 0
+    assert gh.writes == []
+
+
+def test_an_override_removed_from_a_version_update_isnt_put_back(
+    declarations: tuple[Path, Path],
+) -> None:
+    p = troupe_pull()
+    gh = FakeGitHub({"troupe": {"pulls": [lined(p, 100)], "issues": [app_issue(p)]},
+                     "website": {}})  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 0
+    assert gh.writes == []
+
+
+def test_a_security_update_in_an_ecosystem_that_doesnt_ship_gets_no_override() -> None:
+    p = troupe_pull()
+    (action,) = di.plan([p], [], {}, NOW, [EVENTSOURCING_ALERT], ships=[]).actions
+    assert (action.kind, action.security, action.override) == ("open", True, None)
+
+
+def test_the_dry_run_says_it_would_add_the_override(
+    declarations: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    p = troupe_pull()
+    gh = FakeGitHub({"troupe": {"pulls": [lined(p, 100)], "issues": [app_issue(p)],
+                                "alerts": [EVENTSOURCING_ALERT]}, "website": {}})  # fmt: skip
+    assert di.run(*declarations, {}, gh, NOW) == 0
+    assert gh.writes == []
+    assert (
+        "would add release-please's override `fix(deps): Bump eventsourcing from 9.5.5 to 9.5.6` "
+        "to #174" in capsys.readouterr().out
+    )
+
+
+def test_an_unknown_branch_ecosystem_in_a_repository_that_ships_is_named() -> None:
+    p = troupe_pull(head={"ref": "dependabot/cargo/eventsourcing-9.5.6"})
+    result = di.plan([lined(p, 100)], [app_issue(p)], {}, NOW, [EVENTSOURCING_ALERT], ships=["uv"])
+    assert result.actions == []
+    assert any("cargo" in problem and "SHIPPED_ECOSYSTEMS" in problem for problem in
+               result.unreadable)  # fmt: skip
+
+
+def test_a_malformed_releases_stops_the_run_before_any_read(
+    declarations: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    policy = tmp_path / "bad.json"
+    policy.write_text(json.dumps({"releases": ["troupe"]}))
+    gh = FakeGitHub({"troupe": {"pulls": [troupe_pull()]}, "website": {}})
+    calls: list[list[str]] = []
+
+    def recording(args: list[str], stdin: str | None) -> di.GhResult:
+        calls.append(args)
+        return gh(args, stdin)
+
+    assert di.run(*declarations, ACTIONS, recording, NOW, policy) == 2
+    assert calls == []
+    assert "tofu/dependabot.json's releases isn't an object" in capsys.readouterr().err
+
+
+def test_a_policy_with_no_releases_ships_nothing(
+    declarations: tuple[Path, Path], tmp_path: Path
+) -> None:
+    policy = tmp_path / "none.json"
+    policy.write_text(json.dumps({"directories": {"uv": "/"}}))
+    p = troupe_pull()
+    gh = FakeGitHub({"troupe": {"pulls": [lined(p, 100)], "issues": [app_issue(p)],
+                                "alerts": [EVENTSOURCING_ALERT]}, "website": {}})  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW, policy) == 0
+    assert gh.writes == []
