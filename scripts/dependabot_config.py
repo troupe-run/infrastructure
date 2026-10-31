@@ -43,6 +43,27 @@ def undirected_ecosystems(policy: dict[str, Any], labels: dict[str, Any]) -> lis
     ]
 
 
+def unknown_releases(policy: dict[str, Any], labels: dict[str, Any]) -> list[str]:
+    """Each repository or ecosystem in the policy's releases that isn't declared for Dependabot.
+    The releases say whose runtime dependencies ship, so a security update to one releases a fix
+    (security-updates-release design D4); they change no generated file."""
+    problems = []
+    for repo, ecosystems in policy.get("releases", {}).items():
+        if repo not in labels["repositories"]:
+            problems.append(
+                f"{repo}: in tofu/dependabot.json's releases, but not a repository in "
+                "tofu/labels/dependabot.json"
+            )
+            continue
+        problems += [
+            f"{repo}: ecosystem {ecosystem!r} in tofu/dependabot.json's releases isn't one of its "
+            "Dependabot ecosystems in tofu/labels/dependabot.json"
+            for ecosystem in ecosystems
+            if ecosystem not in labels["repositories"][repo]
+        ]
+    return problems
+
+
 def delivered_workflows(guard_files: list[str]) -> list[str]:
     """The workflows the guard delivers, sorted."""
     return sorted(path for path in guard_files if path.startswith(WORKFLOWS))
@@ -113,7 +134,7 @@ def generated() -> dict[str, str]:
     """Each generated file's name in tofu/dependabot/ mapped to its content."""
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     labels = json.loads(LABELS.read_text(encoding="utf-8"))
-    problems = undirected_ecosystems(policy, labels)
+    problems = undirected_ecosystems(policy, labels) + unknown_releases(policy, labels)
     if problems:
         raise SystemExit("\n".join(problems))
     guard_delivery_tf = tofu_text.GUARD_DELIVERY_TF.read_text(encoding="utf-8")

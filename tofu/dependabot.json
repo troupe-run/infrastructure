@@ -8,5 +8,6 @@
   },
   "semver_cooldown": ["npm", "uv"],
   "commit-message": { "prefix": "chore", "include": "scope" },
-  "directories": { "github-actions": "/", "npm": "/", "uv": "/" }
+  "directories": { "github-actions": "/", "npm": "/", "uv": "/" },
+  "releases": { "troupe": ["uv"] }
 }
