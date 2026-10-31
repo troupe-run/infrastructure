@@ -424,7 +424,17 @@ request itself looks the same either way. If the alerts can't be read, the workf
 and fails, naming it. It never takes a milestone off an issue, so one you set stays. Its title names the
 dependency and the versions, and its body links the pull request, whose description has the release notes, and gives
 the update type: patch, minor, major, or unknown when the versions can't be read. The workflow then adds
-`Closes #<n>` to the pull request's description, and puts it back if Dependabot rewrites the description. When
+`Closes #<n>` to the pull request's description, and puts it back if Dependabot rewrites the description. A
+security update titled `chore(deps):`, a runtime dependency's, from an ecosystem whose dependencies ship in a release
+(`releases` in `tofu/dependabot.json`: troupe's `uv`) also gets release-please's commit override in the same
+description: a `BEGIN_COMMIT_OVERRIDE` … `END_COMMIT_OVERRIDE` block reading its title as `fix(deps):`. troupe merges
+by rebase, so Dependabot's `chore(deps)` commit lands on `main` as it is, but release-please reads the override in its
+place, and the release pull request lists the update as a fix and releases a patch (troupe-run/troupe#214; probed on
+#240). release-please still releases only the packages whose files the commit changes, so a change to the root
+`uv.lock` alone releases nothing. The workflow never changes or removes an override, whoever wrote it: to stop one
+releasing, dismiss its alert if it's still open, then delete the block from the description. If a security update
+merged before its override was added, add the block to the merged pull request's description before the release pull
+request merges, and re-run troupe's `release` workflow: release-please reads it then. When
 Dependabot supersedes an update, the open issue is relinked to the new pull request rather than a second one opened.
 A pull request closed without merging closes its issue as not planned, once an hour has passed with no successor,
 and reopening the pull request reopens it. So to drop an update, close Dependabot's pull request, or comment
@@ -440,10 +450,10 @@ it: here directly, and in troupe and website through their `dependabot-dispatch`
 That workflow starts this one with the `troupe-run-dispatch` App's token, kept in a main-only environment
 (oob/README.md). A daily run, the backstop, does the same work, which includes what only time makes due, such as
 closing an issue as not planned an hour after its pull request closed. Closing a Dependabot pull request by hand starts
-no Dependabot run, so its issue closes at the next backstop. Any run that finds a pull request still missing its issue
-or closing line over an hour after it last changed has found a missed event. The run fixes it, lists it in the
-"Dependabot events missed" issue here, and fails. Only the daily run closes the issue, when it finds none, so it stays
-open while a cause such as a missing key is still there. The schedule watch
+no Dependabot run, so its issue closes at the next backstop. Any run that finds a pull request still missing its issue,
+closing line or due override over an hour after it last changed has found a missed event. The run fixes it, lists it
+in the "Dependabot events missed" issue here, and fails. Only the daily run closes the issue, when it finds none, so it
+stays open while a cause such as a missing key is still there. The schedule watch
 reports the backstop if its schedule stops. To run the workflow by hand: `gh workflow run dependabot-issues.yml -R
 troupe-run/infrastructure`.
 
