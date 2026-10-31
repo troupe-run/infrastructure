@@ -72,7 +72,7 @@
       dependency in an ecosystem declared in `tofu/dependabot.json`'s `releases` gets release-please's override, so it
       releases a patch; that the override is never removed by the workflow; and the recovery from design D6 (unless
       1.5 showed it doesn't work). Verify `uv run scripts/check.py` passes (the docs gates)
-- [ ] 5.2 Comment on troupe-run/troupe#215 with what `contributing/releasing.md`'s "What bumps what" should say about
+- [x] 5.2 Comment on troupe-run/troupe#215 with what `contributing/releasing.md`'s "What bumps what" should say about
       Dependabot's updates (security to a runtime dependency: patch, through this override; version and dev updates:
       nothing on their own), linking this change. Verify the comment is on #215
 
