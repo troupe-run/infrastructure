@@ -17,6 +17,7 @@ Pull requests, each read with
 | `pull-troupe-175.json` | `Update … requirement from <range> to <range>`: a requirement update, whose versions are ranges |
 | `pull-troupe-181.json` | the same, read on 2026-10-29 (guard-requirement-range): bounds reordered between the ranges |
 | `pull-infrastructure-184.json` | a `github-actions` update |
+| `pull-troupe-174.json` | a runtime dependency of shipped packages (eventsourcing 9.5.5 → 9.5.6), read on 2026-10-31 (security-updates-release, task 3.2): merged, so tests reopen it and drop its `Closes` line |
 
 Others:
 

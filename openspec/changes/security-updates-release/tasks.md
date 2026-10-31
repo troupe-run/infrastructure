@@ -40,22 +40,22 @@
 
 ## 3. The override (design D1, D3, D5; spec: "A shipped runtime dependency's security update releases a fix", "A run never takes an override away")
 
-- [ ] 3.1 Write a test first that passes on this branch before any script change: for a set of pull requests that
+- [x] 3.1 Write a test first that passes on this branch before any script change: for a set of pull requests that
       don't qualify (a version update, a `chore(deps-dev):` security update, a security update in website and from
       troupe's `github-actions`), the planned actions and the description written are exactly what the current script
       produces. Keep it as the test that nothing else changes (rule: differential tests for rewrites). Verify it
       passes before 3.2
-- [ ] 3.2 Write the tests for each scenario of the two spec requirements in `scripts/tests/test_dependabot_issues.py`,
+- [x] 3.2 Write the tests for each scenario of the two spec requirements in `scripts/tests/test_dependabot_issues.py`,
       using a troupe fixture whose shape is copied from a real Dependabot pull request (e.g. troupe's eventsourcing
       one, `gh api repos/troupe-run/troupe/pulls/<n>`), not hand-written: an override added with the closing line in
       one write; one put back after a rewrite; one present (with any content) left alone; none added when removed by
       hand from a pull request that no longer qualifies; the override's text is the title with `fix(deps):`. Verify
       they fail before 3.3, for the missing behaviour only
-- [ ] 3.3 In `scripts/dependabot_issues.py`, read `releases`, add the override rule (design D3), and fold `line` into
+- [x] 3.3 In `scripts/dependabot_issues.py`, read `releases`, add the override rule (design D3), and fold `line` into
       one body action per pull request that carries whatever is missing (design D5), with `describe` naming each part
       and the local dry-run printing it. Update the module docstring. Verify 3.1's and 3.2's tests pass, and `uv run
       scripts/check.py` passes (mypy --strict, ruff)
-- [ ] 3.4 Run the script locally (`uv run scripts/dependabot_issues.py`, which only reads) and verify it prints no
+- [x] 3.4 Run the script locally (`uv run scripts/dependabot_issues.py`, which only reads) and verify it prints no
       error, and an override only for an open troupe security update, if one exists. Record the output in the pull
       request
 

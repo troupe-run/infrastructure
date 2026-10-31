@@ -8,7 +8,11 @@ pull requests by dependabot[bot] and the issues the troupe-run-dependabot App op
 request gets an issue (type Task, label `dependencies`), or reuses the open one for the same
 dependency, and its description gets `Closes #<n>`. A security update's issue, told by the
 repository's open Dependabot alerts, gets the release in progress as its milestone; a version
-update's gets none, and no milestone is ever taken off (needed-for-milestones design D1, D3). An
+update's gets none, and no milestone is ever taken off (needed-for-milestones design D1, D3). A
+security update titled `chore(deps):` from an ecosystem whose runtime dependencies ship
+(tofu/dependabot.json's releases) also gets release-please's commit override, reading its title as
+`fix(deps):`, so the release it lands in is a patch; one already there is never changed or removed
+(security-updates-release design D1, D3, D5). An
 issue whose pull request merged, or closed with no successor after an hour, is closed (design D2,
 D3). It never reads a pull request's files: only the API's metadata, and the description to find
 its own line.
@@ -38,6 +42,7 @@ from typing import Any, NamedTuple
 
 ROOT = Path(__file__).resolve().parent.parent
 LABELS = ROOT / "tofu" / "labels" / "dependabot.json"
+POLICY = ROOT / "tofu" / "dependabot.json"
 MILESTONES = ROOT / "tofu" / "milestones.json"
 ORG = "troupe-run"
 DEPENDABOT = "dependabot[bot]"
@@ -84,6 +89,20 @@ ALERT_ECOSYSTEMS = {
     "github_actions": "actions",
 }
 PYPI_SEPARATORS = re.compile(r"[-_.]+")
+# A branch's ecosystem, as Dependabot names it, to the ecosystem tofu/dependabot.json's releases
+# name (security-updates-release design D4). One missing here, in a repository whose dependencies
+# ship, is an error, not a guess.
+SHIPPED_ECOSYSTEMS = {
+    "npm_and_yarn": "npm",
+    "uv": "uv",
+    "github_actions": "github-actions",
+}
+# release-please reads the text between these in a pull request's description in place of its
+# commit's message (design D1). Dependabot titles a runtime dependency's update `chore(deps):`.
+OVERRIDE_BEGIN = "BEGIN_COMMIT_OVERRIDE"
+OVERRIDE_END = "END_COMMIT_OVERRIDE"
+RUNTIME = "chore(deps):"
+FIX = "fix(deps):"
 # The missed-event tracking issue, in infrastructure (design D5). It carries no `dependencies` label
 # and no dependabot-issue marker, so it's never taken for an update's issue.
 TRACKING_REPOSITORY = "infrastructure"
@@ -140,11 +159,14 @@ class Marker:
 
 @dataclass
 class Action:
-    kind: str  # open, relink, reopen, line, close-completed, close-not-planned
+    kind: str  # open, relink, reopen, line, override, close-completed, close-not-planned
     pull: dict[str, Any]
     issue: dict[str, Any] | None = None
     # Whether the pull request is a security update; read only for open and relink.
     security: bool = False
+    # The commit release-please is to read for it, added to the description with open's or
+    # line's write, or override's own (security-updates-release design D5).
+    override: str | None = None
 
 
 @dataclass
@@ -391,8 +413,57 @@ def has_closing_line(pull: Mapping[str, Any], number: int) -> bool:
 
 
 def with_closing_line(pull: Mapping[str, Any], number: int) -> str:
+    return with_additions(pull, number, None)
+
+
+def with_additions(pull: Mapping[str, Any], number: int | None, message: str | None) -> str:
+    """The description with release-please's override for message, then the closing line to
+    issue number, each when given: one write carries both (security-updates-release design D5)."""
     body = str(pull.get("body") or "").rstrip()
-    return f"{body}\n\n{closing_line(number)}" if body else closing_line(number)
+    parts = [body] if body else []
+    if message is not None:
+        parts.append(f"{OVERRIDE_BEGIN}\n{message}\n{OVERRIDE_END}")
+    if number is not None:
+        parts.append(closing_line(number))
+    return "\n\n".join(parts)
+
+
+# --- A shipped runtime dependency's security update (security-updates-release design D1, D3) ---
+
+
+def has_override(pull: Mapping[str, Any]) -> bool:
+    """Whether release-please would read an override from the description: as it does, any
+    `BEGIN_COMMIT_OVERRIDE` counts, whatever follows it, so one a person wrote stands."""
+    return OVERRIDE_BEGIN in str(pull.get("body") or "")
+
+
+def override_message(pull: Mapping[str, Any]) -> str:
+    """The commit release-please reads in place of Dependabot's: the title, as a fix."""
+    title = str(pull.get("title") or "").strip()
+    return FIX + title.removeprefix(RUNTIME)
+
+
+def override_block(pull: Mapping[str, Any]) -> str:
+    return f"{OVERRIDE_BEGIN}\n{override_message(pull)}\n{OVERRIDE_END}"
+
+
+def releases(text: str) -> dict[str, list[str]]:
+    """Each repository's ecosystems whose runtime dependencies ship in a release
+    (tofu/dependabot.json; design D4). No `releases` key means nothing ships; a malformed one is
+    an error, not nothing."""
+    try:
+        policy = json.loads(text)
+    except json.JSONDecodeError:
+        raise StartError("tofu/dependabot.json isn't JSON") from None
+    declared = policy.get("releases", {}) if isinstance(policy, dict) else None
+    if not isinstance(declared, dict) or not all(
+        isinstance(ecosystems, list) and all(isinstance(e, str) for e in ecosystems)
+        for ecosystems in declared.values()
+    ):
+        raise StartError(
+            "tofu/dependabot.json's releases isn't an object of repositories to lists of ecosystems"
+        )
+    return declared
 
 
 # --- Trust (design D6) ---
@@ -436,11 +507,14 @@ def plan(
     linked: Mapping[int, dict[str, Any]],
     now: datetime,
     alerts: Iterable[Mapping[str, Any]] = (),
+    ships: Iterable[str] = (),
 ) -> Plan:
     """What to do in one repository. open_pulls are Dependabot's open pull requests; issues are
     the App's, open and recently closed; linked holds each pull request an open issue names that
-    isn't open; alerts are the repository's open Dependabot alerts."""
+    isn't open; alerts are the repository's open Dependabot alerts; ships are its ecosystems whose
+    runtime dependencies ship in a release (tofu/dependabot.json's releases)."""
     alerts = list(alerts)
+    ships = set(ships)
     result = Plan()
     pulls = sorted((p for p in open_pulls if is_dependabot(p)), key=lambda p: int(p["number"]))
     mine: list[dict[str, Any]] = []
@@ -461,12 +535,47 @@ def plan(
     open_keys = {u.key for u in (read_update(p) for p in pulls) if u.key is not None}
     taken: set[int] = set()
 
+    told: dict[int, bool | None] = {}
+
     def security(pull: dict[str, Any]) -> bool | None:
-        try:
-            return is_security(pull, alerts)
-        except ReadError as error:
-            result.unreadable.append(f"{error}. No issue was opened or relinked for it")
+        number = int(pull["number"])
+        if number not in told:
+            try:
+                told[number] = is_security(pull, alerts)
+            except ReadError as error:
+                result.unreadable.append(f"{error}. No issue was opened or relinked for it")
+                told[number] = None
+        return told[number]
+
+    def due(pull: dict[str, Any]) -> str | None:
+        """The override the pull request is due, if any (design D3). One already there, whatever
+        it says, is never added again or changed (design D5)."""
+        if not ships or has_override(pull):
             return None
+        if not str(pull.get("title") or "").strip().startswith(RUNTIME):
+            return None  # a development dependency, or a title Dependabot didn't write
+        branch = BRANCH.fullmatch(str((pull.get("head") or {}).get("ref") or ""))
+        if branch is None:
+            return None
+        ecosystem = SHIPPED_ECOSYSTEMS.get(branch.group("ecosystem"))
+        if ecosystem is None:
+            result.unreadable.append(
+                f"#{pull['number']}'s ecosystem {branch.group('ecosystem')} has no declared "
+                "ecosystem, so it can't be told whether its dependencies ship. Add it to "
+                "SHIPPED_ECOSYSTEMS in scripts/dependabot_issues.py. No override was added to it"
+            )
+            return None
+        if ecosystem not in ships or not security(pull):
+            return None
+        return override_message(pull)
+
+    def description(pull: dict[str, Any], issue: dict[str, Any]) -> None:
+        """The one write the description needs, if any: its closing line, its override, or both."""
+        message = due(pull)
+        if not has_closing_line(pull, int(issue["number"])):
+            result.actions.append(Action("line", pull, issue, override=message))
+        elif message is not None:
+            result.actions.append(Action("override", pull, issue, override=message))
 
     for pull in pulls:
         number = int(pull["number"])
@@ -490,8 +599,7 @@ def plan(
                 if issue.get("state_reason") != "not_planned":
                     continue
                 result.actions.append(Action("reopen", pull, issue))
-            if not has_closing_line(pull, int(issue["number"])):
-                result.actions.append(Action("line", pull, issue))
+            description(pull, issue)
             continue
         if update.key is not None:
             issue = next(
@@ -510,12 +618,11 @@ def plan(
                     continue
                 taken.add(int(issue["number"]))
                 result.actions.append(Action("relink", pull, issue, fixes))
-                if not has_closing_line(pull, int(issue["number"])):
-                    result.actions.append(Action("line", pull, issue))
+                description(pull, issue)
                 continue
         if (fixes := security(pull)) is None:
             continue
-        result.actions.append(Action("open", pull, None, fixes))
+        result.actions.append(Action("open", pull, None, fixes, due(pull)))
 
     for issue in mine:
         number = int(issue["number"])
@@ -724,8 +831,14 @@ def describe(action: Action) -> str:
     issue = f"#{action.issue['number']}" if action.issue else "a new issue"
     if action.kind in ("open", "relink"):
         kind = "a security update" if action.security else "a version update"
-        return f"{_describe(action, pull, issue)} ({kind})"
-    return _describe(action, pull, issue)
+        return f"{_describe(action, pull, issue)}{_overriding(action)} ({kind})"
+    return f"{_describe(action, pull, issue)}{_overriding(action)}"
+
+
+def _overriding(action: Action) -> str:
+    if action.override is None or action.kind == "override":
+        return ""
+    return f", with release-please's override `{action.override}`"
 
 
 def _describe(action: Action, pull: str, issue: str) -> str:
@@ -735,6 +848,7 @@ def _describe(action: Action, pull: str, issue: str) -> str:
         "relink": f"relink {issue} to {pull}",
         "reopen": f"reopen {issue} for {pull}",
         "line": f"add `Closes {issue}` to {pull}",
+        "override": f"add release-please's override `{action.override}` to {pull}",
         "close-completed": f"close {issue} as completed: {pull} merged",
         "close-not-planned": f"close {issue} as not planned: {pull} closed without merging",
     }[action.kind]
@@ -795,7 +909,7 @@ def act(repo: Repository, action: Action, gh: Gh) -> dict[str, Any] | None:
             gh,
             "PATCH",
             f"{base}/pulls/{number}",
-            {"body": with_closing_line(pull, issue["number"])},
+            {"body": with_additions(pull, issue["number"], action.override)},
         )
         return issue
     if action.issue is None:
@@ -814,9 +928,13 @@ def act(repo: Repository, action: Action, gh: Gh) -> dict[str, Any] | None:
         write(gh, "PATCH", f"{base}/issues/{issue_number}", {"state": "open"})
         comment(gh, base, issue_number, f"#{number} was reopened, so this issue is too.")
         return action.issue
-    elif action.kind == "line":
+    elif action.kind in ("line", "override"):
+        closes = issue_number if action.kind == "line" else None
         write(
-            gh, "PATCH", f"{base}/pulls/{number}", {"body": with_closing_line(pull, issue_number)}
+            gh,
+            "PATCH",
+            f"{base}/pulls/{number}",
+            {"body": with_additions(pull, closes, action.override)},
         )
     elif action.kind == "close-completed":
         comment(gh, base, issue_number, f"#{number} merged.")
@@ -858,11 +976,13 @@ def run(
     env: Mapping[str, str],
     gh: Gh,
     now: datetime | None = None,
+    policy: Path | None = None,
 ) -> int:
     now = now or datetime.now(UTC)
     try:
         names = repositories(labels.read_text(encoding="utf-8"))
         title = release_in_progress(milestones.read_text(encoding="utf-8"))
+        shipped = releases((policy or POLICY).read_text(encoding="utf-8"))
     except (OSError, StartError) as error:
         print(f"dependabot-issues: {error}. Nothing was read or changed.", file=sys.stderr)
         return 2
@@ -873,7 +993,9 @@ def run(
     for name in names:
         try:
             repo = read_repository(name, title, gh, now)
-            decided = plan(repo.open_pulls, repo.issues, repo.linked, now, repo.alerts)
+            decided = plan(
+                repo.open_pulls, repo.issues, repo.linked, now, repo.alerts, shipped.get(name, [])
+            )
             found = misses(name, decided, now)
         except ReadError as error:
             print(
