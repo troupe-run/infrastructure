@@ -68,7 +68,7 @@
 
 ## 5. Documentation and troupe
 
-- [ ] 5.1 In `docs/development-workflow.md`'s `dependabot-issues` paragraph, say that a security update to a runtime
+- [x] 5.1 In `docs/development-workflow.md`'s `dependabot-issues` paragraph, say that a security update to a runtime
       dependency in an ecosystem declared in `tofu/dependabot.json`'s `releases` gets release-please's override, so it
       releases a patch; that the override is never removed by the workflow; and the recovery from design D6 (unless
       1.5 showed it doesn't work). Verify `uv run scripts/check.py` passes (the docs gates)
