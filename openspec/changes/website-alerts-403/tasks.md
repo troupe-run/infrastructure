@@ -2,7 +2,7 @@
 
 ## 1. The token asks for what the App is declared with
 
-- [ ] 1.1 Write the test first, in `scripts/tests/test_dependabot_issues_workflow.py` (design D2, D3; spec: "The
+- [x] 1.1 Write the test first, in `scripts/tests/test_dependabot_issues_workflow.py` (design D2, D3; spec: "The
       workflow's token asks for the App's declared permissions"): read `troupe-run-dependabot`'s entry from
       `oob/app-installations.json`, drop `metadata`, turn each key into its input name (`_` → `-`, prefixed
       `permission-`) with its level, and pass that as the `issues` token's `granted`. Fail, naming the App, if the
@@ -12,12 +12,12 @@
       fail naming that permission; and one that adds a permission to a copy of the declaration fails naming it.
       Verify `uv run pytest scripts/tests/test_dependabot_issues_workflow.py` fails on this branch before 1.2, naming
       `permission-vulnerability-alerts` as declared but not asked for, and for no other reason
-- [ ] 1.2 Add `permission-vulnerability-alerts: read` to the `issues` job's "Mint the troupe-run-dependabot App's
+- [x] 1.2 Add `permission-vulnerability-alerts: read` to the `issues` job's "Mint the troupe-run-dependabot App's
       token" step in `.github/workflows/dependabot-issues.yml` (design D1), and say in the step's comment that the token
       asks for the App's declared permissions, checked against `oob/app-installations.json`. Verify 1.1's tests pass,
       `uv run scripts/check.py` passes, and `git diff .github/workflows/dependabot-issues.yml` adds that one input and
       the comment, and no job permission
-- [ ] 1.3 In `oob/README.md`'s `troupe-run-dependabot` paragraph (line ~238, which lists its permissions), add that the
+- [x] 1.3 In `oob/README.md`'s `troupe-run-dependabot` paragraph (line ~238, which lists its permissions), add that the
       `dependabot-issues` token asks for each of them and `scripts/check.py` holds the two together, so a permission
       added here needs the workflow too. Verify `uv run scripts/check.py` passes (the docs gates) and `git diff
       oob/README.md` is that sentence only

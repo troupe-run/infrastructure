@@ -62,7 +62,10 @@ jobs:
         with:
           python-version: "3.12"
       # The App is installed on exactly the repositories it serves (spec:
-      # dependabot-issue-credentials), so the token covers those and no others.
+      # dependabot-issue-credentials), so the token covers those and no others. Once any permission is
+      # listed the token gets only those, so it asks for every one the App is declared with in
+      # oob/app-installations.json, alerts read included, and the workflow test holds the two together
+      # (#238).
       - name: Mint the troupe-run-dependabot App's token
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -72,6 +75,7 @@ jobs:
           owner: troupe-run
           permission-issues: write
           permission-pull-requests: write
+          permission-vulnerability-alerts: read
       - name: Open and link the issues
         id: issues
         env:

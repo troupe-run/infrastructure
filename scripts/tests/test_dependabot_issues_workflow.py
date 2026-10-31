@@ -5,9 +5,12 @@ design D1, D3, D4, D7).
 
 GitHub evaluates the workflow, so these tests pin what it's given: when it runs, what it checks out,
 what each job's token may do, the environment that holds each key, and the check on the URLs the
-board job is handed."""
+board job is handed. The issues job's token asks for what the App is declared with in
+oob/app-installations.json (website-alerts-403 design D2), so a permission added there needs the
+workflow too."""
 
 import copy
+import json
 import re
 from collections.abc import Callable
 from typing import Any
@@ -17,6 +20,8 @@ import yaml
 from conftest import REPO
 
 WORKFLOW = REPO / ".github" / "workflows" / "dependabot-issues.yml"
+APPS = REPO / "oob" / "app-installations.json"
+APP = "troupe-run-dependabot"
 BOARD_IF = (
     "!cancelled() && needs.issues.outputs.issue-urls != '' && "
     "needs.issues.outputs.issue-urls != '[]'"
@@ -45,6 +50,27 @@ def workflow() -> dict[str, Any]:
     return loaded
 
 
+def apps() -> list[dict[str, Any]]:
+    loaded = json.loads(APPS.read_text(encoding="utf-8"))
+    assert isinstance(loaded, list)
+    return loaded
+
+
+def declared_inputs(declared: list[dict[str, Any]], slug: str) -> dict[str, str] | None:
+    """The token inputs for an App's declared repository permissions, but metadata, which every
+    installation token has and the action has no input for. None if the App declares none."""
+    entries = [app for app in declared if app.get("app_slug") == slug]
+    permissions = entries[0].get("permissions") if len(entries) == 1 else None
+    if not isinstance(permissions, dict):
+        return None
+    inputs = {
+        "permission-" + key.replace("_", "-"): level
+        for key, level in permissions.items()
+        if key != "metadata"
+    }
+    return inputs or None
+
+
 def condition(job: dict[str, Any]) -> str:
     text = str(job.get("if", "")).strip()
     if text.startswith("${{") and text.endswith("}}"):
@@ -70,8 +96,12 @@ def token_problems(
     inputs = tokens[0].get("with") or {}
     found = []
     asked = {k: v for k, v in inputs.items() if k.startswith("permission-")}
-    if asked != granted:
-        found.append(f"{name}'s token asks for {asked}")
+    for wanted, level in granted.items():
+        if asked.get(wanted) != level:
+            found.append(f"{name}'s token doesn't ask for {wanted}: {level}, which it's granted")
+    for wanted, level in asked.items():
+        if granted.get(wanted) != level:
+            found.append(f"{name}'s token asks for {wanted}: {level}, which it isn't granted")
     if inputs.get("private-key") != f"${{{{ secrets.{key} }}}}":
         found.append(f"{name}'s token is minted from {inputs.get('private-key')!r}")
     if inputs.get("client-id") != f"${{{{ vars.{client} }}}}":
@@ -94,7 +124,7 @@ DAILY = re.compile(r"\d{1,2} \d{1,2} \* \* \*")
 COMMAND = "uv run --no-project scripts/dependabot_issues.py"
 
 
-def problems(w: dict[str, Any]) -> list[str]:
+def problems(w: dict[str, Any], declared: list[dict[str, Any]] | None = None) -> list[str]:
     found = []
     on = w.get("on") or {}
     if set(on) != TRIGGERS:
@@ -134,13 +164,17 @@ def problems(w: dict[str, Any]) -> list[str]:
         found.append(f"issues' environment is {issues.get('environment')!r}")
     if issues.get("permissions") != {"contents": "read"}:
         found.append(f"issues' GITHUB_TOKEN permissions are {issues.get('permissions')!r}")
-    found += token_problems(
-        issues,
-        "issues",
-        "DEPENDABOT_APP_PRIVATE_KEY",
-        "DEPENDABOT_APP_CLIENT_ID",
-        {"permission-issues": "write", "permission-pull-requests": "write"},
-    )
+    granted = declared_inputs(apps() if declared is None else declared, APP)
+    if granted is None:
+        found.append(f"{APP} isn't declared once with permissions in oob/app-installations.json")
+    else:
+        found += token_problems(
+            issues,
+            "issues",
+            "DEPENDABOT_APP_PRIVATE_KEY",
+            "DEPENDABOT_APP_CLIENT_ID",
+            granted,
+        )
     runs = [s for s in issues.get("steps", []) if "dependabot_issues.py" in str(s.get("run"))]
     if len(runs) != 1:
         found.append("issues doesn't run scripts/dependabot_issues.py exactly once")
@@ -264,7 +298,19 @@ Change = Callable[[dict[str, Any]], object]
         ),
         (
             lambda w: token(w["jobs"], "issues").update({"permission-contents": "write"}),
-            "issues's token asks for",
+            "issues's token asks for permission-contents: write, which it isn't granted",
+        ),
+        (
+            lambda w: token(w["jobs"], "issues").update({"permission-contents": "read"}),
+            "issues's token asks for permission-contents: read, which it isn't granted",
+        ),
+        (
+            lambda w: token(w["jobs"], "issues").pop("permission-vulnerability-alerts"),
+            "issues's token doesn't ask for permission-vulnerability-alerts: read",
+        ),
+        (
+            lambda w: token(w["jobs"], "issues").update({"permission-issues": "read"}),
+            "issues's token doesn't ask for permission-issues: write",
         ),
         (
             lambda w: token(w["jobs"], "issues").update({"repositories": "website"}),
@@ -314,3 +360,39 @@ def test_each_departure_is_named(change: Change, named: str) -> None:
     w = copy.deepcopy(workflow())
     change(w)
     assert any(named in problem for problem in problems(w)), problems(w)
+
+
+def dependabot_app(declared: list[dict[str, Any]]) -> dict[str, Any]:
+    return next(app for app in declared if app["app_slug"] == APP)
+
+
+DeclarationChange = Callable[[list[dict[str, Any]]], object]
+
+
+@pytest.mark.parametrize(
+    ("change", "named"),
+    [
+        (
+            lambda d: dependabot_app(d)["permissions"].update({"actions": "read"}),
+            "issues's token doesn't ask for permission-actions: read, which it's granted",
+        ),
+        (
+            lambda d: dependabot_app(d)["permissions"].update({"vulnerability_alerts": "write"}),
+            "issues's token doesn't ask for permission-vulnerability-alerts: write",
+        ),
+        (lambda d: d.remove(dependabot_app(d)), f"{APP} isn't declared once with permissions"),
+        (
+            lambda d: dependabot_app(d).update({"permissions": {"metadata": "read"}}),
+            f"{APP} isn't declared once with permissions",
+        ),
+        (lambda d: d.append(copy.deepcopy(dependabot_app(d))), "isn't declared once"),
+    ],
+)
+def test_a_declaration_the_token_doesnt_match_is_named(
+    change: DeclarationChange, named: str
+) -> None:
+    declared = copy.deepcopy(apps())
+    change(declared)
+    assert any(named in problem for problem in problems(workflow(), declared)), problems(
+        workflow(), declared
+    )

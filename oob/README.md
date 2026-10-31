@@ -238,7 +238,9 @@ infrastructure. The board card is added with the board App's token, in the `boar
 - repository permissions "Issues: read and write", "Pull requests: read and write" and "Dependabot alerts: read",
   and nothing else: no organisation or account permissions. GitHub adds "Metadata: read". Setting an issue's type
   needs nothing more. The alerts tell a security update from a version update, since only a security update's issue
-  gets a milestone (added 2026-10-30, needed-for-milestones design D2);
+  gets a milestone (added 2026-10-30, needed-for-milestones design D2). The `dependabot-issues` workflow's token asks
+  for each of these by name, and `scripts/check.py` holds it to `app-installations.json`, so a permission added here
+  needs the workflow too (#238);
 - install it with "Only select repositories" and select `troupe`, `infrastructure` and `website`. The run's token
   names no repositories, so it covers exactly these.
 
