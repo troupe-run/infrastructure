@@ -61,7 +61,7 @@
 
 ## 4. Misses (design D6; spec: "A missed event is reported")
 
-- [ ] 4.1 Write the tests first: a troupe security update rebased three hours ago with its line but no override is a
+- [x] 4.1 Write the tests first: a troupe security update rebased three hours ago with its line but no override is a
       miss, is fixed and fails the run; one rewritten ten minutes ago is fixed and isn't a miss; a pull request not due
       an override is never a miss for lacking one. Then widen `misses` to count a missing due override. Verify the
       tests fail before the change and pass after, and `uv run scripts/check.py` passes

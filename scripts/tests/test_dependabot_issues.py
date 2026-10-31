@@ -1288,3 +1288,42 @@ def test_a_policy_with_no_releases_ships_nothing(
                                 "alerts": [EVENTSOURCING_ALERT]}, "website": {}})  # fmt: skip
     assert di.run(*declarations, ACTIONS, gh, NOW, policy) == 0
     assert gh.writes == []
+
+
+# A missing override is a miss like a missing line (spec: dependency-updates, "A missed event is
+# reported"; security-updates-release design D6)
+
+
+def test_an_override_missing_for_over_an_hour_is_a_miss() -> None:
+    p = stale({**EVENTSOURCING}, timedelta(hours=3))
+    decided = di.plan([lined(p, 100)], [app_issue(p)], {}, NOW, [EVENTSOURCING_ALERT], ["uv"])
+    assert kinds(decided) == [("override", 174, 100)]
+    assert di.misses("troupe", decided, NOW) == ["troupe-run/troupe#174"]
+
+
+def test_an_override_missing_within_the_hour_is_fixed_but_not_a_miss() -> None:
+    p = stale({**EVENTSOURCING}, timedelta(minutes=10))
+    decided = di.plan([lined(p, 100)], [app_issue(p)], {}, NOW, [EVENTSOURCING_ALERT], ["uv"])
+    assert kinds(decided) == [("override", 174, 100)]
+    assert di.misses("troupe", decided, NOW) == []
+
+
+def test_a_pull_request_not_due_an_override_is_never_a_miss_for_lacking_one() -> None:
+    p = stale({**EVENTSOURCING}, timedelta(hours=3))
+    decided = di.plan([lined(p, 100)], [app_issue(p)], {}, NOW, [], ["uv"])
+    assert kinds(decided) == []
+    assert di.misses("troupe", decided, NOW) == []
+
+
+def test_any_run_puts_a_missed_override_back_reports_it_and_fails(
+    declarations: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    p = stale({**EVENTSOURCING}, timedelta(hours=3))
+    gh = FakeGitHub({"troupe": {"pulls": [lined(p, 100)], "issues": [app_issue(p)],
+                                "alerts": [EVENTSOURCING_ALERT]}, "website": {},
+                     "infrastructure": {}})  # fmt: skip
+    assert di.run(*declarations, RUN_ENV, gh, NOW) == 1
+    assert body_writes(gh) == {
+        "repos/troupe-run/troupe/pulls/174": f"{lined(p, 100)['body']}\n\n{OVERRIDE}"
+    }
+    assert "missed events, handled now: troupe-run/troupe#174" in capsys.readouterr().err
