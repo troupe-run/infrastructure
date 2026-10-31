@@ -95,6 +95,43 @@ def test_every_declared_ecosystem_has_a_directory() -> None:
     assert dependabot_config.undirected_ecosystems(policy, labels) == []
 
 
+# What ships in a release (security-updates-release design D4)
+
+
+def test_a_release_naming_an_ecosystem_the_repository_lacks_is_named() -> None:
+    policy = copy.deepcopy(POLICY) | {"releases": {"troupe": ["uv", "npm"]}}
+    assert dependabot_config.unknown_releases(policy, LABELS) == [
+        "troupe: ecosystem 'npm' in tofu/dependabot.json's releases isn't one of its Dependabot "
+        "ecosystems in tofu/labels/dependabot.json"
+    ]
+
+
+def test_a_release_naming_an_undeclared_repository_is_named() -> None:
+    policy = copy.deepcopy(POLICY) | {"releases": {"troupe-docs": ["uv"]}}
+    assert dependabot_config.unknown_releases(policy, LABELS) == [
+        "troupe-docs: in tofu/dependabot.json's releases, but not a repository in "
+        "tofu/labels/dependabot.json"
+    ]
+
+
+def test_a_policy_with_no_releases_has_none_to_check() -> None:
+    assert dependabot_config.unknown_releases(POLICY, LABELS) == []
+
+
+def test_releases_change_no_generated_configuration() -> None:
+    policy = copy.deepcopy(POLICY) | {"releases": {"troupe": ["uv"]}}
+    assert dependabot_config.configs(policy, LABELS, GUARD_FILES, TARGETS) == generate()
+
+
+@pytest.mark.dependabot
+@pytest.mark.labels
+def test_only_troupes_uv_dependencies_ship_and_the_declaration_is_valid() -> None:
+    policy = json.loads(dependabot_config.POLICY.read_text(encoding="utf-8"))
+    labels = json.loads(dependabot_config.LABELS.read_text(encoding="utf-8"))
+    assert policy["releases"] == {"troupe": ["uv"]}
+    assert dependabot_config.unknown_releases(policy, labels) == []
+
+
 # Schedule and cooldown
 
 

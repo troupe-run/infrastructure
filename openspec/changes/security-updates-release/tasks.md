@@ -2,11 +2,11 @@
 
 ## 1. Probe: release-please honours an override on a rebase merge through a merge queue (design D1, D2)
 
-- [ ] 1.1 Read what the probe copies: troupe's `main` ruleset's merge-queue settings (`gh api
+- [x] 1.1 Read what the probe copies: troupe's `main` ruleset's merge-queue settings (`gh api
       repos/troupe-run/troupe/rulesets` and the ruleset by id), and the exact `release-please` version
       release-please-action v5.0.0 bundles (its `package-lock.json` at the tag). Note both on #240. Verify the note
       names the merge method, the queue's settings and a `17.x.y` version
-- [ ] 1.2 Create `troupe-run/infra-probe-release-override` (`gh repo create troupe-run/infra-probe-release-override
+- [x] 1.2 Create `troupe-run/infra-probe-release-override` (`gh repo create troupe-run/infra-probe-release-override
       --public --add-readme`), and push the layout from design D2: `packages/a` and `packages/b`, each with a
       `pyproject.toml`, a root `uv.lock` placeholder, `release-please-config.json` (linked group,
       `bump-minor-pre-major`, `bootstrap-sha` at this commit), `.release-please-manifest.json` at `0.1.0`, and a
@@ -14,27 +14,27 @@
       `permissions: {contents: read, pull-requests: read}`. Then add a ruleset requiring a pull request and a merge
       queue with 1.1's settings. Verify `gh api repos/troupe-run/infra-probe-release-override/rules/branches/main`
       lists `pull_request` and `merge_queue`, and a dispatched dry run before any pull request proposes no release
-- [ ] 1.3 Open pull requests A, B and C from design D2, each one commit, with A's and C's descriptions holding the
+- [x] 1.3 Open pull requests A, B and C from design D2, each one commit, with A's and C's descriptions holding the
       override block, and merge each through the queue (`gh pr merge <n> --rebase -R
       troupe-run/infra-probe-release-override`). Verify `gh pr view <n> --json mergeCommit,commits` shows each merge
       commit equals the single commit now on `main` (`git log` of the probe), and record whether it does
-- [ ] 1.4 Dispatch the dry run and save its log. Verify it passes design D2's test: version `0.1.1` for the group, A
+- [x] 1.4 Dispatch the dry run and save its log. Verify it passes design D2's test: version `0.1.1` for the group, A
       under bug fixes, and neither B nor C listed. If it doesn't, stop: post the log on #240, and ask the owner with
       AskUserQuestion which of design D1's alternatives to take, before any task in groups 2 to 5
-- [ ] 1.5 Case D: open and merge a fourth pull request like A without an override, run the dry run, add the override
+- [x] 1.5 Case D: open and merge a fourth pull request like A without an override, run the dry run, add the override
       to its description after the merge, and run it again. Verify D is missing from the first output and listed in
       the second. If it isn't listed, take the recovery out of 5.1 and say so on #240
-- [ ] 1.6 Post the probe's findings on #240 (setup, each pull request's merge commit, the dry-run excerpts for 1.4 and
+- [x] 1.6 Post the probe's findings on #240 (setup, each pull request's merge commit, the dry-run excerpts for 1.4 and
       1.5), then delete the probe (`gh repo delete troupe-run/infra-probe-release-override --yes`). Verify `gh repo
       view troupe-run/infra-probe-release-override` fails, and the comment is on #240
 
 ## 2. The declaration of what ships (design D4; spec: "The ecosystems whose runtime dependencies ship are declared once")
 
-- [ ] 2.1 Write the tests first, in `scripts/tests/test_dependabot_config.py`: the declaration names troupe's `uv` and
+- [x] 2.1 Write the tests first, in `scripts/tests/test_dependabot_config.py`: the declaration names troupe's `uv` and
       nothing else; a copy naming `npm` for troupe fails the check, naming troupe and `npm`; a copy naming an
       undeclared repository fails naming it; and every generated `dependabot.yml` is byte-for-byte what `main`
       generates (the files in `tofu/dependabot/`). Verify the new tests fail before 2.2, for the missing key only
-- [ ] 2.2 Add `"releases": {"troupe": ["uv"]}` to `tofu/dependabot.json` and its validation to
+- [x] 2.2 Add `"releases": {"troupe": ["uv"]}` to `tofu/dependabot.json` and its validation to
       `scripts/dependabot_config.py`, next to the `directories` check, so `scripts/check.py` runs it. Verify 2.1's
       tests pass, `uv run scripts/check.py` passes, and `git diff tofu/dependabot/` is empty
 
