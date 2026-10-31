@@ -19,10 +19,10 @@ its own line.
 
 Dependabot's own runs start it, so a pull request is handled soon after Dependabot changes it
 (spec: dependency-updates; #195; dependabot-issues-on-events design D1, D2). A daily schedule is
-the backstop. Every run, whatever started it, counts each pull request still missing its issue or
-closing line over an hour after it was last updated: the run Dependabot's change started should
-have handled it, so an event was missed. It reports the misses in one tracking issue in
-infrastructure, after every other write (design D4, D5).
+the backstop. Every run, whatever started it, counts each pull request still missing its issue,
+closing line or due override over an hour after it was last updated: the run Dependabot's change
+started should have handled it, so an event was missed. It reports the misses in one tracking
+issue in infrastructure, after every other write (design D4, D5).
 
 It exits 1 when it couldn't handle a repository, after handling the others, or when it found a
 miss, and 2 when it couldn't start at all. Outside GitHub Actions it only reads, and prints
@@ -52,7 +52,7 @@ ISSUE_TYPE = "Task"
 # How long a pull request closed without merging waits for a successor before its issue closes.
 GRACE = timedelta(hours=1)
 # How soon an event run handles a pull request Dependabot changed (spec: dependency-updates). A run
-# counts a pull request still missing its issue or line after this as a missed event.
+# counts a pull request still missing its issue, line or due override after this as a missed event.
 BOUND = timedelta(hours=1)
 # Closed issues are read back this far, so a reopened pull request finds its issue again.
 CLOSED_LOOKBACK = timedelta(days=30)
@@ -109,9 +109,10 @@ TRACKING_REPOSITORY = "infrastructure"
 TRACKING_TITLE = "Dependabot events missed"
 TRACKING_LABEL = "bug"
 MISSED = re.compile(r"<!-- dependabot-missed: (\[.*?\]) -->")
-# The actions an event run makes for a pull request without its issue or closing line. Closing
-# and reopening issues are due only by time or a person's action, so no event could have made them.
-EVENT_WORK = ("open", "relink", "line")
+# The actions an event run makes for a pull request without its issue, closing line or due override
+# (security-updates-release design D6). Closing and reopening issues are due only by time or a
+# person's action, so no event could have made them.
+EVENT_WORK = ("open", "relink", "line", "override")
 
 
 class StartError(Exception):
