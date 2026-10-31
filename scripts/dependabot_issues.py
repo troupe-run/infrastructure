@@ -102,6 +102,8 @@ SHIPPED_ECOSYSTEMS = {
 OVERRIDE_BEGIN = "BEGIN_COMMIT_OVERRIDE"
 OVERRIDE_END = "END_COMMIT_OVERRIDE"
 RUNTIME = "chore(deps):"
+# What a pull request whose security update can't be told is left without, by who was asking.
+OPENED = "No issue was opened or relinked for it"
 FIX = "fix(deps):"
 # The missed-event tracking issue, in infrastructure (design D5). It carries no `dependencies` label
 # and no dependabot-issue marker, so it's never taken for an update's issue.
@@ -538,13 +540,15 @@ def plan(
 
     told: dict[int, bool | None] = {}
 
-    def security(pull: dict[str, Any]) -> bool | None:
+    def security(pull: dict[str, Any], skipped: str) -> bool | None:
+        """Told once per pull request: skipped says what its caller leaves undone when it can't
+        be, and an issue left unopened leaves its override unadded too."""
         number = int(pull["number"])
         if number not in told:
             try:
                 told[number] = is_security(pull, alerts)
             except ReadError as error:
-                result.unreadable.append(f"{error}. No issue was opened or relinked for it")
+                result.unreadable.append(f"{error}. {skipped}")
                 told[number] = None
         return told[number]
 
@@ -566,7 +570,7 @@ def plan(
                 "SHIPPED_ECOSYSTEMS in scripts/dependabot_issues.py. No override was added to it"
             )
             return None
-        if ecosystem not in ships or not security(pull):
+        if ecosystem not in ships or not security(pull, "No override was added to it"):
             return None
         return override_message(pull)
 
@@ -615,13 +619,13 @@ def plan(
                 None,
             )
             if issue is not None:
-                if (fixes := security(pull)) is None:
+                if (fixes := security(pull, OPENED)) is None:
                     continue
                 taken.add(int(issue["number"]))
                 result.actions.append(Action("relink", pull, issue, fixes))
                 description(pull, issue)
                 continue
-        if (fixes := security(pull)) is None:
+        if (fixes := security(pull, OPENED)) is None:
             continue
         result.actions.append(Action("open", pull, None, fixes, due(pull)))
 

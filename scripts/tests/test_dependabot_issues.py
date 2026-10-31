@@ -1223,14 +1223,52 @@ def test_an_override_stays_when_the_alert_is_dismissed(declarations: tuple[Path,
     assert gh.writes == []
 
 
-def test_an_override_removed_from_a_version_update_isnt_put_back(
-    declarations: tuple[Path, Path],
-) -> None:
+def test_a_version_update_gets_no_override(declarations: tuple[Path, Path]) -> None:
     p = troupe_pull()
     gh = FakeGitHub({"troupe": {"pulls": [lined(p, 100)], "issues": [app_issue(p)]},
                      "website": {}})  # fmt: skip
     assert di.run(*declarations, ACTIONS, gh, NOW) == 0
     assert gh.writes == []
+
+
+def test_an_override_removed_after_its_alert_was_dismissed_isnt_put_back(
+    declarations: tuple[Path, Path],
+) -> None:
+    # The owner's way to stop one releasing (docs/development-workflow.md): dismiss the alert,
+    # then delete the block the run added.
+    p = troupe_pull()
+    held = f"{lined(p, 100)['body']}\n\n{OVERRIDE}"
+    removed = held.replace(f"\n\n{OVERRIDE}", "")
+    assert removed != held
+    assert di.OVERRIDE_BEGIN not in removed
+    dismissed = alert("pip", "eventsourcing", "9.5.6", state="dismissed")
+    gh = FakeGitHub({"troupe": {"pulls": [{**p, "body": removed}], "issues": [app_issue(p)],
+                                "alerts": [dismissed]}, "website": {}})  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 0
+    assert gh.writes == []
+
+
+def test_an_override_removed_while_its_alert_is_open_is_put_back(
+    declarations: tuple[Path, Path],
+) -> None:
+    p = troupe_pull()
+    removed = lined(p, 100)["body"]
+    gh = FakeGitHub({"troupe": {"pulls": [{**p, "body": removed}], "issues": [app_issue(p)],
+                                "alerts": [EVENTSOURCING_ALERT]}, "website": {}})  # fmt: skip
+    assert di.run(*declarations, ACTIONS, gh, NOW) == 0
+    assert body_writes(gh) == {"repos/troupe-run/troupe/pulls/174": f"{removed}\n\n{OVERRIDE}"}
+
+
+def test_an_alert_that_cant_be_matched_names_the_override_it_skipped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A pull request with its issue and line: only the override needed the alerts.
+    p = troupe_pull()
+    monkeypatch.delitem(di.ALERT_ECOSYSTEMS, "uv")
+    result = di.plan([lined(p, 100)], [app_issue(p)], {}, NOW, [EVENTSOURCING_ALERT], ["uv"])
+    assert result.actions == []
+    (problem,) = result.unreadable
+    assert problem.endswith("No override was added to it")
 
 
 def test_a_security_update_in_an_ecosystem_that_doesnt_ship_gets_no_override() -> None:
