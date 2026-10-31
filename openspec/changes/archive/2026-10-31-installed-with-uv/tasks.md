@@ -8,8 +8,11 @@
   uv from a tag". Verify `git diff` changes only that line and `uv run scripts/check.py` passes.
 - [x] 1.3 Run a local plan. Verify it shows four updates in place, milestone 0.1.0 in each of troupe, infrastructure,
   website and `.github`, each changing only `description`, and nothing created, destroyed or replaced.
-- [ ] 1.4 Open a draft pull request with `Closes #236`, using `--body-file`. Verify the CI plan comment, once the
+- [x] 1.4 Open a draft pull request with `Closes #236`, using `--body-file`. Verify the CI plan comment, once the
   pull request is ready and its plan has run, shows the same four updates as 1.3.
+  Done: #237. Claude's review of 68f6b01 had no findings, and `gh pr ready 237` started CI and `plan (pull
+  request)`. The owner approved run 41193824325; its plan of 68f6b01 is "0 to add, 4 to change, 0 to destroy":
+  0.1.0's description in `.github`, infrastructure, troupe and website, as 1.3 showed.
 
 ## Workflow follow-up
 
