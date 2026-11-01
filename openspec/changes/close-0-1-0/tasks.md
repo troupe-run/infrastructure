@@ -11,12 +11,15 @@
   line and `uv run scripts/check.py` passes.
   Added: `test_today_s_release_in_progress_is_0_1_0` pins today's release in progress, which this moves to the
   milestone titled 0.2.0, so it's renamed `..._is_0_2_0` and asserts `0.2.0`.
-- [ ] 1.4 Run a local plan. Verify it shows four updates in place, milestone 0.1.0 in each of troupe, infrastructure,
+- [x] 1.4 Run a local plan. Verify it shows four updates in place, milestone 0.1.0 in each of troupe, infrastructure,
   website and `.github`, each changing only `state` to `closed`, and nothing created, destroyed or replaced.
-- [ ] 1.5 Run `scripts/milestone_review.py` locally the way the `tofu` workflow does for a plan that closes a
+- [x] 1.5 Run `scripts/milestone_review.py` locally the way the `tofu` workflow does for a plan that closes a
   milestone. Verify it says 0.1.0 closes, lists the open issues with no milestone for troupe, infrastructure and
   website with their count, and leaves `.github` out saying why. Compare its count with
   `gh issue list -R troupe-run/<repo> --state open --search no:milestone`.
+  Done: the local plan of d7bac5b is "0 to add, 4 to change, 0 to destroy", 0.1.0's `state` open -> closed in
+  `.github`, infrastructure, troupe and website. The list has 17 issues (troupe 7, infrastructure 5, website 5,
+  `.github` left out as its issues are off), the same numbers the query gives. #244 is one of them.
 - [ ] 1.6 Open a draft pull request with `Closes #244`, using `--body-file`. Verify the CI plan comment, once the pull
   request is ready and its plan has run, shows the same four updates as 1.4 and the same list as 1.5 (as it is then).
 

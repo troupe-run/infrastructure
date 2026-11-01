@@ -17,7 +17,7 @@ lists every open issue with no milestone, and each of those gets an outcome so n
   website and `.github`), and nothing else. Its issues keep it (spec: milestones, "A release ships").
 - **The plan lists the open issues with no milestone.** The pull request's plan comment and the plan of `main` list
   them for troupe, infrastructure and website, and leave `.github` out because its issues are off (spec: milestones,
-  "A plan that closes a milestone lists the open issues with no milestone"). On 2026-11-01 there are 8 in troupe, 5 in
+  "A plan that closes a milestone lists the open issues with no milestone"). On 2026-11-01 there are 7 in troupe, 5 in
   infrastructure and 5 in website; the plan's list is the one that counts.
 - **The owner gives each listed issue an outcome**, before the merge: into a milestone because it's now needed,
   labelled `parked` with a reason to come back, or closed as not planned. The outcomes are recorded on #244. Issues
