@@ -46,11 +46,13 @@
 
 ## 3. Required checks and delivery (design D6)
 
-- [ ] 3.1 Add `claude review completed` (app `github-actions`) to troupe, infrastructure and website in
+- [x] 3.1 Add `claude review completed` (app `github-actions`) to troupe, infrastructure and website in
   `tofu/required-checks.json`, and to the required-checks tests' expected lists; verify `uv run scripts/check.py`
   passes and the pull request's `plan (pull request)` (the owner's choice over a local plan, whose 1Password approval
   timed out) shows the three rulesets, the two deliveries of `claude-review.yml` and the contributing guide's update in
-  `.github`, and nothing else
+  `.github`, and nothing else. Done: the plan for fff92aa (run 41263236059) is 0 to add, 6 to change, 0 to
+  destroy: the three `protect main` rulesets each add `claude review completed` (integration 15368), the two
+  deliveries of `claude-review.yml`, and `CONTRIBUTING.md` in `.github`
 - [x] 3.2 Run website's `npx vitest run tests/unit/workflow-node-version.test.ts` and troupe's `uv run scripts/check.py`
   with the new `claude-review.yml` in place in scratch clones, as the file's header asks; verify both pass
 

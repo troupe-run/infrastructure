@@ -154,6 +154,21 @@ The required names SHALL be declared in one place.
 - **WHEN** any check leg on a troupe pull request's latest commit has failed
 - **THEN** its `check` fails, and GitHub refuses to merge it, naming `check`
 
+### Requirement: Each repository receiving the review requires that it completed
+troupe, infrastructure and website SHALL each require `claude review completed`, the review workflow's check that the
+review of a pull request's head completed (spec: pr-review), and none of the review workflow's other jobs. It SHALL be
+declared with the other required checks.
+
+#### Scenario: A pull request whose last review didn't complete
+- **WHEN** a pull request into troupe, infrastructure or website has passed every other required check, but the last
+  review of its head was cancelled
+- **THEN** GitHub refuses to merge it, naming `claude review completed`
+
+#### Scenario: The declared names match the delivered review workflow
+- **WHEN** this repository's tests run
+- **THEN** they fail if a repository receiving `claude-review.yml` doesn't require `claude review completed`, or any
+  repository requires another of its jobs
+
 ### Requirement: Only the App changes .github's main
 In `troupe-run/.github`, every change to `main` SHALL be refused unless the infrastructure App makes it. That
 includes pushes, merges of pull requests, force-pushes and deleting the branch, by anyone, org owners included.
