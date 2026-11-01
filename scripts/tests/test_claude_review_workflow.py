@@ -1,12 +1,12 @@
 """claude-review.yml reviews each member's pull request and can't change the repository (spec:
 pr-review; claude-pr-review design D1 to D4, D7, D8; review-denials-and-guide design D1 to D4;
-review-findings-by-severity design D1 to D4).
+review-findings-by-severity design D1 to D4; review-completed-check design D2 to D5).
 
 GitHub evaluates the workflow, so these tests pin what it's given: when it runs and what it
 skips, what its token may do, which credentials reach the action, which tools Claude has, what
-it checks out, and its three steps of its own: one reads the review conversations before Claude
-starts, one resolves and re-tiers what Claude names, and one names the tool calls Claude was
-refused."""
+it checks out, and its four steps of its own: one reads the review conversations before Claude
+starts, one resolves and re-tiers what Claude names, one names the tool calls Claude was refused,
+and one, the required check, says whether the review of the head completed."""
 
 import ast
 import copy
@@ -41,6 +41,9 @@ COMMENT_EVENTS = ["created"]
 TRIGGERS = {
     "pull_request": {"types": EVENTS},
     "pull_request_review_comment": {"types": COMMENT_EVENTS},
+    # Only so the required check reports on a merge queue's commit, skipped (review-completed-check
+    # design D5): every job's `if:` is false there.
+    "merge_group": None,
 }
 # The run's own token only checks out the code (design D1). No id-token: without it the action can't
 # swap OIDC for a Claude App token that writes contents.
@@ -186,6 +189,28 @@ GATE_TOKEN_INPUTS = {**TOKEN_INPUTS, "permission-pull-requests": "read"}
 REVIEW_NEEDS = "gate"
 REVIEW_IF = "needs.gate.outputs.review == 'true'"
 OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME}
+# The required check that the review of the head completed (review-completed-check design D2 to
+# D5): after every other job, whatever became of them, on pull request events only, since GitHub
+# ignores a comment's run for a pull request (Probe results). No token, no secret, no checkout,
+# and outside the concurrency group, so a newer review can't cancel it.
+COMPLETED_NAME = "claude review completed"
+COMPLETED_NEEDS = ["gate", "review", "resolve"]
+COMPLETED_IF = "always() && github.event_name == 'pull_request'"
+COMPLETED_STEP_NAME = "Did the review of this head complete?"
+COMPLETED_STEP = {
+    "shell": "python3 {0}",
+    "env": {
+        "REPOSITORY": "${{ github.repository }}",
+        "RUN_ID": "${{ github.run_id }}",
+        "AUTHOR_TYPE": "${{ github.event.pull_request.user.type }}",
+        "HEAD_REPOSITORY": "${{ github.event.pull_request.head.repo.full_name }}",
+        "GATE": "${{ needs.gate.result }}",
+        "WANTS_REVIEW": "${{ needs.gate.outputs.review }}",
+        "REVIEW": "${{ needs.review.result }}",
+        "RESOLVE": "${{ needs.resolve.result }}",
+    },
+}
+COMPLETED_SHA256 = "bbb2f7677c73563fe54fb2a5bebbad3713ad6b0cd020f11a7851102ac0fbf424"
 # What Claude returns, and all the resolving step reads from it (design D4).
 SCHEMA = {
     "type": "object",
@@ -365,14 +390,55 @@ def gate_job_problems(job: dict[str, Any]) -> list[str]:
     return found
 
 
+def completed_job_problems(job: dict[str, Any]) -> list[str]:
+    """The required check: its name, after every job whatever their result, on pull request events
+    only, no permissions, no concurrency group, and its one step (review-completed-check design
+    D2 to D4)."""
+    found = []
+    if job.get("name") != COMPLETED_NAME:
+        found.append(
+            f"the check's job is named {job.get('name')!r}, not {COMPLETED_NAME!r}, the name "
+            "tofu/required-checks.json requires"
+        )
+    if job.get("needs") != COMPLETED_NEEDS:
+        found.append(f"completed needs {job.get('needs')!r}, not {COMPLETED_NEEDS!r}")
+    if job.get("if") != COMPLETED_IF:
+        found.append(
+            f"completed runs when {job.get('if')!r}, not {COMPLETED_IF!r}: after a cancelled "
+            "review too, and never for a comment's run or a merge group"
+        )
+    if job.get("permissions") != {}:
+        found.append(
+            f"completed's GITHUB_TOKEN permissions are {job.get('permissions')!r}, not none"
+        )
+    if "concurrency" in job:
+        found.append("completed is in a concurrency group, so a newer review could cancel it")
+    if "environment" in job:
+        found.append(f"completed runs in environment {job['environment']!r}; it needs none")
+    if not isinstance(job.get("timeout-minutes"), int):
+        found.append("completed has no timeout-minutes")
+    steps = job.get("steps") or []
+    if [s.get("name") for s in steps] != [COMPLETED_STEP_NAME] or "uses" in steps[0]:
+        return [*found, f"completed's steps aren't the one step {COMPLETED_STEP_NAME!r}"]
+    found += own_step_problems(
+        steps[0], COMPLETED_STEP, COMPLETED_SHA256, repr(COMPLETED_STEP_NAME)
+    )
+    return found
+
+
 def problems(workflow: dict[str, Any]) -> list[str]:
     found = []
     on = workflow.get("on") or {}
     if set(on) != set(TRIGGERS):
         found.append(
-            f"it runs on {sorted(on)}, not on pull_request and pull_request_review_comment only"
+            f"it runs on {sorted(on)}, not on pull_request, pull_request_review_comment and "
+            "merge_group only"
         )
     for event, wanted in TRIGGERS.items():
+        if wanted is None:
+            if on.get(event) is not None:
+                found.append(f"it runs on {event} {on.get(event)!r}, not every {event}")
+            continue
         types = (on.get(event) or {}).get("types")
         if types != wanted["types"]:
             found.append(f"it runs on {event} {types!r}, not {wanted['types']!r}")
@@ -382,11 +448,12 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         )
 
     jobs = workflow.get("jobs") or {}
-    if set(jobs) != {"gate", "review", "resolve"}:
-        return [*found, f"its jobs are {sorted(jobs)}, not gate, review and resolve"]
+    if set(jobs) != {"gate", "review", "resolve", "completed"}:
+        return [*found, f"its jobs are {sorted(jobs)}, not gate, review, resolve and completed"]
     job = jobs["review"]
     found += gate_job_problems(jobs["gate"])
     found += resolve_job_problems(jobs["resolve"])
+    found += completed_job_problems(jobs["completed"])
     if job.get("needs") != REVIEW_NEEDS:
         found.append(f"review needs {job.get('needs')!r}, not {REVIEW_NEEDS!r}")
     if job.get("outputs") != REVIEW_OUTPUTS:
@@ -595,6 +662,14 @@ def token(w: dict[str, Any]) -> dict[str, Any]:
     return step  # type: ignore[no-any-return]
 
 
+def completed_job(w: dict[str, Any]) -> dict[str, Any]:
+    return w["jobs"]["completed"]  # type: ignore[no-any-return]
+
+
+def completed(w: dict[str, Any]) -> dict[str, Any]:
+    return completed_job(w)["steps"][0]  # type: ignore[no-any-return]
+
+
 def tools(w: dict[str, Any], change: str) -> None:
     action(w)["claude_args"] = str(action(w)["claude_args"]).replace("Bash(gh pr view:*)", change)
 
@@ -613,11 +688,11 @@ def sources(w: dict[str, Any], change: str) -> None:
 @pytest.mark.parametrize(
     ("change", "named"),
     [
-        (lambda w: w.update({"on": {"pull_request_target": None}}), "not on pull_request and"),
-        (lambda w: w["on"].update({"push": None}), "not on pull_request and"),
-        (lambda w: w["on"].update({"issue_comment": None}), "not on pull_request and"),
-        (lambda w: w["on"].update({"pull_request_review": None}), "not on pull_request and"),
-        (lambda w: w["on"].pop("pull_request_review_comment"), "not on pull_request and"),
+        (lambda w: w.update({"on": {"pull_request_target": None}}), "not on pull_request, pull"),
+        (lambda w: w["on"].update({"push": None}), "not on pull_request, pull"),
+        (lambda w: w["on"].update({"issue_comment": None}), "not on pull_request, pull"),
+        (lambda w: w["on"].update({"pull_request_review": None}), "not on pull_request, pull"),
+        (lambda w: w["on"].pop("pull_request_review_comment"), "not on pull_request, pull"),
         (
             lambda w: w["on"]["pull_request_review_comment"]["types"].append("edited"),
             "pull_request_review_comment ['created', 'edited'], not ['created']",
@@ -639,7 +714,7 @@ def sources(w: dict[str, Any], change: str) -> None:
         (lambda w: job(w).pop("if"), "not only on the gate's yes"),
         (lambda w: job(w).update({"if": "always()"}), "not only on the gate's yes"),
         (lambda w: job(w).pop("needs"), "review needs None"),
-        (lambda w: w["jobs"].pop("gate"), "not gate, review and resolve"),
+        (lambda w: w["jobs"].pop("gate"), "not gate, review, resolve"),
         (
             lambda w: gate_job(w).update({"concurrency": copy.deepcopy(CONCURRENCY)}),
             "gate is in a concurrency group",
@@ -762,7 +837,7 @@ def sources(w: dict[str, Any], change: str) -> None:
             "at the workflow level",
         ),
         (lambda w: job(w).pop("timeout-minutes"), "no timeout-minutes"),
-        (lambda w: w["jobs"].update({"other": {}}), "not gate, review and resolve"),
+        (lambda w: w["jobs"].update({"other": {}}), "not gate, review, resolve"),
         (
             lambda w: job(w)["steps"].append({"run": "git push"}),
             "runs a command of its own",
@@ -892,7 +967,7 @@ def sources(w: dict[str, Any], change: str) -> None:
         ),
         (lambda w: job(w)["steps"].remove(snapshot(w)), '0 steps named "Read the pull'),
         (lambda w: resolve_job(w)["steps"].remove(resolver(w)), "resolve's steps are"),
-        (lambda w: w["jobs"].pop("resolve"), "not gate, review and resolve"),
+        (lambda w: w["jobs"].pop("resolve"), "not gate, review, resolve"),
         (lambda w: resolve_job(w).pop("needs"), "resolve needs None"),
         (lambda w: resolve_job(w).update({"if": "always()"}), "resolve runs when 'always()'"),
         (
@@ -981,6 +1056,57 @@ def sources(w: dict[str, Any], change: str) -> None:
             ),
             "isn't the schema this test pins",
         ),
+        (lambda w: w["on"].pop("merge_group"), "not on pull_request, pull"),
+        (lambda w: w["on"].update({"merge_group": {"types": ["checks_requested"]}}), "not every"),
+        (lambda w: w["jobs"].pop("completed"), "not gate, review, resolve"),
+        (lambda w: completed_job(w).update({"name": "review completed"}), "required-checks.json"),
+        (lambda w: completed_job(w).update({"needs": ["review", "resolve"]}), "completed needs"),
+        (lambda w: completed_job(w).update({"needs": "resolve"}), "completed needs"),
+        # Without always(), a cancelled or failed review skips it, which counts as passed.
+        (
+            lambda w: completed_job(w).update({"if": "github.event_name == 'pull_request'"}),
+            "after a cancelled review too",
+        ),
+        (lambda w: completed_job(w).pop("if"), "after a cancelled review too"),
+        # A merge group or a comment's run reporting it: a merge group must skip it, and a
+        # comment's run reports what GitHub ignores (design D4, D5).
+        (lambda w: completed_job(w).update({"if": "always()"}), "never for a comment's run"),
+        (
+            lambda w: completed_job(w).update(
+                {"if": "always() && github.event_name != 'merge_group'"}
+            ),
+            "never for a comment's run",
+        ),
+        (
+            lambda w: completed_job(w).update({"permissions": {"actions": "read"}}),
+            "completed's GITHUB_TOKEN permissions",
+        ),
+        (lambda w: completed_job(w).pop("permissions"), "completed's GITHUB_TOKEN permissions"),
+        (
+            lambda w: completed_job(w).update({"concurrency": copy.deepcopy(CONCURRENCY)}),
+            "completed is in a concurrency group",
+        ),
+        (lambda w: completed_job(w).pop("timeout-minutes"), "completed has no timeout-minutes"),
+        (
+            lambda w: completed_job(w)["steps"].insert(
+                0, {"uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"}
+            ),
+            "completed's steps aren't the one step",
+        ),
+        (
+            lambda w: completed(w)["env"].update(
+                {"TOKEN": "${{ secrets.REVIEW_APP_PRIVATE_KEY }}"}
+            ),
+            f"{COMPLETED_STEP_NAME!r} is given",
+        ),
+        (
+            lambda w: completed(w)["env"].update({"REVIEW": "${{ needs.gate.result }}"}),
+            f"{COMPLETED_STEP_NAME!r} is given",
+        ),
+        (
+            lambda w: completed(w).update({"run": str(completed(w)["run"]) + "\nsys.exit(0)\n"}),
+            "complete?''s script isn't the one this test pins",
+        ),
         (lambda w: sources(w, ""), "from None"),
         (lambda w: sources(w, "--setting-sources user,project"), "from 'user,project'"),
         (lambda w: sources(w, "--setting-sources project"), "from 'project'"),
@@ -990,6 +1116,105 @@ def test_each_way_the_workflow_can_go_wrong_is_named(change: Any, named: str) ->
     workflow = copy.deepcopy(review())
     change(workflow)
     assert any(named in problem for problem in problems(workflow)), problems(workflow)
+
+
+def run_completed(tmp_path: Path, **results: str) -> subprocess.CompletedProcess[str]:
+    """Run the required check's step, as a pull request event's run of a member's own pull request
+    would, with the needs' results given here instead of a completed review's."""
+    env = {
+        "RUN_ID": "41258918187",
+        "AUTHOR_TYPE": "User",
+        "HEAD_REPOSITORY": "troupe-run/infrastructure",
+        "GATE": "success",
+        "WANTS_REVIEW": "true",
+        "REVIEW": "success",
+        "RESOLVE": "success",
+        **results,
+    }
+    return run_step(completed(review()), tmp_path, tmp_path, env)
+
+
+def test_the_check_passes_when_the_review_and_its_resolving_job_succeeded(tmp_path: Path) -> None:
+    done = run_completed(tmp_path)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "::error" not in done.stdout
+
+
+@pytest.mark.parametrize(
+    ("results", "named"),
+    [
+        ({"REVIEW": "cancelled", "RESOLVE": "cancelled"}, "claude review (cancelled)"),
+        ({"REVIEW": "failure", "RESOLVE": "skipped"}, "claude review (failure)"),
+        ({"RESOLVE": "failure"}, "resolve review conversations (failure)"),
+        ({"RESOLVE": "cancelled"}, "resolve review conversations (cancelled)"),
+        ({"REVIEW": "", "RESOLVE": ""}, "claude review (no result)"),
+    ],
+)
+def test_a_review_that_didn_t_complete_fails_naming_the_run_to_re_run(
+    tmp_path: Path, results: dict[str, str], named: str
+) -> None:
+    done = run_completed(tmp_path, **results)
+    assert done.returncode == 1
+    errors = [line for line in done.stdout.splitlines() if line.startswith("::error")]
+    assert len(errors) == 1, done.stdout
+    assert named in errors[0]
+    assert "gh run rerun 41258918187" in errors[0]
+
+
+@pytest.mark.parametrize(
+    "results",
+    [
+        {"GATE": "failure", "WANTS_REVIEW": "", "REVIEW": "skipped", "RESOLVE": "skipped"},
+        {"GATE": "cancelled", "WANTS_REVIEW": "", "REVIEW": "skipped", "RESOLVE": "skipped"},
+        # A pull request event's gate always says yes; anything else isn't an answer to trust.
+        {"WANTS_REVIEW": "false", "REVIEW": "skipped", "RESOLVE": "skipped"},
+        {"WANTS_REVIEW": "", "REVIEW": "skipped", "RESOLVE": "skipped"},
+        # Skipped by the gate's own if:, but the pull request is a member's, not a bot's or fork's.
+        {"GATE": "skipped", "WANTS_REVIEW": "", "REVIEW": "skipped", "RESOLVE": "skipped"},
+    ],
+)
+def test_a_gate_that_didn_t_say_yes_fails_the_check(
+    tmp_path: Path, results: dict[str, str]
+) -> None:
+    done = run_completed(tmp_path, **results)
+    assert done.returncode == 1
+    assert "::error title=Review not started::" in done.stdout
+    assert "gh run rerun 41258918187" in done.stdout
+
+
+@pytest.mark.parametrize(
+    "who",
+    [
+        {"AUTHOR_TYPE": "Bot"},
+        {"HEAD_REPOSITORY": "someone/infrastructure"},
+        # A fork that's since been deleted has no head repository.
+        {"HEAD_REPOSITORY": ""},
+    ],
+)
+def test_a_bot_s_or_a_fork_s_pull_request_passes_with_its_review_skipped(
+    tmp_path: Path, who: dict[str, str]
+) -> None:
+    skipped = {"GATE": "skipped", "WANTS_REVIEW": "", "REVIEW": "skipped", "RESOLVE": "skipped"}
+    done = run_completed(tmp_path, **skipped, **who)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "isn't reviewed" in done.stdout
+
+
+def test_without_a_run_id_the_check_still_says_how_to_re_run(tmp_path: Path) -> None:
+    done = run_completed(tmp_path, RUN_ID="", REVIEW="cancelled", RESOLVE="cancelled")
+    assert done.returncode == 1
+    assert "gh run rerun <this run's ID>" in done.stdout
+
+
+def test_an_input_that_holds_a_workflow_command_stays_inside_the_check_s_one_error(
+    tmp_path: Path,
+) -> None:
+    done = run_completed(tmp_path, GATE="failure\n::notice::injected", WANTS_REVIEW="")
+    assert done.returncode == 1
+    assert [line for line in done.stdout.splitlines() if line.startswith("::")] == [
+        line for line in done.stdout.splitlines() if line.startswith("::error")
+    ]
+    assert "%0A::notice::injected" in done.stdout
 
 
 def run_report(tmp_path: Path, content: str | None, set_path: bool = True) -> tuple[int, str]:
