@@ -1,8 +1,10 @@
-"""The rules doc (docs/development-workflow.md) lists exactly the guard's rules."""
+"""The rules doc (docs/development-workflow.md) lists exactly the guard's rules, and names the
+review's required check."""
 
 import re
 
 import pytest
+import yaml
 from conftest import REPO
 
 import guard
@@ -34,3 +36,19 @@ def test_the_docs_example_declaration_is_one_the_guard_reads() -> None:
     assert ("vcs_git", ("packages/troupe-vcs-git/tests/**", "packages/troupe/tests/**")) in (
         declaration.tests
     )
+
+
+def test_the_docs_name_the_review_s_required_check_and_how_to_re_run_it() -> None:
+    """review-completed-check (#242): where the docs say to act on the review of the last push,
+    they name the job that holds a pull request until that review completed, by the name its
+    workflow gives it, and how to re-run a review that didn't."""
+    workflow = yaml.safe_load(
+        (REPO / ".github" / "workflows" / "claude-review.yml").read_text(encoding="utf-8")
+    )
+    name = workflow["jobs"]["completed"]["name"]
+    text = DOC.read_text(encoding="utf-8")
+    section = text[text.index("## Claude's review") :]
+    section = section[: section.index("\n## ", 1)]
+    assert f"`{name}`" in section
+    assert "gh run rerun <id>" in section
+    assert "review of the last push has completed" in section

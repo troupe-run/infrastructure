@@ -50,12 +50,12 @@
   `tofu/required-checks.json`, and to the required-checks tests' expected lists; verify `uv run scripts/check.py`
   passes and `tofu plan` (local, against fast-forwarded `main`) shows the three rulesets and the two deliveries of
   `claude-review.yml`, and nothing else
-- [ ] 3.2 Run website's `npx vitest run tests/unit/workflow-node-version.test.ts` and troupe's `uv run scripts/check.py`
+- [x] 3.2 Run website's `npx vitest run tests/unit/workflow-node-version.test.ts` and troupe's `uv run scripts/check.py`
   with the new `claude-review.yml` in place in scratch clones, as the file's header asks; verify both pass
 
 ## 4. Docs (development-workflow delta)
 
-- [ ] 4.1 In `docs/development-workflow.md`, next to "the review of the last push", say the required check holds the
+- [x] 4.1 In `docs/development-workflow.md`, next to "the review of the last push", say the required check holds the
   pull request until the review of its head completed, and that a cancelled or failed last review is re-run with
   `gh run rerun <id>` from the check's message; update "it isn't a required check" wherever the docs or CLAUDE.md say
   it of the review. Add a test that the doc names `claude review completed`; verify it passes and fails with the

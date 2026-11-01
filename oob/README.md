@@ -382,8 +382,10 @@ gh api orgs/troupe-run/actions/secrets/CLAUDE_CODE_OAUTH_TOKEN/repositories --jq
 
 **Rotating them.** For the key: generate a new one in the App's settings, replace the 1Password item's key, run its
 set command, then delete the old key in the App's settings. For the token: before it expires, run `claude setup-token`
-again, replace the 1Password item's credential, and run its set command. A missing or expired credential fails only
-the review, which isn't a required check.
+again, replace the 1Password item's credential, and run its set command. A missing or expired credential fails the
+review, and so its required check `claude review completed`: no member's pull request in troupe, infrastructure or
+website can merge until the credential is set and each run re-run (`gh run rerun <id>`, named in the check), or the
+owner bypasses the rules (review-completed-check, #242).
 
 ## troupe.run's DNS (set up by hand)
 
