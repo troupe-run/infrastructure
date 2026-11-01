@@ -31,16 +31,18 @@
 - [x] 3.2 Change `WORKFLOW_SUMMARY` in `scripts/guard.py` to say the review resolves the must-fixes and the nits a push
   fixed, keeping it ASCII. Verify by running the session-start hook (`uv run scripts/guard.py` as the hook calls it)
   and reading its `additionalContext`, and `uv run scripts/check.py`
-- [ ] 3.3 Run website's `npx vitest run tests/unit/workflow-node-version.test.ts` and troupe's `uv run
+- [x] 3.3 Run website's `npx vitest run tests/unit/workflow-node-version.test.ts` and troupe's `uv run
   scripts/check.py` with the new `claude-review.yml` and `scripts/guard.py` in place in scratch clones, as the
-  workflow's header asks; verify both pass
+  workflow's header asks; verify both pass. Done: website's test, 8 passed; troupe's check, all gates passed (3361
+  passed, 14 skipped)
 
 ## 4. troupe and website (design D4)
 
-- [ ] 4.1 Raise an issue in troupe-run/troupe and one in troupe-run/website (each with `--project "troupe roadmap"`)
+- [x] 4.1 Raise an issue in troupe-run/troupe and one in troupe-run/website (each with `--project "troupe roadmap"`)
   to say in their `CLAUDE.md` and `openspec/config.yaml` that the review resolves a nit a push has fixed, citing #246
   and the development-workflow requirement. Verify each with `gh issue view <n> -R troupe-run/<repo> --json
-  projectItems`, and link both in a comment on #246
+  projectItems`, and link both in a comment on #246. Done: troupe-run/troupe#238 and troupe-run/website#89, both on
+  the board as Todo, linked on #246
 
 ## 5. Plan
 
