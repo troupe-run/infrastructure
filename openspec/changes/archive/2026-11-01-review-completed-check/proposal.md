@@ -44,7 +44,8 @@ None.
 - `pr-review`: the review stays advisory in what it finds, but a new check reports whether the review of the head
   completed; "The review is advisory" and the expired-token scenario change, and new requirements say what the check
   reports in each case.
-- `rulesets`: "Each repository requires its own checks" adds `claude review completed` to all three repositories.
+- `rulesets`: a new requirement that troupe, infrastructure and website each require `claude review completed`.
+  "Each repository requires its own checks" stays as it is: adding the check to it pushed it past 500 characters.
 - `development-workflow`: a new requirement that `docs/development-workflow.md` says, next to "the review of the last
   push", that the check holds a pull request whose last review didn't complete, and how to re-run it. "A pull request
   opens as a draft and is marked ready once its review is clean" stays as it is.
