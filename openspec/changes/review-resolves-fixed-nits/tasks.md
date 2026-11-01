@@ -28,7 +28,7 @@
   run for the push that fixed it, and the paragraph on replies says a nit fixed by a push needs no reply or resolve.
   Say the same in `CLAUDE.md` step 5, `openspec/config.yaml`'s context, and `org-profile/CONTRIBUTING.md` step 4.
   Verify with `grep -n -i "nit" ` over the four files, reading each hit, and `uv run scripts/check.py`
-- [ ] 3.2 Change `WORKFLOW_SUMMARY` in `scripts/guard.py` to say the review resolves the must-fixes and the nits a push
+- [x] 3.2 Change `WORKFLOW_SUMMARY` in `scripts/guard.py` to say the review resolves the must-fixes and the nits a push
   fixed, keeping it ASCII. Verify by running the session-start hook (`uv run scripts/guard.py` as the hook calls it)
   and reading its `additionalContext`, and `uv run scripts/check.py`
 - [ ] 3.3 Run website's `npx vitest run tests/unit/workflow-node-version.test.ts` and troupe's `uv run
