@@ -20,8 +20,13 @@
   Done: the local plan of d7bac5b is "0 to add, 4 to change, 0 to destroy", 0.1.0's `state` open -> closed in
   `.github`, infrastructure, troupe and website. The list has 17 issues (troupe 7, infrastructure 5, website 5,
   `.github` left out as its issues are off), the same numbers the query gives. #244 is one of them.
-- [ ] 1.6 Open a draft pull request with `Closes #244`, using `--body-file`. Verify the CI plan comment, once the pull
+- [x] 1.6 Open a draft pull request with `Closes #244`, using `--body-file`. Verify the CI plan comment, once the pull
   request is ready and its plan has run, shows the same four updates as 1.4 and the same list as 1.5 (as it is then).
+  Done: #245. Claude's reviews of d7bac5b and 35830a0 had no findings. The owner approved run 41301473855: its plan of
+  35830a0 is "0 to add, 4 to change, 0 to destroy", 0.1.0's `state` open -> closed in `.github`, infrastructure,
+  troupe and website, as 1.4 showed. Its list is wrong: it says none in every repository, because the job's
+  `GITHUB_TOKEN` has no issues permission and GitHub answers with pull requests only. Filed as #247, to be fixed in its
+  own change (owner, 2026-11-01). The outcomes come from 1.5's local list, which is right.
 
 ## 2. Outcomes for the issues with no milestone
 
@@ -47,7 +52,8 @@
 - Act on Claude's review of the last push, then archive the change on the branch in the same push as ticking 1.6 and
   2.3, and rebase onto `main`'s latest state commit before asking for the plan approval (memory: archive before plan
   approval).
-- When the plan of `main` runs, compare its list with 2.3's record. Any issue opened since gets an outcome from the
+- When the plan of `main` runs, its list will also say none (#247). Re-run `scripts/milestone_review.py` locally
+  against `main`'s plan instead, post its list on #244, and compare it with 2.3's record. Any issue opened since gets an outcome from the
   owner and is added to #244's record before the owner approves the apply.
 - After the apply, check on GitHub that milestone 0.1.0 is closed in all four repositories
   (`gh api 'repos/troupe-run/<repo>/milestones?state=all'`), still holds its closed issues, and that the next drift
