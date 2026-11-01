@@ -25,15 +25,22 @@
 
 ## 2. Outcomes for the issues with no milestone
 
-- [ ] 2.1 Comment on #244 with the plan comment's list, one line per issue, and ask the owner for each one's outcome:
+- [x] 2.1 Comment on #244 with the plan comment's list, one line per issue, and ask the owner for each one's outcome:
   into a milestone (which), `parked` (with the reason to come back), or closed as not planned. Ask with
   AskUserQuestion, not by assuming (memory: ask open decisions directly). Verify the comment is on #244.
-- [ ] 2.2 Carry out each outcome the owner gives, at their word: set the milestone, add the `parked` label with a
+  Done from 1.5's local list, since CI's plan hasn't run yet: issuecomment-6557168483. 1.6 compares CI's list with
+  it. Asked in four AskUserQuestion rounds. The owner kept five issues open with no milestone as upkeep, which isn't
+  one of the guide's three outcomes; that gap is noted on #223 (issuecomment-6557226446).
+- [x] 2.2 Carry out each outcome the owner gives, at their word: set the milestone, add the `parked` label with a
   comment giving the reason, or `gh issue close <n> -R troupe-run/<repo> --reason "not planned" --comment "<why>"`.
   Verify every listed issue now has a milestone, the `parked` label, or is closed, by re-running the 1.5 query: what
-  it still lists is only issues the owner parked.
-- [ ] 2.3 Record the outcomes on #244 in one comment: each issue, its outcome, and the owner's reason where given.
+  it still lists is only issues the owner parked, or kept open with no milestone as upkeep.
+  Done: the query lists 14. Nine are parked (troupe 150, 151, 153 and 220; infrastructure 72 and 73; website 64, 81
+  and 85). Five were kept open as upkeep (troupe 227; infrastructure 170, 223 and 244; website 51). troupe 235 and 237
+  and website 83 are in 0.2.0. Each new park has its reason commented, and #72 has its new date, January 2027.
+- [x] 2.3 Record the outcomes on #244 in one comment: each issue, its outcome, and the owner's reason where given.
   Verify every issue from 2.1's list appears in it.
+  Done: issuecomment-6557226210 lists all 17.
 
 ## Workflow follow-up
 
