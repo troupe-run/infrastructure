@@ -37,8 +37,9 @@ None.
 - `pr-review`: the review resolves its own nits once a push has fixed them, as well as its must-fixes; the nit tier
   says the author or the review resolves it; the resolving step's widening check allows nits and still refuses
   decisions.
-- `development-workflow`: the requirement that findings are acted on before the archive says a nit fixed by a push
-  may be left for the review to resolve.
+- `development-workflow`: a new requirement that the contributing guide and each repository's OpenSpec context say
+  the review resolves a nit a push has fixed, so the session may leave it for the review. "Review findings are acted
+  on before a change is archived" is unchanged: adding to it would take it past 500 characters.
 
 ## Impact
 
