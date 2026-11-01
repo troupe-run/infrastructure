@@ -3,10 +3,10 @@ run on a pull request, as GitHub reports them (spec: rulesets; required-checks d
 
 A required name that no job reports blocks every pull request, and a job left out can fail
 without blocking anything. troupe's and website's own jobs can't be read from here, so they are
-not tested; the guard check each repository receiving the guard requires is, since its workflow is
-delivered from here. troupe's list is pinned to its `check` result rather than its legs
-(require-troupe-check design D3): that can't prove troupe's CI reports `check`, only that the legs
-don't come back.
+not tested; the guard check and `claude review completed` each repository receiving the guard
+requires are, since their workflows are delivered from here. troupe's list is pinned to its
+`check` result rather than its legs (require-troupe-check design D3): that can't prove troupe's CI
+reports `check`, only that the legs don't come back.
 """
 
 import itertools
@@ -33,9 +33,10 @@ STATE_FILE = "tofu/terraform.tfstate"
 # The workflows whose pull-request jobs infrastructure requires, and the jobs deliberately left
 # out: each `changes` only decides what runs, and a failure there runs everything (design D2); the
 # guard's legs report through `guard tests`, because a skipped matrix job reports under its
-# unexpanded name (run-checks-by-path design D6).
-REQUIRED_WORKFLOWS = ("ci.yml", "guard.yml", "tofu.yml")
-NOT_REQUIRED = {"changes", "guard-tests"}
+# unexpanded name (run-checks-by-path design D6). Of the review's jobs, only whether the review of
+# the head completed is required, never the review itself (review-completed-check design D2).
+REQUIRED_WORKFLOWS = ("ci.yml", "guard.yml", "tofu.yml", "claude-review.yml")
+NOT_REQUIRED = {"changes", "guard-tests", "gate", "review", "resolve"}
 
 MATRIX_REF = re.compile(r"\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}")
 EXPRESSION = re.compile(r"\$\{\{.*?\}\}")
@@ -206,6 +207,28 @@ def test_every_repository_receiving_the_guard_requires_its_check_by_its_name_her
         repo: sorted(guard_jobs - required(repo, "github-actions")) for repo in guard_targets()
     }
     assert {repo: jobs for repo, jobs in missing.items() if jobs} == {}
+
+
+def test_every_repository_receiving_the_review_requires_its_completed_check() -> None:
+    """review-completed-check design D6: claude-review.yml is delivered with the guard, so each
+    repository it reaches requires the check that its review completed, and nothing else of it."""
+    workflow = load_yaml(WORKFLOWS / "claude-review.yml")
+    wanted = {
+        name
+        for job_id, job in workflow["jobs"].items()
+        if job_id not in NOT_REQUIRED and runs_on_pull_requests(workflow, job_id)
+        for name in job_names(job_id, job)
+    }
+    assert wanted == {"claude review completed"}
+    missing = {repo: sorted(wanted - required(repo, "github-actions")) for repo in guard_targets()}
+    assert {repo: jobs for repo, jobs in missing.items() if jobs} == {}
+    review_jobs = {
+        name for job_id, job in workflow["jobs"].items() for name in job_names(job_id, job)
+    } - wanted
+    every = {"infrastructure", *guard_targets()}
+    assert {repo: sorted(review_jobs & required(repo, "github-actions")) for repo in every} == {
+        repo: [] for repo in every
+    }
 
 
 def test_troupe_requires_its_check_result_and_none_of_its_legs() -> None:

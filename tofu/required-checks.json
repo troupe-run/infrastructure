@@ -17,6 +17,10 @@
       "app": "github-actions"
     },
     {
+      "context": "claude review completed",
+      "app": "github-actions"
+    },
+    {
       "context": "DCO",
       "app": "dco"
     }
@@ -31,6 +35,10 @@
       "app": "github-actions"
     },
     {
+      "context": "claude review completed",
+      "app": "github-actions"
+    },
+    {
       "context": "DCO",
       "app": "dco"
     }
@@ -42,6 +50,10 @@
     },
     {
       "context": "guard (workflow rules)",
+      "app": "github-actions"
+    },
+    {
+      "context": "claude review completed",
       "app": "github-actions"
     }
   ]
