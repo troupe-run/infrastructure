@@ -48,8 +48,9 @@
 
 - [ ] 3.1 Add `claude review completed` (app `github-actions`) to troupe, infrastructure and website in
   `tofu/required-checks.json`, and to the required-checks tests' expected lists; verify `uv run scripts/check.py`
-  passes and `tofu plan` (local, against fast-forwarded `main`) shows the three rulesets and the two deliveries of
-  `claude-review.yml`, and nothing else
+  passes and the pull request's `plan (pull request)` (the owner's choice over a local plan, whose 1Password approval
+  timed out) shows the three rulesets, the two deliveries of `claude-review.yml` and the contributing guide's update in
+  `.github`, and nothing else
 - [x] 3.2 Run website's `npx vitest run tests/unit/workflow-node-version.test.ts` and troupe's `uv run scripts/check.py`
   with the new `claude-review.yml` in place in scratch clones, as the file's header asks; verify both pass
 
