@@ -46,8 +46,10 @@
 
 ## 5. Plan
 
-- [ ] 5.1 Check the pull request's `plan (pull request)` shows the two deliveries of `claude-review.yml`, the two of
-  `scripts/guard.py`, and `CONTRIBUTING.md` in troupe-run/.github, and nothing else. Record its run and counts here
+- [x] 5.1 Check the pull request's `plan (pull request)` shows the two deliveries of `claude-review.yml`, the two of
+  `scripts/guard.py`, and `CONTRIBUTING.md` in troupe-run/.github, and nothing else. Record its run and counts here.
+  Done: the plan for c89e07e (run 41306047106) is 0 to add, 5 to change, 0 to destroy: `claude-review.yml` and
+  `scripts/guard.py` delivered to troupe and to website, and `CONTRIBUTING.md` in troupe-run/.github
 
 ## Workflow follow-up
 
