@@ -56,7 +56,7 @@ which says who resolves it (spec: pr-review; review-findings-by-severity design 
 | Tier | What it is | Who resolves it |
 | --- | --- | --- |
 | `**must-fix** · …` | someone other than the author should check the fix before it merges: wrong behaviour, lost data, a weakened fence, a missing or overclaiming test, a ticked task with nothing behind it, or the issue's "Done when" not met. Unsure between must-fix and nit means must-fix | the review, on its next run, once the problem is gone or the author's reply convinces it; a dispute that's still open after that goes to the owner |
-| `**nit** · …` | the worst outcome of leaving it is a reader briefly misled, or untidy code | the author, after replying with what it did: fixed it, raised a follow-up issue, or not worth it and why |
+| `**nit** · …` | the worst outcome of leaving it is a reader briefly misled, or untidy code | the author, after replying with what it did: fixed it, raised a follow-up issue, or not worth it and why; or the review, on the run for the push that fixed it (review-resolves-fixed-nits design D1) |
 | `**decision** · …` | a choice the change's design doesn't settle, that's hard to reverse or reaches beyond the pull request | the owner |
 
 A conversation's tier is the latest label the review gave in it: only the review re-tiers, by replying with a new label
@@ -64,8 +64,10 @@ and its reason. A label in anyone else's reply counts for nothing.
 
 **The review runs on each push and on each reply to one of its must-fixes.** When someone with write access replies in
 an open must-fix the review opened, a review starts and judges the reply with the rest, so a must-fix answered with a
-reply alone needs no push. A reply to a nit or a decision starts none, since the review has nothing to do with it, so
-replying to each nit before resolving it costs no review. Nor do a bot's comment, an outside user's, a reply in a
+reply alone needs no push. A reply to a nit or a decision starts none, since a reply doesn't change what the review
+does with either, so replying to each nit before resolving it costs no review. A nit fixed by a push needs no reply or
+resolve: the review of that push sees the fix and resolves it. Only a nit answered without a fix, or one that review
+leaves open, is the author's to resolve. Nor do a bot's comment, an outside user's, a reply in a
 person's conversation or a resolved one, a comment that opens a conversation, or an edit. A newer push or reply cancels
 a review still running for the pull request. If a reply's run fails, re-run it (`gh run rerun <id>`, which the guard
 allows, or "Re-run jobs" on GitHub): each job reads the conversations afresh, so the reply is judged.

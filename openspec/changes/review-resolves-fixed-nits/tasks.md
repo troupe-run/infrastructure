@@ -24,7 +24,7 @@
 
 ## 3. Docs and the delivered summary (design D4)
 
-- [ ] 3.1 In `docs/development-workflow.md`, "Claude's review": the nit row's "Who resolves it" adds the review, on the
+- [x] 3.1 In `docs/development-workflow.md`, "Claude's review": the nit row's "Who resolves it" adds the review, on the
   run for the push that fixed it, and the paragraph on replies says a nit fixed by a push needs no reply or resolve.
   Say the same in `CLAUDE.md` step 5, `openspec/config.yaml`'s context, and `org-profile/CONTRIBUTING.md` step 4.
   Verify with `grep -n -i "nit" ` over the four files, reading each hit, and `uv run scripts/check.py`
