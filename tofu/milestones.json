@@ -9,7 +9,7 @@
     {
       "key": "0.1.0",
       "title": "0.1.0",
-      "state": "open",
+      "state": "closed",
       "description": "One real actor, safely: an actor defined in config runs through Claude Code on a worktree, and you keep or discard its work. Installed with uv"
     },
     {
