@@ -52,3 +52,15 @@ def test_the_docs_name_the_review_s_required_check_and_how_to_re_run_it() -> Non
     assert f"`{name}`" in section
     assert "gh run rerun <id>" in section
     assert "review of the last push has completed" in section
+
+
+def test_the_docs_say_a_fixed_must_fix_gets_no_reply_and_a_discussion_comes_before_the_push() -> (
+    None
+):
+    """review-completed-check (owner, 2026-11-01): a "fixed" reply posted while the push's review
+    runs cancels it, and only the push's run counts for `claude review completed`."""
+    text = DOC.read_text(encoding="utf-8")
+    section = text[text.index("## Claude's review") :]
+    section = section[: section.index("\n## ", 1)]
+    assert "A must-fix fixed by a push needs no reply" in section
+    assert "reply first, then push" in section

@@ -62,6 +62,11 @@
   it of the review. Add a test that the doc names `claude review completed`; verify it passes and fails with the
   name removed
 
+- [x] 4.2 Say in `docs/development-workflow.md`, `CLAUDE.md` step 5 and the org's contributing guide that a must-fix
+  fixed by a push gets no "fixed" reply (it would cancel the push's review, which then needs a re-run), and that a
+  reply that needs a discussion is posted before the push (owner, 2026-11-01). Extend the docs test to check it; verify
+  it passes, and fails with the paragraph removed
+
 ## Workflow follow-up
 
 - Open the draft pull request (`Closes #242`), act on Claude's review, mark it ready; the owner approves `plan (pull
