@@ -18,9 +18,9 @@ on 2026-10-31 to fix it with a required check.
   - is pending while the review runs, because it waits for the review's jobs;
   - passes when the pull request isn't reviewed by design (a bot's pull request, such as Dependabot's or
     release-please's, or a fork's);
-  - in a run whose event needs no review (a bot's comment, a reply to a nit or a decision, a comment from someone
-    without write access), reports the result of the latest run that did review the head, so a run that reviews
-    nothing can't hide a cancelled review;
+  - runs only for pull request events. GitHub counts only the newest pull request event's run for a pull request,
+    so a comment's run can neither hide a cancelled review nor pass one (probed on a throwaway repository). A reply
+    whose review cancels a push's running review leaves the check failed until the push's run is re-run;
   - is skipped on `merge_group`, which counts as passed, so the merge queue isn't held up. `claude-review.yml` gains
     `merge_group:` for that alone (merge-queue design D5's pattern).
 - `tofu/required-checks.json` requires `claude review completed` in troupe, infrastructure and website. The workflow
@@ -30,8 +30,8 @@ on 2026-10-31 to fix it with a required check.
   waits until the token is renewed and the run re-run, or the owner bypasses the rules.
 - `docs/development-workflow.md` says, next to "the review of the last push", that the check holds a pull request
   until the review of its head has completed, and how to re-run it.
-- A probe on a throwaway repository settles, before the job is written, which commit a reply's run reports on and
-  which of two same-named checks on a commit GitHub counts.
+- A probe on a throwaway repository settled, before the job was written, which runs GitHub counts for a pull request
+  (design.md, "Probe results").
 
 ## Capabilities
 
