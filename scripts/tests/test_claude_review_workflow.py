@@ -167,7 +167,7 @@ RESOLVE_TOKEN_INPUTS = {
     **TOKEN_INPUTS,
     "permission-contents": "write",
 }
-RESOLVER_SHA256 = "0edb8face669593a9f3bff916607df894a1eddb85579f0dd4604c9275ba68269"
+RESOLVER_SHA256 = "0e693536e81d5708d820bac881ae42469381c98ce15b4d5d55e2935514e13ef3"
 # The gate: before the review, outside its concurrency group, with D2's skip, it decides whether
 # the event needs a review: a pull request event always, a reply only in an open must-fix the
 # review opened. A no there costs no Claude run and cancels nothing (review-judge-reply-on-post
@@ -1020,7 +1020,22 @@ def sources(w: dict[str, Any], change: str) -> None:
         ),
         (
             lambda w: resolver(w).update(
-                {"run": str(resolver(w)["run"]).replace('if current != "must-fix":', "if False:")}
+                {
+                    "run": str(resolver(w)["run"]).replace(
+                        'if current not in ("must-fix", "nit"):', "if False:"
+                    )
+                }
+            ),
+            "'Resolve and re-tier what Claude named''s script isn't the one this test pins",
+        ),
+        # Widened to decisions, which are the owner's (review-resolves-fixed-nits design D2).
+        (
+            lambda w: resolver(w).update(
+                {
+                    "run": str(resolver(w)["run"]).replace(
+                        '("must-fix", "nit")', '("must-fix", "nit", "decision")'
+                    )
+                }
             ),
             "'Resolve and re-tier what Claude named''s script isn't the one this test pins",
         ),
@@ -1351,6 +1366,16 @@ def test_the_prompt_s_examples_are_labels_of_each_tier() -> None:
     assert [guard.review_tier(line) for line in examples] == list(guard.REVIEW_TIERS)
 
 
+def test_the_prompt_tells_the_review_to_resolve_a_nit_only_on_a_fix_and_never_a_decision() -> None:
+    # The step checks the tier; only the prompt can say a nit needs a fix in the diff, not a reply
+    # (review-resolves-fixed-nits design D1).
+    prompt = " ".join(str(action(review())["prompt"]).split())
+    assert "Never resolve a decision or a nit" not in prompt
+    assert "a nit whose problem is gone from the diff: name its ID in `resolve`" in prompt
+    assert "A reply alone doesn't settle a nit" in prompt
+    assert "Never resolve a decision, nor anyone else's conversation" in prompt
+
+
 # The two steps, run as the runner would, with a gh on PATH that answers from a script
 
 GH_STUB = """\
@@ -1510,20 +1535,19 @@ def resolved(calls: list[list[str]]) -> list[str]:
     return [arg[3:] for call in calls if "graphql" in call for arg in call if arg.startswith("id=")]
 
 
-def test_only_the_review_s_open_must_fixes_are_resolved(tmp_path: Path) -> None:
-    named = [
-        "PRRT_mustfix", "PRRT_upgraded", "PRRT_downgraded", "PRRT_nit", "PRRT_decision",
-        "PRRT_unlabelled", "PRRT_person", "PRRT_selflabel", "PRRT_done", "PRRT_elsewhere",
-    ]  # fmt: skip
-    done, calls = resolve_run(tmp_path, {"resolve": named, "retier": []})
+def test_only_the_review_s_open_must_fixes_and_nits_are_resolved(tmp_path: Path) -> None:
+    # PRRT_selflabel is a nit: a person's label counts for nothing.
+    allowed = ["PRRT_mustfix", "PRRT_upgraded", "PRRT_downgraded", "PRRT_nit", "PRRT_selflabel"]
+    refused = ["PRRT_decision", "PRRT_unlabelled", "PRRT_person", "PRRT_done", "PRRT_elsewhere"]
+    done, calls = resolve_run(tmp_path, {"resolve": allowed + refused, "retier": []})
     assert done.returncode == 0, done.stdout + done.stderr
-    assert resolved(calls) == ["PRRT_mustfix", "PRRT_upgraded"]
+    assert resolved(calls) == allowed
     for call in calls:
         query = next(arg for arg in call if arg.startswith("query=")).partition("=")[2]
         assert guard.graphql_mutations(query) == ["resolveReviewThread"]
     warnings = [line for line in done.stdout.splitlines() if line.startswith("::warning")]
-    assert len(warnings) == len(named) - 2
-    for ident in named[2:]:
+    assert len(warnings) == len(refused)
+    for ident in refused:
         assert any(ident in line for line in warnings), ident
 
 
