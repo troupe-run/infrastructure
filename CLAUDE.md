@@ -18,7 +18,8 @@ Every change, however small, follows one path. The full guide is the org's
 5. **Claude's review is acted on**, after the review of the last push: fix or answer each finding, resolve only nits,
    and raise decisions and disputed must-fixes with the owner. The review resolves its own must-fixes once they're
    addressed, judging a reply to one when it's posted; if that run fails, re-run it (`gh run rerun <id>`). Once the
-   review of the last push leaves no must-fix or decision open, **mark it ready** (`gh pr ready <n>`): CI runs, and
+   review of the last push has completed (the required `claude review completed` check passed; if it failed, re-run
+   the run it names) and leaves no must-fix or decision open, **mark it ready** (`gh pr ready <n>`): CI runs, and
    posts its plan as evidence once the owner approves that run. A merge needs every conversation resolved
    ([docs/development-workflow.md](docs/development-workflow.md)).
 6. **`/opsx:archive`** runs on the branch before merging. The owner merges by rebase, through the merge queue.
