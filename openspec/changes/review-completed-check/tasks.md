@@ -28,18 +28,18 @@
 
 ## 2. The job (design D2, D3, D5)
 
-- [ ] 2.1 Add `merge_group:` to `claude-review.yml`'s triggers with a comment naming D5, and the `completed` job
+- [x] 2.1 Add `merge_group:` to `claude-review.yml`'s triggers with a comment naming D5, and the `completed` job
   (`claude review completed`): `needs: [gate, review, resolve]`, `if: always() && github.event_name == 'pull_request'`,
   `permissions: {}`, a short timeout, no checkout, no secret, and an inline Python step
   that reads the needs' results and the event from `env:`. Update the file's header comment ("It isn't a required
   check" no longer holds). Verify `uv run scripts/check.py` passes
-- [ ] 2.2 Implement D3's steps 1 to 3 in the step, each failure an escaped `::error` with `gh run rerun <id>`; pin the
+- [x] 2.2 Implement D3's steps 1 to 3 in the step, each failure an escaped `::error` with `gh run rerun <id>`; pin the
   job's shape in `scripts/tests/test_claude_review_workflow.py`'s `problems()` and add named cases to
   `test_each_way_the_workflow_can_go_wrong_is_named` (missing `always()`, running on a merge group, a secret, a
   checkout, a permission, joining the concurrency group). Add tests that run the step for a bot's, a fork's, a completed, a failed,
   a cancelled review and a failed gate, each named for its outcome. Verify `uv run pytest
   scripts/tests/test_claude_review_workflow.py` passes
-- [ ] 2.3 Pin D4 as task 1.6 settled it: the job runs for pull request events only. Add named cases to
+- [x] 2.3 Pin D4 as task 1.6 settled it: the job runs for pull request events only. Add named cases to
   `test_each_way_the_workflow_can_go_wrong_is_named` for an `if:` that also lets a comment's event or every event
   through, and say in the job's comment why (Probe results 1 and 2). Verify the tests pass, and fail with the `if:`
   widened to `always()`
