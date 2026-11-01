@@ -2,26 +2,26 @@
 
 ## 1. Probe (design D1)
 
-- [ ] 1.1 Create public `troupe-run/infra-probe-review-check` with `gh repo create` on its own, and push a copy of
+- [x] 1.1 Create public `troupe-run/infra-probe-review-check` with `gh repo create` on its own, and push a copy of
   `claude-review.yml` in which the review job's Claude step is a stub (`sleep "$SLEEP"; exit "$EXIT"`, both read from
   a file on the branch, so a push sets them) and no step uses a secret, plus the new `claude review completed` job as
   D2 and D3 describe it, with D4 as a plain "print what it would carry forward" step. Add a ruleset on `main`
   requiring `claude review completed` from `github-actions`. Verify the workflow is on the probe's `main` and
   `gh api repos/troupe-run/infra-probe-review-check/rules/branches/main` lists the required check
-- [ ] 1.2 Open a pull request; let its review succeed. Record the check on the head, then push with the stub sleeping
+- [x] 1.2 Open a pull request; let its review succeed. Record the check on the head, then push with the stub sleeping
   120 seconds and post an inline comment as the owner on it, and reply to it, while it sleeps. Record for the reply's
   run: its `head_sha` in `gh api .../actions/runs/<id>`, and which commit its check runs land on
   (`gh api .../commits/<head>/check-runs`). Verify by those two reads
-- [ ] 1.3 With a review sleeping (its `claude review completed` queued behind it), start a second run on the same
+- [x] 1.3 With a review sleeping (its `claude review completed` queued behind it), start a second run on the same
   head whose check fails at once; let the sleeping run then succeed. Record which check the ruleset counts
   (`gh pr view <n> --json mergeStateStatus,statusCheckRollup`, and whether `gh pr merge --rebase` is refused). Repeat
   with the order reversed. Verify by the reads after each
-- [ ] 1.4 Cancel the last review (`gh run cancel`), record that the check fails and the merge is refused; then
+- [x] 1.4 Cancel the last review (`gh run cancel`), record that the check fails and the merge is refused; then
   `gh run rerun <id>` and record that the re-run's check counts and the merge is allowed (don't merge: close the pull
   request afterwards). Verify by the reads
-- [ ] 1.5 Add `merge_group:` and turn the probe's merge queue on; record that the check reports as skipped on the
+- [x] 1.5 Add `merge_group:` and turn the probe's merge queue on; record that the check reports as skipped on the
   group's commit and the queue lands the pull request. Verify with the group's check runs and `main`'s log
-- [ ] 1.6 Write what 1.2 to 1.5 showed into design.md's "Probe results", and settle D4's two branches (reply runs on
+- [x] 1.6 Write what 1.2 to 1.5 showed into design.md's "Probe results", and settle D4's two branches (reply runs on
   the head or not; fail or wait while a review is running), editing D4 and the pr-review delta if a branch is dropped.
   Delete the probe with `gh repo delete troupe-run/infra-probe-review-check --yes`; verify `gh repo view` says it's
   gone
@@ -29,20 +29,20 @@
 ## 2. The job (design D2, D3, D5)
 
 - [ ] 2.1 Add `merge_group:` to `claude-review.yml`'s triggers with a comment naming D5, and the `completed` job
-  (`claude review completed`): `needs: [gate, review, resolve]`, `if: always() && github.event_name != 'merge_group'`,
-  `permissions: {contents: read, actions: read}`, a short timeout, no checkout, no secret, and an inline Python step
+  (`claude review completed`): `needs: [gate, review, resolve]`, `if: always() && github.event_name == 'pull_request'`,
+  `permissions: {}`, a short timeout, no checkout, no secret, and an inline Python step
   that reads the needs' results and the event from `env:`. Update the file's header comment ("It isn't a required
   check" no longer holds). Verify `uv run scripts/check.py` passes
 - [ ] 2.2 Implement D3's steps 1 to 3 in the step, each failure an escaped `::error` with `gh run rerun <id>`; pin the
   job's shape in `scripts/tests/test_claude_review_workflow.py`'s `problems()` and add named cases to
-  `test_each_way_the_workflow_can_go_wrong_is_named` (missing `always()`, missing merge-group skip, a secret, a
-  checkout, joining the concurrency group). Add tests that run the step for a bot's, a fork's, a completed, a failed,
+  `test_each_way_the_workflow_can_go_wrong_is_named` (missing `always()`, running on a merge group, a secret, a
+  checkout, a permission, joining the concurrency group). Add tests that run the step for a bot's, a fork's, a completed, a failed,
   a cancelled review and a failed gate, each named for its outcome. Verify `uv run pytest
   scripts/tests/test_claude_review_workflow.py` passes
-- [ ] 2.3 Implement D4 as task 1.6 settled it: the paged runs query by head, skipping runs whose review was skipped,
-  with a stubbed `gh` in tests for: carry forward a completed review, a cancelled one (names its run), one still
-  running, none found, an unreadable answer, and paging past many skipped runs. Verify the tests pass and fail when
-  the carry-forward is replaced by a plain pass
+- [ ] 2.3 Pin D4 as task 1.6 settled it: the job runs for pull request events only. Add named cases to
+  `test_each_way_the_workflow_can_go_wrong_is_named` for an `if:` that also lets a comment's event or every event
+  through, and say in the job's comment why (Probe results 1 and 2). Verify the tests pass, and fail with the `if:`
+  widened to `always()`
 
 ## 3. Required checks and delivery (design D6)
 

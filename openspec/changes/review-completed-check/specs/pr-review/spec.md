@@ -39,10 +39,10 @@ That the review of the head completed SHALL be required, through the `claude rev
 ## ADDED Requirements
 
 ### Requirement: A check reports whether the review of a pull request's head completed
-Each run of the review workflow SHALL report a check named `claude review completed` on the pull request's head. In a
-run that reviews, it SHALL wait for the review and its resolving job, and pass only if both succeeded. If either, or
-the gate before them, failed or was cancelled, it SHALL fail, and its message SHALL name the run to re-run with
-`gh run rerun <id>`.
+Each run of the review workflow started by a pull request event SHALL report a check named `claude review completed`
+on the pull request's head. It SHALL wait for the review and its resolving job, and pass only if both succeeded. If
+either, or the gate before them, failed or was cancelled, it SHALL fail, and its message SHALL name the run to re-run
+with `gh run rerun <id>`.
 
 #### Scenario: The review completes
 - **WHEN** a push starts a review, and the review and its resolving job succeed
@@ -60,39 +60,42 @@ the gate before them, failed or was cancelled, it SHALL fail, and its message SH
 - **WHEN** the review job fails
 - **THEN** `claude review completed` fails, and its message says `gh run rerun <id>` with that run's ID
 
-#### Scenario: The gate can't read the conversations
-- **WHEN** a reply's gate fails because it can't read the review conversations
+#### Scenario: The gate fails
+- **WHEN** the gate job of a pull request event's run fails or is cancelled
 - **THEN** `claude review completed` fails in that run, naming the run to re-run
 
-### Requirement: The latest review of the head decides the check
-When a commit has more than one `claude review completed` check, the one that counts SHALL be the latest. A
-cancelled or failed review followed by one that completes SHALL pass, and a re-run that completes SHALL pass.
-
-#### Scenario: A cancelled review, then a completed one
-- **WHEN** a push's review is cancelled by a reply's review run on the same head, and the reply's run completes
-- **THEN** the pull request's `claude review completed` passes
+### Requirement: The newest pull request event's run decides the check
+The `claude review completed` that counts for a pull request SHALL be the one from the newest run started by a pull
+request event on its head. A cancelled or failed review followed by such a run, or a re-run, that completes SHALL
+pass.
 
 #### Scenario: A re-run completes
-- **WHEN** a failed review run is re-run with `gh run rerun <id>` and its review completes
+- **WHEN** a cancelled review run is re-run with `gh run rerun <id>` and its review completes
+- **THEN** the pull request's `claude review completed` passes, though the cancelled attempt's failure is still listed
+
+#### Scenario: A newer run on the same head
+- **WHEN** the pull request is reopened while its last review on the same head had failed, and the new run's review
+  completes
 - **THEN** the pull request's `claude review completed` passes
 
-### Requirement: A run that reviews nothing can't hide a review that didn't complete
-In a run whose event needs no review (a bot's comment, a reply to a nit or a decision, a comment by someone without
-write access, a comment that isn't a reply), `claude review completed` SHALL report the result of the latest run that
-reviewed the pull request's head: pass if it completed, fail naming it if it didn't, and fail if no run has reviewed
-the head or one is still running.
+### Requirement: A comment's run doesn't change the check
+A run started by a review comment SHALL NOT report `claude review completed`, and SHALL NOT change whether it passes:
+the check stays as the newest pull request event's run left it. A reply's review that completes SHALL NOT pass a check
+whose last pull request review was cancelled; that run is re-run instead.
 
 #### Scenario: The review's own comments after a cancelled review
 - **WHEN** the last review of a head was cancelled, and a bot's comment then starts a run that reviews nothing
-- **THEN** that run's `claude review completed` fails, naming the cancelled run to re-run
+- **THEN** `claude review completed` still fails, naming the cancelled run
 
-#### Scenario: A reply to a nit after a completed review
-- **WHEN** the last review of a head completed, and a person replies to a nit
-- **THEN** that run's `claude review completed` passes
+#### Scenario: A reply cancels a push's review
+- **WHEN** a reply to a must-fix starts a review that cancels the push's review still running, and the reply's
+  review completes
+- **THEN** `claude review completed` still fails, naming the push's run, and re-running that run, which judges the
+  reply too, passes it
 
-#### Scenario: The run that reviewed the head can't be read
-- **WHEN** a run that reviews nothing can't read the workflow's earlier runs
-- **THEN** its `claude review completed` fails, saying the earlier review couldn't be read and how to re-run
+#### Scenario: A reply after a completed review
+- **WHEN** the last review of a head completed, and a person then replies to a nit or a must-fix
+- **THEN** `claude review completed` still passes
 
 ### Requirement: A pull request that isn't reviewed by design isn't held by the check
 `claude review completed` SHALL pass on a pull request that isn't reviewed by design: one opened by a bot, including

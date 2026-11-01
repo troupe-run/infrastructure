@@ -48,7 +48,7 @@ that sleeps or exits 1 on demand, and no secrets), with a ruleset requiring the 
 ### D2. One job at the end, named `claude review completed`
 
 A fourth job, `completed`, named `claude review completed`, `needs: [gate, review, resolve]`, with
-`if: always() && github.event_name != 'merge_group'`. `always()` makes it run whatever happened before it, including
+`if: always() && github.event_name == 'pull_request'`. `always()` makes it run whatever happened before it, including
 a cancelled review, so it reports a failure rather than leaving nothing. It sits outside the concurrency group, so a
 newer run's review never cancels it; it doesn't need cancelling, because it does nothing but decide.
 
@@ -62,55 +62,53 @@ also chose a job (#242).
 
 ### D3. What the job decides, in order
 
-Its step reads the needs' results and the event, never anything the pull request controls in an expression:
+The job runs only on `pull_request` events (D4). Its step reads the needs' results and the event from `env:`, never
+from an expression in the script:
 
 1. **Not reviewed by design** (the pull request's author is a bot, or it's from a fork; the same test as the gate's
    `if:`): pass, saying why. This covers Dependabot, release-please (`troupe-run-release[bot]`), any App's and a
    fork's pull request.
-2. **This run reviewed** (`gate` succeeded with `review=true`): pass if `review` and `resolve` both succeeded.
-   Otherwise fail, naming each that didn't and `gh run rerun <run id>` with this run's ID. `resolve` counts because a
-   review whose must-fixes weren't resolved leaves the pull request's state undecided, and re-running is cheap.
-3. **The gate failed or was cancelled**: fail, naming the run to re-run. Whether the event needed a review isn't
-   known, so the conservative answer is "not completed".
-4. **This run reviews nothing by its event** (`gate` skipped by its `if:` for a comment, or `gate` said `review=false`):
-   carry forward (D4).
+2. **This run reviewed** (`gate` succeeded with `review=true`, which it always says for a pull request event): pass
+   if `review` and `resolve` both succeeded. Otherwise fail, naming each that didn't, with `gh run rerun <run id>`
+   for this run. `resolve` counts because a review whose must-fixes weren't resolved leaves the pull request's state
+   undecided, and re-running is cheap.
+3. **Anything else** (the gate failed, was cancelled, or gave no answer or another one): fail, naming the run to
+   re-run. Whether the head was reviewed isn't known, so the safe answer is "not completed".
 
 Every failure is an `::error` annotation whose title is short and whose message has the command to run.
 
-### D4. Carrying forward the latest review of the head
+### D4. Only a pull request event's run reports the check
 
-In a run that reviews nothing, the job asks the Actions API (with `actions: read`, the run's own token) for this
-workflow's runs on the pull request's head, newest first, skipping this run, and takes the first whose `claude review`
-job wasn't skipped. Then:
+The probe (Probe results 1 and 2) showed that a comment's run lands its check runs on the pull request's head, and
+GitHub links its check suite to the pull request, but the pull request's checks and its ruleset ignore it: they read
+only the newest `pull_request` run on the head. So nothing a comment's run reports can turn a cancelled review green,
+or a completed one red.
 
-- that run's `claude review` and `resolve review conversations` jobs both succeeded → pass, naming the run;
-- it was cancelled or failed → fail, naming that run for `gh run rerun`;
-- it's still queued or running → fail, saying a review is running and its own check reports when it's done;
-- none is found, or the API can't be read → fail, saying so and suggesting a push or re-running the last review run.
+The job's `if:` is therefore `always() && github.event_name == 'pull_request'`: skipped on a comment's run, and on a
+merge group (D5). Carrying the latest review forward in a comment's run, as this design first planned, would
+compute an answer nothing reads.
 
-Which runs count as "on the head" depends on D1's first answer:
+What that means for a reply: a reply to a must-fix that cancels a push's review still running leaves the push run's
+check failed, and the reply's own review, though it completes, doesn't count. The way past is to re-run the push's
+run, which the check's message names. That review reads the conversations afresh, so it judges the reply too. It
+costs one more review than #242 expected, in the case where a reply arrives while a push's review runs.
 
-- **If a reply's run reports on the head**, the API query is by `head_sha` (the pull request's head from the event),
-  and a reply's review run counts like a push's. This is the case #242 expects.
-- **If it doesn't**, a reply's run, and its checks, never touch the head's required check. Then a reply's review
-  can't turn a cancelled push review green, so the only way past a cancelled push review is to re-run it, which the
-  check's message says. The job still runs in reply runs (it's harmless off the head) but needn't carry forward; the
-  design then drops step 4 to a plain pass and records why.
+**Alternative: carry forward in comment runs anyway**, in case GitHub starts counting them. It's an API read on every
+one of the review's own comments, to guard against a change nobody has announced; the after-merge check on a real
+pull request is where a change would show.
 
-The "still running" case relies on D1's second answer: the running review's own `claude review completed` must count
-once it reports. If the ruleset counts the check run created last, and the running run's check run was created
-earlier, the reply run's failure would stick. Then step 4 instead waits for that run (polling, bounded by the job's
-timeout) rather than failing at once.
-
-**Alternative: skip the job in runs that review nothing.** A skipped required check counts as passed, and could be the
-latest check on the head. That's exactly the hole this change closes.
+**Alternative: a reply's run waits for a running review instead of cancelling it** (`cancel-in-progress` true only
+for `pull_request`). It would spare the re-run, but it changes the review's concurrency design (review-judge-reply-on
+-post D3) and has edge cases of its own, since a group holds one pending run. That's a separate decision for the owner,
+outside #242.
 
 ### D5. `merge_group:` and the queue
 
 `claude-review.yml` adds `merge_group:` to its triggers only so `claude review completed` reports, as skipped, on
 each group's commit (merge-queue design D5's pattern for `plan (pull request)`). On a merge group the gate's `if:` is
 false (there's no pull request), so `gate`, `review` and `resolve` are skipped too, and nothing is minted or spent.
-The concurrency group names a pull request number; skipped jobs never join it.
+The concurrency group names a pull request number; skipped jobs never join it. The probe's queue landed its pull
+request with the check skipped on the group's commit (Probe results 4).
 
 ### D6. Required in all three repositories, in one apply
 
@@ -130,8 +128,8 @@ approval for a window that blocks nothing in practice.
 ### D7. Tests
 
 `scripts/tests/test_claude_review_workflow.py` pins the new job (name, needs, `if:`, permissions, timeout, no
-secrets, no checkout) the way it pins the others, and runs the job's script with stubbed `gh` answers for each case in
-D3 and D4, named for what each checks. The required-checks tests already fail when a required name has no job; they
+secrets, no checkout, no concurrency group) the way it pins the others, and runs the job's script for each case in
+D3, named for what each checks. The required-checks tests already fail when a required name has no job; they
 gain the new name for all three repositories. A docs test checks `docs/development-workflow.md` names the check.
 
 ## Risks / Trade-offs
@@ -139,13 +137,13 @@ gain the new name for all three repositories. A docs test checks `docs/developme
 - [An expired Claude token blocks every member's pull request in three repositories] → the run fails loudly, the
   check names the re-run, and the owner can bypass with `gh pr merge --admin` in an emergency. Renewing the token is
   already in `oob/README.md`.
-- [A run that reviews nothing fails while an earlier review is still running, and stays the latest] → D1 tests it;
-  D4 waits instead if so.
-- [The Actions API's runs list is paginated and filtered by `head_sha`] → the query asks for this workflow only and
-  pages until it finds a run whose review wasn't skipped; the review's own comments can add many runs to one head.
+- [GitHub starts counting a comment run's checks for the pull request] → a comment's run would then report a skipped
+  check, which counts as passed. Nothing announced suggests it; the probe's reads are recorded below, to repeat if
+  the check ever passes where it shouldn't.
+- [A reply that cancels a push's running review costs a re-run] → the check names it; the alternative in D4 is the
+  owner's to choose.
 - [GitHub caps a run's job outputs or changes a job's check run name] → the tests pin the name; the after-merge check
   is a real pull request seen blocked and unblocked.
-- [Extra runs: every bot comment's run now runs a short job] → it mints nothing and makes one or two API reads.
 
 ## Migration Plan
 
@@ -160,4 +158,25 @@ harmless.
 
 ## Probe results
 
-To be filled in by task 1.
+Run on `troupe-run/infra-probe-review-check` (2026-11-01), with a copy of the workflow whose review is a stub and a
+ruleset requiring `claude review completed` from `github-actions`. Pull request #1, head `50d7ce1`.
+
+1. **A comment's run reports on the head, and is linked to the pull request.** The reply's run (41258230382, event
+   `pull_request_review_comment`) has `head_sha` `50d7ce1`, the head; its check runs are among the head's check runs,
+   and its check suite lists the pull request. Its `GITHUB_SHA` is the merge ref's commit.
+2. **The pull request counts only its newest `pull_request` run.** The push's run (41258217217) had its review
+   cancelled by the reply's run and reported `claude review completed` failed at 00:48:16; the reply's run reported
+   it passed at 00:50:31. The pull request stayed `BLOCKED`, and `statusCheckRollup` and `gh pr checks` listed only the
+   push run's jobs. Then two reopens on the same head: run A (41258596608), and run B (41258659793) 50 seconds later,
+   which cancelled A's review. A's check failed after B had started; when B's passed, the pull request was `CLEAN`,
+   with both failures still listed. And as soon as run C (41258918187) was created, before it had reported anything,
+   the pull request went `BLOCKED` though B's success was listed: the newest run decides, and a check it hasn't
+   reported yet is missing.
+3. **A cancelled run still reports a failure, and a re-run counts.** `gh run cancel` on run C cancelled its review
+   and resolving jobs, but the `always()` job ran and failed: `BLOCKED`, with B's success listed. `gh run rerun` gave
+   attempt 2, whose check passed: `CLEAN`.
+4. **The merge queue lands with the check skipped.** With `merge_group:` added, a `merge_queue` rule on the ruleset
+   and auto-merge on, `gh pr merge 1 --rebase` queued the pull request. The group's run (41259300771) skipped every
+   job, `claude review completed` among them, on the group's commit `9681caa`, and the queue landed it on `main`.
+
+The probe repository was deleted afterwards.
