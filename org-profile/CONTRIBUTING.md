@@ -57,8 +57,9 @@ status; OpenSpec holds what the system does and how each change will do it.
    Specs, code and tests change together, and the repository's check passes before every commit (its README says how
    to run it).
 4. **Claude's review is acted on.** It reviews each push, and posts every finding as a conversation on the lines
-   it's about, labelled for who resolves it. A **must-fix** is fixed, or answered with a reason, and the review
-   resolves it on its next run once it's addressed. A **nit** is fixed, or answered (a follow-up issue, or why it
+   it's about, labelled for who resolves it. A **must-fix** is fixed, or answered with a reason (a fix needs no
+   reply, since the review sees the push; a reason is posted before any push), and the review resolves it on its
+   next run once it's addressed. A **nit** is fixed, or answered (a follow-up issue, or why it
    isn't worth it), and the author resolves it. A **decision** is the maintainer's, and so is a must-fix still in
    dispute after the re-review. The review runs again on each push, and on each reply to one of its
    open must-fixes, so a must-fix answered with a reply alone is judged when the reply is posted. A required check,

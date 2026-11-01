@@ -70,6 +70,12 @@ person's conversation or a resolved one, a comment that opens a conversation, or
 a review still running for the pull request. If a reply's run fails, re-run it (`gh run rerun <id>`, which the guard
 allows, or "Re-run jobs" on GitHub): each job reads the conversations afresh, so the reply is judged.
 
+**Reply to a must-fix only when it needs a discussion.** A must-fix fixed by a push needs no reply: the push's review
+sees the fix and resolves the conversation itself, so "fixed" adds nothing, and posted while that review is running it
+cancels it (see below). Reply when the answer isn't in the code: "this isn't a bug, because…". When a change needs both
+a reply and a push, reply first, then push: the push's review reads the reply with everything else (owner, 2026-11-01;
+review-completed-check design D4).
+
 **A pull request can't merge until the review of its head has completed** (spec: pr-review; review-completed-check
 design D2 to D4, #242). The required check `claude review completed` passes when a push's review and its resolving job
 succeeded, and fails when either was cancelled or failed. "Nothing open" after a review that never finished isn't a
