@@ -1,21 +1,18 @@
 # Tasks
 
-## 1. Probe GitHub's behaviour (design D3)
+## 1. Probe GitHub's behaviour, and the App's permission (design Context, D1)
 
-- [ ] 1.1 Create public `troupe-run/infra-probe-milestone-list` with one open issue (no milestone) and one open pull
-  request, and a workflow (`permissions: contents: read`) that prints `open_issues_count` and the length of
-  `issues?state=open` for itself and for `troupe-run/website`. Verify from the run log that each list holds only the
-  pull requests while the count includes the issues. If either doesn't hold, stop and bring the finding to the owner
-  before 2.x
-- [ ] 1.2 Record 1.1's results in a comment on #247, then delete the repository and verify `gh repo view` reports
+- [x] 1.1 Create public `troupe-run/infra-probe-milestone-list` with one open issue (no milestone) and one open pull
+  request, and a workflow that prints `open_issues_count` and the open items `issues?state=open` lists (with and
+  without `milestone=none`) for itself, troupe, website and infrastructure, from a `contents: read` job and a job
+  with `pr-plan`'s permissions. Done: the `contents: read` job saw everything; the `pull-requests: write` job saw only
+  pull requests (troupe 10 of 67). The finding went to the owner, who chose D1
+- [x] 1.2 Record 1.1's results in a comment on #247, then delete the repository and verify `gh repo view` reports
   it gone
-
-- [ ] 1.3 Test design D2's precondition: mint an issues-only token from the infrastructure App locally (JWT from the
-  App's key in 1Password, then `app/installations/<id>/access_tokens` with `{"permissions":{"issues":"read"}}`; the
-  owner runs any `op` prompt; never print the key or token), and compare `issues?state=open` for troupe with the
-  owner's `gh` login. Record on #247 whether the pull requests are listed. If they aren't, stop and ask the owner to
-  choose between `pull_requests: read` on the App and the search count, record the choice in design D2, and adjust
-  2.x and 3.x before going on
+- [ ] 1.3 Declare `"pull_requests": "read"` for `troupe-run-infrastructure` in `oob/app-installations.json`. The owner
+  grants "Pull requests: Read-only" in the App's settings and accepts it on the org's installation. Verify
+  `gh api orgs/troupe-run/installations` shows the permission, and `uv run scripts/oob.py` reports no installation
+  difference
 
 ## 2. The script refuses a short read (design D2)
 
@@ -34,15 +31,15 @@
 
 - [ ] 3.1 Change `scripts/tests/test_milestone_review_workflow.py` first: each job has a "Token to read the issues"
   step before "Issues with no milestone", with the same `if:`, App 5272634, `owner: troupe-run`, the repositories
-  derived from `tofu/milestones.json`, and `permission-issues: read` (plus `permission-pull-requests: read` if 1.3 chose it) as its only `permission-*`
-  inputs; the list step's
+  derived from `tofu/milestones.json`, and `permission-issues: read` and `permission-pull-requests: read` as its only `permission-*` inputs; the list step's
   `GH_TOKEN` is that step's output; the jobs' permissions are unchanged. Rename the test that says "the job's own
   token". Verify the new tests fail on the current workflow
 - [ ] 3.2 Add the token step to `pr-plan` and `plan` in `.github/workflows/tofu.yml`, pointing each list step's
   `GH_TOKEN` at it, and rewrite the comment above `pr-plan`'s step to say which token reads and why (#247). Verify
   `uv run scripts/check.py` passes, including the workflow tests and actionlint if the check runs it
-- [ ] 3.3 Prove an `issues: read` token from the infrastructure App sees the issues: mint one locally for the four
-  repositories with the permissions 3.1 pins, as 1.3 does, and run the script with it against a scratch
+- [ ] 3.3 Prove the token D1 mints sees every issue: mint one locally for the four repositories with the permissions
+  3.1 pins (JWT from the App's key in 1Password, then `app/installations/<id>/access_tokens`; the owner runs any `op`
+  prompt; never print the key or token), and run the script with it against a scratch
   `tofu show -json` with one milestone's state edited to `closed`. Verify it lists troupe's open issues with no
   milestone, matching a run with the owner's `gh` login, and passes the count check. Never print the key or token;
   delete the scratch files afterwards
