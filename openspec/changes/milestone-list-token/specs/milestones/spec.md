@@ -4,8 +4,8 @@
 
 ### Requirement: The list of issues with no milestone is read with a token that can see issues
 Both plan jobs SHALL read the list with a token minted from the troupe-run-infrastructure App, limited to the
-milestone repositories and to reading issues. They SHALL NOT read it with the job's `GITHUB_TOKEN`, which can't see
-issues on the other repositories, and SHALL NOT give the job's `GITHUB_TOKEN` a new permission for it.
+milestone repositories and to reading issues and pull requests. They SHALL NOT read it with the job's `GITHUB_TOKEN`,
+whose view of issues depends on its other permissions, and SHALL NOT give it a new permission for it.
 `scripts/check.py` SHALL fail when either job reads the list with another token or one that can do more.
 
 #### Scenario: A milestone-closing plan on a pull request
