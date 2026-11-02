@@ -23,7 +23,7 @@ Evidence read on 2026-11-02:
 | `uv run scripts/oob.py` on this branch (359ee07, = `origin/main`) | one difference: the App's `pull_requests: read`, which #261 declares. Nothing about troupe's specs |
 | troupe#268 (`runner-sdk`, head 581dc2f) | draft, blocked. Adds `specs/plugin-sdk` and `specs/runner-tools`; its `installation`, `quality-check` and `scripted-runner` deltas change no Purpose |
 | troupe `main` (5837ccc) | neither spec |
-| `purpose()` of each new spec on 581dc2f | exactly #262's quotes |
+| `purpose()` of each new spec | exactly #262's quotes on 581dc2f (proposal), on 454da7a (task 1.1, after the head moved), on 51041e0, and on troupe `main` at e4a33c2, troupe#268's merge (task 2.1) |
 | `plugin-sdk`'s Capability line | `` `cap:plugins`, `cap:protocol` `` |
 | `runner-tools`'s Capability line | `` `cap:actor-runners`, `cap:plugins` `` |
 | troupe specs on `main` naming `cap:actor-runners` | actor-runners, claude-code-runner, runner-protocol, scripted-runner |
