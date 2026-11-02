@@ -6,6 +6,10 @@ The plan changes are written in `tofu show -json`'s shape for resource_changes. 
 closes a milestone yet, so the script refuses any milestone change whose state it can't read: every
 plan lists each milestone, unchanged ones as no-op, so a shape it misreads fails every plan rather
 than hiding a close. The issues are the API's shape, trimmed to the fields the script reads.
+
+The fake answers like GitHub's issues list: every open issue and pull request, with or without a
+milestone, and `open_issues_count` counts them all. A token that can't see some of them (#247: a
+job token with `pull-requests: write` saw only the pull requests) is a count above what's listed.
 """
 
 import json
@@ -53,20 +57,34 @@ def closing(title: str = "0.1.0") -> dict[str, Any]:
     return plan(*(change(repo, "open", "closed", title) for repo in REPOSITORIES))
 
 
-def issue(repo: str, number: int, title: str = "Some work") -> dict[str, Any]:
+def issue(
+    repo: str, number: int, title: str = "Some work", milestone: str | None = None
+) -> dict[str, Any]:
     return {
         "number": number,
         "title": title,
         "html_url": f"https://github.com/troupe-run/{repo}/issues/{number}",
-        "milestone": None,
+        "milestone": None if milestone is None else {"title": milestone},
     }
 
 
-class FakeGitHub:
-    """Answers `gh api` reads from per-repository data, a page per list, and records each path."""
+def pull(repo: str, number: int) -> dict[str, Any]:
+    return {**issue(repo, number, "Bump something"), "pull_request": {"url": "x"}}
 
-    def __init__(self, issues: dict[str, list[list[dict[str, Any]]]], **fail: bool) -> None:
+
+class FakeGitHub:
+    """Answers `gh api` reads from per-repository data, a page per list, and records each path.
+
+    `counts` gives a repository's `open_issues_count`; by default it's how many are listed."""
+
+    def __init__(
+        self,
+        issues: dict[str, list[list[dict[str, Any]]]],
+        counts: dict[str, Any] | None = None,
+        **fail: bool,
+    ) -> None:
         self.issues = issues
+        self.counts = counts or {}
         self.fail = fail
         self.paths: list[str] = []
 
@@ -81,10 +99,18 @@ class FakeGitHub:
         if "/issues?" in path:
             assert "--paginate" in args
             assert "--slurp" in args
-            assert "milestone=none" in path
+            assert "milestone=" not in path  # every open item, so the count can be checked
             assert "state=open" in path
             return mr.GhResult(0, json.dumps(self.issues.get(repo, [[]])), "")
-        return mr.GhResult(0, json.dumps({"name": repo, "has_issues": repo != ".github"}), "")
+        listed = sum(len(page) for page in self.issues.get(repo, [[]]))
+        about = {
+            "name": repo,
+            "has_issues": repo != ".github",
+            "open_issues_count": self.counts.get(repo, listed),
+        }
+        if self.counts.get(repo, listed) is None:
+            del about["open_issues_count"]
+        return mr.GhResult(0, json.dumps(about), "")
 
 
 def run(
@@ -154,11 +180,66 @@ def test_a_repository_with_issues_off_is_left_out_and_said_so(
 
 
 def test_pull_requests_are_left_out(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    pull = {**issue("website", 55, "Bump typescript"), "pull_request": {"url": "x"}}
-    gh = FakeGitHub({"website": [[pull, issue("website", 80)]]})
+    gh = FakeGitHub({"website": [[pull("website", 55), issue("website", 80)]]})
     _, written, _ = run(tmp_path, closing(), gh, capsys)
     assert "website: 1" in written
     assert "#55" not in written
+
+
+def test_issues_with_a_milestone_are_left_out(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    planned = issue("troupe", 12, milestone="0.2.0")
+    gh = FakeGitHub({"troupe": [[planned, issue("troupe", 13)]]})
+    code, written, _ = run(tmp_path, closing(), gh, capsys)
+    assert code == 0
+    assert "troupe: 1" in written
+    assert "[#13]" in written
+    assert "#12" not in written
+
+
+def test_a_read_short_of_github_s_count_fails_naming_the_repository_and_both_numbers(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # #245: the token saw troupe's pull requests and none of its issues.
+    pulls = [pull("troupe", n) for n in (301, 302, 303)]
+    gh = FakeGitHub({"troupe": [pulls]}, counts={"troupe": 17})
+    code, written, said = run(tmp_path, closing(), gh, capsys)
+    assert (code, written) == (1, "<not written>")
+    assert "troupe-run/troupe" in said
+    assert "read 3" in said
+    assert "GitHub counts 17" in said
+
+
+def test_a_read_above_github_s_count_lists_as_it_read(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # An issue opened between reading the count and reading the list.
+    gh = FakeGitHub({"troupe": [[issue("troupe", 7), issue("troupe", 8)]]}, counts={"troupe": 1})
+    code, written, _ = run(tmp_path, closing(), gh, capsys)
+    assert code == 0
+    assert "troupe: 2" in written
+
+
+def test_an_issue_without_a_milestone_field_fails_rather_than_counting_as_none(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    bare = issue("troupe", 7)
+    del bare["milestone"]
+    code, written, said = run(tmp_path, closing(), FakeGitHub({"troupe": [[bare]]}), capsys)
+    assert (code, written) == (1, "<not written>")
+    assert "no milestone field" in said
+
+
+@pytest.mark.parametrize("count", [None, "17", True])
+def test_a_count_that_can_t_be_read_fails_and_writes_no_list(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], count: object
+) -> None:
+    gh = FakeGitHub({"troupe": [[issue("troupe", 7)]]}, counts={"troupe": count})
+    code, written, said = run(tmp_path, closing(), gh, capsys)
+    assert (code, written) == (1, "<not written>")
+    assert "troupe-run/troupe" in said
+    assert "open_issues_count" in said
 
 
 def test_every_page_is_read(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

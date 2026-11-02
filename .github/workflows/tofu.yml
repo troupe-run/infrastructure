@@ -180,12 +180,26 @@ jobs:
             --summary "$RUNNER_TEMP/checks.md"
       # A plan that closes a milestone lists the open issues with no milestone, so each gets an
       # outcome before the release closes (spec: milestones; needed-for-milestones design D4). It
-      # reads the public repositories' issues with this job's token, and fails rather than show a
-      # short list.
+      # reads with a token from the infrastructure App that reads issues and pull requests on the
+      # milestone repositories (tofu/milestones.json), never this job's own: with
+      # `pull-requests: write`, GitHub's issues list showed that token only the pull requests, and
+      # the list read "none" (#247). It fails rather than show a short list, and it checks it read
+      # as many as GitHub counts (milestone-list-token design D1, D2).
+      - name: Token to read the issues
+        id: issues-token
+        if: steps.secrets.outputs.available == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: 5272634
+          private-key: ${{ secrets.TF_VAR_github_app_pem }}
+          owner: troupe-run
+          repositories: troupe,.github,infrastructure,website
+          permission-issues: read
+          permission-pull-requests: read
       - name: Issues with no milestone
         if: steps.secrets.outputs.available == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.issues-token.outputs.token }}
         run: |
           uv run --no-project scripts/milestone_review.py --plan-json "$RUNNER_TEMP/plan.json" \
             --summary "$RUNNER_TEMP/review.md"
@@ -398,11 +412,23 @@ jobs:
         run: |
           uv run --no-project scripts/plan_checks.py --plan-json "$RUNNER_TEMP/plan.json" \
             --summary "$RUNNER_TEMP/checks.md"
-      # As in pr-plan: the issues with no milestone, when this plan closes one, as they are now.
+      # As in pr-plan: the issues with no milestone, when this plan closes one, as they are now,
+      # read with the same App token.
+      - name: Token to read the issues
+        id: issues-token
+        if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: 5272634
+          private-key: ${{ secrets.TF_VAR_github_app_pem }}
+          owner: troupe-run
+          repositories: troupe,.github,infrastructure,website
+          permission-issues: read
+          permission-pull-requests: read
       - name: Issues with no milestone
         if: steps.target.outputs.plan == 'true' && steps.ci.outputs.superseded != 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.issues-token.outputs.token }}
         run: |
           uv run --no-project scripts/milestone_review.py --plan-json "$RUNNER_TEMP/plan.json" \
             --summary "$RUNNER_TEMP/review.md"
