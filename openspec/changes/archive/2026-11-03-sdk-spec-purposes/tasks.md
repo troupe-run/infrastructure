@@ -25,9 +25,10 @@
       `pull_requests: read` difference shows too; name it as #261's. Keep the output for the pull request. Stop and
       revise the change if it reports anything else (c6d710c, 0 behind `origin/main` c8f7466, #261 merged: exactly the
       two board options, "oob: 2 difference(s)")
-- [ ] 2.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows
+- [x] 2.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows
       only `cap:plugins`' and `cap:actor-runners`' descriptions updated in place on troupe-run/troupe, and nothing
-      else created, changed or deleted. Tick this in the same push as the archive, so the owner approves one more run
+      else created, changed or deleted. Tick this in the same push as the archive, so the owner approves one more run (plan for 83e571f, run
+      41457719962: 0 to add, 1 to change, 0 to destroy, the two labels' descriptions only)
 - [x] 2.4 Run `openspec validate sdk-spec-purposes --strict` and verify it passes
 
 ## Workflow follow-up
