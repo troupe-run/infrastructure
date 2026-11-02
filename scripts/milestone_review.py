@@ -8,10 +8,13 @@ Spec: milestones ("A plan that closes a milestone lists the open issues with no 
 list of issues with no milestone is never silently short"); design: needed-for-milestones D4. When
 a release closes, every open issue with no milestone needs an outcome (the org's CONTRIBUTING.md,
 "Milestones"). The plan says whether the apply closes one: a milestone whose state goes from open to
-closed. Then this reads each milestone repository's open issues with no milestone, through
-`gh api`, and writes a Markdown section for the posted plan. A plan that closes none writes an
-empty file and reads nothing. A repository it can't read fails the step, and nothing is written,
-so the list is never shown short. It only lists: it never fails on what it finds.
+closed. Then this reads each milestone repository's open issues and pull requests, through
+`gh api`, keeps the issues with no milestone, and writes a Markdown section for the posted plan. A
+plan that closes none writes an empty file and reads nothing. A repository it can't read fails the
+step, and nothing is written, so the list is never shown short. So does a read with fewer items
+than GitHub's `open_issues_count`: the token couldn't see them all (#247). The workflow gives it a
+token from the infrastructure App that reads issues and pull requests (milestone-list-token design
+D1). It only lists: it never fails on what it finds.
 """
 
 import argparse
@@ -102,21 +105,35 @@ def gh_json(gh: Gh, path: str, paginate: bool = False) -> Any:  # noqa: ANN401 (
 
 
 def unmilestoned(repo: str, gh: Gh) -> list[dict[str, Any]] | None:
-    """The repository's open issues with no milestone, or None when its issues are off."""
+    """The repository's open issues with no milestone, or None when its issues are off.
+
+    It reads every open issue and pull request, and checks there are at least as many as GitHub's
+    `open_issues_count`, which counts both. A token that can't see some of them lists fewer: #245's
+    job token, with `pull-requests: write`, saw only the pull requests and listed none (#247)."""
     about = gh_json(gh, f"repos/{ORG}/{repo}")
     if not isinstance(about, dict):
         raise ReadError(f"repos/{ORG}/{repo}: GitHub's answer isn't an object")
     if about.get("has_issues") is False:
         return None
-    listed = gh_json(
-        gh, f"repos/{ORG}/{repo}/issues?milestone=none&state=open&per_page=100", paginate=True
-    )
+    counted = about.get("open_issues_count")
+    if not isinstance(counted, int) or isinstance(counted, bool):
+        raise ReadError(f"repos/{ORG}/{repo}: GitHub's answer has no open_issues_count")
+    listed = gh_json(gh, f"repos/{ORG}/{repo}/issues?state=open&per_page=100", paginate=True)
+    if len(listed) < counted:
+        raise ReadError(
+            f"{ORG}/{repo}: read {len(listed)} open issues and pull requests, but GitHub counts "
+            f"{counted}, so the token can't see them all (#247)"
+        )
     found = []
     for each in listed:
         if not isinstance(each, dict):
             raise ReadError(f"{ORG}/{repo}: an issue in GitHub's answer isn't an object")
         if "pull_request" in each:
             continue  # the issues API lists pull requests too
+        if "milestone" not in each:
+            raise ReadError(f"{ORG}/{repo}: an issue has no milestone field")
+        if each["milestone"] is not None:
+            continue
         if not isinstance(each.get("number"), int) or not isinstance(each.get("html_url"), str):
             raise ReadError(f"{ORG}/{repo}: an issue has no number or link")
         found.append(each)
