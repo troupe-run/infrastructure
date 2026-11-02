@@ -26,7 +26,7 @@
 - [ ] 2.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows
       only `cap:plugins`' and `cap:actor-runners`' descriptions updated in place on troupe-run/troupe, and nothing
       else created, changed or deleted. Tick this in the same push as the archive, so the owner approves one more run
-- [ ] 2.4 Run `openspec validate sdk-spec-purposes --strict` and verify it passes
+- [x] 2.4 Run `openspec validate sdk-spec-purposes --strict` and verify it passes
 
 ## Workflow follow-up
 
