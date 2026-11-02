@@ -421,7 +421,9 @@ fix, Dependabot opens a pull request for it.
 
 troupe, website and this repository also get weekly version updates, from a `.github/dependabot.yml` that this
 repository generates and delivers (spec: `dependency-updates`). Its schedule, cooldown and commit prefix are changed
-in `tofu/dependabot.json`, and a repository's ecosystems and labels in `tofu/labels/dependabot.json`. Then run
+in `tofu/dependabot.json`, and so are the dependencies an ecosystem ignores (`ignore`: troupe's `uv` ignores its
+own workspace members, `troupe` and `troupe-*`, which PyPI's unrelated `troupe` would otherwise shadow, #259). A
+repository's ecosystems and labels are changed in `tofu/labels/dependabot.json`. Then run
 `uv run scripts/dependabot_config.py`. An edit to the delivered file itself is refused in troupe and website, and
 reverted by the next apply everywhere. Version updates leave out the workflows the guard delivers. Those are bumped
 here, and the next apply delivers them. Their pull requests are titled `chore(deps): …` and carry only declared

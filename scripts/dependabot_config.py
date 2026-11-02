@@ -103,6 +103,7 @@ def entry(
     labels: dict[str, Any],
     ecosystem: str,
     excluded: list[str],
+    ignored: list[str],
 ) -> dict[str, Any]:
     cooldown = dict(policy["cooldown"])
     if ecosystem not in policy["semver_cooldown"]:
@@ -115,6 +116,8 @@ def entry(
         "commit-message": dict(policy["commit-message"]),
         "labels": [labels["dependencies"]["name"], labels["ecosystems"][ecosystem]["name"]],
     }
+    if ignored:
+        update["ignore"] = [{"dependency-name": name} for name in ignored]
     if ecosystem == "github-actions" and excluded:
         update["exclude-paths"] = excluded
     return update
@@ -132,7 +135,13 @@ def configs(
         repo: {
             "version": 2,
             "updates": [
-                entry(policy, labels, ecosystem, workflows if repo in guard_targets else [])
+                entry(
+                    policy,
+                    labels,
+                    ecosystem,
+                    workflows if repo in guard_targets else [],
+                    policy.get("ignore", {}).get(repo, {}).get(ecosystem, []),
+                )
                 for ecosystem in ecosystems
             ],
         }
