@@ -6,7 +6,9 @@ workflows:
     uv run scripts/dependabot_config.py
 
 Spec: dependency-updates; deliver-dependabot design D1 to D3. A test fails while a generated file
-differs from what this writes, so the files can't drift from their sources.
+differs from what this writes, so the files can't drift from their sources. The policy's `ignore`
+names, per repository and ecosystem, the dependencies that entry ignores (dependabot-ignore-members
+design D1).
 """
 
 import json
@@ -61,6 +63,33 @@ def unknown_releases(policy: dict[str, Any], labels: dict[str, Any]) -> list[str
             for ecosystem in ecosystems
             if ecosystem not in labels["repositories"][repo]
         ]
+    return problems
+
+
+def invalid_ignores(policy: dict[str, Any], labels: dict[str, Any]) -> list[str]:
+    """Each problem with the policy's ignore: a repository or ecosystem that isn't declared for
+    Dependabot, an empty list, or a name listed twice (dependabot-ignore-members design D3)."""
+    problems = []
+    for repo, ecosystems in policy.get("ignore", {}).items():
+        if repo not in labels["repositories"]:
+            problems.append(
+                f"{repo}: in tofu/dependabot.json's ignore, but not a repository in "
+                "tofu/labels/dependabot.json"
+            )
+            continue
+        for ecosystem, names in ecosystems.items():
+            where = f"{repo}: ecosystem {ecosystem!r} in tofu/dependabot.json's ignore"
+            if ecosystem not in labels["repositories"][repo]:
+                problems.append(
+                    f"{where} isn't one of its Dependabot ecosystems in tofu/labels/dependabot.json"
+                )
+            elif not names:
+                problems.append(f"{where} lists no dependency; leave it out to ignore nothing")
+            else:
+                problems += [
+                    f"{where} lists {name!r} more than once"
+                    for name in sorted({n for n in names if names.count(n) > 1})
+                ]
     return problems
 
 
@@ -134,7 +163,11 @@ def generated() -> dict[str, str]:
     """Each generated file's name in tofu/dependabot/ mapped to its content."""
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     labels = json.loads(LABELS.read_text(encoding="utf-8"))
-    problems = undirected_ecosystems(policy, labels) + unknown_releases(policy, labels)
+    problems = (
+        undirected_ecosystems(policy, labels)
+        + unknown_releases(policy, labels)
+        + invalid_ignores(policy, labels)
+    )
     if problems:
         raise SystemExit("\n".join(problems))
     guard_delivery_tf = tofu_text.GUARD_DELIVERY_TF.read_text(encoding="utf-8")

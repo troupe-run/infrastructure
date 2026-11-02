@@ -132,6 +132,47 @@ def test_only_troupes_uv_dependencies_ship_and_the_declaration_is_valid() -> Non
     assert dependabot_config.unknown_releases(policy, labels) == []
 
 
+# What an entry ignores (dependabot-ignore-members design D1, D3)
+
+MEMBERS = {"troupe": {"uv": ["troupe", "troupe-*"]}}
+
+
+def test_an_ignore_naming_an_ecosystem_the_repository_lacks_is_named() -> None:
+    policy = copy.deepcopy(POLICY) | {"ignore": {"troupe": {"npm": ["left-pad"]}}}
+    assert dependabot_config.invalid_ignores(policy, LABELS) == [
+        "troupe: ecosystem 'npm' in tofu/dependabot.json's ignore isn't one of its Dependabot "
+        "ecosystems in tofu/labels/dependabot.json"
+    ]
+
+
+def test_an_ignore_naming_an_undeclared_repository_is_named() -> None:
+    policy = copy.deepcopy(POLICY) | {"ignore": {"troupe-docs": {"uv": ["troupe"]}}}
+    assert dependabot_config.invalid_ignores(policy, LABELS) == [
+        "troupe-docs: in tofu/dependabot.json's ignore, but not a repository in "
+        "tofu/labels/dependabot.json"
+    ]
+
+
+def test_an_empty_ignore_list_is_named() -> None:
+    policy = copy.deepcopy(POLICY) | {"ignore": {"troupe": {"uv": []}}}
+    assert dependabot_config.invalid_ignores(policy, LABELS) == [
+        "troupe: ecosystem 'uv' in tofu/dependabot.json's ignore lists no dependency; leave it "
+        "out to ignore nothing"
+    ]
+
+
+def test_a_name_ignored_twice_is_named() -> None:
+    policy = copy.deepcopy(POLICY) | {"ignore": {"troupe": {"uv": ["troupe", "x", "troupe"]}}}
+    assert dependabot_config.invalid_ignores(policy, LABELS) == [
+        "troupe: ecosystem 'uv' in tofu/dependabot.json's ignore lists 'troupe' more than once"
+    ]
+
+
+def test_a_policy_with_no_ignore_has_none_to_check() -> None:
+    assert dependabot_config.invalid_ignores(POLICY, LABELS) == []
+    assert dependabot_config.invalid_ignores(POLICY | {"ignore": MEMBERS}, LABELS) == []
+
+
 # Schedule and cooldown
 
 

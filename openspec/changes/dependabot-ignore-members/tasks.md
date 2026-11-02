@@ -2,12 +2,12 @@
 
 ## 1. The declaration is checked (design D1, D3; spec: "A malformed ignore declaration fails the check")
 
-- [ ] 1.1 Write the tests first, in `scripts/tests/test_dependabot_config.py`, beside the `releases` ones: a copy of
+- [x] 1.1 Write the tests first, in `scripts/tests/test_dependabot_config.py`, beside the `releases` ones: a copy of
       the policy naming `npm` for troupe is named with troupe and `npm`; one naming an undeclared repository is named
       with it; an empty list for troupe's `uv` is named with troupe and `uv`; `troupe` twice is named with troupe,
       `uv` and `troupe`; a policy with no `ignore` has nothing to report. Verify they fail before 1.2, for the missing
       function only
-- [ ] 1.2 Add `unknown_ignores` (or similarly named) to `scripts/dependabot_config.py`, run from `generated()` with
+- [x] 1.2 Add `invalid_ignores` to `scripts/dependabot_config.py`, run from `generated()` with
       the other checks, and mention `ignore` in the module docstring. Verify 1.1's tests pass and `uv run
       scripts/check.py` passes
 
