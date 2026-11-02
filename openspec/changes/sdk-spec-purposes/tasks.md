@@ -2,12 +2,12 @@
 
 ## 1. Record the Purposes and widen the descriptions
 
-- [ ] 1.1 Read the `plugin-sdk` and `runner-tools` Purposes from troupe#268's branch
+- [x] 1.1 Read the `plugin-sdk` and `runner-tools` Purposes from troupe#268's branch
       (`gh api "repos/troupe-run/troupe/contents/openspec/changes/runner-sdk/specs/<name>/spec.md?ref=runner-sdk"`,
       through `scripts/oob.py`'s `purpose()`), and add them to `oob/troupe-spec-purposes.json` where design D1 says.
       Verify the file has 29 entries, its keys are sorted (`jq -r 'keys_unsorted[]'` against `sort`), each new entry
       matches #262's quote, and `git diff` shows only those two added lines
-- [ ] 1.2 Set `cap:plugins`'s and `cap:actor-runners`'s descriptions in `tofu/labels/troupe.json` to design D2's text.
+- [x] 1.2 Set `cap:plugins`'s and `cap:actor-runners`'s descriptions in `tofu/labels/troupe.json` to design D2's text.
       Verify the file still holds 36 labels, `git diff` shows only those two descriptions, they are 85 and 98
       characters, and `uv run scripts/check.py` passes
 
