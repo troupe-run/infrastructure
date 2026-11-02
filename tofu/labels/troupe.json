@@ -2,7 +2,7 @@
   {
     "name": "cap:actor-runners",
     "color": "1D76DB",
-    "description": "Running an actor through a runner process: launch, limits, cancel, and one trusted outcome"
+    "description": "Running an actor through a runner: launch, limits, cancel, its tool calls, and one trusted outcome"
   },
   {
     "name": "cap:actors",
@@ -112,7 +112,7 @@
   {
     "name": "cap:plugins",
     "color": "1D76DB",
-    "description": "Ports, transports (direct or JSON-RPC), and how plugins are declared, acquired and trusted"
+    "description": "Ports, transports, the plugin SDK, and how plugins are declared, acquired and trusted"
   },
   {
     "name": "cap:policy",
