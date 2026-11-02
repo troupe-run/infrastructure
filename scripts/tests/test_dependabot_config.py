@@ -173,6 +173,47 @@ def test_a_policy_with_no_ignore_has_none_to_check() -> None:
     assert dependabot_config.invalid_ignores(POLICY | {"ignore": MEMBERS}, LABELS) == []
 
 
+def ignoring(repo: str) -> dict[str, dict[str, Any]]:
+    """The repository's update entries, keyed by ecosystem, under a policy ignoring troupe's
+    workspace members."""
+    configs = dependabot_config.configs(POLICY | {"ignore": MEMBERS}, LABELS, GUARD_FILES, TARGETS)
+    return {u["package-ecosystem"]: u for u in configs[repo]["updates"]}
+
+
+def test_troupes_uv_entry_ignores_only_its_members_by_name() -> None:
+    assert ignoring("troupe")["uv"]["ignore"] == [
+        {"dependency-name": "troupe"},
+        {"dependency-name": "troupe-*"},
+    ]
+
+
+def test_no_other_entry_ignores_anything() -> None:
+    assert "ignore" not in ignoring("troupe")["github-actions"]
+    for repo in ("infrastructure", "website"):
+        for update in ignoring(repo).values():
+            assert "ignore" not in update
+
+
+def test_the_ignore_comes_after_the_labels() -> None:
+    assert list(ignoring("troupe")["uv"])[-2:] == ["labels", "ignore"]
+
+
+def test_the_rendered_ignore_reads_back_with_its_wildcard() -> None:
+    configs = dependabot_config.configs(POLICY | {"ignore": MEMBERS}, LABELS, GUARD_FILES, TARGETS)
+    text = dependabot_config.render(configs["troupe"])
+    assert "- dependency-name: troupe-*\n" in text
+    assert yaml.safe_load(text) == configs["troupe"]
+
+
+@pytest.mark.dependabot
+@pytest.mark.labels
+def test_only_troupes_uv_entry_ignores_and_only_its_members() -> None:
+    policy = json.loads(dependabot_config.POLICY.read_text(encoding="utf-8"))
+    labels = json.loads(dependabot_config.LABELS.read_text(encoding="utf-8"))
+    assert policy["ignore"] == MEMBERS
+    assert dependabot_config.invalid_ignores(policy, labels) == []
+
+
 # Schedule and cooldown
 
 
