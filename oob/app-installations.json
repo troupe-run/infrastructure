@@ -57,6 +57,7 @@
       "organization_administration": "write",
       "organization_projects": "read",
       "pages": "write",
+      "pull_requests": "read",
       "workflows": "write"
     },
     "repository_selection": "selected"
