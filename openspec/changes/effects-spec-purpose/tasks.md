@@ -13,15 +13,17 @@
 
 ## 2. Verify against troupe's main
 
-- [ ] 2.1 Once troupe#273 has merged (design D3), re-read the Purpose from troupe's `main`
+- [x] 2.1 Once troupe#273 has merged (design D3), re-read the Purpose from troupe's `main`
       (`gh api repos/troupe-run/troupe/contents/openspec/specs/effects/spec.md`, through `purpose()`) and compare it with
       the record. Verify the spec's `Capability:` line still names `cap:effects` and `cap:config`. If the Purpose
       changed, update the record, check design D2 against the new text, and re-run 1.1–1.2's checks. Stop and revise
-      the change if the spec is renamed, dropped or names other labels
-- [ ] 2.2 Fast-forward the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports nothing about
+      the change if the spec is renamed, dropped or names other labels (troupe `main` 97c1a2d, troupe#273's merge:
+      the Purpose matches the record, Capability line unchanged)
+- [x] 2.2 Fast-forward the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports nothing about
       troupe's specs or Purposes, and exactly one difference of this change's: the board's `effects` option still has
       the old description (design D3). Keep the output for the pull request. Stop and revise the change if it reports
-      anything else
+      anything else (10c5543, 0 behind `origin/main` e2811fa: exactly the board's `effects` option,
+      "oob: 1 difference(s)")
 - [ ] 2.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows only
       `cap:effects`'s description updated in place on troupe-run/troupe, and nothing else created, changed or deleted.
       Tick this in the same push as the archive, so the owner approves one more run
