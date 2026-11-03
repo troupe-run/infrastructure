@@ -24,10 +24,14 @@
       the old description (design D3). Keep the output for the pull request. Stop and revise the change if it reports
       anything else (10c5543, 0 behind `origin/main` e2811fa: exactly the board's `effects` option,
       "oob: 1 difference(s)")
-- [ ] 2.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows only
+- [x] 2.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows only
       `cap:effects`'s description updated in place on troupe-run/troupe, and nothing else created, changed or deleted.
-      Tick this in the same push as the archive, so the owner approves one more run
-- [ ] 2.4 Run `openspec validate effects-spec-purpose --strict` and verify it passes
+      Tick this in the same push as the archive, so the owner approves one more run (plan for ae66651, run
+      41717875449: 0 to add, 3 to change, 0 to destroy. This change's one: `cap:effects`' description, updated in
+      place. The other two are `guard.yml` deliveries to troupe and website that infrastructure's `main` has pending,
+      from ee9fba1's setup-uv bump, whose `tofu` run on `main` waits for approval; every pull request's plan shows
+      them until it's applied)
+- [x] 2.4 Run `openspec validate effects-spec-purpose --strict` and verify it passes
 
 ## Workflow follow-up
 
