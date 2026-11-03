@@ -42,7 +42,7 @@
   {
     "name": "cap:effects",
     "color": "1D76DB",
-    "description": "What an actor may touch (files, network), declared in config and enforced by its stage"
+    "description": "What an actor may touch, declared in config, applied by its runner, audited, and enforced by a stage"
   },
   {
     "name": "cap:escalation",
