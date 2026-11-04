@@ -113,12 +113,14 @@ The coverage step (after the review step, `if: ${{ !cancelled() }}`) reads the e
    towards coverage.
 2. It pairs each with the `tool_result` that has the same `tool_use_id`. A result with `is_error: true`, or none,
    counts for nothing.
-3. The lines a Read covered are taken from the line numbers at the start of each line of the result's text: what
-   was actually returned, not what was asked for. So the default limit, a truncation or an offset past the end all
+3. The lines a Read covered are taken from the line numbers at the start of each line of the result's text
+   (`<n>` then a tab; `<n>→` is accepted too, an earlier format): what was actually returned, not what was asked for.
+   The result's content is a string, or a list of text blocks whose texts are joined. So the default limit, a truncation or an offset past the end all
    count as they really happened. A result whose lines don't parse counts for nothing. That errs towards "not read",
    never towards "read".
 4. A target is read when the union of its covered lines is `1..N`, where `N` is its line count from the
-   `RUNNER_TEMP` list. A file is **read in full** when every one of its targets is read; **in part** when any line
+   `RUNNER_TEMP` list, counted as Python's `splitlines()` counts them. Read numbers an empty line after the last
+   newline too, which isn't required. A file is **read in full** when every one of its targets is read; **in part** when any line
    of any target is covered; **not read** otherwise. A file with no targets is complete.
 
 The step prints only paths and counts, never a result's text. It writes a table to `GITHUB_STEP_SUMMARY` (paths
@@ -148,21 +150,22 @@ the resolving job and doesn't change D2 or D3.)
 
 ### D5. The turn budget and the timeout
 
-A step before the review counts the Reads the list needs, `reads = Σ ceil(N / READ_CHUNK)` over every target, and
+A step before the review counts the Reads the list needs, `reads = Σ ceil(bytes / READ_CHUNK_BYTES)` over every
+target, and
 sets `max_turns = min(40 + 2 × reads, 400)`. `claude_args` reads it as `--max-turns ${{ steps.diff.outputs.max_turns
 }}`. The value is an integer the step computed, never pull request text. Two turns per Read leaves room for searches,
 call sites and findings. Read calls made in parallel in one turn make the real need lower. The cap of 400, with the
 timeout raised from 20 to 90 minutes, bounds a runaway review's cost and time. A pull request too big for that fails
 D4's check, naming what wasn't read.
 
-`READ_CHUNK` is the number of lines one Read with no `limit` returns. That's Claude Code's default, not something
-the prompt sets. The review's tool reads 2,000 lines by default, but the value used is the one task 1.1 measures,
-along with any cap on how much one Read returns. The budget is only an estimate: if `READ_CHUNK` is wrong, the
-budget is too generous or too tight, and too tight shows as a failed check naming files, never as a false pass,
-because D3 counts the lines actually returned.
+How much one Read returns is Claude Code's, not something the prompt sets, and it's a token cap, not a line count
+(Probe results): a Read with no `limit` stops at about 25,000 tokens, which was about 41 KB of short lines and about
+22 KB of long ones. So the estimate is by size. `READ_CHUNK_BYTES` is 20,000, below both, so the estimate errs
+towards more turns. The budget is only an estimate: if it's wrong, it's too generous or too tight, and too tight
+shows as a failed check naming files, never as a false pass, because D3 counts the lines actually returned.
 
-The base (40), the per-Read amount (2), the cap (400) and `READ_CHUNK` are named constants in the step, pinned by the
-test.
+The base (40), the per-Read amount (2), the cap (400) and `READ_CHUNK_BYTES` are named constants in the step, pinned
+by the test.
 
 ### D6. The model is a repository variable, declared once in OpenTofu
 
@@ -189,8 +192,9 @@ The prompt changes in three places:
 
 - "Read the diff with `gh pr diff`" becomes: read `.review-diff/files.json`, then read every target it lists in full
   with Read, in parallel where you can, before writing findings. That's an added file whole, a modified or renamed
-  file whole and its `.diff`, and a deleted file's `.diff`. A file longer than one Read returns needs Reads with
-  `offset` until its end. `gh pr diff` is no longer the way to read it.
+  file whole and its `.diff`, and a deleted file's `.diff`. A Read with no `limit` may stop early (its result says
+  how far it got), and Read refuses a file over 256 KB, or a `limit` over 25,000 tokens, outright: read such a file in
+  parts with `offset` and `limit` (for example 500 lines at a time) until its end. `gh pr diff` is no longer the way to read it.
 - For each changed signature, removed or renamed name, or changed behaviour, search the checkout for its uses with
   Grep and read them (D7a).
 - A review that hasn't read everything listed isn't a clean review. Don't say it is, and don't stop at the task list
@@ -223,8 +227,8 @@ follow-up issue, sized by what these reports show.
   that hides its outputs, reading `structured_output`; `completed` not reading `coverage`; the model taken straight
   from `vars` into `claude_args`; `--max-turns` fixed again; `fetch-depth` back to 1;
 - tests that run the diff step on a scratch git repository with a merge commit: a modified, an added, a deleted, a
-  binary, a renamed and a skip-listed file, each with the targets D2's table gives; a file longer than `READ_CHUNK`
-  and the `reads` it gives; a planted `.review-diff/`;
+  binary, a renamed and a skip-listed file, each with the targets D2's table gives; a file larger than
+  `READ_CHUNK_BYTES` and the `reads` it gives; a planted `.review-diff/`;
 - tests that run the coverage step on execution files: every target read; one file read in part across two Reads
   that leave a gap; a modified file whose diff was read but not the file; a Read with `is_error`; a Read outside the
   list, which appears in the call-site report and not in coverage; a Grep's pattern in the report; no execution file;
@@ -267,3 +271,44 @@ follow-up issue, sized by what these reports show.
 
 None that change the specs. The constants in D5 may need tuning once real large reviews have run. Tuning them is a
 reviewed change to the workflow.
+
+## Probe results
+
+Task 1.1, 2026-11-04. Claude Code 2.1.316 run locally as the action runs it (`claude -p --output-format stream-json
+--verbose --setting-sources user --allowedTools "Read(./**),Grep(./**)"`, model `claude-sonnet-5-5`), in a scratch
+directory of generated files. Only fields and counts are recorded here, no file contents.
+
+**The execution file is the same messages.** At the pinned SHA, `base-action/src/run-claude-sdk.ts` pushes every
+message the Agent SDK's `query()` yields into a list, and `base-action/src/execution-file.ts` writes that list with
+`JSON.stringify` to `$RUNNER_TEMP/claude-execution-output.json`. The action depends on
+`@anthropic-ai/claude-agent-sdk ^0.3.311`, so its Claude Code may differ from 2.1.316 in Read's limits. D3 counts what
+was returned, so a difference can only make coverage lower, never pass a skim.
+
+**Shapes:**
+
+- A tool call is a block in an `assistant` message's `message.content`: `{type: "tool_use", id, name, input, caller}`.
+  Read's `input` is `{file_path}` (absolute), with `offset` and `limit` when given. Grep's is `{pattern, path,
+  output_mode}`.
+- Its result is a block in the next `user` message's `message.content`: `{type: "tool_result", tool_use_id, content}`,
+  with `is_error: true` only on an error. `content` was a string in every case.
+- Read's text numbers each line as `<n>` then a tab (`1\tline 1 ...`), from `offset` (or 1).
+- The `user` message also carries `tool_use_result`; for a Read that succeeded it's `{type, file: {filePath, content,
+  numLines, startLine, totalLines, truncatedByTokenCap?}}`. D3 uses the numbered text, which is in the message
+  itself, not this.
+
+**What Read returned:**
+
+| File | Call | Result |
+| --- | --- | --- |
+| 2,500 lines, ~20 bytes each (51 KB) | no `limit` | lines 1 to 2,004 (`truncatedByTokenCap: true`) |
+| the same | `offset 2001, limit 600` | lines 2,001 to 2,501 (the last is the empty line after the final newline) |
+| 3,000 lines of one character | no `limit` | all 3,001 lines, in one Read |
+| 2,500 lines of ~100 bytes (252 KB) | no `limit` | lines 1 to 216 (`truncatedByTokenCap: true`) |
+| the same | `offset 1, limit 2500` | error: "exceeds maximum allowed tokens (25000)" |
+| 3,000 lines of ~400 bytes (1.2 MB) | no `limit` | error: "exceeds maximum allowed size (256KB)" |
+| the same | `offset 1, limit 100` | error: "exceeds maximum allowed tokens (25000)" |
+| a missing file | no `limit` | error: "File does not exist" |
+
+So there's no line limit: a Read with no `limit` stops at a token cap, and one whose `limit` asks for more than 25,000
+tokens, or a file over 256 KB read with no `limit`, is refused outright and returns nothing. The prompt says so (D7).
+D5 estimates by size, not lines.
