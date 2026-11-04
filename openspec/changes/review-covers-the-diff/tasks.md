@@ -65,19 +65,19 @@
   implementation line by line", which read only `tasks.md`, goes through the coverage step and then `completed`, and
   the check fails naming the unread files. Verify it passes, and that it fails when `completed`'s coverage step is
   removed
-- [ ] 5.5 Update the workflow's header comment and the `review` and `completed` jobs' comments for D2 to D6. Run
+- [x] 5.5 Update the workflow's header comment and the `review` and `completed` jobs' comments for D2 to D6. Run
   website's `npx vitest run tests/unit/workflow-node-version.test.ts` and troupe's `uv run scripts/check.py` with the
   new `claude-review.yml` in place in scratch clones, as the header asks. Verify both pass
 
 ## 6. Docs (development-workflow delta)
 
-- [ ] 6.1 In `docs/development-workflow.md`, "Claude's review": say what a passing `claude review completed` means
+- [x] 6.1 In `docs/development-workflow.md`, "Claude's review": say what a passing `claude review completed` means
   (the head's review finished and read every listed file and diff in full) and doesn't (no bugs, call sites checked,
   or no need for the owner's review), what the list leaves out, where the call-site report is, and what to do when it
   fails for coverage. Update the paragraph on
   required checks that says what the review job is. Add a docs test that the section says what a passing review
   means. Verify it passes, and fails with the paragraph removed
-- [ ] 6.2 Check `CLAUDE.md` step 5 and the org's contributing guide (`org-profile/CONTRIBUTING.md`) for "the review of
+- [x] 6.2 Check `CLAUDE.md` step 5 and the org's contributing guide (`org-profile/CONTRIBUTING.md`) for "the review of
   the last push has completed" and say there that it includes coverage, where they say what a passing check means.
   Verify `uv run scripts/check.py` passes
 
