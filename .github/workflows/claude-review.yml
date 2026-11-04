@@ -345,6 +345,14 @@ jobs:
               return {"path": path, "lines": lines(data), "bytes": len(data)}
 
 
+          def binary(rev, path):
+              # Git's own test, on the blob as committed: a NUL byte in its first 8,000 bytes. Never
+              # .gitattributes, which the pull request can change to mark its code binary.
+              done = subprocess.run(["git", "cat-file", "blob", f"{rev}:{path}"], capture_output=True,
+                                    check=False)
+              return done.returncode == 0 and b"\0" in done.stdout[:8000]
+
+
           if os.path.lexists(OUT):
               if git("ls-files", "--", OUT).strip():
                   fail(f"The pull request has files under {OUT}/, which is the review's own")
@@ -370,11 +378,13 @@ jobs:
               entry = {"path": path, "status": kind, "targets": []}
               if kind == "renamed":
                   entry["from"] = old
-              diff = git("diff", "--no-color", "--no-ext-diff", "-M", "HEAD^1", "HEAD", "--",
-                         *dict.fromkeys((old, new)))
+              # --text and --no-textconv, so no .gitattributes the pull request brings can hide its
+              # text behind "Binary files differ" or a driver's rendering of it.
+              diff = git("diff", "--no-color", "--no-ext-diff", "--no-textconv", "--text", "-M",
+                         "HEAD^1", "HEAD", "--", *dict.fromkeys((old, new)))
               if os.path.basename(path) in REVIEW_SKIP:
                   entry["skipped"] = "on the skip list"
-              elif b"\n@@ " not in diff and (b"\nBinary files " in diff or b"\nGIT binary patch" in diff):
+              elif binary("HEAD^1" if kind == "deleted" else "HEAD", path):
                   entry["skipped"] = "binary"
               else:
                   name = os.path.join(OUT, path + ".diff")
@@ -532,11 +542,13 @@ jobs:
             file whole as it is now and its diff (`.review-diff/<path>.diff`, which also shows
             what was removed), and a deleted file's diff. Read every target in full with Read,
             several at once where you can, before you write any finding; don't stop at the task
-            list or the file list. A Read with no `limit` may stop early, and its result says how
-            far it got; Read refuses a file over 256 KB, or a `limit` over 25,000 tokens, outright.
-            Read such a target in parts with `offset` and `limit`, say 500 lines at a time, until
-            its end. Use these diffs rather than `gh pr diff`, whose output a large pull request
-            cuts short. A step after you measures which targets your Read calls covered, and a
+            list or the file list. A Read with no `limit` often stops before the end of a long
+            file. When a result ends before the target's last line (the list gives each target's
+            line count), Read it again from the next line with `offset`, until you've read its
+            last line. Do this for every target before you write any finding. Read refuses a file
+            over 256 KB, or a `limit` over 25,000 tokens, outright: read such a target in parts
+            with `offset` and `limit`, say 500 lines at a time. Use these diffs rather than
+            `gh pr diff`, whose output a large pull request cuts short. A step after you measures which targets your Read calls covered, and a
             review that didn't read them all isn't a clean review, whatever its summary says.
 
             A change can be wrong for code it didn't touch. For each changed signature, removed

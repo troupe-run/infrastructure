@@ -201,9 +201,16 @@ The prompt changes in three places:
 
 - "Read the diff with `gh pr diff`" becomes: read `.review-diff/files.json`, then read every target it lists in full
   with Read, in parallel where you can, before writing findings. That's an added file whole, a modified or renamed
-  file whole and its `.diff`, and a deleted file's `.diff`. A Read with no `limit` may stop early (its result says
-  how far it got), and Read refuses a file over 256 KB, or a `limit` over 25,000 tokens, outright: read such a file in
-  parts with `offset` and `limit` (for example 500 lines at a time) until its end. `gh pr diff` is no longer the way to read it.
+  file whole and its `.diff`, and a deleted file's `.diff`. A Read with no `limit` often stops before the end of a
+  long file: when a result ends before the target's last line (the list gives each target's line count), Read it
+  again from the next line with `offset`, until its last line, for every target before any finding. Read refuses a
+  file over 256 KB, or a `limit` over 25,000 tokens, outright: read such a file in parts with `offset` and `limit`
+  (for example 500 lines at a time).
+
+  #274's second review read `docs/development-workflow.md` (60 KB) with one Read that stopped at the token cap, and
+  didn't continue, so its check failed, as it should. The prompt put the action first after that (owner, 2026-11-04).
+  If that isn't enough, the next step is for the diff step to list each target's Reads as `offset`/`limit` chunks in
+  `files.json`, for the session to make exactly those. `gh pr diff` is no longer the way to read it.
 - For each changed signature, removed or renamed name, or changed behaviour, search the checkout for its uses with
   Grep and read them (D7a).
 - A review that hasn't read everything listed isn't a clean review. Don't say it is, and don't stop at the task list
