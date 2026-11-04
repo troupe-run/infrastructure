@@ -47,12 +47,12 @@
 
 ## 5. Coverage and the check (design D3, D4, D5)
 
-- [ ] 5.1 Add the step "Measure what the review read" after the review step (`if: ${{ !cancelled() }}`) as D3 and D7a
+- [x] 5.1 Add the step "Measure what the review read" after the review step (`if: ${{ !cancelled() }}`) as D3 and D7a
   say, with the job outputs `coverage` and `unread`, and in `GITHUB_STEP_SUMMARY` the coverage table and the
   call-site report. Raise the review job's
   `timeout-minutes` to 90. Pin both, and add named cases (the step removed, reading `structured_output` or the
   summary, printing a result's text, the timeout back to 20). Verify `uv run scripts/check.py` passes
-- [ ] 5.2 Add tests that run the step on execution files shaped as task 1.1 recorded: every diff read; one read in
+- [x] 5.2 Add tests that run the step on execution files shaped as task 1.1 recorded: every diff read; one read in
   part across two Reads with a gap; a modified file whose diff was read but not the file (in part); a Read with
   `is_error`; a Read of an unchanged file, which is in the call-site report and not in coverage; a Grep whose pattern
   is in the report, and a hostile one that stays escaped; a session with no search, reported as none and not failing;

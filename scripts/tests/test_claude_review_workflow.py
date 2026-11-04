@@ -178,6 +178,19 @@ PROMPT_READS = [
     "a review that didn't read them all isn't a clean review",
 ]
 PROMPT_NOT = "Read the diff with"
+# After Claude: what it read, from the execution file only, never its structured output or its
+# summary (D3). It can't fail the job; an output it didn't set fails the check (D4).
+COVERAGE_NAME = "Measure what the review read"
+COVERAGE = {
+    "id": "coverage",
+    "if": "${{ !cancelled() }}",
+    "continue-on-error": True,
+    "shell": "python3 {0}",
+    "env": {"EXECUTION_FILE": "${{ steps.review.outputs.execution_file }}"},
+}
+COVERAGE_SHA256 = "5cddb61a0067b32b2ef66b94cd6fa2211c5296732f3f37dd95cfec8bcbacf013"
+# Long enough for MAX_TURNS' cap (D5).
+REVIEW_TIMEOUT = 90
 # After Claude, in a job of its own, only when the review succeeded: resolve and re-tier what Claude
 # names, checked against conversations read again in that job (design D4, D4a).
 RESOLVER_NAME = "Resolve and re-tier what Claude named"
@@ -185,7 +198,12 @@ RESOLVER = {
     "shell": "python3 {0}",
     "env": {**STEP_ENV, "STRUCTURED_OUTPUT": "${{ needs.review.outputs.structured_output }}"},
 }
-REVIEW_OUTPUTS = {"structured_output": "${{ steps.review.outputs.structured_output }}"}
+REVIEW_OUTPUTS = {
+    "structured_output": "${{ steps.review.outputs.structured_output }}",
+    # What the review read, for the check (review-covers-the-diff design D4).
+    "coverage": "${{ steps.coverage.outputs.coverage }}",
+    "unread": "${{ steps.coverage.outputs.unread }}",
+}
 # The resolving job: after the review, only when it succeeded, with nothing checked out and no
 # Claude, and the one token that can write contents, which resolving a conversation needs (D4a).
 RESOLVE_NEEDS = "review"
@@ -215,7 +233,7 @@ GATE_OUTPUTS = {"review": "${{ steps.gate.outputs.review }}"}
 GATE_TOKEN_INPUTS = {**TOKEN_INPUTS, "permission-pull-requests": "read"}
 REVIEW_NEEDS = "gate"
 REVIEW_IF = "needs.gate.outputs.review == 'true'"
-OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME, DIFF_NAME, MODEL_NAME}
+OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME, DIFF_NAME, MODEL_NAME, COVERAGE_NAME}
 # The required check that the review of the head completed (review-completed-check design D2 to
 # D5): after every other job, whatever became of them, on pull request events only, since GitHub
 # ignores a comment's run for a pull request (Probe results). No token, no secret, no checkout,
@@ -511,6 +529,11 @@ def problems(workflow: dict[str, Any]) -> list[str]:
             )
     if not isinstance(job.get("timeout-minutes"), int):
         found.append("review has no timeout-minutes")
+    elif job["timeout-minutes"] != REVIEW_TIMEOUT:
+        found.append(
+            f"review's timeout-minutes is {job['timeout-minutes']}, not {REVIEW_TIMEOUT}, "
+            "which the turn cap needs"
+        )
 
     steps = job.get("steps") or []
     reports = []
@@ -600,6 +623,13 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         at = steps.index(diffs[0])
         if checkouts and not (steps.index(checkouts[-1]) < at < steps.index(actions[0])):
             found.append(f"{DIFF_NAME!r} doesn't run between the checkouts and the action")
+    measures = [step for step in steps if step.get("name") == COVERAGE_NAME and "run" in step]
+    if len(measures) != 1:
+        found.append(f"review has {len(measures)} steps named {COVERAGE_NAME!r}, not one")
+    else:
+        found += own_step_problems(measures[0], COVERAGE, COVERAGE_SHA256, repr(COVERAGE_NAME))
+        if steps.index(measures[0]) < steps.index(actions[0]):
+            found.append(f"{COVERAGE_NAME!r} runs before the action")
     models = [step for step in steps if step.get("name") == MODEL_NAME and "run" in step]
     if len(models) != 1:
         found.append(f"review has {len(models)} steps named {MODEL_NAME!r}, not one")
@@ -706,6 +736,11 @@ def snapshot(w: dict[str, Any]) -> dict[str, Any]:
 
 def diff_step(w: dict[str, Any]) -> dict[str, Any]:
     step = next(s for s in job(w)["steps"] if s.get("name") == DIFF_NAME)
+    return step  # type: ignore[no-any-return]
+
+
+def coverage_step(w: dict[str, Any]) -> dict[str, Any]:
+    step = next(s for s in job(w)["steps"] if s.get("name") == COVERAGE_NAME)
     return step  # type: ignore[no-any-return]
 
 
@@ -1237,6 +1272,31 @@ def sources(w: dict[str, Any], change: str) -> None:
             ),
             "the prompt still says",
         ),
+        # What the review read (D3, D4).
+        (lambda w: job(w)["steps"].remove(coverage_step(w)), "0 steps named 'Measure what"),
+        (lambda w: move(w, coverage_step(w), 0), "runs before the action"),
+        (
+            lambda w: coverage_step(w)["env"].update(
+                {"EXECUTION_FILE": "${{ steps.review.outputs.structured_output }}"}
+            ),
+            "'Measure what the review read' is given",
+        ),
+        (
+            lambda w: coverage_step(w)["env"].update(
+                {"SAID": "${{ steps.review.outputs.structured_output }}"}
+            ),
+            "'Measure what the review read' is given",
+        ),
+        (lambda w: coverage_step(w).pop("continue-on-error"), "the review read' is given"),
+        (lambda w: coverage_step(w).update({"if": "${{ success() }}"}), "review read' is given"),
+        (
+            lambda w: coverage_step(w).update(
+                {"run": str(coverage_step(w)["run"]) + "print(text)\n"}
+            ),
+            "the review read''s script isn't the one this test pins",
+        ),
+        (lambda w: job(w)["outputs"].pop("coverage"), "review's outputs are"),
+        (lambda w: job(w).update({"timeout-minutes": 20}), "timeout-minutes is 20, not 90"),
         # The model, from the checked variable (D6).
         (lambda w: job(w)["steps"].remove(model_step(w)), '0 steps named "Check the review'),
         (lambda w: move(w, model_step(w), len(job(w)["steps"])), "runs after the action"),
@@ -2098,3 +2158,205 @@ def test_a_value_that_isn_t_a_model_name_fails_and_reaches_nothing(
     assert len(done.stdout.splitlines()) == 1, done.stdout
     assert "which isn't a model name" in done.stdout
     assert outputs == ""
+
+
+# The coverage step, run on execution files shaped as the probe recorded (review-covers-the-diff
+# design D3, Probe results): a Read is a tool_use block in an assistant message, its result a
+# tool_result block in the next user message, each returned line numbered "<n>" and a tab.
+def call(ident: str, name: str, given: dict[str, Any]) -> dict[str, Any]:
+    block = {"type": "tool_use", "id": ident, "name": name, "input": given, "caller": {}}
+    return {"type": "assistant", "message": {"content": [block]}}
+
+
+def result(ident: str, text: str, *, error: bool = False) -> dict[str, Any]:
+    block: dict[str, Any] = {"type": "tool_result", "tool_use_id": ident, "content": text}
+    if error:
+        block["is_error"] = True
+    return {"type": "user", "message": {"content": [block]}}
+
+
+class Session:
+    """A workspace, the list the diff step left in RUNNER_TEMP, and the session's messages."""
+
+    def __init__(self, tmp_path: Path, files: list[dict[str, Any]]) -> None:
+        self.tmp_path = tmp_path
+        self.workspace = tmp_path / "workspace"
+        self.workspace.mkdir()
+        (tmp_path / "runner-temp").mkdir()
+        listed = tmp_path / "runner-temp" / "review-files.json"
+        listed.write_text(json.dumps({"files": files}), encoding="utf-8")
+        self.messages: list[dict[str, Any]] = []
+        self.count = 0
+
+    def read(self, path: str, lines: range, *, arrow: bool = False, error: bool = False) -> None:
+        self.count += 1
+        ident = f"toolu_{self.count}"
+        mark = "→" if arrow else "\t"
+        text = "\n".join(f"{n}{mark}text {n}" for n in lines)
+        self.messages += [
+            call(ident, "Read", {"file_path": str(self.workspace / path)}),
+            result(ident, "File does not exist." if error else text, error=error),
+        ]
+
+    def grep(self, pattern: str) -> None:
+        self.count += 1
+        ident = f"toolu_{self.count}"
+        self.messages += [
+            call(ident, "Grep", {"pattern": pattern, "path": str(self.workspace)}),
+            result(ident, "1:found"),
+        ]
+
+    def finish(self, text: str = "Done.") -> None:
+        self.messages.append({"type": "result", "subtype": "success", "result": text})
+
+    def run(self, content: str | None = None) -> tuple[str, list[Any], str, str]:
+        """The coverage and unread outputs, the run summary, and the log."""
+        execution = self.tmp_path / "claude-execution-output.json"
+        execution.write_text(
+            json.dumps(self.messages) if content is None else content, encoding="utf-8"
+        )
+        outputs = self.tmp_path / "outputs"
+        summary = self.tmp_path / "summary.md"
+        outputs.write_text("", encoding="utf-8")
+        env = {
+            "EXECUTION_FILE": str(execution),
+            "GITHUB_OUTPUT": str(outputs),
+            "GITHUB_STEP_SUMMARY": str(summary),
+        }
+        done = run_step(coverage_step(review()), self.tmp_path, self.tmp_path, env)
+        assert done.returncode == 0, done.stdout + done.stderr
+        said = dict(line.split("=", 1) for line in outputs.read_text(encoding="utf-8").splitlines())
+        return (
+            said["coverage"],
+            json.loads(said["unread"]),
+            summary.read_text(encoding="utf-8"),
+            done.stdout,
+        )
+
+
+def listed(path: str, status: str, *targets: tuple[str, int]) -> dict[str, Any]:
+    return {
+        "path": path,
+        "status": status,
+        "targets": [{"path": p, "lines": n, "bytes": n * 10} for p, n in targets],
+    }
+
+
+MODIFIED = listed("src/a.py", "modified", ("src/a.py", 30), (".review-diff/src/a.py.diff", 12))
+ADDED = listed("src/b.py", "added", ("src/b.py", 2500))
+SKIPPED = {"path": "uv.lock", "status": "modified", "skipped": "on the skip list", "targets": []}
+
+
+def test_every_target_read_is_complete(tmp_path: Path) -> None:
+    session = Session(tmp_path, [MODIFIED, ADDED, SKIPPED])
+    session.read("src/a.py", range(1, 31))
+    session.read(".review-diff/src/a.py.diff", range(1, 13))
+    session.read("src/b.py", range(1, 2005))
+    session.read("src/b.py", range(2001, 2502))
+    session.finish()
+    coverage, unread, summary, _ = session.run()
+    assert (coverage, unread) == ("complete", [])
+    assert "| src/a.py | modified | in full |" in summary
+    assert "| uv.lock | on the skip list | nothing to read |" in summary
+
+
+def test_two_reads_that_leave_a_gap_are_in_part(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED])
+    session.read("src/b.py", range(1, 1001))
+    session.read("src/b.py", range(1501, 2501))
+    coverage, unread, _, out = session.run()
+    assert (coverage, unread) == ("incomplete", [{"path": "src/b.py", "read": "in part"}])
+    assert "  in part: src/b.py" in out.splitlines()
+
+
+def test_a_modified_file_whose_diff_was_read_but_not_the_file_is_in_part(tmp_path: Path) -> None:
+    session = Session(tmp_path, [MODIFIED])
+    session.read(".review-diff/src/a.py.diff", range(1, 13))
+    assert session.run()[:2] == ("incomplete", [{"path": "src/a.py", "read": "in part"}])
+
+
+def test_a_read_that_failed_counts_for_nothing(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED])
+    session.read("src/b.py", range(1, 2501), error=True)
+    assert session.run()[:2] == ("incomplete", [{"path": "src/b.py", "read": "not read"}])
+
+
+def test_the_earlier_arrow_numbering_counts_too(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED])
+    session.read("src/b.py", range(1, 2501), arrow=True)
+    assert session.run()[:2] == ("complete", [])
+
+
+def test_an_unchanged_file_read_is_reported_not_counted(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED])
+    session.read("src/caller.py", range(1, 2501))
+    session.read(".review-threads.json", range(1, 5))
+    coverage, unread, summary, _ = session.run()
+    assert (coverage, unread) == ("incomplete", [{"path": "src/b.py", "read": "not read"}])
+    assert "- Read src/caller.py, which the pull request didn't change" in summary
+    assert ".review-threads.json" not in summary
+
+
+def test_a_read_outside_the_workspace_counts_for_nothing(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED])
+    session.read("../src/b.py", range(1, 2501))
+    coverage, _, summary, _ = session.run()
+    assert coverage == "incomplete"
+    assert "../" not in summary
+
+
+def test_searches_are_reported_and_a_hostile_one_stays_in_its_line(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED])
+    session.read("src/b.py", range(1, 2501))
+    session.grep("def resolve(")
+    session.grep("x |\n## Approved <b>")
+    coverage, _, summary, _ = session.run()
+    assert coverage == "complete"
+    assert "- Searched for def resolve\\(" in summary
+    assert "- Searched for x \\| \\#\\# Approved \\<b\\>" in summary
+    assert not any(line.startswith("## Approved") for line in summary.splitlines())
+
+
+def test_no_search_is_reported_and_doesn_t_fail_the_coverage(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED])
+    session.read("src/b.py", range(1, 2501))
+    coverage, _, summary, _ = session.run()
+    assert coverage == "complete"
+    assert "- No search." in summary
+    assert "- Read no file the pull request didn't change." in summary
+
+
+def test_a_list_planted_in_the_workspace_is_ignored(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED])
+    planted = session.workspace / ".review-diff" / "files.json"
+    planted.parent.mkdir()
+    planted.write_text(json.dumps({"files": []}), encoding="utf-8")
+    assert session.run()[:2] == ("incomplete", [{"path": "src/b.py", "read": "not read"}])
+
+
+@pytest.mark.parametrize("content", ["not json", '{"type": "result"}', ""])
+def test_an_unreadable_record_counts_nothing_as_read(tmp_path: Path, content: str) -> None:
+    session = Session(tmp_path, [MODIFIED, SKIPPED])
+    coverage, unread, summary, _ = session.run(content)
+    assert (coverage, unread) == ("unknown", [{"path": "src/a.py", "read": "not read"}])
+    assert "Coverage isn't known" in summary
+
+
+def test_no_execution_file_counts_nothing_as_read(tmp_path: Path) -> None:
+    Session(tmp_path, [MODIFIED])
+    outputs = tmp_path / "outputs"
+    outputs.write_text("", encoding="utf-8")
+    env = {"EXECUTION_FILE": "", "GITHUB_OUTPUT": str(outputs)}
+    done = run_step(coverage_step(review()), tmp_path, tmp_path, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert outputs.read_text(encoding="utf-8") == (
+        'coverage=unknown\nunread=[{"path":"src/a.py","read":"not read"}]\n'
+    )
+
+
+def test_a_path_that_holds_a_workflow_command_stays_inside_its_line(tmp_path: Path) -> None:
+    hostile = listed("x\n::error::forged", "added", ("x\n::error::forged", 3))
+    session = Session(tmp_path, [hostile])
+    _, unread, _, out = session.run()
+    assert unread == [{"path": "x\n::error::forged", "read": "not read"}]
+    assert not any(line.startswith("::") for line in out.splitlines()), out
