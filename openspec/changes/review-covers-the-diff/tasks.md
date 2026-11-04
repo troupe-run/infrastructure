@@ -2,13 +2,13 @@
 
 ## 1. The execution file's shape (design D3)
 
-- [ ] 1.1 Run Claude Code locally in a scratch directory, the way the action runs it (`claude -p --output-format
+- [x] 1.1 Run Claude Code locally in a scratch directory, the way the action runs it (`claude -p --output-format
   stream-json --verbose`, `--allowedTools "Read(./**)"`), on a prompt that reads a 2,500-line file once whole and
   once with `offset`/`limit`, reads a file large enough to meet any cap on one Read's output (many long lines), runs
   one Grep, and reads one missing file. Record in design.md, under a new "Probe results": the `tool_use` block's
   fields for Read and Grep, the `tool_result` block's `tool_use_id` and `is_error`, the line-number prefix of Read's
   text, how many lines a Read with no `limit` returned, and whether a large file hit a size or token cap and what it
-  returned then. Set D5's `READ_CHUNK` from it. Check the action's execution file is the same list of messages (its
+  returned then. Set D5's chunk constant from it. Check the action's execution file is the same list of messages (its
   source at the pinned SHA, `base-action/`). Verify by quoting the fields and counts (never file contents) in the
   design, and amend D3 and D5 if any differ
 
@@ -23,7 +23,7 @@
   (`fetch-depth` back to 1, `REVIEW_SKIP` or the constants changed, `--max-turns` fixed again or not from the step's
   output). Add tests that run the step on a scratch repository whose `HEAD` is a merge commit: a modified file (the
   file and its diff), an added one (the file only), a deleted one (its diff only), a binary, renamed and skip-listed
-  file, a file longer than `READ_CHUNK` and the Reads it counts, a planted `.review-diff/`, and nothing to read; each
+  file, a file larger than `READ_CHUNK_BYTES` and the Reads it counts, a planted `.review-diff/`, and nothing to read; each
   named for its outcome. Verify `uv run pytest scripts/tests/test_claude_review_workflow.py` passes
 
 ## 3. The model variable (design D6)

@@ -108,7 +108,7 @@ bypass the rules.
 
 ### Requirement: The review's turn budget scales with the reading needed
 The review's turn limit SHALL be a base plus an amount for each Read call the listed files and diffs need, at the
-Read tool's measured lines per call, up to a declared cap. The review job's timeout SHALL be long enough for the
+Read tool's measured size per call, up to a declared cap. The review job's timeout SHALL be long enough for the
 cap. A review that runs out of turns or time SHALL fail `claude review completed`, through its failure or its
 coverage.
 
