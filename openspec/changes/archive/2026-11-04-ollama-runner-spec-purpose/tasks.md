@@ -21,9 +21,10 @@
 - [x] 2.2 Fast-forward the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports nothing about
       troupe's specs or Purposes. Keep the output for the pull request. Stop and revise the change if it reports
       anything of this change's (0 behind `origin/main` 520f003: "oob: no differences", troupe specs included)
-- [ ] 2.3 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it shows nothing
+- [x] 2.3 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it shows nothing
       of this change's created, changed or deleted (any change listed is another pending one of `main`'s, named in
-      the tick)
+      the tick) (no plan run: `scripts/plan_needed.py` found only `oob/` and `openspec/` changed, which need none, so
+      tofu run 41820825258 skipped `plan (pull request)`, and this change applies nothing to GitHub)
 - [x] 2.4 Run `openspec validate ollama-runner-spec-purpose --strict` and verify it passes (valid)
 
 ## Workflow follow-up
