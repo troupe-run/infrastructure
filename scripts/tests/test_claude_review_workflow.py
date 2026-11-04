@@ -169,6 +169,15 @@ MODEL_NAME = "Check the review's model"
 MODEL = {"id": "model", "shell": "python3 {0}", "env": {"MODEL": "${{ vars.CLAUDE_REVIEW_MODEL }}"}}
 MODEL_SHA256 = "1566ed73c892e39e9531b83bb147ed5778ed215c939496f13718ae7e7b3424a2"
 MODEL_ARG = "${{ steps.model.outputs.model }}"
+# What the prompt must say about reading (D7, D7a): the list, reading every target in full, and
+# the uses of what changed. And it mustn't send the review to `gh pr diff` for the diff.
+PROMPT_READS = [
+    "`.review-diff/files.json` lists every changed file",
+    "Read every target in full with Read",
+    "search the checkout for its uses with Grep",
+    "a review that didn't read them all isn't a clean review",
+]
+PROMPT_NOT = "Read the diff with"
 # After Claude, in a job of its own, only when the review succeeded: resolve and re-tier what Claude
 # names, checked against conversations read again in that job (design D4, D4a).
 RESOLVER_NAME = "Resolve and re-tier what Claude named"
@@ -607,6 +616,12 @@ def problems(workflow: dict[str, Any]) -> list[str]:
             found.append(f"the prompt doesn't name {path}")
     if GUIDE_URL in prompt:
         found.append("the prompt names the guide by URL, which the review has no tool to fetch")
+    flat = " ".join(prompt.split())
+    for sentence in PROMPT_READS:
+        if sentence not in flat:
+            found.append(f"the prompt doesn't say {sentence!r}")
+    if PROMPT_NOT in flat:
+        found.append(f"the prompt still says {PROMPT_NOT!r} with `gh pr diff`")
 
     for name, value in CREDENTIALS.items():
         if inputs.get(name) != value:
@@ -1205,6 +1220,22 @@ def sources(w: dict[str, Any], change: str) -> None:
                 {"claude_args": str(action(w)["claude_args"]).replace(MAX_TURNS, "30")}
             ),
             "--max-turns isn't",
+        ),
+        # What the prompt says about reading (D7, D7a).
+        *[
+            (
+                lambda w, s=sentence: action(w).update(
+                    {"prompt": " ".join(str(action(w)["prompt"]).split()).replace(s, "")}
+                ),
+                f"the prompt doesn't say {sentence!r}",
+            )
+            for sentence in PROMPT_READS
+        ],
+        (
+            lambda w: action(w).update(
+                {"prompt": str(action(w)["prompt"]) + "\nRead the diff with `gh pr diff`.\n"}
+            ),
+            "the prompt still says",
         ),
         # The model, from the checked variable (D6).
         (lambda w: job(w)["steps"].remove(model_step(w)), '0 steps named "Check the review'),
