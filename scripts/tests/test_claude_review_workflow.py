@@ -253,9 +253,12 @@ COMPLETED_STEP = {
         "WANTS_REVIEW": "${{ needs.gate.outputs.review }}",
         "REVIEW": "${{ needs.review.result }}",
         "RESOLVE": "${{ needs.resolve.result }}",
+        # What the review read (review-covers-the-diff design D4).
+        "COVERAGE": "${{ needs.review.outputs.coverage }}",
+        "UNREAD": "${{ needs.review.outputs.unread }}",
     },
 }
-COMPLETED_SHA256 = "bbb2f7677c73563fe54fb2a5bebbad3713ad6b0cd020f11a7851102ac0fbf424"
+COMPLETED_SHA256 = "a2375ac39af83706374874ab7fb319664a589b9309bdaa9b1141598798d9cffa"
 # What Claude returns, and all the resolving step reads from it (design D4).
 SCHEMA = {
     "type": "object",
@@ -1320,6 +1323,24 @@ def sources(w: dict[str, Any], change: str) -> None:
             ),
             "--model isn't",
         ),
+        # The check judges what the review read (D4).
+        (lambda w: completed(w)["env"].pop("COVERAGE"), f"{COMPLETED_STEP_NAME!r} is given"),
+        (
+            lambda w: completed(w)["env"].update({"COVERAGE": "complete"}),
+            f"{COMPLETED_STEP_NAME!r} is given",
+        ),
+        (
+            lambda w: completed(w)["env"].update(
+                {"COVERAGE": "${{ needs.review.outputs.structured_output }}"}
+            ),
+            f"{COMPLETED_STEP_NAME!r} is given",
+        ),
+        (
+            lambda w: completed(w).update(
+                {"run": str(completed(w)["run"]).replace('if coverage != "complete":', "if False:")}
+            ),
+            "complete?''s script isn't the one this test pins",
+        ),
         (lambda w: sources(w, ""), "from None"),
         (lambda w: sources(w, "--setting-sources user,project"), "from 'user,project'"),
         (lambda w: sources(w, "--setting-sources project"), "from 'project'"),
@@ -1342,6 +1363,8 @@ def run_completed(tmp_path: Path, **results: str) -> subprocess.CompletedProcess
         "WANTS_REVIEW": "true",
         "REVIEW": "success",
         "RESOLVE": "success",
+        "COVERAGE": "complete",
+        "UNREAD": "[]",
         **results,
     }
     return run_step(completed(review()), tmp_path, tmp_path, env)
@@ -2181,7 +2204,7 @@ class Session:
     def __init__(self, tmp_path: Path, files: list[dict[str, Any]]) -> None:
         self.tmp_path = tmp_path
         self.workspace = tmp_path / "workspace"
-        self.workspace.mkdir()
+        self.workspace.mkdir(parents=True)
         (tmp_path / "runner-temp").mkdir()
         listed = tmp_path / "runner-temp" / "review-files.json"
         listed.write_text(json.dumps({"files": files}), encoding="utf-8")
@@ -2360,3 +2383,80 @@ def test_a_path_that_holds_a_workflow_command_stays_inside_its_line(tmp_path: Pa
     _, unread, _, out = session.run()
     assert unread == [{"path": "x\n::error::forged", "read": "not read"}]
     assert not any(line.startswith("::") for line in out.splitlines()), out
+
+
+# The check judges what the review read (review-covers-the-diff design D4).
+@pytest.mark.parametrize(
+    ("coverage", "said"),
+    [
+        ("incomplete", "didn't read every changed file in full"),
+        ("unknown", "couldn't be measured, so nothing counts as read"),
+        ("", "wasn't measured"),
+        ("complete-ish", "wasn't measured"),
+    ],
+)
+def test_a_review_that_didn_t_read_everything_fails_naming_the_files(
+    tmp_path: Path, coverage: str, said: str
+) -> None:
+    unread = [{"path": "src/a.py", "read": "in part"}, {"path": "src/b.py", "read": "not read"}]
+    done = run_completed(tmp_path, COVERAGE=coverage, UNREAD=json.dumps(unread))
+    assert done.returncode == 1
+    assert done.stdout.startswith("::error title=Review didn't read the code::")
+    assert f"it {said}: src/a.py (in part), src/b.py (not read)." in done.stdout
+    assert "gh run rerun 41258918187" in done.stdout
+
+
+def test_an_unread_list_that_isn_t_one_still_fails(tmp_path: Path) -> None:
+    done = run_completed(tmp_path, COVERAGE="incomplete", UNREAD="not json")
+    assert done.returncode == 1
+    assert ": files unnamed." in done.stdout
+
+
+def test_more_than_fifty_unread_files_are_cut_short(tmp_path: Path) -> None:
+    unread = [{"path": f"f{i}.py", "read": "not read"} for i in range(60)]
+    done = run_completed(tmp_path, COVERAGE="incomplete", UNREAD=json.dumps(unread))
+    assert done.returncode == 1
+    assert "f49.py (not read), and 10 more." in done.stdout
+    assert "f50.py" not in done.stdout
+
+
+def test_a_hostile_unread_path_stays_inside_the_one_error(tmp_path: Path) -> None:
+    unread = [{"path": "x\n::notice::forged", "read": "not read"}]
+    done = run_completed(tmp_path, COVERAGE="incomplete", UNREAD=json.dumps(unread))
+    assert done.returncode == 1
+    assert len(done.stdout.splitlines()) == 1, done.stdout
+
+
+def test_a_bot_s_pull_request_passes_whatever_the_coverage(tmp_path: Path) -> None:
+    done = run_completed(tmp_path, AUTHOR_TYPE="Bot", REVIEW="skipped", COVERAGE="")
+    assert done.returncode == 0, done.stdout
+
+
+def test_a_review_that_says_it_didn_t_read_the_code_fails_the_check(tmp_path: Path) -> None:
+    """#268: troupe#283's reviews said "not checked" for its code and still passed. A session
+    that reads only the task list, and says so in its result, leaves the check failed, naming
+    the files, whatever its summary says."""
+    files = [
+        MODIFIED,
+        ADDED,
+        listed(
+            "openspec/changes/x/tasks.md",
+            "modified",
+            ("openspec/changes/x/tasks.md", 20),
+            (".review-diff/openspec/changes/x/tasks.md.diff", 8),
+        ),
+    ]
+    session = Session(tmp_path / "session", files)
+    session.read("openspec/changes/x/tasks.md", range(1, 21))
+    session.read(".review-diff/openspec/changes/x/tasks.md.diff", range(1, 9))
+    session.finish(
+        "No must-fix found. **Not checked:** the diff is about 9,000 lines, and I read the task "
+        "list, the file list and the task/code pairing. I did not read the implementation line "
+        "by line."
+    )
+    coverage, unread, _, _ = session.run()
+    assert coverage == "incomplete"
+    done = run_completed(tmp_path, COVERAGE=coverage, UNREAD=json.dumps(unread))
+    assert done.returncode == 1
+    assert "src/a.py (not read), src/b.py (not read)." in done.stdout
+    assert "tasks.md" not in done.stdout

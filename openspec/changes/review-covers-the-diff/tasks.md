@@ -58,10 +58,10 @@
   is in the report, and a hostile one that stays escaped; a session with no search, reported as none and not failing;
   a planted `files.json` in the workspace that differs from `RUNNER_TEMP`'s; no execution file; a malformed one. Each
   is named for its outcome. Verify the tests pass
-- [ ] 5.3 Add D4's step to `completed` and its `env:` (`COVERAGE`, `UNREAD`). Add tests that run it with `complete`,
+- [x] 5.3 Add D4's step to `completed` and its `env:` (`COVERAGE`, `UNREAD`). Add tests that run it with `complete`,
   `incomplete`, `unknown` and no value, with more than 50 unread files, and with a hostile path that stays inside one
   error. Add the named cases for `completed` not reading `coverage`. Verify the tests pass
-- [ ] 5.4 Add the test #268 asks for: a session whose result text says "Not checked: I did not read the
+- [x] 5.4 Add the test #268 asks for: a session whose result text says "Not checked: I did not read the
   implementation line by line", which read only `tasks.md`, goes through the coverage step and then `completed`, and
   the check fails naming the unread files. Verify it passes, and that it fails when `completed`'s coverage step is
   removed
