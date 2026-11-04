@@ -159,7 +159,7 @@ SNAPSHOT_SHA256 = "881c6b51fbc892399d33e02bcfc14f93611d0f293eab577dd415b1bd6e575
 # that follows (review-covers-the-diff design D2, D5). Its constants are in the pinned script.
 DIFF_NAME = "Write each changed file's diff"
 DIFF = {"id": "diff", "shell": "python3 {0}"}
-DIFF_SHA256 = "19cfadb51be90e30872ed8f2411fe831076667296530c37c74c138c59b3a41b2"
+DIFF_SHA256 = "026f5ec0047cb1a6a4d6d5d4673d469fc602d6d15426d5450f585500a321da7d"
 # The pull request's checkout keeps the merge commit's parents, so the diff step can diff against
 # the base's tip (D2).
 CHECKOUT_DEPTH = 2
@@ -179,6 +179,7 @@ PROMPT_READS = [
     "Read every target in full with Read",
     "search the checkout for its uses with Grep",
     "a review that didn't read them all isn't a clean review",
+    "Read it again from the next line with `offset`, until you've read its last line",
 ]
 PROMPT_NOT = "Read the diff with"
 # After Claude: what it read, from the execution file only, never its structured output or its
@@ -2086,6 +2087,37 @@ def test_a_lockfile_and_a_binary_file_need_nothing_read(tmp_path: Path) -> None:
         "tofu/terraform.tfstate": ([], "on the skip list"),
         "blob.bin": ([], "binary"),
     }
+
+
+@pytest.mark.parametrize(
+    "attributes", [b"*.py -diff\n", b"*.py binary\n", b'*.py diff=hide\n[diff "hide"]\n']
+)
+def test_gitattributes_can_t_make_code_binary(tmp_path: Path, attributes: bytes) -> None:
+    """#274's review: .gitattributes in the pull request, or the repository, mustn't turn its code
+    into "Binary files differ" and so exempt it from the read."""
+    workspace = merged(
+        tmp_path,
+        {"code.py": b"x = 1\n", "old.py": b"y = 2\n"},
+        {".gitattributes": attributes, "code.py": b"x = 2\n", "old.py": None},
+    )
+    git(workspace, "config", "diff.hide.textconv", "true")
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert targets(data)["code.py"] == ["code.py", ".review-diff/code.py.diff"]
+    assert targets(data)["old.py"] == [".review-diff/old.py.diff"]
+    written = (workspace / ".review-diff" / "code.py.diff").read_text(encoding="utf-8")
+    assert "-x = 1" in written
+    assert "+x = 2" in written
+
+
+def test_a_deleted_binary_file_needs_nothing_read(tmp_path: Path) -> None:
+    done, data, _ = run_diff(merged(tmp_path, {"blob.bin": bytes(range(256))}, {"blob.bin": None}))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert [(f["path"], f["targets"], f.get("skipped")) for f in data["files"]] == [
+        ("blob.bin", [], "binary")
+    ]
 
 
 def test_nothing_to_read_gets_the_base_turns(tmp_path: Path) -> None:
