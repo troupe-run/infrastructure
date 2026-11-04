@@ -12,18 +12,19 @@
 
 ## 2. Verify against troupe's main
 
-- [ ] 2.1 Once troupe#283 has merged (design D3), re-read the Purpose from troupe's `main`
+- [x] 2.1 Once troupe#283 has merged (design D3), re-read the Purpose from troupe's `main`
       (`gh api repos/troupe-run/troupe/contents/openspec/specs/ollama-runner/spec.md`, through `purpose()`) and compare
       it with the record. Verify the spec's `Capability:` line still names `cap:actor-runners` alone. If the Purpose
       changed, update the record, check design D2 against the new text, and re-run 1.1's checks. Stop and revise the
-      change if the spec is renamed, dropped or names other labels
-- [ ] 2.2 Fast-forward the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports nothing about
+      change if the spec is renamed, dropped or names other labels (troupe `main` 168362d, troupe#283's merge: the
+      Purpose matches the record, Capability line unchanged)
+- [x] 2.2 Fast-forward the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports nothing about
       troupe's specs or Purposes. Keep the output for the pull request. Stop and revise the change if it reports
-      anything of this change's
+      anything of this change's (0 behind `origin/main` 520f003: "oob: no differences", troupe specs included)
 - [ ] 2.3 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it shows nothing
       of this change's created, changed or deleted (any change listed is another pending one of `main`'s, named in
       the tick)
-- [ ] 2.4 Run `openspec validate ollama-runner-spec-purpose --strict` and verify it passes
+- [x] 2.4 Run `openspec validate ollama-runner-spec-purpose --strict` and verify it passes (valid)
 
 ## Workflow follow-up
 
