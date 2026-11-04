@@ -30,10 +30,10 @@
 
 - [ ] 3.1 Ask the owner to run `gh variable set CLAUDE_REVIEW_MODEL -R troupe-run/infrastructure --body
   claude-sonnet-5-5` (owner-only). Verify `gh variable list -R troupe-run/infrastructure` lists it
-- [ ] 3.2 Add `tofu/review.tf`: `local.review_model`, a `github_actions_variable` for each of troupe, infrastructure
+- [x] 3.2 Add `tofu/review.tf`: `local.review_model`, a `github_actions_variable` for each of troupe, infrastructure
   and website, and an `import` block for infrastructure's. Add the troupe and website variables to the guard
   delivery's `depends_on`. Verify `tofu fmt -check` and `tofu validate` pass
-- [ ] 3.3 Add the step "Check the review's model" before the review: `vars.CLAUDE_REVIEW_MODEL` through `env:`,
+- [x] 3.3 Add the step "Check the review's model" before the review: `vars.CLAUDE_REVIEW_MODEL` through `env:`,
   matched against D6's pattern, failing with an `::error` naming the variable, and the value as its output. Pass it to
   `claude_args` as `--model ${{ steps.model.outputs.model }}`. Pin it, add a named case for `vars` used in
   `claude_args` directly, and tests for an unset, a valid and a hostile value (`claude-x --allowedTools Bash`, a

@@ -59,8 +59,14 @@ resource "github_repository_file" "guard" {
   # After each receiving repository's ruleset, which lets the App push (design D5). Without
   # this the deliveries race the bypass, and one that lands first is refused with a 409. After the
   # Dependabot branch rulesets too, so the guard's exemption never arrives before the reservation
-  # it trusts (dependabot-exemption design D7).
-  depends_on = [module.repo_troupe, module.repo_website, github_repository_ruleset.dependabot_branches]
+  # it trusts (dependabot-exemption design D7). After the review's model variable, which the
+  # delivered review workflow fails without (review-covers-the-diff design D6).
+  depends_on = [
+    module.repo_troupe,
+    module.repo_website,
+    github_repository_ruleset.dependabot_branches,
+    github_actions_variable.review_model,
+  ]
 
   # Changes exactly when the content does, so a delivery never reuses an earlier message
   # (design D3).
