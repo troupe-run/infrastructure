@@ -315,6 +315,12 @@ jobs:
           TURNS_PER_READ = 2
           MAX_TURNS = 400
           OUT = ".review-diff"
+          # The paths the action puts back from the base branch before Claude starts, keeping the
+          # pull request's copies under .claude-pr/: SENSITIVE_PATHS in the pinned action's
+          # src/github/operations/restore-config.ts. A changed file under one is read there (#274).
+          RESTORED = {".claude", ".mcp.json", ".claude.json", ".gitmodules", ".ripgreprc", "CLAUDE.md",
+                      "CLAUDE.local.md", ".husky"}
+          RESTORED_TO = ".claude-pr"
 
 
           def escape(text):
@@ -394,7 +400,12 @@ jobs:
                   # An added file's diff is its text, so the file alone is read; a symlink or submodule
                   # has nothing in the checkout to read but its diff.
                   whole = kind != "deleted" and os.path.isfile(path) and not os.path.islink(path)
-                  if whole:
+                  if whole and path.split("/")[0] in RESTORED:
+                      # What Claude finds at the path is the base's copy; the pull request's is the
+                      # committed blob, which the action copies to .claude-pr/.
+                      entry["targets"].append(target(f"{RESTORED_TO}/{path}",
+                                                     git("cat-file", "blob", f"HEAD:{path}")))
+                  elif whole:
                       with open(path, "rb") as file:
                           entry["targets"].append(target(path, file.read()))
                   if kind != "added" or not whole:

@@ -72,7 +72,9 @@ The checkout already holds the whole branch as it would merge, so the full sourc
 the review lacks is the list of what changed and a diff it can read whole. A step before the review (after the
 checkouts, before the action) writes:
 
-- `.review-diff/<path>.diff` for each changed file: `git diff --no-color --no-ext-diff -M HEAD^1 HEAD -- <path>`;
+- `.review-diff/<path>.diff` for each changed file: `git diff --no-color --no-ext-diff --no-textconv --text -M
+  HEAD^1 HEAD -- <path>`. `--text` and `--no-textconv` keep a `.gitattributes` the pull request brings (`*.py -diff`,
+  `binary`, a `diff=` driver) from hiding its text behind "Binary files differ" (#274's review);
 - `.review-diff/files.json`: each changed file's path, status, and its **targets**, the things that must be read,
   each with its line count, or the reason it needs none:
 
@@ -83,6 +85,12 @@ checkouts, before the action) writes:
   | deleted | its `.diff`, the only record of what went |
   | binary, or on `REVIEW_SKIP` | none, with the reason |
 
+  A changed file under a path the action restores from the base before Claude starts (`.claude`, `.mcp.json`,
+  `.claude.json`, `.gitmodules`, `.ripgreprc`, `CLAUDE.md`, `CLAUDE.local.md`, `.husky`: `SENSITIVE_PATHS` in the
+  pinned action's `src/github/operations/restore-config.ts`) is read as the action's copy of the pull request's
+  version, `.claude-pr/<path>`, counted from the committed blob: at its own path Claude finds the base's copy
+  (#274's review). If the action stops making that copy, the Read fails and coverage fails, which is the safe way.
+
   A copy goes to `RUNNER_TEMP` for the coverage step, as `.review-threads.json` does, so a pull request can't plant a
   list.
 
@@ -91,8 +99,9 @@ The checkout is GitHub's merge commit (`refs/pull/<n>/merge`). The review's chec
 review reviews. It has no size cap, unlike `gh pr diff`, which GitHub refuses past 20,000 lines, and the files API,
 which leaves out large patches. The step removes any `.review-diff/` the checkout holds before writing.
 
-Needing nothing, each with its reason in `files.json`: binary files (no text to read) and one declared skip list,
-`REVIEW_SKIP`, in the step:
+Needing nothing, each with its reason in `files.json`: binary files, which are those whose committed blob has a NUL
+byte in its first 8,000 bytes, git's own test, and never what `.gitattributes` says (#274's review); and one declared
+skip list, `REVIEW_SKIP`, in the step:
 
 - `uv.lock`, `package-lock.json`, `.terraform.lock.hcl`;
 - `terraform.tfstate` (encrypted state that CI commits).
