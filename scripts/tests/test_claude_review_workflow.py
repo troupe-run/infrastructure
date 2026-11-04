@@ -17,12 +17,13 @@ import re
 import shlex
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
-from conftest import REPO
+from conftest import REPO, clean_env, git
 
 import guard
 
@@ -151,6 +152,17 @@ STEP_ENV = {
 SNAPSHOT_NAME = "Read the pull request's review conversations"
 SNAPSHOT = {"shell": "python3 {0}", "env": STEP_ENV}
 SNAPSHOT_SHA256 = "881c6b51fbc892399d33e02bcfc14f93611d0f293eab577dd415b1bd6e5757c9"
+# Before Claude: what each changed file needs read, its diff in the workspace, and the turn budget
+# that follows (review-covers-the-diff design D2, D5). Its constants are in the pinned script.
+DIFF_NAME = "Write each changed file's diff"
+DIFF = {"id": "diff", "shell": "python3 {0}"}
+DIFF_SHA256 = "19cfadb51be90e30872ed8f2411fe831076667296530c37c74c138c59b3a41b2"
+# The pull request's checkout keeps the merge commit's parents, so the diff step can diff against
+# the base's tip (D2).
+CHECKOUT_DEPTH = 2
+# --max-turns comes from the diff step, never a fixed number (D5). GitHub substitutes it before
+# the action reads claude_args.
+MAX_TURNS = "${{ steps.diff.outputs.max_turns }}"
 # After Claude, in a job of its own, only when the review succeeded: resolve and re-tier what Claude
 # names, checked against conversations read again in that job (design D4, D4a).
 RESOLVER_NAME = "Resolve and re-tier what Claude named"
@@ -188,7 +200,7 @@ GATE_OUTPUTS = {"review": "${{ steps.gate.outputs.review }}"}
 GATE_TOKEN_INPUTS = {**TOKEN_INPUTS, "permission-pull-requests": "read"}
 REVIEW_NEEDS = "gate"
 REVIEW_IF = "needs.gate.outputs.review == 'true'"
-OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME}
+OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME, DIFF_NAME}
 # The required check that the review of the head completed (review-completed-check design D2 to
 # D5): after every other job, whatever became of them, on pull request events only, since GitHub
 # ignores a comment's run for a pull request (Probe results). No token, no secret, no checkout,
@@ -247,7 +259,9 @@ def review() -> dict[str, Any]:
 def claude_args(inputs: dict[str, Any]) -> tuple[set[str], str | None, list[str]]:
     """The allowed tools, the setting sources, and every other flag, in the action's claude_args.
     The --json-schema is read by json_schema."""
-    words = shlex.split(str(inputs.get("claude_args", "")))
+    # The expressions GitHub substitutes before the action reads them, as one word each.
+    text = str(inputs.get("claude_args", "")).replace(MAX_TURNS, "MAX_TURNS")
+    words = shlex.split(text)
     tools: set[str] = set()
     sources = None
     others = []
@@ -258,7 +272,7 @@ def claude_args(inputs: dict[str, Any]) -> tuple[set[str], str | None, list[str]
         elif words[i] == "--allowedTools" and i + 1 < len(words):
             tools |= {tool.strip() for tool in words[i + 1].split(",") if tool.strip()}
             i += 2
-        elif words[i] == "--max-turns" and i + 1 < len(words) and words[i + 1].isdigit():
+        elif words[i] == "--max-turns" and i + 1 < len(words):
             i += 2
         elif words[i] == "--setting-sources" and i + 1 < len(words):
             sources = words[i + 1]
@@ -508,6 +522,11 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         own, guide = (dict(step.get("with") or {}) for step in checkouts)
         if "repository" in own:
             found.append(f"the first checkout is {own['repository']!r}, not the pull request's own")
+        elif own.get("fetch-depth") != CHECKOUT_DEPTH:
+            found.append(
+                f"the pull request's checkout has fetch-depth {own.get('fetch-depth')!r}, not "
+                f"{CHECKOUT_DEPTH}, so the diff step has no base to diff against"
+            )
         if guide != GUIDE:
             found.append(f"the guide's checkout is {guide!r}, not {GUIDE!r}")
     tokens = [step for step in steps if str(step.get("uses", "")).startswith(f"{MINTER}@")]
@@ -556,6 +575,14 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         at = steps.index(named[0])
         if not (tokens and steps.index(tokens[0]) < at < steps.index(actions[0])):
             found.append(f"{SNAPSHOT_NAME!r} doesn't run between minting the token and the action")
+    diffs = [step for step in steps if step.get("name") == DIFF_NAME and "run" in step]
+    if len(diffs) != 1:
+        found.append(f"review has {len(diffs)} steps named {DIFF_NAME!r}, not one")
+    else:
+        found += own_step_problems(diffs[0], DIFF, DIFF_SHA256, repr(DIFF_NAME))
+        at = steps.index(diffs[0])
+        if checkouts and not (steps.index(checkouts[-1]) < at < steps.index(actions[0])):
+            found.append(f"{DIFF_NAME!r} doesn't run between the checkouts and the action")
     if json_schema(inputs) != SCHEMA:
         found.append("Claude's structured output isn't the schema this test pins (SCHEMA)")
 
@@ -585,6 +612,8 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         )
     if "--max-turns" not in str(inputs.get("claude_args", "")):
         found.append("claude_args has no --max-turns")
+    elif f"--max-turns {MAX_TURNS}" not in str(inputs.get("claude_args", "")):
+        found.append(f"--max-turns isn't {MAX_TURNS}, the turns the diff needs (D5)")
     return found
 
 
@@ -641,6 +670,16 @@ def move(w: dict[str, Any], step: dict[str, Any], to: int) -> None:
 def snapshot(w: dict[str, Any]) -> dict[str, Any]:
     step = next(s for s in job(w)["steps"] if s.get("name") == SNAPSHOT_NAME)
     return step  # type: ignore[no-any-return]
+
+
+def diff_step(w: dict[str, Any]) -> dict[str, Any]:
+    step = next(s for s in job(w)["steps"] if s.get("name") == DIFF_NAME)
+    return step  # type: ignore[no-any-return]
+
+
+def diff_script(w: dict[str, Any], old: str, new: str) -> None:
+    assert old in str(diff_step(w)["run"]), old
+    diff_step(w)["run"] = str(diff_step(w)["run"]).replace(old, new)
 
 
 def resolve_job(w: dict[str, Any]) -> dict[str, Any]:
@@ -961,7 +1000,11 @@ def sources(w: dict[str, Any], change: str) -> None:
         (lambda w: tools(w, 'Bash(gh pr view:*)" --dangerously-skip-permissions "'), "besides"),
         (
             lambda w: action(w).update(
-                {"claude_args": re.sub(r"--max-turns \d+", "", str(action(w)["claude_args"]))}
+                {
+                    "claude_args": str(action(w)["claude_args"]).replace(
+                        f"--max-turns {MAX_TURNS}", ""
+                    )
+                }
             ),
             "no --max-turns",
         ),
@@ -1121,6 +1164,25 @@ def sources(w: dict[str, Any], change: str) -> None:
         (
             lambda w: completed(w).update({"run": str(completed(w)["run"]) + "\nsys.exit(0)\n"}),
             "complete?''s script isn't the one this test pins",
+        ),
+        # The diff the review reads, and the turns it needs (review-covers-the-diff D2, D5).
+        (lambda w: job(w)["steps"][0]["with"].update({"fetch-depth": 1}), "fetch-depth 1, not 2"),
+        (lambda w: job(w)["steps"].remove(diff_step(w)), '0 steps named "Write each'),
+        (lambda w: move(w, diff_step(w), len(job(w)["steps"])), "between the checkouts and"),
+        (lambda w: move(w, diff_step(w), 0), "between the checkouts and the action"),
+        (lambda w: diff_step(w).update({"id": "files"}), '"Write each changed file\'s diff" is'),
+        (
+            lambda w: diff_step(w).update({"env": {"T": "${{ secrets.GITHUB_TOKEN }}"}}),
+            "also has ['env']",
+        ),
+        (lambda w: diff_script(w, '"uv.lock", ', '"uv.lock", "x.py", '), "this test pins"),
+        (lambda w: diff_script(w, "MAX_TURNS = 400", "MAX_TURNS = 9999"), "this test pins"),
+        (lambda w: diff_script(w, "READ_CHUNK_BYTES = 20_000", "READ_CHUNK_BYTES = 10**9"), "pins"),
+        (
+            lambda w: action(w).update(
+                {"claude_args": str(action(w)["claude_args"]).replace(MAX_TURNS, "30")}
+            ),
+            "--max-turns isn't",
         ),
         (lambda w: sources(w, ""), "from None"),
         (lambda w: sources(w, "--setting-sources user,project"), "from 'user,project'"),
@@ -1753,3 +1815,162 @@ def test_a_gate_that_can_t_tell_fails_and_says_nothing(
     assert done.returncode == 1
     assert done.stdout.startswith("::error title=")
     assert said is None
+
+
+# The diff step, run on a repository whose HEAD is a merge commit, as GitHub's checkout of a pull
+# request is (review-covers-the-diff design D2, D5).
+DIFF_READ_CHUNK = 20_000
+
+
+def merged(tmp_path: Path, base: Mapping[str, bytes], head: Mapping[str, bytes | None]) -> Path:
+    """A workspace whose HEAD merges a branch into main: `base` is main's files, `head` what the
+    branch writes over them (None deletes one)."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True)
+    git(workspace, "init", "-q", "-b", "main")
+    git(workspace, "config", "user.email", "tester@example.com")
+    git(workspace, "config", "user.name", "Tester")
+    git(workspace, "config", "commit.gpgsign", "false")
+    for name, contents in {"README.md": b"base\n", **base}.items():
+        (workspace / name).parent.mkdir(parents=True, exist_ok=True)
+        (workspace / name).write_bytes(contents)
+    git(workspace, "add", "-A")
+    git(workspace, "commit", "-q", "-m", "chore: base")
+    git(workspace, "switch", "-q", "-c", "pr")
+    for name, data in head.items():
+        if data is None:
+            git(workspace, "rm", "-q", name)
+        else:
+            (workspace / name).parent.mkdir(parents=True, exist_ok=True)
+            (workspace / name).write_bytes(data)
+    git(workspace, "add", "-A")
+    git(workspace, "commit", "-q", "-m", "feat: the pull request")
+    git(workspace, "switch", "-q", "main")
+    git(workspace, "commit", "-q", "--allow-empty", "-m", "chore: main moves on")
+    git(workspace, "merge", "-q", "--no-ff", "--no-edit", "pr")
+    return workspace
+
+
+Ran = tuple[subprocess.CompletedProcess[str], dict[str, Any] | None, str]
+
+
+def run_diff(workspace: Path) -> Ran:
+    """Run the diff step in the workspace: its result, the list it left in RUNNER_TEMP, and its
+    outputs."""
+    runner_temp = workspace.parent / "runner-temp"
+    runner_temp.mkdir(exist_ok=True)
+    outputs = workspace.parent / "outputs"
+    outputs.write_text("", encoding="utf-8")
+    script = workspace.parent / "diff.py"
+    script.write_text(str(diff_step(review())["run"]), encoding="utf-8")
+    env = {**clean_env(), "RUNNER_TEMP": str(runner_temp), "GITHUB_OUTPUT": str(outputs)}
+    done = subprocess.run(
+        [sys.executable, str(script)], cwd=workspace, capture_output=True, text=True,
+        encoding="utf-8", env=env, check=False,
+    )  # fmt: skip
+    listed = runner_temp / "review-files.json"
+    data = json.loads(listed.read_text(encoding="utf-8")) if listed.exists() else None
+    return done, data, outputs.read_text(encoding="utf-8")
+
+
+def targets(data: dict[str, Any]) -> dict[str, list[str]]:
+    return {f["path"]: [t["path"] for t in f["targets"]] for f in data["files"]}
+
+
+def test_each_change_lists_what_it_needs_read(tmp_path: Path) -> None:
+    workspace = merged(
+        tmp_path,
+        {"keep.py": b"a\nb\n", "gone.py": b"old\n", "move_me.py": b"x = 1\n"},
+        {"keep.py": b"a\nB\n", "gone.py": None, "added.py": b"new\n", "move_me.py": None,
+         "moved.py": b"x = 1\n"},
+    )  # fmt: skip
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert targets(data) == {
+        "keep.py": ["keep.py", ".review-diff/keep.py.diff"],
+        "gone.py": [".review-diff/gone.py.diff"],
+        "added.py": ["added.py"],
+        "moved.py": ["moved.py", ".review-diff/moved.py.diff"],
+    }
+    statuses = {f["path"]: f["status"] for f in data["files"]}
+    assert statuses == {
+        "keep.py": "modified", "gone.py": "deleted", "added.py": "added", "moved.py": "renamed"
+    }  # fmt: skip
+    removed = (workspace / ".review-diff" / "gone.py.diff").read_text(encoding="utf-8")
+    assert "-old" in removed
+
+
+def test_a_target_s_lines_are_counted_as_read_numbers_them(tmp_path: Path) -> None:
+    workspace = merged(tmp_path, {}, {"three.txt": b"a\nb\nc\n", "no_newline.txt": b"a\nb"})
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    counts = {t["path"]: t["lines"] for f in data["files"] for t in f["targets"]}
+    assert counts == {"three.txt": 3, "no_newline.txt": 2}
+
+
+def test_a_lockfile_and_a_binary_file_need_nothing_read(tmp_path: Path) -> None:
+    workspace = merged(
+        tmp_path,
+        {"uv.lock": b"a\n", "tofu/terraform.tfstate": b"{}\n"},
+        {"uv.lock": b"b\n", "tofu/terraform.tfstate": b'{"v": 2}\n', "blob.bin": bytes(range(256))},
+    )
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert {f["path"]: (f["targets"], f.get("skipped")) for f in data["files"]} == {
+        "uv.lock": ([], "on the skip list"),
+        "tofu/terraform.tfstate": ([], "on the skip list"),
+        "blob.bin": ([], "binary"),
+    }
+
+
+def test_nothing_to_read_gets_the_base_turns(tmp_path: Path) -> None:
+    done, data, outputs = run_diff(merged(tmp_path, {"uv.lock": b"a\n"}, {"uv.lock": b"b\n"}))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert (data["reads"], outputs) == (0, "max_turns=40\n")
+
+
+def test_the_turns_follow_the_size_to_read_up_to_the_cap(tmp_path: Path) -> None:
+    # One added file of three chunks: three Reads, so 40 + 2 x 3 turns.
+    big = b"x" * (DIFF_READ_CHUNK * 3 - 10) + b"\n"
+    done, data, outputs = run_diff(merged(tmp_path, {}, {"big.txt": big}))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert (data["reads"], outputs) == (3, "max_turns=46\n")
+    huge = {f"f{i}.txt": b"y" * (DIFF_READ_CHUNK * 4) for i in range(60)}
+    done, _, outputs = run_diff(merged(tmp_path / "huge", {}, huge))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert outputs == "max_turns=400\n"
+
+
+def test_a_diff_larger_than_one_read_is_written_whole(tmp_path: Path) -> None:
+    before = "".join(f"line {i}\n" for i in range(5000)).encode()
+    after = "".join(f"line {i} changed\n" for i in range(5000)).encode()
+    workspace = merged(tmp_path, {"long.txt": before}, {"long.txt": after})
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    written = (workspace / ".review-diff" / "long.txt.diff").read_bytes()
+    assert written.count(b"\n+line ") == 5000
+    assert written.count(b"\n-line ") == 5000
+
+
+def test_a_planted_review_diff_is_refused(tmp_path: Path) -> None:
+    workspace = merged(tmp_path, {}, {".review-diff/files.json": b'{"files": []}\n'})
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 1
+    assert done.stdout.startswith("::error title=Diff not made::")
+    assert data is None
+
+
+def test_a_checkout_with_no_base_fails_saying_so(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    git(workspace, "init", "-q", "-b", "main")
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 1
+    assert done.stdout.startswith("::error title=Diff not made::git diff exited with")
+    assert data is None

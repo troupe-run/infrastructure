@@ -14,12 +14,12 @@
 
 ## 2. The per-file diff (design D2, D5)
 
-- [ ] 2.1 Change the review job's checkout to `fetch-depth: 2`, and add the step "Write each changed file's diff"
+- [x] 2.1 Change the review job's checkout to `fetch-depth: 2`, and add the step "Write each changed file's diff"
   after the guide's checkout: it removes any `.review-diff/`, writes `.review-diff/<path>.diff` and `files.json` from
   `git diff -M HEAD^1 HEAD` with each file's targets and their line counts as D2's table says, copies `files.json` to
   `RUNNER_TEMP`, applies `REVIEW_SKIP` and the binary rule, and sets `max_turns` from the Reads needed and the D5
   constants. A diff that can't be made fails with an escaped `::error`. Verify `uv run scripts/check.py` passes
-- [ ] 2.2 Pin the step in `problems()` and add named cases to `test_each_way_the_workflow_can_go_wrong_is_named`
+- [x] 2.2 Pin the step in `problems()` and add named cases to `test_each_way_the_workflow_can_go_wrong_is_named`
   (`fetch-depth` back to 1, `REVIEW_SKIP` or the constants changed, `--max-turns` fixed again or not from the step's
   output). Add tests that run the step on a scratch repository whose `HEAD` is a merge commit: a modified file (the
   file and its diff), an added one (the file only), a deleted one (its diff only), a binary, renamed and skip-listed
