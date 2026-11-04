@@ -159,7 +159,7 @@ SNAPSHOT_SHA256 = "881c6b51fbc892399d33e02bcfc14f93611d0f293eab577dd415b1bd6e575
 # that follows (review-covers-the-diff design D2, D5). Its constants are in the pinned script.
 DIFF_NAME = "Write each changed file's diff"
 DIFF = {"id": "diff", "shell": "python3 {0}"}
-DIFF_SHA256 = "026f5ec0047cb1a6a4d6d5d4673d469fc602d6d15426d5450f585500a321da7d"
+DIFF_SHA256 = "3df3b42ab65747fb27f67d84be82eed677a86e0107288af99b604007dcf60cfb"
 # The pull request's checkout keeps the merge commit's parents, so the diff step can diff against
 # the base's tip (D2).
 CHECKOUT_DEPTH = 2
@@ -2109,6 +2109,40 @@ def test_gitattributes_can_t_make_code_binary(tmp_path: Path, attributes: bytes)
     written = (workspace / ".review-diff" / "code.py.diff").read_text(encoding="utf-8")
     assert "-x = 1" in written
     assert "+x = 2" in written
+
+
+def test_a_path_the_action_restores_is_read_from_its_copy_of_the_pull_request(
+    tmp_path: Path,
+) -> None:
+    """#274's review: the action puts CLAUDE.md, .claude/ and the rest back from the base before
+    Claude starts, keeping the pull request's copies under .claude-pr/. So their whole-file targets
+    are those copies, counted from the pull request's blob, not the base's file."""
+    workspace = merged(
+        tmp_path,
+        {"CLAUDE.md": b"one\n", ".claude/settings.json": b"{}\n", "src/x.py": b"a\n"},
+        {
+            "CLAUDE.md": b"one\ntwo\nthree\n",
+            ".claude/settings.json": b'{\n  "a": 1\n}\n',
+            ".husky/pre-commit": b"#!/bin/sh\nexit 0\n",
+            "src/CLAUDE.md": b"nested\n",
+        },
+    )
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert targets(data) == {
+        "CLAUDE.md": [".claude-pr/CLAUDE.md", ".review-diff/CLAUDE.md.diff"],
+        ".claude/settings.json": [
+            ".claude-pr/.claude/settings.json",
+            ".review-diff/.claude/settings.json.diff",
+        ],
+        ".husky/pre-commit": [".claude-pr/.husky/pre-commit"],
+        # Only the paths at the top of the checkout are restored.
+        "src/CLAUDE.md": ["src/CLAUDE.md"],
+    }
+    counts = {t["path"]: t["lines"] for f in data["files"] for t in f["targets"]}
+    assert counts[".claude-pr/CLAUDE.md"] == 3
+    assert counts[".claude-pr/.claude/settings.json"] == 3
 
 
 def test_a_deleted_binary_file_needs_nothing_read(tmp_path: Path) -> None:
