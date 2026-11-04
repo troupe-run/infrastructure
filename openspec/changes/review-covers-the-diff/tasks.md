@@ -28,7 +28,7 @@
 
 ## 3. The model variable (design D6)
 
-- [ ] 3.1 Ask the owner to run `gh variable set CLAUDE_REVIEW_MODEL -R troupe-run/infrastructure --body
+- [x] 3.1 Ask the owner to run `gh variable set CLAUDE_REVIEW_MODEL -R troupe-run/infrastructure --body
   claude-sonnet-5-5` (owner-only). Verify `gh variable list -R troupe-run/infrastructure` lists it
 - [x] 3.2 Add `tofu/review.tf`: `local.review_model`, a `github_actions_variable` for each of troupe, infrastructure
   and website, and an `import` block for infrastructure's. Add the troupe and website variables to the guard
