@@ -169,6 +169,13 @@ shows as a failed check naming files, never as a false pass, because D3 counts t
 The base (40), the per-Read amount (2), the cap (400) and `READ_CHUNK_BYTES` are named constants in the step, pinned
 by the test.
 
+A run that a reply to a must-fix starts is the same review a push's run is (spec: pr-review, "The review judges a
+reply to one of its must-fixes when it's posted"), so it gets the same list, budget and timeout, and reads the whole
+pull request again: whether a reply settles a must-fix is judged against the code. Its coverage is measured and shown
+in its run's summary, but enforced only through a push's run, since GitHub counts only a pull request event's run for
+`claude review completed` (review-completed-check, Probe results). The owner chose this over a smaller budget for
+reply runs, which would have changed that requirement (2026-11-04, on #274's review).
+
 ### D6. The model is a repository variable, declared once in OpenTofu
 
 A new `tofu/review.tf` holds `local.review_model = "claude-sonnet-5-5"` and a `github_actions_variable`
@@ -247,7 +254,7 @@ follow-up issue, sized by what these reports show.
   change that's wrong for its surroundings. A file-length house rule (#271) is what makes it cheaper.
 - [A review reads every changed file and still misses a broken caller] → Call sites are asked for and reported
   (D7a), not gated. The report shows when a review didn't look.
-- [Cost goes up for large pull requests, on every push] → The cap bounds it. The model is one variable away from a
+- [Cost goes up for large pull requests, on every push and every reply to a must-fix] → The cap bounds it. The model is one variable away from a
   cheaper or dearer one. If it's too much, a follow-up can review only what changed since the last completed review.
 - [A session reads every diff and still reviews badly] → Accepted. This is a floor (Non-Goals). The owner's review is
   still the gate.

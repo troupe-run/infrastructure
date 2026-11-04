@@ -1,12 +1,15 @@
 """claude-review.yml reviews each member's pull request and can't change the repository (spec:
 pr-review; claude-pr-review design D1 to D4, D7, D8; review-denials-and-guide design D1 to D4;
-review-findings-by-severity design D1 to D4; review-completed-check design D2 to D5).
+review-findings-by-severity design D1 to D4; review-completed-check design D2 to D5;
+review-covers-the-diff design D2 to D7).
 
 GitHub evaluates the workflow, so these tests pin what it's given: when it runs and what it
 skips, what its token may do, which credentials reach the action, which tools Claude has, what
-it checks out, and its four steps of its own: one reads the review conversations before Claude
-starts, one resolves and re-tiers what Claude names, one names the tool calls Claude was refused,
-and one, the required check, says whether the review of the head completed."""
+it checks out, and its seven steps of its own: before Claude, one checks the model, one writes
+each changed file's diff and the list of what to read, and one reads the review conversations;
+after it, one names the tool calls Claude was refused, one measures what the review read, and
+one resolves and re-tiers what Claude names; and the required check says whether the review of
+the head completed and read the code."""
 
 import ast
 import copy
