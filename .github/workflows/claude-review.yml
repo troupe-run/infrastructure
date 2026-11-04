@@ -348,7 +348,17 @@ jobs:
 
 
           def target(path, data):
-              return {"path": path, "lines": lines(data), "bytes": len(data)}
+              # With the Reads that cover it: consecutive lines of at most READ_CHUNK_BYTES each (a
+              # longer line on its own), so no Read stops at the token cap before its limit (#274).
+              reads, start, size = [], 1, 0
+              for number, line in enumerate(data.split(b"\n")[:lines(data)], 1):
+                  if size and size + len(line) + 1 > READ_CHUNK_BYTES:
+                      reads.append({"offset": start, "limit": number - start})
+                      start, size = number, 0
+                  size += len(line) + 1
+              if data:
+                  reads.append({"offset": start, "limit": lines(data) - start + 1})
+              return {"path": path, "lines": lines(data), "bytes": len(data), "reads": reads}
 
 
           def binary(rev, path):
@@ -410,7 +420,7 @@ jobs:
                           entry["targets"].append(target(path, file.read()))
                   if kind != "added" or not whole:
                       entry["targets"].append(target(name, diff))
-              reads += sum(-(-t["bytes"] // READ_CHUNK_BYTES) for t in entry["targets"])
+              reads += sum(len(t["reads"]) for t in entry["targets"])
               files.append(entry)
           turns = min(BASE_TURNS + TURNS_PER_READ * reads, MAX_TURNS)
           text = json.dumps({"files": files, "reads": reads, "max_turns": turns}, indent=1)
@@ -553,14 +563,14 @@ jobs:
             file whole as it is now and its diff (`.review-diff/<path>.diff`, which also shows
             what was removed), and a deleted file's diff. Read every target in full with Read,
             several at once where you can, before you write any finding; don't stop at the task
-            list or the file list. A Read with no `limit` often stops before the end of a long
-            file. When a result ends before the target's last line (the list gives each target's
-            line count), Read it again from the next line with `offset`, until you've read its
-            last line. Do this for every target before you write any finding. Read refuses a file
-            over 256 KB, or a `limit` over 25,000 tokens, outright: read such a target in parts
-            with `offset` and `limit`, say 500 lines at a time. Use these diffs rather than
-            `gh pr diff`, whose output a large pull request cuts short. A step after you measures which targets your Read calls covered, and a
-            review that didn't read them all isn't a clean review, whatever its summary says.
+            list or the file list, and don't take a file's diff for the file. Each target's
+            `reads` lists the Reads that cover it: make every one, as Read with the target's
+            `path` and that `offset` and `limit`. A Read with no `limit` stops early on a long
+            file, so don't leave the limit out. On a later run, read them all again: this session
+            hasn't seen them. Use these diffs rather than `gh pr diff`, whose output a large pull
+            request cuts short. A step after you measures which targets your Read calls covered,
+            and a review that didn't read them all isn't a clean review, whatever its summary
+            says.
 
             A change can be wrong for code it didn't touch. For each changed signature, removed
             or renamed name, or changed behaviour, search the checkout for its uses with Grep and
