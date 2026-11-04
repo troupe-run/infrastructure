@@ -1083,10 +1083,17 @@ jobs:
           WANTS_REVIEW: ${{ needs.gate.outputs.review }}
           REVIEW: ${{ needs.review.result }}
           RESOLVE: ${{ needs.resolve.result }}
+          # What the review read, measured after it (review-covers-the-diff design D4).
+          COVERAGE: ${{ needs.review.outputs.coverage }}
+          UNREAD: ${{ needs.review.outputs.unread }}
         run: |
+          import json
           import os
           import re
           import sys
+
+          # The files a failure names before "and n more" (review-covers-the-diff design D4).
+          SHOWN = 50
 
 
           def escape(text):
@@ -1125,4 +1132,26 @@ jobs:
                         for name, result in jobs.items() if result != "success"]
           if unfinished:
               fail("Review not completed", f"Not completed: {', '.join(unfinished)}.")
-          print("The review of this head completed, and its resolving job too.")
+          # A review that finished but didn't read what it was given isn't a review of the head:
+          # the coverage step measured it from the session's tool calls, not Claude's word.
+          coverage = os.environ.get("COVERAGE", "")
+          if coverage != "complete":
+              try:
+                  unread = json.loads(os.environ.get("UNREAD", ""))
+                  names = [f"{item['path']} ({item['read']})" for item in unread]
+              except (ValueError, KeyError, TypeError):
+                  names = []
+              listed = ", ".join(names[:SHOWN]) + (
+                  f", and {len(names) - SHOWN} more" if len(names) > SHOWN else "")
+              said = {"incomplete": "didn't read every changed file in full",
+                      "unknown": "couldn't be measured, so nothing counts as read"}.get(
+                          coverage, "wasn't measured")
+              reason = (f"The review completed, but it {said}: {listed or 'files unnamed'}. A "
+                        "passing review means its session read every changed file and diff the "
+                        f"run lists. Re-run it with `{rerun}` (a session may read more on "
+                        "another try), make the pull request smaller if it ran out of turns, "
+                        "or have the owner review it by hand and bypass the rules.")
+              print(f"::error title=Review didn't read the code::{escape(reason)}")
+              sys.exit(1)
+          print("The review of this head completed, read every changed file, and its resolving "
+                "job completed too.")
