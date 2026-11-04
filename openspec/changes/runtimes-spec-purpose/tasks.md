@@ -2,14 +2,14 @@
 
 ## 1. Record the Purpose and reword the description
 
-- [ ] 1.1 Read the `runtimes` Purpose from troupe#287's branch
+- [x] 1.1 Read the `runtimes` Purpose from troupe#287's branch
       (`gh api "repos/troupe-run/troupe/contents/openspec/changes/runtimes/specs/runtimes/spec.md?ref=runtimes"`,
       through `scripts/oob.py`'s `purpose()`), and add it to `oob/troupe-spec-purposes.json` where design D1 says.
       Verify the file has 31 entries, its keys are sorted, the entry matches #272's quote, and `git diff` shows only
-      that added line
-- [ ] 1.2 Set `cap:config`'s description in `tofu/labels/troupe.json` to design D2's text. Verify the file still holds
+      that added line (68c084f: 31 entries, sorted, #272's quote, one line added)
+- [x] 1.2 Set `cap:config`'s description in `tofu/labels/troupe.json` to design D2's text. Verify the file still holds
       36 labels, `git diff` shows only that description, it is 98 characters, and `scripts/tests/test_labels.py`
-      passes
+      passes (36 labels, one description changed, 98 characters, 24 passed)
 
 ## 2. Verify against troupe's main
 

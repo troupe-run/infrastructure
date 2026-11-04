@@ -22,7 +22,7 @@
   {
     "name": "cap:config",
     "color": "1D76DB",
-    "description": "A theatre's config as events with lineage, merged across branches, and the actor, its first kind"
+    "description": "A theatre's config as events with lineage, merged across branches, and its kinds: actors, runtimes"
   },
   {
     "name": "cap:core-api",
