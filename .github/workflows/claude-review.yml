@@ -232,7 +232,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 1
+          # GitHub's merge commit and its parents: the first is the base's tip, which the diff
+          # step below diffs against (review-covers-the-diff design D2).
+          fetch-depth: 2
           # The run's token isn't left in .git/config, where Read could reach it.
           persist-credentials: false
       # The org's contributing guide, which the prompt's check 5 names, where Read(./**) reaches it:
@@ -248,6 +250,118 @@ jobs:
           sparse-checkout-cone-mode: false
           fetch-depth: 1
           persist-credentials: false
+      # What the review must read: each changed file's diff, written into the workspace where
+      # Read reaches it, and the list of what each file needs read, made with git from the
+      # checkout so a large pull request's diff isn't cut short. A copy of the list goes to
+      # RUNNER_TEMP, which Claude can't reach, for the step that measures what it read; and the
+      # turn budget follows from it (review-covers-the-diff design D2, D5).
+      - id: diff
+        name: Write each changed file's diff
+        shell: python3 {0}
+        run: |
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+
+          # What each changed file needs read, and the turns that takes (review-covers-the-diff design D2,
+          # D5). By file name: a lockfile or OpenTofu's state needs nothing read, wherever it is.
+          REVIEW_SKIP = {"uv.lock", "package-lock.json", ".terraform.lock.hcl", "terraform.tfstate"}
+          # One Read with no limit stops at a token cap, about 22 to 41 KB in the probe; 20,000 bytes errs
+          # towards more turns (Probe results).
+          READ_CHUNK_BYTES = 20_000
+          BASE_TURNS = 40
+          TURNS_PER_READ = 2
+          MAX_TURNS = 400
+          OUT = ".review-diff"
+
+
+          def escape(text):
+              # As the runner's toolkit escapes a command's message, so no input can start a line.
+              return str(text).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+          def fail(reason):
+              print(f"::error title=Diff not made::{escape(reason)}, so the review can't be told what to "
+                    "read. Re-run this run once it can be made.")
+              sys.exit(1)
+
+
+          def git(*args):
+              done = subprocess.run(["git", "-c", "core.quotepath=off", *args], capture_output=True,
+                                    check=False)
+              if done.returncode != 0:
+                  fail(f"git {args[0]} exited with {done.returncode}")
+              return done.stdout
+
+
+          def lines(data):
+              # As Read numbers them: split on newlines, without the empty line after a final newline.
+              return data.count(b"\n") + (1 if data and not data.endswith(b"\n") else 0)
+
+
+          def target(path, data):
+              return {"path": path, "lines": lines(data), "bytes": len(data)}
+
+
+          if os.path.lexists(OUT):
+              if git("ls-files", "--", OUT).strip():
+                  fail(f"The pull request has files under {OUT}/, which is the review's own")
+              shutil.rmtree(OUT) if os.path.isdir(OUT) and not os.path.islink(OUT) else os.remove(OUT)
+          # The checkout is GitHub's merge commit; its first parent is the base's tip (D2).
+          words = git("diff", "--no-color", "--no-ext-diff", "-M", "--name-status", "-z", "HEAD^1",
+                      "HEAD").decode("utf-8", "surrogateescape").split("\0")
+          changes = []
+          i = 0
+          while i < len(words) and words[i]:
+              status = words[i]
+              if status[:1] in "RC":
+                  changes.append((status[:1], words[i + 1], words[i + 2]))
+                  i += 3
+              else:
+                  changes.append((status[:1], words[i + 1], words[i + 1]))
+                  i += 2
+          files = []
+          reads = 0
+          for status, old, new in changes:
+              kind = {"A": "added", "D": "deleted", "R": "renamed", "C": "added"}.get(status, "modified")
+              path = old if kind == "deleted" else new
+              entry = {"path": path, "status": kind, "targets": []}
+              if kind == "renamed":
+                  entry["from"] = old
+              diff = git("diff", "--no-color", "--no-ext-diff", "-M", "HEAD^1", "HEAD", "--",
+                         *dict.fromkeys((old, new)))
+              if os.path.basename(path) in REVIEW_SKIP:
+                  entry["skipped"] = "on the skip list"
+              elif b"\n@@ " not in diff and (b"\nBinary files " in diff or b"\nGIT binary patch" in diff):
+                  entry["skipped"] = "binary"
+              else:
+                  name = os.path.join(OUT, path + ".diff")
+                  os.makedirs(os.path.dirname(name), exist_ok=True)
+                  with open(name, "wb") as file:
+                      file.write(diff)
+                  # An added file's diff is its text, so the file alone is read; a symlink or submodule
+                  # has nothing in the checkout to read but its diff.
+                  whole = kind != "deleted" and os.path.isfile(path) and not os.path.islink(path)
+                  if whole:
+                      with open(path, "rb") as file:
+                          entry["targets"].append(target(path, file.read()))
+                  if kind != "added" or not whole:
+                      entry["targets"].append(target(name, diff))
+              reads += sum(-(-t["bytes"] // READ_CHUNK_BYTES) for t in entry["targets"])
+              files.append(entry)
+          turns = min(BASE_TURNS + TURNS_PER_READ * reads, MAX_TURNS)
+          text = json.dumps({"files": files, "reads": reads, "max_turns": turns}, indent=1)
+          os.makedirs(OUT, exist_ok=True)
+          for name in (os.path.join(OUT, "files.json"),
+                       os.path.join(os.environ["RUNNER_TEMP"], "review-files.json")):
+              with open(name, "w", encoding="utf-8") as file:
+                  file.write(text)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as file:
+              file.write(f"max_turns={turns}\n")
+          listed = sum(1 for f in files if f["targets"])
+          print(f"{len(files)} changed file(s), {listed} to read in {reads} Read(s): --max-turns {turns}.")
       # The review App's token, for this repository only: read the code, write on pull requests.
       # The App itself has nothing more, so no token minted for it can push (oob/README.md).
       - id: app-token
@@ -353,7 +467,7 @@ jobs:
           # do almost anything. Here the token and this tool list are the fence, and the hooks would
           # widen it, since they grant gh writes such as `gh pr close` (owner, 2026-10-26; design D8).
           claude_args: >-
-            --max-turns 30
+            --max-turns ${{ steps.diff.outputs.max_turns }}
             --setting-sources user
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*),Read(./**),Grep(./**),Glob(./**)"
             --json-schema '{"type":"object","additionalProperties":false,"required":["resolve","retier"],"properties":{"resolve":{"type":"array","items":{"type":"string"}},"retier":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["thread","tier","title","reason"],"properties":{"thread":{"type":"string"},"tier":{"type":"string","enum":["must-fix","nit","decision"]},"title":{"type":"string"},"reason":{"type":"string"}}}}}}'
