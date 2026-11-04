@@ -163,6 +163,12 @@ CHECKOUT_DEPTH = 2
 # --max-turns comes from the diff step, never a fixed number (D5). GitHub substitutes it before
 # the action reads claude_args.
 MAX_TURNS = "${{ steps.diff.outputs.max_turns }}"
+# The model is the repository variable OpenTofu declares (tofu/review.tf), checked by a step of
+# its own and passed on as its output, never pasted from vars into claude_args (D6).
+MODEL_NAME = "Check the review's model"
+MODEL = {"id": "model", "shell": "python3 {0}", "env": {"MODEL": "${{ vars.CLAUDE_REVIEW_MODEL }}"}}
+MODEL_SHA256 = "1566ed73c892e39e9531b83bb147ed5778ed215c939496f13718ae7e7b3424a2"
+MODEL_ARG = "${{ steps.model.outputs.model }}"
 # After Claude, in a job of its own, only when the review succeeded: resolve and re-tier what Claude
 # names, checked against conversations read again in that job (design D4, D4a).
 RESOLVER_NAME = "Resolve and re-tier what Claude named"
@@ -200,7 +206,7 @@ GATE_OUTPUTS = {"review": "${{ steps.gate.outputs.review }}"}
 GATE_TOKEN_INPUTS = {**TOKEN_INPUTS, "permission-pull-requests": "read"}
 REVIEW_NEEDS = "gate"
 REVIEW_IF = "needs.gate.outputs.review == 'true'"
-OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME, DIFF_NAME}
+OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME, DIFF_NAME, MODEL_NAME}
 # The required check that the review of the head completed (review-completed-check design D2 to
 # D5): after every other job, whatever became of them, on pull request events only, since GitHub
 # ignores a comment's run for a pull request (Probe results). No token, no secret, no checkout,
@@ -261,6 +267,7 @@ def claude_args(inputs: dict[str, Any]) -> tuple[set[str], str | None, list[str]
     The --json-schema is read by json_schema."""
     # The expressions GitHub substitutes before the action reads them, as one word each.
     text = str(inputs.get("claude_args", "")).replace(MAX_TURNS, "MAX_TURNS")
+    text = text.replace(MODEL_ARG, "MODEL")
     words = shlex.split(text)
     tools: set[str] = set()
     sources = None
@@ -272,7 +279,8 @@ def claude_args(inputs: dict[str, Any]) -> tuple[set[str], str | None, list[str]
         elif words[i] == "--allowedTools" and i + 1 < len(words):
             tools |= {tool.strip() for tool in words[i + 1].split(",") if tool.strip()}
             i += 2
-        elif words[i] == "--max-turns" and i + 1 < len(words):
+        elif words[i] in ("--max-turns", "--model") and i + 1 < len(words):
+            # Each checked against its expression in problems().
             i += 2
         elif words[i] == "--setting-sources" and i + 1 < len(words):
             sources = words[i + 1]
@@ -583,6 +591,13 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         at = steps.index(diffs[0])
         if checkouts and not (steps.index(checkouts[-1]) < at < steps.index(actions[0])):
             found.append(f"{DIFF_NAME!r} doesn't run between the checkouts and the action")
+    models = [step for step in steps if step.get("name") == MODEL_NAME and "run" in step]
+    if len(models) != 1:
+        found.append(f"review has {len(models)} steps named {MODEL_NAME!r}, not one")
+    else:
+        found += own_step_problems(models[0], MODEL, MODEL_SHA256, repr(MODEL_NAME))
+        if steps.index(models[0]) > steps.index(actions[0]):
+            found.append(f"{MODEL_NAME!r} runs after the action")
     if json_schema(inputs) != SCHEMA:
         found.append("Claude's structured output isn't the schema this test pins (SCHEMA)")
 
@@ -607,13 +622,15 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         found.append(f"Claude's tools add {sorted(tools - TOOLS)} and drop {sorted(TOOLS - tools)}")
     if others:
         found.append(
-            f"claude_args has {others!r} besides --allowedTools, --max-turns, --setting-sources "
-            "and --json-schema"
+            f"claude_args has {others!r} besides --allowedTools, --max-turns, --model, "
+            "--setting-sources and --json-schema"
         )
     if "--max-turns" not in str(inputs.get("claude_args", "")):
         found.append("claude_args has no --max-turns")
     elif f"--max-turns {MAX_TURNS}" not in str(inputs.get("claude_args", "")):
         found.append(f"--max-turns isn't {MAX_TURNS}, the turns the diff needs (D5)")
+    if f"--model {MODEL_ARG}" not in str(inputs.get("claude_args", "")):
+        found.append(f"--model isn't {MODEL_ARG}, the checked repository variable (D6)")
     return found
 
 
@@ -674,6 +691,11 @@ def snapshot(w: dict[str, Any]) -> dict[str, Any]:
 
 def diff_step(w: dict[str, Any]) -> dict[str, Any]:
     step = next(s for s in job(w)["steps"] if s.get("name") == DIFF_NAME)
+    return step  # type: ignore[no-any-return]
+
+
+def model_step(w: dict[str, Any]) -> dict[str, Any]:
+    step = next(s for s in job(w)["steps"] if s.get("name") == MODEL_NAME)
     return step  # type: ignore[no-any-return]
 
 
@@ -1183,6 +1205,29 @@ def sources(w: dict[str, Any], change: str) -> None:
                 {"claude_args": str(action(w)["claude_args"]).replace(MAX_TURNS, "30")}
             ),
             "--max-turns isn't",
+        ),
+        # The model, from the checked variable (D6).
+        (lambda w: job(w)["steps"].remove(model_step(w)), '0 steps named "Check the review'),
+        (lambda w: move(w, model_step(w), len(job(w)["steps"])), "runs after the action"),
+        (
+            lambda w: model_step(w)["env"].update({"MODEL": "claude-opus-5-5"}),
+            '"Check the review\'s model" is given',
+        ),
+        (
+            lambda w: action(w).update(
+                {
+                    "claude_args": str(action(w)["claude_args"]).replace(
+                        MODEL_ARG, "${{ vars.CLAUDE_REVIEW_MODEL }}"
+                    )
+                }
+            ),
+            "--model isn't",
+        ),
+        (
+            lambda w: action(w).update(
+                {"claude_args": str(action(w)["claude_args"]).replace(f"--model {MODEL_ARG}", "")}
+            ),
+            "--model isn't",
         ),
         (lambda w: sources(w, ""), "from None"),
         (lambda w: sources(w, "--setting-sources user,project"), "from 'user,project'"),
@@ -1974,3 +2019,51 @@ def test_a_checkout_with_no_base_fails_saying_so(tmp_path: Path) -> None:
     assert done.returncode == 1
     assert done.stdout.startswith("::error title=Diff not made::git diff exited with")
     assert data is None
+
+
+# The model step: the variable checked before Claude starts (D6).
+def run_model(tmp_path: Path, value: str | None) -> tuple[subprocess.CompletedProcess[str], str]:
+    outputs = tmp_path / "outputs"
+    outputs.write_text("", encoding="utf-8")
+    env = {"GITHUB_OUTPUT": str(outputs)}
+    if value is not None:
+        env["MODEL"] = value
+    done = run_step(model_step(review()), tmp_path, tmp_path, env)
+    return done, outputs.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("value", ["claude-sonnet-5-5", "claude-opus-5-5", "claude-x-4-5-20250929"])
+def test_a_model_name_is_passed_on(tmp_path: Path, value: str) -> None:
+    done, outputs = run_model(tmp_path, value)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert outputs == f"model={value}\n"
+
+
+@pytest.mark.parametrize("value", [None, ""])
+def test_an_unset_model_fails_naming_the_variable(tmp_path: Path, value: str | None) -> None:
+    done, outputs = run_model(tmp_path, value)
+    assert done.returncode == 1
+    assert done.stdout.startswith(
+        "::error title=Review model unknown::CLAUDE_REVIEW_MODEL isn't set."
+    )
+    assert outputs == ""
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "claude-x --allowedTools Bash",
+        "claude-sonnet-5-5\n::error::forged",
+        "--dangerously-skip-permissions",
+        "claude-sonnet-5-5[1m]",
+        "gpt-5",
+    ],
+)
+def test_a_value_that_isn_t_a_model_name_fails_and_reaches_nothing(
+    tmp_path: Path, value: str
+) -> None:
+    done, outputs = run_model(tmp_path, value)
+    assert done.returncode == 1
+    assert len(done.stdout.splitlines()) == 1, done.stdout
+    assert "which isn't a model name" in done.stdout
+    assert outputs == ""
