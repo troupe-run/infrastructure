@@ -91,6 +91,12 @@ checkouts, before the action) writes:
   version, `.claude-pr/<path>`, counted from the committed blob: at its own path Claude finds the base's copy
   (#274's review). If the action stops making that copy, the Read fails and coverage fails, which is the safe way.
 
+  Each target also lists its `reads`: consecutive `offset`/`limit` chunks of at most `READ_CHUNK_BYTES` (a longer
+  line on its own) that cover it, for the session to make exactly. #274's third and fourth reviews showed wording
+  alone isn't enough: one read a 60 KB doc with a single capped Read, and one took modified files' diffs for the files
+  (7 of 14 read in full, while its summary said all 14). The plan turns "read it all" into a list to work through;
+  coverage is still measured, not trusted (owner, 2026-11-04, option 1 after option 3 failed).
+
   A copy goes to `RUNNER_TEMP` for the coverage step, as `.review-threads.json` does, so a pull request can't plant a
   list.
 
@@ -161,8 +167,8 @@ the resolving job and doesn't change D2 or D3.)
 
 ### D5. The turn budget and the timeout
 
-A step before the review counts the Reads the list needs, `reads = Σ ceil(bytes / READ_CHUNK_BYTES)` over every
-target, and
+A step before the review counts the Reads the list plans (D2's `reads`, one per chunk of at most `READ_CHUNK_BYTES`)
+over every target, and
 sets `max_turns = min(40 + 2 × reads, 400)`. `claude_args` reads it as `--max-turns ${{ steps.diff.outputs.max_turns
 }}`. The value is an integer the step computed, never pull request text. Two turns per Read leaves room for searches,
 call sites and findings. Read calls made in parallel in one turn make the real need lower. The cap of 400, with the
@@ -210,16 +216,14 @@ The prompt changes in three places:
 
 - "Read the diff with `gh pr diff`" becomes: read `.review-diff/files.json`, then read every target it lists in full
   with Read, in parallel where you can, before writing findings. That's an added file whole, a modified or renamed
-  file whole and its `.diff`, and a deleted file's `.diff`. A Read with no `limit` often stops before the end of a
-  long file: when a result ends before the target's last line (the list gives each target's line count), Read it
-  again from the next line with `offset`, until its last line, for every target before any finding. Read refuses a
-  file over 256 KB, or a `limit` over 25,000 tokens, outright: read such a file in parts with `offset` and `limit`
-  (for example 500 lines at a time).
+  file whole and its `.diff`, and a deleted file's `.diff`. Each target's `reads` lists the Reads that cover it:
+  make every one, with that `offset` and `limit`, and don't take a file's diff for the file. On a later run, read
+  them all again. `gh pr diff` is no longer the way to read it.
 
-  #274's second review read `docs/development-workflow.md` (60 KB) with one Read that stopped at the token cap, and
-  didn't continue, so its check failed, as it should. The prompt put the action first after that (owner, 2026-11-04).
-  If that isn't enough, the next step is for the diff step to list each target's Reads as `offset`/`limit` chunks in
-  `files.json`, for the session to make exactly those. `gh pr diff` is no longer the way to read it.
+  #274's second review read `docs/development-workflow.md` (60 KB) with one Read that stopped at the token cap; the
+  prompt then said to read on from the next line (option 3), and the fourth review still read 7 of 14 files in full.
+  So the prompt now hands over D2's plan rather than asking the session to notice it stopped short (owner,
+  2026-11-04).
 - For each changed signature, removed or renamed name, or changed behaviour, search the checkout for its uses with
   Grep and read them (D7a).
 - A review that hasn't read everything listed isn't a clean review. Don't say it is, and don't stop at the task list

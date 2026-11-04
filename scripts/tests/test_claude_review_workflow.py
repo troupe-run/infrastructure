@@ -159,7 +159,7 @@ SNAPSHOT_SHA256 = "881c6b51fbc892399d33e02bcfc14f93611d0f293eab577dd415b1bd6e575
 # that follows (review-covers-the-diff design D2, D5). Its constants are in the pinned script.
 DIFF_NAME = "Write each changed file's diff"
 DIFF = {"id": "diff", "shell": "python3 {0}"}
-DIFF_SHA256 = "3df3b42ab65747fb27f67d84be82eed677a86e0107288af99b604007dcf60cfb"
+DIFF_SHA256 = "75811f224c98b36d79a93d8de332a8caeca3b67e04d0aca030f21b8e214b0390"
 # The pull request's checkout keeps the merge commit's parents, so the diff step can diff against
 # the base's tip (D2).
 CHECKOUT_DEPTH = 2
@@ -179,7 +179,8 @@ PROMPT_READS = [
     "Read every target in full with Read",
     "search the checkout for its uses with Grep",
     "a review that didn't read them all isn't a clean review",
-    "Read it again from the next line with `offset`, until you've read its last line",
+    "make every one, as Read with the target's `path` and that `offset` and `limit`",
+    "don't take a file's diff for the file",
 ]
 PROMPT_NOT = "Read the diff with"
 # After Claude: what it read, from the execution file only, never its structured output or its
@@ -2161,17 +2162,40 @@ def test_nothing_to_read_gets_the_base_turns(tmp_path: Path) -> None:
     assert (data["reads"], outputs) == (0, "max_turns=40\n")
 
 
-def test_the_turns_follow_the_size_to_read_up_to_the_cap(tmp_path: Path) -> None:
-    # One added file of three chunks: three Reads, so 40 + 2 x 3 turns.
-    big = b"x" * (DIFF_READ_CHUNK * 3 - 10) + b"\n"
+def test_the_turns_follow_the_reads_planned_up_to_the_cap(tmp_path: Path) -> None:
+    # One added file of 600 lines of 100 bytes: three Reads of 200 lines, so 40 + 2 x 3 turns.
+    big = (b"x" * 99 + b"\n") * 600
     done, data, outputs = run_diff(merged(tmp_path, {}, {"big.txt": big}))
     assert done.returncode == 0, done.stdout + done.stderr
     assert data is not None
     assert (data["reads"], outputs) == (3, "max_turns=46\n")
-    huge = {f"f{i}.txt": b"y" * (DIFF_READ_CHUNK * 4) for i in range(60)}
+    huge = {f"f{i}.txt": (b"y" * 99 + b"\n") * 800 for i in range(60)}
     done, _, outputs = run_diff(merged(tmp_path / "huge", {}, huge))
     assert done.returncode == 0, done.stdout + done.stderr
     assert outputs == "max_turns=400\n"
+
+
+def test_each_target_lists_the_reads_that_cover_it(tmp_path: Path) -> None:
+    """#274: a session left a long file at its first, capped Read. Each target lists consecutive
+    Reads of at most DIFF_READ_CHUNK bytes that cover it, a longer line on its own."""
+    lines_100 = (b"z" * 99 + b"\n") * 450
+    one_long = b"a\n" + b"w" * (DIFF_READ_CHUNK * 2) + b"\nb"
+    workspace = merged(tmp_path, {}, {"many.txt": lines_100, "long_line.txt": one_long})
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    plans = {t["path"]: t["reads"] for f in data["files"] for t in f["targets"]}
+    assert plans["many.txt"] == [
+        {"offset": 1, "limit": 200},
+        {"offset": 201, "limit": 200},
+        {"offset": 401, "limit": 50},
+    ]
+    assert plans["long_line.txt"] == [
+        {"offset": 1, "limit": 1},
+        {"offset": 2, "limit": 1},
+        {"offset": 3, "limit": 1},
+    ]
+    assert data["reads"] == 6
 
 
 def test_a_diff_larger_than_one_read_is_written_whole(tmp_path: Path) -> None:

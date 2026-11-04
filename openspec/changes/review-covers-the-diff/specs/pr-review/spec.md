@@ -5,8 +5,8 @@
 ### Requirement: The changed files and their diffs are listed before the review starts
 Before Claude starts, a review run SHALL write each changed file's diff into the workspace, made from the checked-out
 commit, and a list of what must be read: an added file whole; a modified or renamed file whole, as it is now, and its
-diff; a deleted file's diff. Binary files and the paths on one declared skip list SHALL need nothing, and the list
-SHALL say why.
+diff; a deleted file's diff. A path the review's action restores from the base SHALL be read as its copy of the pull
+request's version. Each target SHALL list the Reads that cover it. Binary files and a declared skip list need nothing.
 
 #### Scenario: A large pull request
 - **WHEN** a pull request adds 9,000 lines across 114 files
@@ -17,6 +17,14 @@ SHALL say why.
 - **WHEN** a pull request changes one function in a 600-line module
 - **THEN** the list names the whole module and its diff
 
+#### Scenario: A pull request that grows CLAUDE.md
+- **WHEN** a pull request adds two lines to `CLAUDE.md`, which the action puts back from the base before Claude starts
+- **THEN** the list names the action's copy of the pull request's `CLAUDE.md` and counts the pull request's lines
+
+#### Scenario: A long file
+- **WHEN** a pull request adds a 60 KB file
+- **THEN** its target lists consecutive Reads that cover every line, each small enough that Read returns it whole
+
 #### Scenario: A deleted file
 - **WHEN** a pull request deletes a module
 - **THEN** the list names its diff, which holds every line that was removed
@@ -24,6 +32,10 @@ SHALL say why.
 #### Scenario: A lockfile
 - **WHEN** a pull request changes `uv.lock`
 - **THEN** the list needs nothing read for it, and says it's on the skip list
+
+#### Scenario: Attributes that mark code binary
+- **WHEN** a pull request adds a `.gitattributes` with `*.py -diff` and changes a `.py` file
+- **THEN** that file's targets are listed as for any text file
 
 #### Scenario: The diff can't be made
 - **WHEN** the diff can't be made from the checkout
