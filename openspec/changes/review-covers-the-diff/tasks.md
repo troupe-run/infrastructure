@@ -41,7 +41,7 @@
 
 ## 4. The prompt (design D7)
 
-- [ ] 4.1 Change the prompt as D7 says. Add a test that the prompt names `.review-diff/files.json`, tells the review
+- [x] 4.1 Change the prompt as D7 says. Add a test that the prompt names `.review-diff/files.json`, tells the review
   to read every listed target in full, asks for the uses of changed names to be searched for and read, and no longer
   says to read the diff with `gh pr diff`. Verify it passes, and fails with each sentence removed
 
