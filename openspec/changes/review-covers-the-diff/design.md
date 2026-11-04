@@ -94,8 +94,10 @@ which leaves out large patches. The step removes any `.review-diff/` the checkou
 Needing nothing, each with its reason in `files.json`: binary files (no text to read) and one declared skip list,
 `REVIEW_SKIP`, in the step:
 
-- `uv.lock`, `package-lock.json`, `**/.terraform.lock.hcl`;
-- `tofu/terraform.tfstate` (encrypted state that CI commits).
+- `uv.lock`, `package-lock.json`, `.terraform.lock.hcl`;
+- `terraform.tfstate` (encrypted state that CI commits).
+
+It matches by file name, wherever the file is, so a lockfile in a subdirectory needs nothing read too.
 
 The list is a constant in the step, pinned by the workflow's test. Adding a path is a reviewed change to the
 workflow (owner, 2026-11-04: every file but a skip list).
@@ -119,8 +121,8 @@ The coverage step (after the review step, `if: ${{ !cancelled() }}`) reads the e
    count as they really happened. A result whose lines don't parse counts for nothing. That errs towards "not read",
    never towards "read".
 4. A target is read when the union of its covered lines is `1..N`, where `N` is its line count from the
-   `RUNNER_TEMP` list, counted as Python's `splitlines()` counts them. Read numbers an empty line after the last
-   newline too, which isn't required. A file is **read in full** when every one of its targets is read; **in part** when any line
+   `RUNNER_TEMP` list, counted as Read numbers them: split on newlines, without the empty line after a final
+   newline, which Read numbers too but isn't required. A file is **read in full** when every one of its targets is read; **in part** when any line
    of any target is covered; **not read** otherwise. A file with no targets is complete.
 
 The step prints only paths and counts, never a result's text. It writes a table to `GITHUB_STEP_SUMMARY` (paths
@@ -134,9 +136,9 @@ runs the new step.
 
 ### D4. The `completed` job fails on coverage
 
-`claude review completed` gains one step after its current ones. Once the review and resolving jobs succeeded, it
-reads `needs.review.outputs.coverage` and `unread` from `env:`. Anything but `complete` fails with one escaped
-`::error`. It names each file not read in full (up to 50, then "and n more") and says what to do:
+`claude review completed`'s one step gains a check after its current ones. Once the review and resolving jobs
+succeeded, it reads `needs.review.outputs.coverage` and `unread` from `env:`. Anything but `complete` fails with one
+escaped `::error`. It names each file not read in full (up to 50, then "and n more") and says what to do:
 
 - re-run the run (`gh run rerun <id>`), since a session may read more on another try;
 - make the pull request smaller, if the review ran out of turns;

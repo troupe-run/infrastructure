@@ -64,9 +64,10 @@ status; OpenSpec holds what the system does and how each change will do it.
    maintainer's, and so is a must-fix still in
    dispute after the re-review. The review runs again on each push, and on each reply to one of its
    open must-fixes, so a must-fix answered with a reply alone is judged when the reply is posted. A required check,
-   `claude review completed`, holds the pull request until the review of its head has completed; if the review was
-   cancelled or failed, its run is re-run. Once the review of the last push leaves no must-fix or decision open, the
-   pull request is marked ready for review, so CI's full run,
+   `claude review completed`, holds the pull request until the review of its head has completed and read every
+   changed file and diff it was given, measured from its tool calls; if the review was cancelled or failed, its run
+   is re-run, and if it didn't read them all, the pull request isn't reviewed yet. Once the review of the last push
+   leaves no must-fix or decision open, the pull request is marked ready for review, so CI's full run,
    and the plan where there is one, test the code the review has finished with. The pull request can't merge while
    any conversation is open.
 5. **Before the merge,** the change is archived on its branch, which updates `openspec/specs/`, so the pull

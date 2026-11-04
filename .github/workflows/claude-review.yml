@@ -7,7 +7,10 @@ name: claude review
 # (spec: pr-review, #154, #194). The review job isn't a required check, and it can't approve,
 # request changes or push; what blocks a merge is an unresolved conversation, through the ruleset,
 # and the last job, a required check that the review of the head completed (review-completed-check
-# design D2, #242). A job after the
+# design D2, #242) and read every changed file and diff it was given: a step before Claude lists
+# them, and a step after it measures what its Read calls covered, from the action's record of the
+# session, never from what Claude says (review-covers-the-diff design D2 to D4, #268). Its model is
+# the CLAUDE_REVIEW_MODEL variable declared in tofu/review.tf (D6). A job after the
 # review resolves the review's own must-fixes that Claude found addressed, and its nits that a push
 # fixed (review-resolves-fixed-nits design D1, D2, #246), and posts the re-tiers it
 # names; resolving needs contents write, so its token can write contents and the review job's can't,
@@ -1059,7 +1062,9 @@ jobs:
 
   # Whether the review of the pull request's head completed. A required check (tofu/required-checks.
   # json), so a review cancelled or failed with no run after it holds the merge until that run is
-  # re-run (review-completed-check design D2, D3, #242). always(), so it reports after a cancelled
+  # re-run (review-completed-check design D2, D3, #242), and so does one that finished without
+  # reading every changed file and diff it was given, measured by the review job's coverage step
+  # (review-covers-the-diff design D4). always(), so it reports after a cancelled
   # review too, and outside the concurrency group, so a newer review never cancels it. Pull request
   # events only: GitHub counts only the newest pull request event's run for a pull request, and
   # ignores a comment's run, though its checks land on the head (design D4, Probe results). A merge
