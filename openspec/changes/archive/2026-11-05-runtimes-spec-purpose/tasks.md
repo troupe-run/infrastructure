@@ -25,11 +25,13 @@
       anything else (88f48fc, 0 behind `origin/main` 3de7859: exactly the board's `config` option, "oob: 1
       difference(s)". ollama-runner-spec-purpose merged first and added its own record, so the file now holds 32
       entries, still sorted, and this branch still adds only `runtimes`)
-- [ ] 2.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows only
+- [x] 2.3 Once the owner approves the pull request's first `plan-pr` run, read its plan comment and verify it shows only
       `cap:config`'s description updated in place on troupe-run/troupe, and nothing else of this change's created,
       changed or deleted (name anything `main` has pending separately). Tick this in the same push as the archive, so
-      the owner approves one more run
-- [ ] 2.4 Run `openspec validate runtimes-spec-purpose --strict` and verify it passes
+      the owner approves one more run (plan for 5e23fb4, run 41947481716: 0 to add, 1 to change, 0 to destroy:
+      troupe's `github_issue_labels`, updated in place, with only `cap:config`'s description different. Nothing
+      pending from `main`)
+- [x] 2.4 Run `openspec validate runtimes-spec-purpose --strict` and verify it passes
 
 ## Workflow follow-up
 
