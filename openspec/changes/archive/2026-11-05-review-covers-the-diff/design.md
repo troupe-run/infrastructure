@@ -106,8 +106,10 @@ review reviews. It has no size cap, unlike `gh pr diff`, which GitHub refuses pa
 which leaves out large patches. The step removes any `.review-diff/` the checkout holds before writing.
 
 Needing nothing, each with its reason in `files.json`: binary files, which are those whose committed blob has a NUL
-byte in its first 8,000 bytes, git's own test, and never what `.gitattributes` says (#274's review); and one declared
-skip list, `REVIEW_SKIP`, in the step:
+byte in its first 8,000 bytes, git's own test, and isn't valid UTF-8 as a whole, never what `.gitattributes` says
+(#274's review). A NUL alone isn't enough: it's valid UTF-8, and a pull request could plant one near the top of a
+text file to have it exempted, while images, archives and compiled files are almost never valid UTF-8 (owner,
+2026-11-05). And one declared skip list, `REVIEW_SKIP`, in the step:
 
 - `uv.lock`, `package-lock.json`, `.terraform.lock.hcl`;
 - `terraform.tfstate` (encrypted state that CI commits).

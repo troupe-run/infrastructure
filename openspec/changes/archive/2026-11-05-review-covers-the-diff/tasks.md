@@ -86,13 +86,18 @@
 
 - [x] 7.1 On the pull request, read `plan (pull request)`. Verify it imports infrastructure's `CLAUDE_REVIEW_MODEL`,
   adds troupe's and website's, and updates the two deliveries of `claude-review.yml` (and `.github`'s
-  `CONTRIBUTING.md` if 6.2 changed it), and nothing else. Done: the plan for e957476 (run 41907468121) is 1 to import, 2 to add, 3 to change, 0 to
-  destroy: infrastructure's `CLAUDE_REVIEW_MODEL` imported at `claude-sonnet-5-5`, troupe's and website's created with
-  it, the two deliveries of `claude-review.yml`, and `.github`'s `CONTRIBUTING.md`
+  `CONTRIBUTING.md` if 6.2 changed it), and nothing else. Done: each head's plan was 1 to import, 2 to add, 3 to
+  change, 0 to destroy: infrastructure's `CLAUDE_REVIEW_MODEL` imported at `claude-sonnet-5-5`, troupe's and
+  website's created with it, the two deliveries of `claude-review.yml`, and `.github`'s `CONTRIBUTING.md`. Recorded
+  for e957476 (run 41907468121, a head the later rebases replaced), and for bedf6f0, the head after the last rebase
+  (run 42017046826)
 
 - [x] 7.2 Read this pull request's own review run. Verify its coverage table lists every listed file, its
-  `claude review completed` reflects it, and its `--model` and `--max-turns` are as D5 and D6 say. Done: run 41823131665 ran `--max-turns 112 --model claude-sonnet-5-5`
-  (14 files in 36 Reads), used 43 turns, and its coverage step measured 14 of 14 files read in full; the check passed
+  `claude review completed` reflects it, and its `--model` and `--max-turns` are as D5 and D6 say. Done: run
+  41823131665, on the pull request's first head (before the rebases), ran `--max-turns 112 --model
+  claude-sonnet-5-5` for 14 files in 36 Reads, used 43 turns, and measured 14 of 14 read in full. Run 42017046721,
+  on bedf6f0 after the archive added the two synced main specs, listed 16 files in 45 Reads (`--max-turns 130`) and
+  measured 16 of 16 read in full. The check passed on both
 
 ## Workflow follow-up
 

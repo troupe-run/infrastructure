@@ -159,7 +159,7 @@ SNAPSHOT_SHA256 = "881c6b51fbc892399d33e02bcfc14f93611d0f293eab577dd415b1bd6e575
 # that follows (review-covers-the-diff design D2, D5). Its constants are in the pinned script.
 DIFF_NAME = "Write each changed file's diff"
 DIFF = {"id": "diff", "shell": "python3 {0}"}
-DIFF_SHA256 = "75811f224c98b36d79a93d8de332a8caeca3b67e04d0aca030f21b8e214b0390"
+DIFF_SHA256 = "cd9c50c494bdba4de08e435d8b9fc0e526321a49b0606411615b23e9e45dea3c"
 # The pull request's checkout keeps the merge commit's parents, so the diff step can diff against
 # the base's tip (D2).
 CHECKOUT_DEPTH = 2
@@ -2144,6 +2144,19 @@ def test_a_path_the_action_restores_is_read_from_its_copy_of_the_pull_request(
     counts = {t["path"]: t["lines"] for f in data["files"] for t in f["targets"]}
     assert counts[".claude-pr/CLAUDE.md"] == 3
     assert counts[".claude-pr/.claude/settings.json"] == 3
+
+
+def test_a_nul_byte_planted_in_a_text_file_doesn_t_make_it_binary(tmp_path: Path) -> None:
+    """#274's review: a NUL is something the pull request controls, and it's valid UTF-8. A text
+    file with one planted near its top is still read; a file that isn't UTF-8 with a NUL isn't."""
+    planted = b"// \0 a comment\nconst x = 1;\n"
+    image = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\xff\xfe"
+    workspace = merged(tmp_path, {}, {"app.js": planted, "logo.png": image})
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert targets(data)["app.js"] == ["app.js"]
+    assert {f["path"]: f.get("skipped") for f in data["files"]}["logo.png"] == "binary"
 
 
 def test_a_deleted_binary_file_needs_nothing_read(tmp_path: Path) -> None:
