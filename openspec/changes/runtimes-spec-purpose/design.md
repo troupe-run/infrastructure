@@ -22,7 +22,7 @@ Evidence read on 2026-11-04:
 | `purpose()` of `runtimes` on 68c084f | exactly #272's quote |
 | `runtimes`'s Capability line | `` `cap:config`, `cap:actor-runners` `` |
 | troupe specs on `main` (dc5a704) naming `cap:config` or `cap:actor-runners` | actor-runners, claude-code-runner, config, config-files, effects, runner-protocol, runner-tools, scripted-runner |
-| `oob/troupe-spec-purposes.json` | 30 entries, no `runtimes` |
+| `oob/troupe-spec-purposes.json` | 30 entries, no `runtimes` (31 once ollama-runner-spec-purpose merged, 2026-11-05) |
 | `tofu/labels/troupe.json` | 36 labels |
 
 The Purpose:

@@ -42,7 +42,7 @@ the change sets `skip_specs`, as effects-spec-purpose did.
 
 ## Impact
 
-- `oob/troupe-spec-purposes.json`: one entry added (30 → 31).
+- `oob/troupe-spec-purposes.json`: one entry added (31 → 32, after ollama-runner-spec-purpose's, which merged first).
 - `tofu/labels/troupe.json`: one description changed (36 labels, unchanged).
 - GitHub, after the owner approves the plan: `cap:config` updated in place on troupe-run/troupe, then the troupe
   roadmap board's `config` option given the same description by `board descriptions (main)` (spec: labels).
