@@ -84,9 +84,12 @@
 
 ## 7. Plan
 
-- [ ] 7.1 On the pull request, read `plan (pull request)`. Verify it imports infrastructure's `CLAUDE_REVIEW_MODEL`,
+- [x] 7.1 On the pull request, read `plan (pull request)`. Verify it imports infrastructure's `CLAUDE_REVIEW_MODEL`,
   adds troupe's and website's, and updates the two deliveries of `claude-review.yml` (and `.github`'s
-  `CONTRIBUTING.md` if 6.2 changed it), and nothing else
+  `CONTRIBUTING.md` if 6.2 changed it), and nothing else. Done: the plan for e957476 (run 41907468121) is 1 to import, 2 to add, 3 to change, 0 to
+  destroy: infrastructure's `CLAUDE_REVIEW_MODEL` imported at `claude-sonnet-5-5`, troupe's and website's created with
+  it, the two deliveries of `claude-review.yml`, and `.github`'s `CONTRIBUTING.md`
+
 - [x] 7.2 Read this pull request's own review run. Verify its coverage table lists every listed file, its
   `claude review completed` reflects it, and its `--model` and `--max-turns` are as D5 and D6 say. Done: run 41823131665 ran `--max-turns 112 --model claude-sonnet-5-5`
   (14 files in 36 Reads), used 43 turns, and its coverage step measured 14 of 14 files read in full; the check passed
