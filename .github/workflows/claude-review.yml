@@ -362,11 +362,19 @@ jobs:
 
 
           def binary(rev, path):
-              # Git's own test, on the blob as committed: a NUL byte in its first 8,000 bytes. Never
-              # .gitattributes, which the pull request can change to mark its code binary.
+              # On the blob as committed, never .gitattributes, which the pull request can change to
+              # mark its code binary: git's own test, a NUL byte in its first 8,000 bytes, and the
+              # whole blob not valid UTF-8. A NUL is valid UTF-8, so a text file with one planted in
+              # it is still read (owner, 2026-11-05, on #274's review).
               done = subprocess.run(["git", "cat-file", "blob", f"{rev}:{path}"], capture_output=True,
                                     check=False)
-              return done.returncode == 0 and b"\0" in done.stdout[:8000]
+              if done.returncode != 0 or b"\0" not in done.stdout[:8000]:
+                  return False
+              try:
+                  done.stdout.decode("utf-8")
+              except UnicodeDecodeError:
+                  return True
+              return False
 
 
           if os.path.lexists(OUT):
