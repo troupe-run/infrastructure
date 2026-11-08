@@ -7,9 +7,11 @@ name: claude review
 # (spec: pr-review, #154, #194). The review job isn't a required check, and it can't approve,
 # request changes or push; what blocks a merge is an unresolved conversation, through the ruleset,
 # and the last job, a required check that the review of the head completed (review-completed-check
-# design D2, #242) and read every changed file and diff it was given: a step before Claude lists
-# them, and a step after it measures what its Read calls covered, from the action's record of the
-# session, never from what Claude says (review-covers-the-diff design D2 to D4, #268). Its model is
+# design D2, #242) and read changed code: a step before Claude lists every changed file and diff,
+# and a step after it measures what its Read calls covered, from the action's record of the
+# session, never from what Claude says (review-covers-the-diff design D2 to D4, #268). Until #280,
+# the check fails only when no changed source or test file was read in full, or coverage wasn't
+# measured, and warns on any other file left unread (review-coverage-floor design D3). Its model is
 # the CLAUDE_REVIEW_MODEL variable declared in tofu/review.tf (D6). A job after the
 # review resolves the review's own must-fixes that Claude found addressed, and its nits that a push
 # fixed (review-resolves-fixed-nits design D1, D2, #246), and posts the re-tiers it
