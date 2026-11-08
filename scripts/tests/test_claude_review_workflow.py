@@ -193,7 +193,7 @@ COVERAGE = {
     "shell": "python3 {0}",
     "env": {"EXECUTION_FILE": "${{ steps.review.outputs.execution_file }}"},
 }
-COVERAGE_SHA256 = "5cddb61a0067b32b2ef66b94cd6fa2211c5296732f3f37dd95cfec8bcbacf013"
+COVERAGE_SHA256 = "9384c380c3a100245be0e3c8152c243e96f5d4cc226a3bb466a06af63f009703"
 # Long enough for MAX_TURNS' cap (D5).
 REVIEW_TIMEOUT = 90
 # After Claude, in a job of its own, only when the review succeeded: resolve and re-tier what Claude
@@ -207,6 +207,8 @@ REVIEW_OUTPUTS = {
     "structured_output": "${{ steps.review.outputs.structured_output }}",
     # What the review read, for the check (review-covers-the-diff design D4).
     "coverage": "${{ steps.coverage.outputs.coverage }}",
+    # Whether any changed source or test file was read in full (review-coverage-floor design D1).
+    "code": "${{ steps.coverage.outputs.code }}",
     "unread": "${{ steps.coverage.outputs.unread }}",
 }
 # The resolving job: after the review, only when it succeeded, with nothing checked out and no
@@ -2316,6 +2318,8 @@ class Session:
         listed.write_text(json.dumps({"files": files}), encoding="utf-8")
         self.messages: list[dict[str, Any]] = []
         self.count = 0
+        # The floor's output after run(): none, read, unread or unknown (review-coverage-floor D1).
+        self.code = ""
 
     def read(self, path: str, lines: range, *, arrow: bool = False, error: bool = False) -> None:
         self.count += 1
@@ -2355,6 +2359,7 @@ class Session:
         done = run_step(coverage_step(review()), self.tmp_path, self.tmp_path, env)
         assert done.returncode == 0, done.stdout + done.stderr
         said = dict(line.split("=", 1) for line in outputs.read_text(encoding="utf-8").splitlines())
+        self.code = said["code"]
         return (
             said["coverage"],
             json.loads(said["unread"]),
@@ -2385,8 +2390,8 @@ def test_every_target_read_is_complete(tmp_path: Path) -> None:
     session.finish()
     coverage, unread, summary, _ = session.run()
     assert (coverage, unread) == ("complete", [])
-    assert "| src/a.py | modified | in full |" in summary
-    assert "| uv.lock | on the skip list | nothing to read |" in summary
+    assert "| src/a.py | modified | source or test | in full |" in summary
+    assert "| uv.lock | on the skip list | - | nothing to read |" in summary
 
 
 def test_two_reads_that_leave_a_gap_are_in_part(tmp_path: Path) -> None:
@@ -2394,20 +2399,29 @@ def test_two_reads_that_leave_a_gap_are_in_part(tmp_path: Path) -> None:
     session.read("src/b.py", range(1, 1001))
     session.read("src/b.py", range(1501, 2501))
     coverage, unread, _, out = session.run()
-    assert (coverage, unread) == ("incomplete", [{"path": "src/b.py", "read": "in part"}])
+    assert (coverage, unread) == (
+        "incomplete",
+        [{"path": "src/b.py", "read": "in part", "code": True}],
+    )
     assert "  in part: src/b.py" in out.splitlines()
 
 
 def test_a_modified_file_whose_diff_was_read_but_not_the_file_is_in_part(tmp_path: Path) -> None:
     session = Session(tmp_path, [MODIFIED])
     session.read(".review-diff/src/a.py.diff", range(1, 13))
-    assert session.run()[:2] == ("incomplete", [{"path": "src/a.py", "read": "in part"}])
+    assert session.run()[:2] == (
+        "incomplete",
+        [{"path": "src/a.py", "read": "in part", "code": True}],
+    )
 
 
 def test_a_read_that_failed_counts_for_nothing(tmp_path: Path) -> None:
     session = Session(tmp_path, [ADDED])
     session.read("src/b.py", range(1, 2501), error=True)
-    assert session.run()[:2] == ("incomplete", [{"path": "src/b.py", "read": "not read"}])
+    assert session.run()[:2] == (
+        "incomplete",
+        [{"path": "src/b.py", "read": "not read", "code": True}],
+    )
 
 
 def test_the_earlier_arrow_numbering_counts_too(tmp_path: Path) -> None:
@@ -2421,7 +2435,10 @@ def test_an_unchanged_file_read_is_reported_not_counted(tmp_path: Path) -> None:
     session.read("src/caller.py", range(1, 2501))
     session.read(".review-threads.json", range(1, 5))
     coverage, unread, summary, _ = session.run()
-    assert (coverage, unread) == ("incomplete", [{"path": "src/b.py", "read": "not read"}])
+    assert (coverage, unread) == (
+        "incomplete",
+        [{"path": "src/b.py", "read": "not read", "code": True}],
+    )
     assert "- Read src/caller.py, which the pull request didn't change" in summary
     assert ".review-threads.json" not in summary
 
@@ -2460,14 +2477,20 @@ def test_a_list_planted_in_the_workspace_is_ignored(tmp_path: Path) -> None:
     planted = session.workspace / ".review-diff" / "files.json"
     planted.parent.mkdir()
     planted.write_text(json.dumps({"files": []}), encoding="utf-8")
-    assert session.run()[:2] == ("incomplete", [{"path": "src/b.py", "read": "not read"}])
+    assert session.run()[:2] == (
+        "incomplete",
+        [{"path": "src/b.py", "read": "not read", "code": True}],
+    )
 
 
 @pytest.mark.parametrize("content", ["not json", '{"type": "result"}', ""])
 def test_an_unreadable_record_counts_nothing_as_read(tmp_path: Path, content: str) -> None:
     session = Session(tmp_path, [MODIFIED, SKIPPED])
     coverage, unread, summary, _ = session.run(content)
-    assert (coverage, unread) == ("unknown", [{"path": "src/a.py", "read": "not read"}])
+    assert (coverage, unread) == (
+        "unknown",
+        [{"path": "src/a.py", "read": "not read", "code": True}],
+    )
     assert "Coverage isn't known" in summary
 
 
@@ -2479,7 +2502,8 @@ def test_no_execution_file_counts_nothing_as_read(tmp_path: Path) -> None:
     done = run_step(coverage_step(review()), tmp_path, tmp_path, env)
     assert done.returncode == 0, done.stdout + done.stderr
     assert outputs.read_text(encoding="utf-8") == (
-        'coverage=unknown\nunread=[{"path":"src/a.py","read":"not read"}]\n'
+        "coverage=unknown\ncode=unknown\n"
+        'unread=[{"path":"src/a.py","read":"not read","code":true}]\n'
     )
 
 
@@ -2487,8 +2511,132 @@ def test_a_path_that_holds_a_workflow_command_stays_inside_its_line(tmp_path: Pa
     hostile = listed("x\n::error::forged", "added", ("x\n::error::forged", 3))
     session = Session(tmp_path, [hostile])
     _, unread, _, out = session.run()
-    assert unread == [{"path": "x\n::error::forged", "read": "not read"}]
+    assert unread == [{"path": "x\n::error::forged", "read": "not read", "code": True}]
     assert not any(line.startswith("::") for line in out.splitlines()), out
+
+
+# Which changed files are source and test, for the check's floor (review-coverage-floor design D1,
+# D2): data and prose don't count, everything else with a line to read does.
+PROSE = listed("README.md", "modified", ("README.md", 40), (".review-diff/README.md.diff", 6))
+SPEC = listed("openspec/changes/x/tasks.md", "added", ("openspec/changes/x/tasks.md", 20))
+FIXTURE = listed(
+    "plugins/r/fixtures/ollama/thinking/events.json",
+    "modified",
+    ("plugins/r/fixtures/ollama/thinking/events.json", 300),
+    (".review-diff/plugins/r/fixtures/ollama/thinking/events.json.diff", 40),
+)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "plugins/r/fixtures/ollama/thinking/events.json",
+        "plugins/r/fixtures/ollama/thinking/provenance.json",
+        "a/fixtures/b.py",
+        "streams/run.jsonl",
+        "streams/run.ndjson",
+        "README.md",
+        "contributing/runners.md",
+        "docs/page.mdx",
+        "notes.txt",
+        "public/logo.svg",
+        "LICENSE",
+        "LICENSE-CONTENT",
+        "plugins/runner-openai/LICENSE",
+        "openspec/changes/x/.openspec.yaml",
+        "openspec/specs/pr-review/spec.md",
+        "tofu/labels/troupe.json",
+    ],
+)
+def test_data_and_prose_don_t_count_as_source_or_test(tmp_path: Path, path: str) -> None:
+    session = Session(tmp_path, [listed(path, "added", (path, 10))])
+    _, unread, summary, _ = session.run()
+    assert session.code == "none"
+    assert unread == [{"path": path, "read": "not read", "code": False}]
+    assert "| data or prose | not read |" in summary
+    assert (
+        "Source and test files read in full: none changed, so the floor doesn't apply." in summary
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "plugins/r/src/troupe_runner_ollama/conversation.py",
+        "plugins/r/tests/test_ollama_conversation.py",
+        ".github/workflows/ci.yml",
+        "src/pages/index.astro",
+        "hooks/pre-push",
+        "pyproject.toml",
+        "docs/openspec/notes.py",
+        "fixtures.py",
+        "README.md.py",
+    ],
+)
+def test_any_other_kind_counts_as_source_or_test(tmp_path: Path, path: str) -> None:
+    session = Session(tmp_path, [listed(path, "added", (path, 10))])
+    _, unread, summary, _ = session.run()
+    assert session.code == "unread"
+    assert unread == [{"path": path, "read": "not read", "code": True}]
+    assert "| source or test | not read |" in summary
+    assert "Source and test files read in full: none of 1, so `claude review completed` fails." in (
+        summary
+    )
+
+
+def test_one_source_file_read_in_full_meets_the_floor_beside_unread_data(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED, FIXTURE, PROSE, MODIFIED])
+    session.read("src/b.py", range(1, 2501))
+    session.read(".review-diff/src/a.py.diff", range(1, 13))
+    coverage, unread, summary, out = session.run()
+    assert (coverage, session.code) == ("incomplete", "read")
+    assert unread == [
+        {"path": FIXTURE["path"], "read": "not read", "code": False},
+        {"path": "README.md", "read": "not read", "code": False},
+        {"path": "src/a.py", "read": "in part", "code": True},
+    ]
+    assert "Source and test files read in full: 1 of 2." in summary
+    assert "to read were read in full, 1 of 2 source and test file(s);" in out
+
+
+def test_source_read_only_in_part_doesn_t_meet_the_floor(tmp_path: Path) -> None:
+    session = Session(tmp_path, [MODIFIED, SPEC])
+    session.read("openspec/changes/x/tasks.md", range(1, 21))
+    session.read(".review-diff/src/a.py.diff", range(1, 13))
+    coverage, _, _, _ = session.run()
+    assert (coverage, session.code) == ("incomplete", "unread")
+
+
+def test_everything_read_meets_the_floor(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED, SPEC])
+    session.read("src/b.py", range(1, 2501))
+    session.read("openspec/changes/x/tasks.md", range(1, 21))
+    assert session.run()[:2] == ("complete", [])
+    assert session.code == "read"
+
+
+def test_an_empty_file_read_for_nothing_doesn_t_meet_the_floor(tmp_path: Path) -> None:
+    """An added empty file has one target of 0 lines, which counts as read in full with no Read.
+    If it counted as source, adding one would meet the floor for nothing (design D2)."""
+    empty = listed("src/pkg/__init__.py", "added", ("src/pkg/__init__.py", 0))
+    session = Session(tmp_path, [empty, ADDED])
+    coverage, unread, summary, _ = session.run()
+    assert (coverage, session.code) == ("incomplete", "unread")
+    assert unread == [{"path": "src/b.py", "read": "not read", "code": True}]
+    assert "| src/pkg/\\_\\_init\\_\\_.py | added | - | in full |" in summary
+
+
+def test_only_files_with_nothing_to_read_leave_the_floor_nothing_to_check(tmp_path: Path) -> None:
+    binary = {"path": "img/logo.png", "status": "added", "skipped": "binary", "targets": []}
+    session = Session(tmp_path, [SKIPPED, binary])
+    assert session.run()[:2] == ("complete", [])
+    assert session.code == "none"
+
+
+def test_an_unreadable_record_leaves_the_floor_unknown(tmp_path: Path) -> None:
+    session = Session(tmp_path, [MODIFIED])
+    coverage, _, _, _ = session.run("not json")
+    assert (coverage, session.code) == ("unknown", "unknown")
 
 
 # The check judges what the review read (review-covers-the-diff design D4).
