@@ -19,19 +19,19 @@
 
 ## 2. The check fails only on the floor or unknown coverage (design D3)
 
-- [ ] 2.1 In the `completed` job, add `CODE: ${{ needs.review.outputs.code }}` to the step's `env`, and rewrite the
+- [x] 2.1 In the `completed` job, add `CODE: ${{ needs.review.outputs.code }}` to the step's `env`, and rewrite the
   coverage part of its script as D3's four steps: an unmeasured or malformed `COVERAGE`/`CODE` fails, `unread`
   fails naming the source and test files, `incomplete` passes with one escaped `::warning` naming every unread file
   (up to `SHOWN`), and anything else passes. Update the job's comment to say coverage is advisory with a floor until
   #280. Verify that `uv run pytest scripts/tests/test_claude_review_workflow.py` passes after 2.2
-- [ ] 2.2 Move `COMPLETED_SHA256`, and add `CODE` to `COMPLETED_STEP`. Add the weakening cases: `CODE` dropped, `CODE`
+- [x] 2.2 Move `COMPLETED_SHA256`, and add `CODE` to `COMPLETED_STEP`. Add the weakening cases: `CODE` dropped, `CODE`
   fixed to `read`, and the floor's condition replaced with `False`. Rewrite the `run_completed` tests:
   `incomplete`+`read` passes with one warning and no error, `unknown` fails, an empty or garbage `COVERAGE` or `CODE`
   fails, `unread` fails naming only the `"code": true` items, and `none` with unread prose passes with a warning.
   Sixty unread files warn with "and 10 more". A hostile path stays on the one warning line. Remove or rename any test
   whose name still says an incomplete review fails. Verify that
   `uv run pytest scripts/tests/test_claude_review_workflow.py` passes
-- [ ] 2.3 Add the evidence tests. troupe#318's four failing runs (78688ad: a module read in full, and 16 files in part
+- [x] 2.3 Add the evidence tests. troupe#318's four failing runs (78688ad: a module read in full, and 16 files in part
   or not read, including 4 test files; c6c651b twice and f6566be: 10 fixtures) go through the coverage step with
   `Session`, then the check, and each passes with a warning. troupe#283's shape
   (`test_a_review_that_says_it_didn_t_read_the_code_fails_the_check`) still fails, naming only the source files.
@@ -39,7 +39,7 @@
 
 ## 3. The summary comment names what it didn't read (design D5)
 
-- [ ] 3.1 Change the prompt's last paragraph to ask the summary to name each listed file it didn't read in full, and
+- [x] 3.1 Change the prompt's last paragraph to ask the summary to name each listed file it didn't read in full, and
   add that phrase to `PROMPT` in the test. Verify that `uv run pytest scripts/tests/test_claude_review_workflow.py`
   passes, and fails with the phrase removed from the workflow
 

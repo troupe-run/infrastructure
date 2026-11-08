@@ -181,6 +181,9 @@ PROMPT_READS = [
     "a review that didn't read them all isn't a clean review",
     "make every one, as Read with the target's `path` and that `offset` and `limit`",
     "don't take a file's diff for the file",
+    # Its summary names what it didn't read; the check's warning is what was measured
+    # (review-coverage-floor design D5).
+    "name each listed file you didn't read in full",
 ]
 PROMPT_NOT = "Read the diff with"
 # After Claude: what it read, from the execution file only, never its structured output or its
@@ -262,10 +265,12 @@ COMPLETED_STEP = {
         "RESOLVE": "${{ needs.resolve.result }}",
         # What the review read (review-covers-the-diff design D4).
         "COVERAGE": "${{ needs.review.outputs.coverage }}",
+        # Whether any changed source or test file was read in full (review-coverage-floor D1).
+        "CODE": "${{ needs.review.outputs.code }}",
         "UNREAD": "${{ needs.review.outputs.unread }}",
     },
 }
-COMPLETED_SHA256 = "a2375ac39af83706374874ab7fb319664a589b9309bdaa9b1141598798d9cffa"
+COMPLETED_SHA256 = "5d27645b5a3dc3bb71b256f1cecf234c790d5f85fa2793c259a7ce7e945062fe"
 # What Claude returns, and all the resolving step reads from it (design D4).
 SCHEMA = {
     "type": "object",
@@ -1332,6 +1337,16 @@ def sources(w: dict[str, Any], change: str) -> None:
         ),
         # The check judges what the review read (D4).
         (lambda w: completed(w)["env"].pop("COVERAGE"), f"{COMPLETED_STEP_NAME!r} is given"),
+        # The floor is judged from the coverage step's output (review-coverage-floor design D3).
+        (lambda w: completed(w)["env"].pop("CODE"), f"{COMPLETED_STEP_NAME!r} is given"),
+        (
+            lambda w: completed(w)["env"].update({"CODE": "read"}),
+            f"{COMPLETED_STEP_NAME!r} is given",
+        ),
+        (
+            lambda w: job(w)["outputs"].pop("code"),
+            "outputs",
+        ),
         (
             lambda w: completed(w)["env"].update({"COVERAGE": "complete"}),
             f"{COMPLETED_STEP_NAME!r} is given",
@@ -1344,7 +1359,7 @@ def sources(w: dict[str, Any], change: str) -> None:
         ),
         (
             lambda w: completed(w).update(
-                {"run": str(completed(w)["run"]).replace('if coverage != "complete":', "if False:")}
+                {"run": str(completed(w)["run"]).replace('if code == "unread":', "if False:")}
             ),
             "complete?''s script isn't the one this test pins",
         ),
@@ -1371,6 +1386,7 @@ def run_completed(tmp_path: Path, **results: str) -> subprocess.CompletedProcess
         "REVIEW": "success",
         "RESOLVE": "success",
         "COVERAGE": "complete",
+        "CODE": "read",
         "UNREAD": "[]",
         **results,
     }
@@ -2639,57 +2655,153 @@ def test_an_unreadable_record_leaves_the_floor_unknown(tmp_path: Path) -> None:
     assert (coverage, session.code) == ("unknown", "unknown")
 
 
-# The check judges what the review read (review-covers-the-diff design D4).
+# The check judges what the review read (review-covers-the-diff design D4): until #280, it fails
+# only on the floor or unmeasured coverage, and warns on the rest (review-coverage-floor design D3).
+SOURCE_UNREAD = [
+    {"path": "src/a.py", "read": "in part", "code": True},
+    {"path": "fixtures/x/events.json", "read": "not read", "code": False},
+    {"path": "src/b.py", "read": "not read", "code": True},
+]
+
+
+def warnings_and_errors(out: str) -> list[str]:
+    return [line for line in out.splitlines() if line.startswith(("::warning", "::error"))]
+
+
 @pytest.mark.parametrize(
-    ("coverage", "said"),
+    ("results", "said"),
     [
-        ("incomplete", "didn't read every changed file in full"),
-        ("unknown", "couldn't be measured, so nothing counts as read"),
-        ("", "wasn't measured"),
-        ("complete-ish", "wasn't measured"),
+        (
+            {"COVERAGE": "unknown", "CODE": "unknown"},
+            "couldn't be measured, so nothing counts as read",
+        ),
+        (
+            {"COVERAGE": "unknown", "CODE": "read"},
+            "couldn't be measured, so nothing counts as read",
+        ),
+        ({"COVERAGE": "", "CODE": "read"}, "wasn't measured"),
+        ({"COVERAGE": "complete-ish", "CODE": "read"}, "wasn't measured"),
+        ({"COVERAGE": "incomplete", "CODE": ""}, "wasn't measured"),
+        ({"COVERAGE": "complete", "CODE": "some"}, "wasn't measured"),
     ],
 )
-def test_a_review_that_didn_t_read_everything_fails_naming_the_files(
-    tmp_path: Path, coverage: str, said: str
+def test_coverage_that_wasn_t_measured_fails_naming_the_files(
+    tmp_path: Path, results: dict[str, str], said: str
 ) -> None:
-    unread = [{"path": "src/a.py", "read": "in part"}, {"path": "src/b.py", "read": "not read"}]
-    done = run_completed(tmp_path, COVERAGE=coverage, UNREAD=json.dumps(unread))
+    done = run_completed(tmp_path, **results, UNREAD=json.dumps(SOURCE_UNREAD))
     assert done.returncode == 1
     assert done.stdout.startswith("::error title=Review didn't read the code::")
-    assert f"it {said}: src/a.py (in part), src/b.py (not read)." in done.stdout
+    assert (
+        f"what it read {said}: src/a.py (in part), fixtures/x/events.json (not read), "
+        "src/b.py (not read)." in done.stdout
+    )
     assert "gh run rerun 41258918187" in done.stdout
 
 
-def test_an_unread_list_that_isn_t_one_still_fails(tmp_path: Path) -> None:
-    done = run_completed(tmp_path, COVERAGE="incomplete", UNREAD="not json")
+def test_a_review_that_read_no_changed_code_fails_naming_only_the_code(tmp_path: Path) -> None:
+    done = run_completed(
+        tmp_path, COVERAGE="incomplete", CODE="unread", UNREAD=json.dumps(SOURCE_UNREAD)
+    )
+    assert done.returncode == 1
+    assert warnings_and_errors(done.stdout) == done.stdout.splitlines()[:1]
+    assert done.stdout.startswith("::error title=Review didn't read the code::")
+    assert (
+        "it read none of the changed source and test files in full: src/a.py (in part), "
+        "src/b.py (not read)." in done.stdout
+    )
+    assert "events.json" not in done.stdout
+    assert "gh run rerun 41258918187" in done.stdout
+
+
+def test_the_floor_fails_even_when_coverage_says_complete(tmp_path: Path) -> None:
+    done = run_completed(tmp_path, COVERAGE="complete", CODE="unread", UNREAD="[]")
     assert done.returncode == 1
     assert ": files unnamed." in done.stdout
 
 
-def test_more_than_fifty_unread_files_are_cut_short(tmp_path: Path) -> None:
-    unread = [{"path": f"f{i}.py", "read": "not read"} for i in range(60)]
-    done = run_completed(tmp_path, COVERAGE="incomplete", UNREAD=json.dumps(unread))
+def test_a_review_that_read_some_code_passes_with_one_warning(tmp_path: Path) -> None:
+    done = run_completed(
+        tmp_path, COVERAGE="incomplete", CODE="read", UNREAD=json.dumps(SOURCE_UNREAD)
+    )
+    assert done.returncode == 0, done.stdout
+    found = warnings_and_errors(done.stdout)
+    assert len(found) == 1, done.stdout
+    assert found[0].startswith("::warning title=Review didn't read every changed file::")
+    assert (
+        "didn't read every changed file in full: src/a.py (in part), fixtures/x/events.json "
+        "(not read), src/b.py (not read). The check passes: until #280" in found[0]
+    )
+
+
+def test_a_pull_request_with_no_changed_code_passes_with_a_warning(tmp_path: Path) -> None:
+    unread = [{"path": "README.md", "read": "not read", "code": False}]
+    done = run_completed(tmp_path, COVERAGE="incomplete", CODE="none", UNREAD=json.dumps(unread))
+    assert done.returncode == 0, done.stdout
+    found = warnings_and_errors(done.stdout)
+    assert len(found) == 1, done.stdout
+    assert found[0].startswith("::warning"), done.stdout
+    assert "README.md (not read)" in found[0]
+
+
+@pytest.mark.parametrize("code", ["read", "none"])
+def test_a_review_that_read_everything_passes_with_no_warning(tmp_path: Path, code: str) -> None:
+    done = run_completed(tmp_path, COVERAGE="complete", CODE=code, UNREAD="[]")
+    assert done.returncode == 0, done.stdout
+    assert warnings_and_errors(done.stdout) == []
+
+
+@pytest.mark.parametrize(
+    ("results", "code"),
+    [({"CODE": "read"}, 0), ({"CODE": "unread"}, 1)],
+)
+def test_an_unread_list_that_isn_t_one_names_files_unnamed(
+    tmp_path: Path, results: dict[str, str], code: int
+) -> None:
+    done = run_completed(tmp_path, COVERAGE="incomplete", UNREAD="not json", **results)
+    assert done.returncode == code
+    assert ": files unnamed." in done.stdout
+
+
+def test_an_unread_item_without_its_kind_names_files_unnamed(tmp_path: Path) -> None:
+    unread = [{"path": "src/a.py", "read": "in part"}]
+    done = run_completed(tmp_path, COVERAGE="incomplete", CODE="unread", UNREAD=json.dumps(unread))
     assert done.returncode == 1
+    assert ": files unnamed." in done.stdout
+
+
+@pytest.mark.parametrize(("code", "outcome"), [("read", 0), ("unread", 1)])
+def test_more_than_fifty_unread_files_are_cut_short(
+    tmp_path: Path, code: str, outcome: int
+) -> None:
+    unread = [{"path": f"f{i}.py", "read": "not read", "code": True} for i in range(60)]
+    done = run_completed(tmp_path, COVERAGE="incomplete", CODE=code, UNREAD=json.dumps(unread))
+    assert done.returncode == outcome
     assert "f49.py (not read), and 10 more." in done.stdout
     assert "f50.py" not in done.stdout
 
 
-def test_a_hostile_unread_path_stays_inside_the_one_error(tmp_path: Path) -> None:
-    unread = [{"path": "x\n::notice::forged", "read": "not read"}]
-    done = run_completed(tmp_path, COVERAGE="incomplete", UNREAD=json.dumps(unread))
-    assert done.returncode == 1
-    assert len(done.stdout.splitlines()) == 1, done.stdout
+@pytest.mark.parametrize(("code", "outcome"), [("read", 0), ("unread", 1)])
+def test_a_hostile_unread_path_stays_inside_its_one_line(
+    tmp_path: Path, code: str, outcome: int
+) -> None:
+    unread = [{"path": "x\n::notice::forged", "read": "not read", "code": True}]
+    done = run_completed(tmp_path, COVERAGE="incomplete", CODE=code, UNREAD=json.dumps(unread))
+    assert done.returncode == outcome
+    assert len([line for line in done.stdout.splitlines() if line.startswith("::")]) == 1
+    assert "::notice" not in "\n".join(
+        line for line in done.stdout.splitlines() if not line.startswith(("::warning", "::error"))
+    )
 
 
 def test_a_bot_s_pull_request_passes_whatever_the_coverage(tmp_path: Path) -> None:
-    done = run_completed(tmp_path, AUTHOR_TYPE="Bot", REVIEW="skipped", COVERAGE="")
+    done = run_completed(tmp_path, AUTHOR_TYPE="Bot", REVIEW="skipped", COVERAGE="", CODE="")
     assert done.returncode == 0, done.stdout
 
 
 def test_a_review_that_says_it_didn_t_read_the_code_fails_the_check(tmp_path: Path) -> None:
     """#268: troupe#283's reviews said "not checked" for its code and still passed. A session
     that reads only the task list, and says so in its result, leaves the check failed, naming
-    the files, whatever its summary says."""
+    the code it didn't read, whatever its summary says: the floor holds it (#281)."""
     files = [
         MODIFIED,
         ADDED,
@@ -2709,8 +2821,91 @@ def test_a_review_that_says_it_didn_t_read_the_code_fails_the_check(tmp_path: Pa
         "by line."
     )
     coverage, unread, _, _ = session.run()
-    assert coverage == "incomplete"
-    done = run_completed(tmp_path, COVERAGE=coverage, UNREAD=json.dumps(unread))
+    assert (coverage, session.code) == ("incomplete", "unread")
+    done = run_completed(tmp_path, COVERAGE=coverage, CODE=session.code, UNREAD=json.dumps(unread))
     assert done.returncode == 1
     assert "src/a.py (not read), src/b.py (not read)." in done.stdout
     assert "tasks.md" not in done.stdout
+
+
+# troupe#318's 23 files (troupe-run/infrastructure#281): four of its five review runs failed on
+# coverage alone with nothing open. Each is rebuilt from its run's unread list, and now passes with
+# a warning (review-coverage-floor design D6).
+PR_318_SOURCE = [
+    "plugins/runner-ollama/src/troupe_runner_ollama/conversation.py",
+]
+PR_318_TESTS = [
+    "plugins/runner-ollama/tests/fake_ollama.py",
+    "plugins/runner-ollama/tests/test_ollama_conversation.py",
+    "plugins/runner-ollama/tests/test_ollama_conversation_properties.py",
+    "plugins/runner-ollama/tests/test_ollama_fake.py",
+]
+PR_318_FIXTURES = [
+    f"plugins/runner-ollama/fixtures/ollama/{case}/{name}.json"
+    for case in (
+        "network-retries",
+        "refused-by-effects",
+        "server-retries",
+        "success-with-tools",
+        "thinking",
+    )
+    for name in ("events", "provenance")
+]
+PR_318_PROSE = ["contributing/runners.md", "plugins/runner-ollama/README.md"]
+PR_318_SPECS = [
+    f"openspec/changes/archive/2026-11-07-ollama-cache-read-tokens/{name}"
+    for name in (
+        ".openspec.yaml",
+        "design.md",
+        "proposal.md",
+        "specs/ollama-runner/spec.md",
+        "tasks.md",
+    )
+] + ["openspec/specs/ollama-runner/spec.md"]
+
+
+def pr_318_session(tmp_path: Path, in_part: list[str], not_read: list[str]) -> Session:
+    """A session over #318's files, each modified (the file and its diff), that read every one in
+    full except those given: the diff alone for one in part, nothing for one not read."""
+    paths = PR_318_SOURCE + PR_318_TESTS + PR_318_FIXTURES + PR_318_PROSE + PR_318_SPECS
+    assert len(paths) == 23
+    session = Session(
+        tmp_path / "session",
+        [listed(p, "modified", (p, 50), (f".review-diff/{p}.diff", 10)) for p in paths],
+    )
+    for path in paths:
+        if path in not_read:
+            continue
+        session.read(f".review-diff/{path}.diff", range(1, 11))
+        if path not in in_part:
+            session.read(path, range(1, 51))
+    return session
+
+
+@pytest.mark.parametrize(
+    ("run", "in_part", "not_read"),
+    [
+        # 78688ad, run 42369296173: 16 in part (fixtures, the README, contributing/runners.md
+        # and the four test files).
+        ("78688ad", PR_318_FIXTURES + PR_318_PROSE + PR_318_TESTS, []),
+        # c6c651b, run 42378496586, and f6566be, run 42379121357: the 10 fixtures not read.
+        ("c6c651b", [], PR_318_FIXTURES),
+        # c6c651b's re-run: the 10 fixtures in part.
+        ("c6c651b re-run", PR_318_FIXTURES, []),
+        ("f6566be", [], PR_318_FIXTURES),
+    ],
+)
+def test_troupe_318_s_failing_runs_now_pass_with_a_warning(
+    tmp_path: Path, run: str, in_part: list[str], not_read: list[str]
+) -> None:
+    session = pr_318_session(tmp_path, in_part, not_read)
+    session.finish("No findings.")
+    coverage, unread, _, _ = session.run()
+    assert (coverage, session.code) == ("incomplete", "read"), run
+    assert len(unread) == len(in_part) + len(not_read)
+    done = run_completed(tmp_path, COVERAGE=coverage, CODE=session.code, UNREAD=json.dumps(unread))
+    assert done.returncode == 0, done.stdout
+    found = warnings_and_errors(done.stdout)
+    assert len(found) == 1, done.stdout
+    assert found[0].startswith("::warning"), done.stdout
+    assert all(path in found[0] for path in in_part + not_read)
