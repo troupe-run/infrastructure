@@ -2,14 +2,14 @@
 
 ## 1. The coverage step reports the floor (design D1, D2, D4)
 
-- [ ] 1.1 In "Measure what the review read", declare `NOT_CODE` (suffixes, `LICENSE*` names, an `openspec` first
+- [x] 1.1 In "Measure what the review read", declare `NOT_CODE` (suffixes, `LICENSE*` names, an `openspec` first
   segment, any `fixtures` segment) with a comment giving D2's reason. Classify each entry: it counts as source or
   test when `NOT_CODE` doesn't match it and its targets hold at least one line. Write the `code` output (`none`,
   `read`, `unread`, `unknown`), and add `"code": true|false` to each `unread` item. Add the table's `Counts` column
   and the "Source and test files read in full" line, and the same count in the log line. Pass `code` on in the
   review job's `outputs`. Verify by running `uv run pytest scripts/tests/test_claude_review_workflow.py -k coverage`
   after 1.2
-- [ ] 1.2 Move `COVERAGE_SHA256`, add `code` to `REVIEW_OUTPUTS`, and add `Session` tests, each named for its outcome:
+- [x] 1.2 Move `COVERAGE_SHA256`, add `code` to `REVIEW_OUTPUTS`, and add `Session` tests, each named for its outcome:
   `code` is `none` for Markdown and OpenSpec only, `read` when one module was read in full beside unread fixtures,
   `unread` when only the task list was read, and `unknown` with an unreadable record. Each `NOT_CODE` part doesn't
   count (`events.json`, a `.jsonl`, `README.md`, `LICENSE-CONTENT`, `openspec/x/.openspec.yaml`, `a/fixtures/b.py`).
