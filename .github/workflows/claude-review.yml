@@ -653,8 +653,8 @@ jobs:
             still open, disputed (the author disagrees and you still see the problem, so it needs
             the owner), re-tiered, or resolved by its author. If you find nothing, say so plainly in
             that comment. End it with what you read: how many of the listed files you read in
-            full, any you didn't, and which uses of changed names you checked. Don't approve or
-            request changes. Finish with the structured output:
+            full, and name each listed file you didn't read in full, and which uses of changed
+            names you checked. Don't approve or request changes. Finish with the structured output:
             `resolve` and `retier`, each empty when there's nothing to name.
       # The step of our own after the action: it names each tool call Claude was refused, read from the action's
       # execution file, so a denial can be traced. Nothing else of the session is shown: the action
@@ -1149,8 +1149,10 @@ jobs:
   # Whether the review of the pull request's head completed. A required check (tofu/required-checks.
   # json), so a review cancelled or failed with no run after it holds the merge until that run is
   # re-run (review-completed-check design D2, D3, #242), and so does one that finished without
-  # reading every changed file and diff it was given, measured by the review job's coverage step
-  # (review-covers-the-diff design D4). always(), so it reports after a cancelled
+  # reading any changed source or test file in full, or whose coverage wasn't measured, by the
+  # review job's coverage step (review-covers-the-diff design D4). Until #280, coverage short of
+  # complete otherwise passes with a warning (review-coverage-floor design D3). always(), so it
+  # reports after a cancelled
   # review too, and outside the concurrency group, so a newer review never cancels it. Pull request
   # events only: GitHub counts only the newest pull request event's run for a pull request, and
   # ignores a comment's run, though its checks land on the head (design D4, Probe results). A merge
@@ -1176,6 +1178,7 @@ jobs:
           RESOLVE: ${{ needs.resolve.result }}
           # What the review read, measured after it (review-covers-the-diff design D4).
           COVERAGE: ${{ needs.review.outputs.coverage }}
+          CODE: ${{ needs.review.outputs.code }}
           UNREAD: ${{ needs.review.outputs.unread }}
         run: |
           import json
@@ -1183,7 +1186,8 @@ jobs:
           import re
           import sys
 
-          # The files a failure names before "and n more" (review-covers-the-diff design D4).
+          # The files a failure or warning names before "and n more" (review-covers-the-diff
+          # design D4).
           SHOWN = 50
 
 
@@ -1223,26 +1227,49 @@ jobs:
                         for name, result in jobs.items() if result != "success"]
           if unfinished:
               fail("Review not completed", f"Not completed: {', '.join(unfinished)}.")
-          # A review that finished but didn't read what it was given isn't a review of the head:
-          # the coverage step measured it from the session's tool calls, not Claude's word.
+          # What the review read, measured by the coverage step from the session's tool calls, not
+          # Claude's word. Until #280 it's advisory with a floor (review-coverage-floor design D3,
+          # decision #281): a review that read none of the changed source and test files in full
+          # isn't a review of the head, and nor is one whose coverage wasn't measured; any other
+          # file left unread is reported in a warning, not enforced.
           coverage = os.environ.get("COVERAGE", "")
-          if coverage != "complete":
+          code = os.environ.get("CODE", "")
+
+
+          def named(only_code):
               try:
                   unread = json.loads(os.environ.get("UNREAD", ""))
-                  names = [f"{item['path']} ({item['read']})" for item in unread]
+                  names = [f"{item['path']} ({item['read']})" for item in unread
+                           if item["code"] is True or not only_code]
               except (ValueError, KeyError, TypeError):
-                  names = []
-              listed = ", ".join(names[:SHOWN]) + (
-                  f", and {len(names) - SHOWN} more" if len(names) > SHOWN else "")
-              said = {"incomplete": "didn't read every changed file in full",
-                      "unknown": "couldn't be measured, so nothing counts as read"}.get(
-                          coverage, "wasn't measured")
-              reason = (f"The review completed, but it {said}: {listed or 'files unnamed'}. A "
-                        "passing review means its session read every changed file and diff the "
-                        f"run lists. Re-run it with `{rerun}` (a session may read more on "
-                        "another try), make the pull request smaller if it ran out of turns, "
-                        "or have the owner review it by hand and bypass the rules.")
+                  return "files unnamed"
+              more = f", and {len(names) - SHOWN} more" if len(names) > SHOWN else ""
+              return ", ".join(names[:SHOWN]) + more or "files unnamed"
+
+
+          def unreviewed(what):
+              reason = (f"The review completed, but {what}. A passing review means its session read "
+                        "at least one changed source or test file in full, measured from its tool "
+                        f"calls. Re-run it with `{rerun}` (a session may read more on another try), "
+                        "make the pull request smaller if it ran out of turns, or have the owner "
+                        "review it by hand and bypass the rules.")
               print(f"::error title=Review didn't read the code::{escape(reason)}")
               sys.exit(1)
+
+
+          if coverage not in ("complete", "incomplete") or code not in ("none", "read", "unread"):
+              said = ("couldn't be measured, so nothing counts as read"
+                      if "unknown" in (coverage, code) else "wasn't measured")
+              unreviewed(f"what it read {said}: {named(False)}")
+          if code == "unread":
+              unreviewed(f"it read none of the changed source and test files in full: {named(True)}")
+          if coverage == "incomplete":
+              note = (f"The review didn't read every changed file in full: {named(False)}. The check "
+                      "passes: until #280, coverage short of complete is reported, not enforced, "
+                      "once the review has read a changed source or test file in full, or the pull "
+                      "request changed none.")
+              print(f"::warning title=Review didn't read every changed file::{escape(note)}")
+              print("The review of this head completed, and so did its resolving job.")
+              sys.exit(0)
           print("The review of this head completed, read every changed file, and its resolving "
                 "job completed too.")
