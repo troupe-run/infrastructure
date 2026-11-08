@@ -19,8 +19,8 @@ drift apart:
 **Claude's review isn't one of them.** `.github/workflows/claude-review.yml` posts Claude's findings on each member's
 pull request. The review job isn't a required check, it can't approve or request changes, and its run can only read
 the code, comment, and resolve its own must-fix conversations (spec: pr-review). What is required is its last job,
-`claude review completed`: a pull request can't merge until the review of its head has completed and read every
-changed file it was given (see "Claude's review" below). Bots' and forks' pull requests aren't reviewed, and the check passes for them. What it found is enforced by GitHub, not by its run: see "Claude's
+`claude review completed`: a pull request can't merge until the review of its head has completed and read the changed
+code it was given (see "Claude's review" below). Bots' and forks' pull requests aren't reviewed, and the check passes for them. What it found is enforced by GitHub, not by its run: see "Claude's
 review" below. It doesn't load the repository's Claude Code settings, so the guard's hooks don't run
 in it: they're written for an agent in your terminal, and would widen what the review can do (spec: pr-review). Its
 session's output stays hidden. Only a tool call Claude was refused is named in the run's log, as a warning, so the
@@ -88,19 +88,29 @@ that fails because the Claude token expired fails it too, until the token is ren
 ([oob/README.md](../oob/README.md#the-review-app-and-the-claude-token-set-up-by-hand)).
 
 **A passing review means the review read the code; it doesn't mean the code is right** (spec: pr-review;
-review-covers-the-diff design D2 to D4, #268). Before Claude starts, the run lists every changed file and what must
-be read for it: an added file whole, a modified or renamed file whole and its diff, and a deleted file's diff.
-Lockfiles (`uv.lock`, `package-lock.json`, `.terraform.lock.hcl`), OpenTofu's state and binary files need nothing.
-After the session, a step works out from the action's record of its tool calls, never from what Claude says, which
-of those its Read calls covered, and shows a table of each file, read in full, in part or not at all, in the run's
-summary. `claude review completed` fails when any listed file wasn't read in full, and names them. So when it passes,
-the review of the head finished and its session read every listed file and diff. It doesn't mean the code has no
-bugs, that the review checked the callers of what changed, or that the owner's review can be skipped. The prompt
-asks the review to search for and read the uses of each changed name, and the run's summary lists the searches it
-made and the unchanged files it read, but that's reported, not required. When the check fails for coverage, the pull
-request hasn't been reviewed: don't mark it ready. Re-run the run it names, since a session may read more on another
-try; if the review ran out of turns, make the pull request smaller; or ask the owner, who may review it by hand and
-bypass the rules. The review's model is the `CLAUDE_REVIEW_MODEL` variable, declared once in `tofu/review.tf`.
+review-covers-the-diff design D2 to D4, #268; review-coverage-floor, #281, #282). Before Claude starts, the run lists
+every changed file and what must be read for it: an added file whole, a modified or renamed file whole and its diff,
+and a deleted file's diff. Lockfiles (`uv.lock`, `package-lock.json`, `.terraform.lock.hcl`), OpenTofu's state and
+binary files need nothing. After the session, a step works out from the action's record of its tool calls, never from
+what Claude says, which of those its Read calls covered, and shows a table of each file, read in full, in part or not
+at all, in the run's summary. Until #280 carries coverage across a pull request's runs and makes it blocking again,
+coverage is advisory with a floor. `claude review completed` fails when the review read none of the changed source
+and test files in full, naming them, or when what it read couldn't be measured. Any other file it didn't read in full
+is named in a warning on the check, which still passes. Every changed file with a line to read counts as source or
+test, except data and prose: Markdown and text, JSON and recorded streams (`.json`, `.jsonl`, `.ndjson`), SVG,
+licence files, anything under `openspec/` and anything in a `fixtures/` directory. The table says which files count.
+A pull request that changes none of them passes once its review completes. So when the check passes, the review of
+the head finished, and its session read at least one changed source or test file in full, or there was none. It
+doesn't mean the code has no bugs, that the review checked the callers of what changed, that it read every file, or
+that the owner's review can be skipped. The prompt asks the review to search for and read the uses of
+each changed name, and the run's summary lists the searches it made and the unchanged files it read, but that's
+reported, not required. The review's summary comment names the files it says it didn't read in full. That's
+Claude's own account; the check's warning and the table are what was measured. When the check passes with a warning,
+it has passed: act on the findings as usual, and mark the pull request ready once nothing is open. The warning stays
+on the run for the owner to see. When the check fails for coverage, the pull request hasn't been reviewed: don't
+mark it ready. Re-run the run it names, since a session may read more on another try; if the review ran out of
+turns, make the pull request smaller; or ask the owner, who may review it by hand and bypass the rules. The review's
+model is the `CLAUDE_REVIEW_MODEL` variable, declared once in `tofu/review.tf`.
 
 **A pull request opens as a draft, and is marked ready once its review is clean** (spec: development-workflow, "A
 pull request opens as a draft and is marked ready once its review is clean"). Open it with `gh pr create --draft`.
