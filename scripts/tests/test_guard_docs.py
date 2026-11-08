@@ -67,9 +67,10 @@ def test_the_docs_say_a_fixed_must_fix_gets_no_reply_and_a_discussion_comes_befo
 
 
 def test_the_docs_say_what_a_passing_review_means() -> None:
-    """review-covers-the-diff (#268): "Claude's review" says that a passing check means the review
-    read every listed file, what it doesn't mean, what isn't listed, and what to do when it fails
-    for coverage, naming the check as its workflow does."""
+    """review-covers-the-diff (#268), review-coverage-floor (#282): "Claude's review" says what a
+    passing check means while coverage is advisory with a floor, what it doesn't mean, what isn't
+    listed, what a warning means, and what to do when it fails for coverage, naming the check as
+    its workflow does."""
     workflow = yaml.safe_load(
         (REPO / ".github" / "workflows" / "claude-review.yml").read_text(encoding="utf-8")
     )
@@ -80,7 +81,13 @@ def test_the_docs_say_what_a_passing_review_means() -> None:
     assert "A passing review means the review read the code; it doesn't mean the code is right" in (
         section
     )
-    assert f"`{name}` fails when any listed file wasn't read in full" in section
+    # Advisory with a floor until #280 (review-coverage-floor, #281).
+    assert (
+        f"`{name}` fails when the review read none of the changed source and test files in full"
+        in section
+    )
+    assert "is named in a warning on the check, which still passes" in section
+    assert "When the check passes with a warning, it has passed" in section
     assert "It doesn't mean the code has no bugs, that the review checked the callers" in section
     assert "`uv.lock`, `package-lock.json`, `.terraform.lock.hcl`" in section
     assert "When the check fails for coverage, the pull request hasn't been reviewed" in section

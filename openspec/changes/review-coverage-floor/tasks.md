@@ -45,13 +45,13 @@
 
 ## 4. The docs say what a pass means for now
 
-- [ ] 4.1 Rewrite "Claude's review" in `docs/development-workflow.md`: the sentence that `test_guard_docs.py` pins,
+- [x] 4.1 Rewrite "Claude's review" in `docs/development-workflow.md`: the sentence that `test_guard_docs.py` pins,
   which becomes what a pass means until #280; which files count for the floor; that a warning is a pass, shown to the
   owner, and the pull request may be marked ready; that the comment's list is Claude's own account and the warning
   is measured; and what to do on a floor or `unknown` failure. Also update the required-checks paragraph (line 22).
   Update the pin in `scripts/tests/test_guard_docs.py`. Verify that
   `uv run pytest scripts/tests/test_guard_docs.py` passes
-- [ ] 4.2 Update `CLAUDE.md` step 5 ("which also means it read every changed file"), `org-profile/CONTRIBUTING.md`
+- [x] 4.2 Update `CLAUDE.md` step 5 ("which also means it read every changed file"), `org-profile/CONTRIBUTING.md`
   ("and read every changed file and diff it was given"), and the `claude-review.yml` row in `README.md`, so each
   says the check needs the review to have read the code, and that coverage short of complete is a warning until
   #280. Verify by `grep -n "read every changed" CLAUDE.md README.md org-profile/CONTRIBUTING.md

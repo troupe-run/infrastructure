@@ -20,11 +20,11 @@ Every change, however small, follows one path. The full guide is the org's
    reply only when it needs a discussion, and then before pushing. The review resolves its own must-fixes once they're
    addressed, judging a reply to one when it's posted, and its nits once a push has fixed them, so a nit fixed by a
    push needs no reply or resolve; if that run fails, re-run it (`gh run rerun <id>`). Once the review of the last
-   push has completed (the required `claude review completed` check passed, which also means it read every changed
-   file; if it failed, re-run the run it names, or see "Claude's review" in the workflow doc if it failed for what it
-   read) and leaves no must-fix or decision open, **mark it ready** (`gh pr ready <n>`): CI runs, and posts its plan
-   as evidence once the owner approves that run. A merge needs every conversation resolved
-   ([docs/development-workflow.md](docs/development-workflow.md)).
+   push has completed (the required `claude review completed` check passed, which also means it read changed code in
+   full; until #280 a file it didn't read is a warning, not a failure; if it failed, re-run the run it names, or see
+   "Claude's review" in the workflow doc if it failed for what it read) and leaves no must-fix or decision open,
+   **mark it ready** (`gh pr ready <n>`): CI runs, and posts its plan as evidence once the owner approves that run. A
+   merge needs every conversation resolved ([docs/development-workflow.md](docs/development-workflow.md)).
 6. **`/opsx:archive`** runs on the branch before merging. The owner merges by rebase, through the merge queue.
 7. **After the merge**, comment on the issue with the PR and the archived change.
 
