@@ -59,7 +59,7 @@
 
 ## 5. Whole-change verification
 
-- [ ] 5.1 Run `uv run scripts/check.py` and `openspec validate review-coverage-floor --strict`. Both pass. Show the
+- [x] 5.1 Run `uv run scripts/check.py` and `openspec validate review-coverage-floor --strict`. Both pass. Show the
   output
 - [ ] 5.2 On this change's pull request, read its own review run (it runs the new workflow): the summary's table has
   the `Counts` column and count line, and `claude review completed` passes with or without a warning, or fails on
