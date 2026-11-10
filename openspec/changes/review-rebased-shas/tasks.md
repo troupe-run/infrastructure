@@ -36,7 +36,7 @@
 - [ ] 4.2 After rebasing this branch onto `main` at least once while the pull request is open (as happens anyway
   before the merge), read the review run for the head (it runs the new prompt): it raises no finding about the SHAs
   this change's tasks cite from before the rebase. Quote the run's ID and the summary's line on it in the pull
-  request
+  request. Before the rebase: review run 42853411301 on `a3161fe` found nothing
 
 ## Workflow follow-up
 
