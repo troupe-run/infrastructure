@@ -16,7 +16,7 @@
 
 ## 2. The docs say there's no need to re-cite (design D4)
 
-- [ ] 2.1 In `docs/development-workflow.md`, "Claude's review", add a sentence after the tier table: the review
+- [x] 2.1 In `docs/development-workflow.md`, "Claude's review", add a sentence after the tier table: the review
   doesn't flag a cited commit SHA that a rebase removed, since merging by rebase rewrites every SHA, so a SHA needn't
   be re-cited after a rebase; a ticked task's code and verification are still checked. Verify that
   `uv run pytest scripts/tests/test_guard_docs.py` passes and `grep -n "re-cited" docs/development-workflow.md` shows

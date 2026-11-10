@@ -62,6 +62,11 @@ which says who resolves it (spec: pr-review; review-findings-by-severity design 
 A conversation's tier is the latest label the review gave in it: only the review re-tiers, by replying with a new label
 and its reason. A label in anyone else's reply counts for nothing.
 
+**A commit SHA a rebase removed isn't a finding.** Pull requests merge by rebase, which rewrites every SHA, so no SHA
+cited in a change survives the merge. The review doesn't flag a cited SHA that names no commit on the branch, so a SHA
+in a task's evidence needn't be re-cited after a rebase. A ticked task's code and verification are still checked, and
+a CI run id it cites still counts (spec: pr-review; review-rebased-shas design D1, D4).
+
 **The review runs on each push and on each reply to one of its must-fixes.** When someone with write access replies in
 an open must-fix the review opened, a review starts and judges the reply with the rest, so a must-fix answered with a
 reply alone needs no push. A reply to a nit or a decision starts none, since a reply doesn't change what the review
