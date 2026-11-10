@@ -599,7 +599,12 @@ jobs:
                `openspec/changes/<branch>/` (or `openspec/changes/archive/*-<branch>/` once
                archived). A task in its `tasks.md` is ticked only if its code and its verification
                are in the pull request; code for an unticked task, or a ticked task with nothing
-               behind it, is a finding. Its delta specs under `specs/` match what the diff does.
+               behind it, is a finding. A commit SHA cited in the pull request that names no
+               commit on its branch isn't a finding, at any tier, and don't ask for it to be
+               re-cited: pull requests merge by rebase, which rewrites every SHA, so no cited SHA
+               survives the merge. A ticked task is still judged by its code and verification,
+               and a CI run id it cites is still evidence. Its delta specs under `specs/` match
+               what the diff does.
             3. The issue the pull request closes (`Closes #n` in its body; read it with
                `gh issue view`): does the pull request do what its "Done when" asks?
             4. Each commit message is a Conventional Commit with a `Signed-off-by:` line.

@@ -1620,6 +1620,27 @@ def test_the_prompt_tells_the_review_to_resolve_a_nit_only_on_a_fix_and_never_a_
     assert "Never resolve a decision, nor anyone else's conversation" in prompt
 
 
+# A SHA a rebase removed is no finding, and why; a task's run id is still evidence
+# (review-rebased-shas design D1 to D3, #294). Like the tests above, this checks what the prompt
+# says, not what the model does with it.
+PROMPT_REBASED_SHAS = [
+    "A commit SHA cited in the pull request that names no commit on its branch isn't a finding,"
+    " at any tier",
+    "don't ask for it to be re-cited",
+    "pull requests merge by rebase, which rewrites every SHA, so no cited SHA survives the merge",
+    "A ticked task is still judged by its code and verification,"
+    " and a CI run id it cites is still evidence",
+]
+
+
+@pytest.mark.parametrize("sentence", PROMPT_REBASED_SHAS)
+def test_the_prompt_says_a_sha_missing_from_the_branch_is_no_finding_and_a_run_id_is_evidence(
+    sentence: str,
+) -> None:
+    prompt = " ".join(str(action(review())["prompt"]).split())
+    assert sentence in prompt, f"the prompt doesn't say {sentence!r}"
+
+
 # The two steps, run as the runner would, with a gh on PATH that answers from a script
 
 GH_STUB = """\
