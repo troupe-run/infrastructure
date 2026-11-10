@@ -24,14 +24,14 @@
 
 ## 3. The delivered copies still pass their repositories' checks
 
-- [ ] 3.1 In scratch clones of troupe-run/troupe and troupe-run/website (in the scratchpad, deleted afterwards), put
+- [x] 3.1 In scratch clones of troupe-run/troupe and troupe-run/website (in the scratchpad, deleted afterwards), put
   this branch's `claude-review.yml` in place and run troupe's `uv run scripts/check.py` and website's
   `npx vitest run tests/unit/workflow-node-version.test.ts`. Verify both pass, and quote their last lines in the pull
   request
 
 ## 4. Whole-change verification
 
-- [ ] 4.1 Run `uv run scripts/check.py` and `openspec validate review-rebased-shas --strict`. Both pass. Show the
+- [x] 4.1 Run `uv run scripts/check.py` and `openspec validate review-rebased-shas --strict`. Both pass. Show the
   output
 - [ ] 4.2 After rebasing this branch onto `main` at least once while the pull request is open (as happens anyway
   before the merge), read the review run for the head (it runs the new prompt): it raises no finding about the SHAs
