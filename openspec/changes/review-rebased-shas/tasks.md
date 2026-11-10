@@ -33,10 +33,12 @@
 
 - [x] 4.1 Run `uv run scripts/check.py` and `openspec validate review-rebased-shas --strict`. Both pass. Show the
   output
-- [ ] 4.2 After rebasing this branch onto `main` at least once while the pull request is open (as happens anyway
+- [x] 4.2 After rebasing this branch onto `main` at least once while the pull request is open (as happens anyway
   before the merge), read the review run for the head (it runs the new prompt): it raises no finding about the SHAs
   this change's tasks cite from before the rebase. Quote the run's ID and the summary's line on it in the pull
-  request. Before the rebase: review run 42853411301 on `a3161fe` found nothing
+  request. Before the rebase: review run 42853411301 on `a3161fe` found nothing. After it, on `09de65b`: run
+  42898944509 raised nothing about `a3161fe` ("A SHA cited in the change names no commit on the branch, so I raised
+  nothing for it, as the new rule says")
 
 ## Workflow follow-up
 
