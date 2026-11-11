@@ -1,15 +1,17 @@
 """claude-review.yml reviews each member's pull request and can't change the repository (spec:
 pr-review; claude-pr-review design D1 to D4, D7, D8; review-denials-and-guide design D1 to D4;
 review-findings-by-severity design D1 to D4; review-completed-check design D2 to D5;
-review-covers-the-diff design D2 to D7).
+review-covers-the-diff design D2 to D7; review-splits-large-prs design D1 to D11).
 
 GitHub evaluates the workflow, so these tests pin what it's given: when it runs and what it
-skips, what its token may do, which credentials reach the action, which tools Claude has, what
-it checks out, and its seven steps of its own: before Claude, one checks the model, one writes
-each changed file's diff and the list of what to read, and one reads the review conversations;
-after it, one names the tool calls Claude was refused, one measures what the review read, and
-one resolves and re-tiers what Claude names; and the required check says whether the review of
-the head completed and read the code."""
+skips, what each token may do, which credentials reach the action, which tools Claude has, what
+it checks out, and its steps of its own. The plan job checks the model and plans what each
+session reads. Each session (one a part, in up to three rounds that share one list of steps)
+checks its list, reads the review conversations, runs Claude, names the tool calls Claude was
+refused, measures what it read and keeps what Claude named. Each follow-up planner gathers what
+the sessions read and plans the next round. The report job gathers again, resolves and re-tiers
+what Claude named, and posts the review's one summary. The required check says whether the
+review of the head completed and read every changed source and test file."""
 
 import ast
 import copy
@@ -20,7 +22,7 @@ import re
 import shlex
 import subprocess
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -49,11 +51,14 @@ TRIGGERS = {
     # design D5): every job's `if:` is false there.
     "merge_group": None,
 }
-# The run's own token only checks out the code (design D1). No id-token: without it the action can't
-# swap OIDC for a Claude App token that writes contents.
+# The run's own token only checks out the code and reads the run's artifacts (design D1). No
+# id-token: without it the action can't swap OIDC for a Claude App token that writes contents.
 PERMISSIONS = {"contents": "read"}
 # Every write is made with the review App's token, minted for this repository with exactly these.
 MINTER = "actions/create-github-app-token"
+CHECKOUT = "actions/checkout"
+UPLOAD = "actions/upload-artifact"
+DOWNLOAD = "actions/download-artifact"
 # The review App's client ID, written in the workflow: it isn't a secret (minting also needs the
 # key), and a variable set by an apply wouldn't exist for a pull request's run before its merge.
 REVIEW_APP_CLIENT_ID = re.compile(r"^Iv[0-9A-Za-z]{16,}$")
@@ -77,12 +82,54 @@ SKIP = (
     "github.event.comment.user.type != 'Bot'))"
 )
 # On each job, never the workflow: a run whose review is skipped, such as the one each of the
-# review's own comments starts, mustn't join the group and cancel the review that posted it
-# (review-judge-reply-on-post design D3).
-CONCURRENCY = {
-    "group": "claude-review-${{ github.event.pull_request.number }}",
-    "cancel-in-progress": True,
+# review's own comments starts, mustn't join a group and cancel the review that posted it
+# (review-judge-reply-on-post design D3). One group per job; a session's per round and part, since
+# the sessions of one matrix can't share one (review-splits-large-prs design D8).
+PR = "${{ github.event.pull_request.number }}"
+GROUPS = {
+    "plan": f"claude-review-{PR}-plan",
+    "review": f"claude-review-{PR}-${{{{ matrix.round }}}}-${{{{ matrix.part }}}}",
+    "follow-1": f"claude-review-{PR}-follow-1",
+    "review-2": f"claude-review-{PR}-${{{{ matrix.round }}}}-${{{{ matrix.part }}}}",
+    "follow-2": f"claude-review-{PR}-follow-2",
+    "review-3": f"claude-review-{PR}-${{{{ matrix.round }}}}-${{{{ matrix.part }}}}",
+    "resolve": f"claude-review-{PR}-report",
 }
+JOBS = {"gate", "plan", "review", "follow-1", "review-2", "follow-2", "review-3", "resolve",
+        "completed"}  # fmt: skip
+SESSIONS = ("review", "review-2", "review-3")
+PLANNERS = ("follow-1", "follow-2")
+# Each job's needs and when it runs (review-splits-large-prs design D4, D10): a session round runs
+# only when its planner listed parts; the report after the last round that ran.
+NEEDS = {
+    "plan": "gate",
+    "review": "plan",
+    "follow-1": ["plan", "review"],
+    "review-2": ["plan", "follow-1"],
+    "follow-2": ["plan", "follow-1", "review-2"],
+    "review-3": ["plan", "follow-2"],
+    "resolve": ["plan", "review", "follow-1", "review-2", "follow-2", "review-3"],
+}
+IFS = {
+    "plan": "needs.gate.outputs.review == 'true'",
+    "review": "needs.plan.result == 'success'",
+    "follow-1": "needs.review.result == 'success'",
+    "review-2": "needs.follow-1.result == 'success' && needs.follow-1.outputs.parts != '[]'",
+    "follow-2": "needs.review-2.result == 'success'",
+    "review-3": "needs.follow-2.result == 'success' && needs.follow-2.outputs.parts != '[]'",
+    "resolve": (
+        "!cancelled() && needs.follow-1.result == 'success' && "
+        "(needs.follow-1.outputs.parts == '[]' || (needs.review-2.result == 'success' && "
+        "needs.follow-2.result == 'success' && (needs.follow-2.outputs.parts == '[]' || "
+        "needs.review-3.result == 'success')))"
+    ),
+}
+MATRICES = {
+    "review": "${{ fromJSON(needs.plan.outputs.parts) }}",
+    "review-2": "${{ fromJSON(needs.follow-1.outputs.parts) }}",
+    "review-3": "${{ fromJSON(needs.follow-2.outputs.parts) }}",
+}
+NEXT_ROUNDS = {"follow-1": "2", "follow-2": "3"}
 ACTION = "anthropics/claude-code-action"
 # What reaches the action: the review App's token for GitHub, the org secret for Claude (design
 # D1, D3).
@@ -102,11 +149,11 @@ REFUSED_INPUTS = {
     "use_commit_signing",
     "ssh_signing_key",
 }
-# Read the pull request and the checkout, comment on it, nothing else (design D4). No Edit, Write,
-# git or `gh pr review`, which is what keeps the review advisory.
+# Read the pull request and the checkout, comment inline, nothing else (design D4). No Edit,
+# Write, git or `gh pr review`, which is what keeps the review advisory, and no `gh pr comment`:
+# the report job posts the review's one summary (review-splits-large-prs design D6).
 TOOLS = {
     "mcp__github_inline_comment__create_inline_comment",
-    "Bash(gh pr comment:*)",
     "Bash(gh pr diff:*)",
     "Bash(gh pr view:*)",
     "Bash(gh issue view:*)",
@@ -134,18 +181,31 @@ GUIDE = {
     "persist-credentials": False,
 }
 GUIDE_URL = "https://github.com/troupe-run/.github/blob/main/CONTRIBUTING.md"
-# The one step that runs a command: it names each tool call Claude was refused, from the action's
-# execution file, and shows nothing else of the session (design D1, D2). Its script is pinned by
-# hash, so changing it changes this test in the same diff.
-REPORT_NAME = "Name the tool calls Claude was refused"
-REPORT = {
-    "if": "${{ !cancelled() }}",
-    "continue-on-error": True,
+# The plan job's checkout keeps the merge commit's parents, so the plan step can diff against the
+# base's tip (review-covers-the-diff design D2). A session's checkout needs none.
+PLAN_CHECKOUT = {"fetch-depth": 2, "persist-credentials": False}
+SESSION_CHECKOUT = {"persist-credentials": False}
+# The steps of our own, each pinned by hash, so changing one changes this test in the same diff.
+MODEL_NAME = "Check the review's model"
+MODEL = {"id": "model", "shell": "python3 {0}", "env": {"MODEL": "${{ vars.CLAUDE_REVIEW_MODEL }}"}}
+MODEL_SHA256 = "1566ed73c892e39e9531b83bb147ed5778ed215c939496f13718ae7e7b3424a2"
+PLAN_NAME = "Plan what each session reads"
+PLAN = {"id": "plan", "shell": "python3 {0}"}
+PLAN_SHA256 = "566916c3d9f926994f39a41a19c14f94c98824f9852798ee7bc1bcb64da84183"
+SESSION_NAME = "Choose this session's files"
+SESSION = {
+    "id": "session",
     "shell": "python3 {0}",
-    "env": {"EXECUTION_FILE": "${{ steps.review.outputs.execution_file }}"},
+    "env": {
+        "ROUND": "${{ matrix.round }}",
+        "PART": "${{ matrix.part }}",
+        "OF": "${{ matrix.of }}",
+        "FILES_SHA256": "${{ matrix.files_sha256 }}",
+        "ROUND_SHA256": "${{ matrix.round_sha256 }}",
+    },
 }
-REPORT_SHA256 = "0226ac402c3987ad33791bf8b0176f07585e3f5059fab9541c473e56ccf9fcf6"
-# The review App's token, the only one the two conversation steps hold (design D3, D4).
+SESSION_SHA256 = "ae5d98ed215d15aa85b973061307be90c6d0b4b75edc39d94b9c554caf3db9c6"
+# The review App's token, the only one the conversation steps hold (design D3, D4).
 STEP_ENV = {
     "GH_TOKEN": "${{ steps.app-token.outputs.token }}",
     "REPOSITORY": "${{ github.repository }}",
@@ -155,75 +215,135 @@ STEP_ENV = {
 SNAPSHOT_NAME = "Read the pull request's review conversations"
 SNAPSHOT = {"shell": "python3 {0}", "env": STEP_ENV}
 SNAPSHOT_SHA256 = "881c6b51fbc892399d33e02bcfc14f93611d0f293eab577dd415b1bd6e5757c9"
-# Before Claude: what each changed file needs read, its diff in the workspace, and the turn budget
-# that follows (review-covers-the-diff design D2, D5). Its constants are in the pinned script.
-DIFF_NAME = "Write each changed file's diff"
-DIFF = {"id": "diff", "shell": "python3 {0}"}
-DIFF_SHA256 = "cd9c50c494bdba4de08e435d8b9fc0e526321a49b0606411615b23e9e45dea3c"
-# The pull request's checkout keeps the merge commit's parents, so the diff step can diff against
-# the base's tip (D2).
-CHECKOUT_DEPTH = 2
-# --max-turns comes from the diff step, never a fixed number (D5). GitHub substitutes it before
-# the action reads claude_args.
-MAX_TURNS = "${{ steps.diff.outputs.max_turns }}"
-# The model is the repository variable OpenTofu declares (tofu/review.tf), checked by a step of
-# its own and passed on as its output, never pasted from vars into claude_args (D6).
-MODEL_NAME = "Check the review's model"
-MODEL = {"id": "model", "shell": "python3 {0}", "env": {"MODEL": "${{ vars.CLAUDE_REVIEW_MODEL }}"}}
-MODEL_SHA256 = "1566ed73c892e39e9531b83bb147ed5778ed215c939496f13718ae7e7b3424a2"
-MODEL_ARG = "${{ steps.model.outputs.model }}"
-# What the prompt must say about reading (D7, D7a): the list, reading every target in full, and
-# the uses of what changed. And it mustn't send the review to `gh pr diff` for the diff.
-PROMPT_READS = [
-    "`.review-diff/files.json` lists every changed file",
-    "Read every target in full with Read",
-    "search the checkout for its uses with Grep",
-    "a review that didn't read them all isn't a clean review",
-    "make every one, as Read with the target's `path` and that `offset` and `limit`",
-    "don't take a file's diff for the file",
-    # Its summary names what it didn't read; the check's warning is what was measured
-    # (review-coverage-floor design D5).
-    "name each listed file you didn't read in full",
-]
-PROMPT_NOT = "Read the diff with"
-# After Claude: what it read, from the execution file only, never its structured output or its
-# summary (D3). It can't fail the job; an output it didn't set fails the check (D4).
-COVERAGE_NAME = "Measure what the review read"
-COVERAGE = {
-    "id": "coverage",
+# After Claude: each tool call it was refused, and nothing else of the session (design D1, D2).
+REPORT_NAME = "Name the tool calls Claude was refused"
+REPORT = {
     "if": "${{ !cancelled() }}",
     "continue-on-error": True,
     "shell": "python3 {0}",
     "env": {"EXECUTION_FILE": "${{ steps.review.outputs.execution_file }}"},
 }
-COVERAGE_SHA256 = "9384c380c3a100245be0e3c8152c243e96f5d4cc226a3bb466a06af63f009703"
+REPORT_SHA256 = "0226ac402c3987ad33791bf8b0176f07585e3f5059fab9541c473e56ccf9fcf6"
+# After Claude: what the session read, from the execution file only, never its structured output
+# or its summary (review-covers-the-diff design D3). It can't fail the job; a record it didn't
+# make leaves its part's files unread (review-splits-large-prs design D4).
+MEASURE_NAME = "Measure what the session read"
+MEASURE = {
+    "if": "${{ !cancelled() }}",
+    "continue-on-error": True,
+    "shell": "python3 {0}",
+    "env": {
+        "EXECUTION_FILE": "${{ steps.review.outputs.execution_file }}",
+        "ROUND": "${{ matrix.round }}",
+        "PART": "${{ matrix.part }}",
+    },
+}
+MEASURE_SHA256 = "d147391afa136c052903fedabbe8d71b988cc8f00eef7478b103ce08bfabbc88"
+# After Claude: its summary and what it named, kept apart from the measurement (D6).
+ANSWER_NAME = "Keep what Claude named"
+ANSWER = {
+    "if": "${{ !cancelled() }}",
+    "shell": "python3 {0}",
+    "env": {
+        "STRUCTURED_OUTPUT": "${{ steps.review.outputs.structured_output }}",
+        "ROUND": "${{ matrix.round }}",
+        "PART": "${{ matrix.part }}",
+    },
+}
+ANSWER_SHA256 = "815aaab9d79a0f0870bc3aa850f069eae46423fc60c5f1a96272e39328ff18ae"
+# What the sessions read together, in each planner and in the report job: one script (D4).
+GATHER_NAME = "Gather what the sessions read"
+GATHER = {"id": "gather", "shell": "python3 {0}"}
+GATHER_SHA256 = "411e4b1d5208b3ac51657afb7d7bb1e248183602b2825c12c67be735ad7bc4ed"
+# Resolve and re-tier what Claude names, checked against conversations read again in the report
+# job, and only on a file of that session's list (design D4, D4a; review-splits-large-prs D7).
+RESOLVER_NAME = "Resolve and re-tier what Claude named"
+RESOLVER = {"shell": "python3 {0}", "env": STEP_ENV}
+RESOLVER_SHA256 = "7a3c5d59d692083eb11c4239d0ede333716419301cce5f825f874550b560e9f7"
+# The review's one top-level comment (review-splits-large-prs design D6).
+POST_NAME = "Post the review's summary"
+POST = {
+    "shell": "python3 {0}",
+    "env": {**STEP_ENV, "HEAD_SHA": "${{ github.event.pull_request.head.sha }}"},
+}
+POST_SHA256 = "e7ad73b9163d8176d3d6152bef12020412ffe375c05de5a48dbb50b760b9d69b"
+# The artifacts that carry the plan and the records between jobs, written only by these steps
+# (review-splits-large-prs design D4).
+PLAN_UPLOADS: list[dict[str, Any]] = [
+    {"name": "review-plan", "path": ".review-diff/", "include-hidden-files": True,
+     "if-no-files-found": "error", "retention-days": 1},
+    {"name": "review-round-1", "path": ".review-diff/round-1.json",
+     "include-hidden-files": True, "if-no-files-found": "error", "retention-days": 1},
+]  # fmt: skip
+SESSION_DOWNLOADS: list[dict[str, Any]] = [
+    {"name": "review-plan", "path": ".review-diff"},
+    {"name": "review-round-${{ matrix.round }}", "path": ".review-diff"},
+]
+RECORD_UPLOAD = {
+    "name": "review-record-${{ matrix.round }}-${{ matrix.part }}",
+    "path": "${{ runner.temp }}/review/records/",
+    "if-no-files-found": "error",
+    "retention-days": 1,
+}
+GATHER_DOWNLOADS: list[dict[str, Any]] = [
+    {"name": "review-plan", "path": "${{ runner.temp }}/review"},
+    {"pattern": "review-round-*", "merge-multiple": True, "path": "${{ runner.temp }}/review"},
+    {"pattern": "review-record-*", "merge-multiple": True,
+     "path": "${{ runner.temp }}/review/records"},
+]  # fmt: skip
+ROUND_UPLOAD = {
+    "name": "review-round-${{ env.NEXT_ROUND }}",
+    "path": "${{ runner.temp }}/next/round-${{ env.NEXT_ROUND }}.json",
+    "if-no-files-found": "error",
+    "retention-days": 1,
+}
+ROUND_UPLOAD_IF = "steps.gather.outputs.parts != '[]'"
+# --max-turns is the session's own, from its matrix entry, never a fixed number (review-covers-the-
+# diff design D5; review-splits-large-prs design D11). --model is the plan job's checked variable
+# (D6). GitHub substitutes both before the action reads claude_args.
+MAX_TURNS = "${{ matrix.max_turns }}"
+MODEL_ARG = "${{ needs.plan.outputs.model }}"
+# What the prompt must say about reading (D7, D7a; review-splits-large-prs design D5): the
+# session's list, reading every target in full, and the uses of what changed. And it mustn't send
+# the review to `gh pr diff` for the diff.
+PROMPT_READS = [
+    "Read `.review-diff/session.json` first",
+    "`read` is your list, the files you must read",
+    "If your role is `lead`, you also do checks 2 to 5 below",
+    "If your role is `part`, other sessions read the rest of the pull request",
+    "If your role is `follow-up`, an earlier session didn't read the files on your list",
+    "Read every target in full with Read",
+    "search the checkout for its uses with Grep",
+    "a review that didn't read them all isn't a clean review",
+    "make every one, as Read with the target's `path` and that `offset` and `limit`",
+    "don't take a file's diff for the file",
+    # Its summary names what it didn't read; what was measured is in the report (review-coverage-
+    # floor design D5).
+    "name each file on your list you didn't read in full",
+    # One summary for the review, from the report job (review-splits-large-prs design D6).
+    "Don't post a top-level comment",
+    "Give yours in the structured output's `summary`",
+]
+PROMPT_NOT = "Read the diff with"
 # Long enough for MAX_TURNS' cap (D5).
 REVIEW_TIMEOUT = 90
-# After Claude, in a job of its own, only when the review succeeded: resolve and re-tier what Claude
-# names, checked against conversations read again in that job (design D4, D4a).
-RESOLVER_NAME = "Resolve and re-tier what Claude named"
-RESOLVER = {
-    "shell": "python3 {0}",
-    "env": {**STEP_ENV, "STRUCTURED_OUTPUT": "${{ needs.review.outputs.structured_output }}"},
+# The report job's outputs, which the check judges (review-splits-large-prs design D9).
+RESOLVE_OUTPUTS = {
+    "coverage": "${{ steps.gather.outputs.coverage }}",
+    "code": "${{ steps.gather.outputs.code }}",
+    "unread": "${{ steps.gather.outputs.unread }}",
+    "unmeasured": "${{ steps.gather.outputs.unmeasured }}",
 }
-REVIEW_OUTPUTS = {
-    "structured_output": "${{ steps.review.outputs.structured_output }}",
-    # What the review read, for the check (review-covers-the-diff design D4).
-    "coverage": "${{ steps.coverage.outputs.coverage }}",
-    # Whether any changed source or test file was read in full (review-coverage-floor design D1).
-    "code": "${{ steps.coverage.outputs.code }}",
-    "unread": "${{ steps.coverage.outputs.unread }}",
+PLAN_OUTPUTS = {
+    "parts": "${{ steps.plan.outputs.parts }}",
+    "model": "${{ steps.model.outputs.model }}",
 }
-# The resolving job: after the review, only when it succeeded, with nothing checked out and no
-# Claude, and the one token that can write contents, which resolving a conversation needs (D4a).
-RESOLVE_NEEDS = "review"
-RESOLVE_IF = "needs.review.result == 'success'"
+PLANNER_OUTPUTS = {"parts": "${{ steps.gather.outputs.parts }}"}
 RESOLVE_TOKEN_INPUTS = {
     **TOKEN_INPUTS,
     "permission-contents": "write",
 }
-RESOLVER_SHA256 = "0e693536e81d5708d820bac881ae42469381c98ce15b4d5d55e2935514e13ef3"
-# The gate: before the review, outside its concurrency group, with D2's skip, it decides whether
+# The gate: before the review, outside every concurrency group, with D2's skip, it decides whether
 # the event needs a review: a pull request event always, a reply only in an open must-fix the
 # review opened. A no there costs no Claude run and cancels nothing (review-judge-reply-on-post
 # design D2a).
@@ -241,15 +361,13 @@ GATE = {
 GATE_SHA256 = "508cbf7979901b76813676b9704755dd06954a5097aaf2d45360dc526227ba35"
 GATE_OUTPUTS = {"review": "${{ steps.gate.outputs.review }}"}
 GATE_TOKEN_INPUTS = {**TOKEN_INPUTS, "permission-pull-requests": "read"}
-REVIEW_NEEDS = "gate"
-REVIEW_IF = "needs.gate.outputs.review == 'true'"
-OWN_STEPS = {REPORT_NAME, SNAPSHOT_NAME, DIFF_NAME, MODEL_NAME, COVERAGE_NAME}
 # The required check that the review of the head completed (review-completed-check design D2 to
 # D5): after every other job, whatever became of them, on pull request events only, since GitHub
 # ignores a comment's run for a pull request (Probe results). No token, no secret, no checkout,
-# and outside the concurrency group, so a newer review can't cancel it.
+# and outside every concurrency group, so a newer review can't cancel it.
 COMPLETED_NAME = "claude review completed"
-COMPLETED_NEEDS = ["gate", "review", "resolve"]
+COMPLETED_NEEDS = ["gate", "plan", "review", "follow-1", "review-2", "follow-2", "review-3",
+                   "resolve"]  # fmt: skip
 COMPLETED_IF = "always() && github.event_name == 'pull_request'"
 COMPLETED_STEP_NAME = "Did the review of this head complete?"
 COMPLETED_STEP = {
@@ -261,22 +379,31 @@ COMPLETED_STEP = {
         "HEAD_REPOSITORY": "${{ github.event.pull_request.head.repo.full_name }}",
         "GATE": "${{ needs.gate.result }}",
         "WANTS_REVIEW": "${{ needs.gate.outputs.review }}",
+        "PLAN": "${{ needs.plan.result }}",
         "REVIEW": "${{ needs.review.result }}",
+        "FOLLOW_1": "${{ needs.follow-1.result }}",
+        "FOLLOW_1_PARTS": "${{ needs.follow-1.outputs.parts }}",
+        "REVIEW_2": "${{ needs.review-2.result }}",
+        "FOLLOW_2": "${{ needs.follow-2.result }}",
+        "FOLLOW_2_PARTS": "${{ needs.follow-2.outputs.parts }}",
+        "REVIEW_3": "${{ needs.review-3.result }}",
         "RESOLVE": "${{ needs.resolve.result }}",
-        # What the review read (review-covers-the-diff design D4).
-        "COVERAGE": "${{ needs.review.outputs.coverage }}",
-        # Whether any changed source or test file was read in full (review-coverage-floor D1).
-        "CODE": "${{ needs.review.outputs.code }}",
-        "UNREAD": "${{ needs.review.outputs.unread }}",
+        # What the sessions read together (review-splits-large-prs design D9).
+        "COVERAGE": "${{ needs.resolve.outputs.coverage }}",
+        "CODE": "${{ needs.resolve.outputs.code }}",
+        "UNREAD": "${{ needs.resolve.outputs.unread }}",
+        "UNMEASURED": "${{ needs.resolve.outputs.unmeasured }}",
     },
 }
-COMPLETED_SHA256 = "5d27645b5a3dc3bb71b256f1cecf234c790d5f85fa2793c259a7ce7e945062fe"
-# What Claude returns, and all the resolving step reads from it (design D4).
+COMPLETED_SHA256 = "559a24cda4190e4e3feab104723ef69508f00f9010fc65e9277affce17a12002"
+# What Claude returns, and all the report job reads from it (design D4; review-splits-large-prs
+# design D6).
 SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["resolve", "retier"],
+    "required": ["summary", "resolve", "retier"],
     "properties": {
+        "summary": {"type": "string"},
         "resolve": {"type": "array", "items": {"type": "string"}},
         "retier": {
             "type": "array",
@@ -354,7 +481,7 @@ def own_step_problems(
     others = sorted(set(step) - {*expected, "name", "run"})
     if others:
         found.append(f"{what} also has {others}")
-    script = str(step["run"])
+    script = str(step.get("run", ""))
     if "${{" in script:
         found.append(f"{what}'s script interpolates an expression; use its env")
     if hashlib.sha256(script.encode()).hexdigest() != sha256:
@@ -362,46 +489,76 @@ def own_step_problems(
     return found
 
 
-def resolve_job_problems(job: dict[str, Any]) -> list[str]:
-    """The resolving job: after the review, on its success only, minting the write token, reading
-    the conversations again, then resolving; no checkout, no Claude, nothing else (design D4a)."""
+def label(step: dict[str, Any]) -> str:
+    """What a step is, for comparing a job's steps with the order it needs."""
+    uses = str(step.get("uses", ""))
+    if uses.startswith(f"{CHECKOUT}@"):
+        return "guide checkout" if (step.get("with") or {}).get("repository") else "checkout"
+    for prefix, said in ((MINTER, "token"), (UPLOAD, "upload"), (DOWNLOAD, "download")):
+        if uses.startswith(f"{prefix}@"):
+            return said
+    if uses.startswith(f"{ACTION}@"):
+        return "action"
+    return str(step.get("name") or uses or step.get("run", "")[:40])
+
+
+def used_step_problems(
+    step: dict[str, Any], given: dict[str, Any], what: str, condition: str | None = None
+) -> list[str]:
+    """An action's step: pinned, given exactly these inputs, and run only on this condition."""
     found = []
-    if job.get("needs") != RESOLVE_NEEDS:
-        found.append(f"resolve needs {job.get('needs')!r}, not {RESOLVE_NEEDS!r}")
-    if job.get("if") != RESOLVE_IF:
-        found.append(f"resolve runs when {job.get('if')!r}, not {RESOLVE_IF!r}")
-    if job.get("permissions") != PERMISSIONS:
-        found.append(
-            f"resolve's GITHUB_TOKEN permissions are {job.get('permissions')!r}, "
-            f"not {PERMISSIONS!r}"
-        )
-    if "environment" in job:
-        found.append(f"resolve runs in environment {job['environment']!r}; it needs none")
-    if not isinstance(job.get("timeout-minutes"), int):
-        found.append("resolve has no timeout-minutes")
-    steps = job.get("steps") or []
-    shape = [
-        "token"
-        if str(s.get("uses", "")).startswith(f"{MINTER}@")
-        else s.get("name") or s.get("uses")
-        for s in steps
-    ]
-    if shape != ["token", SNAPSHOT_NAME, RESOLVER_NAME]:
-        return [*found, f"resolve's steps are {shape!r}, not the token, {SNAPSHOT_NAME!r} and "
-                f"{RESOLVER_NAME!r}, in that order"]  # fmt: skip
-    minted, read, resolving = steps
-    if not PINNED.match(str(minted.get("uses"))):
-        found.append(f"{minted.get('uses')!r} isn't pinned to a full commit SHA")
-    if minted.get("id") != "app-token":
-        found.append(f"resolve's token step's id is {minted.get('id')!r}, not app-token")
-    given = dict(minted.get("with") or {})
+    if not PINNED.match(str(step.get("uses"))):
+        found.append(f"{step.get('uses')!r} isn't pinned to a full commit SHA")
+    if (step.get("with") or {}) != given:
+        found.append(f"{what} is given {step.get('with')!r}, not {given!r}")
+    if step.get("if") != condition:
+        found.append(f"{what} runs when {step.get('if')!r}, not {condition!r}")
+    others = sorted(set(step) - {"uses", "with", "if", "id", "name"})
+    if others:
+        found.append(f"{what} also has {others}")
+    return found
+
+
+def token_problems(step: dict[str, Any], expected: dict[str, Any], what: str) -> list[str]:
+    found = []
+    if not PINNED.match(str(step.get("uses"))):
+        found.append(f"{step.get('uses')!r} isn't pinned to a full commit SHA")
+    if step.get("id") != "app-token":
+        found.append(f"{what}'s token step's id is {step.get('id')!r}, not app-token")
+    given = dict(step.get("with") or {})
     client_id = str(given.pop("client-id", ""))
     if not REVIEW_APP_CLIENT_ID.match(client_id):
-        found.append(f"resolve's client ID is {client_id!r}, not one written here")
-    if given != RESOLVE_TOKEN_INPUTS:
-        found.append(f"resolve's token is minted with {given!r}, not {RESOLVE_TOKEN_INPUTS!r}")
-    found += own_step_problems(read, SNAPSHOT, SNAPSHOT_SHA256, f"resolve's {SNAPSHOT_NAME!r}")
-    found += own_step_problems(resolving, RESOLVER, RESOLVER_SHA256, repr(RESOLVER_NAME))
+        found.append(f"{what}'s client ID is {client_id!r}, not one written here")
+    if given != expected:
+        found.append(f"{what}'s token is minted with {given!r}, not {expected!r}")
+    return found
+
+
+def job_problems(name: str, job: dict[str, Any], permissions: object = PERMISSIONS) -> list[str]:
+    """What every job of the review shares: its needs, its condition, its token, its group, no
+    environment, and a timeout."""
+    found = []
+    if name in NEEDS and job.get("needs") != NEEDS[name]:
+        found.append(f"{name} needs {job.get('needs')!r}, not {NEEDS[name]!r}")
+    if name in IFS and job.get("if") != IFS[name]:
+        found.append(f"{name} runs when {job.get('if')!r}, not {IFS[name]!r}")
+    if job.get("permissions") != permissions:
+        found.append(
+            f"{name}'s GITHUB_TOKEN permissions are {job.get('permissions')!r}, not {permissions!r}"
+        )
+    if "environment" in job:
+        found.append(f"{name} runs in environment {job['environment']!r}; it needs none")
+    if not isinstance(job.get("timeout-minutes"), int):
+        found.append(f"{name} has no timeout-minutes")
+    if name in GROUPS:
+        wanted = {"group": GROUPS[name], "cancel-in-progress": True}
+        if job.get("concurrency") != wanted:
+            found.append(
+                f"{name}'s concurrency is {job.get('concurrency')!r}, not {wanted!r}: one run of "
+                "it per pull request, the newest cancelling the last"
+            )
+    elif "concurrency" in job:
+        found.append(f"{name} is in a concurrency group, so a newer run could cancel it")
     return found
 
 
@@ -420,37 +577,173 @@ def gate_job_problems(job: dict[str, Any]) -> list[str]:
         )
     if "needs" in job:
         found.append(f"gate needs {job['needs']!r}; it runs first")
-    if job.get("permissions") != PERMISSIONS:
-        found.append(
-            f"gate's GITHUB_TOKEN permissions are {job.get('permissions')!r}, not {PERMISSIONS!r}"
-        )
-    if "environment" in job:
-        found.append(f"gate runs in environment {job['environment']!r}; it needs none")
-    if not isinstance(job.get("timeout-minutes"), int):
-        found.append("gate has no timeout-minutes")
+    found += job_problems("gate", job)
     if job.get("outputs") != GATE_OUTPUTS:
         found.append(f"gate's outputs are {job.get('outputs')!r}, not {GATE_OUTPUTS!r}")
     steps = job.get("steps") or []
-    shape = [
-        "token"
-        if str(s.get("uses", "")).startswith(f"{MINTER}@")
-        else s.get("name") or s.get("uses")
-        for s in steps
-    ]
+    shape = [label(s) for s in steps]
     if shape != ["token", GATE_NAME]:
         return [*found, f"gate's steps are {shape!r}, not the token and {GATE_NAME!r}"]
-    minted, deciding = steps
-    if not PINNED.match(str(minted.get("uses"))):
-        found.append(f"{minted.get('uses')!r} isn't pinned to a full commit SHA")
-    if minted.get("id") != "app-token":
-        found.append(f"gate's token step's id is {minted.get('id')!r}, not app-token")
-    given = dict(minted.get("with") or {})
-    client_id = str(given.pop("client-id", ""))
-    if not REVIEW_APP_CLIENT_ID.match(client_id):
-        found.append(f"gate's client ID is {client_id!r}, not one written here")
-    if given != GATE_TOKEN_INPUTS:
-        found.append(f"gate's token is minted with {given!r}, not {GATE_TOKEN_INPUTS!r}")
-    found += own_step_problems(deciding, GATE, GATE_SHA256, repr(GATE_NAME))
+    found += token_problems(steps[0], GATE_TOKEN_INPUTS, "gate")
+    found += own_step_problems(steps[1], GATE, GATE_SHA256, repr(GATE_NAME))
+    return found
+
+
+def plan_job_problems(job: dict[str, Any]) -> list[str]:
+    """The plan job: the pull request's checkout with its base, the model checked, the plan made,
+    and the plan uploaded; no token, no Claude (review-splits-large-prs design D4)."""
+    found = job_problems("plan", job)
+    if job.get("outputs") != PLAN_OUTPUTS:
+        found.append(f"plan's outputs are {job.get('outputs')!r}, not {PLAN_OUTPUTS!r}")
+    steps = job.get("steps") or []
+    shape = [label(s) for s in steps]
+    wanted = ["checkout", MODEL_NAME, PLAN_NAME, "upload", "upload"]
+    if shape != wanted:
+        return [*found, f"plan's steps are {shape!r}, not {wanted!r}"]
+    checkout, model, plan, *uploads = steps
+    found += used_step_problems(checkout, PLAN_CHECKOUT, "plan's checkout")
+    found += own_step_problems(model, MODEL, MODEL_SHA256, repr(MODEL_NAME))
+    found += own_step_problems(plan, PLAN, PLAN_SHA256, repr(PLAN_NAME))
+    for step, given in zip(uploads, PLAN_UPLOADS, strict=True):
+        found += used_step_problems(step, given, f"plan's upload of {given['name']}")
+    return found
+
+
+def session_job_problems(name: str, job: dict[str, Any]) -> list[str]:
+    """A round of sessions: a matrix of the planner's parts, the session's own steps in order, and
+    the action given only what it needs (design D1 to D9; review-splits-large-prs design D4 to
+    D8, D11)."""
+    found = job_problems(name, job)
+    if "outputs" in job:
+        found.append(f"{name} has outputs {job['outputs']!r}; its records are artifacts")
+    wanted = {"fail-fast": False, "matrix": {"include": MATRICES[name]}}
+    if job.get("strategy") != wanted:
+        found.append(f"{name}'s strategy is {job.get('strategy')!r}, not {wanted!r}")
+    if job.get("timeout-minutes") != REVIEW_TIMEOUT:
+        found.append(
+            f"{name}'s timeout-minutes is {job.get('timeout-minutes')}, not {REVIEW_TIMEOUT}, "
+            "which the turn cap needs"
+        )
+    steps = job.get("steps") or []
+    shape = [label(s) for s in steps]
+    order = ["checkout", "guide checkout", "download", "download", SESSION_NAME, "token",
+             SNAPSHOT_NAME, "action", REPORT_NAME, MEASURE_NAME, ANSWER_NAME, "upload"]  # fmt: skip
+    if shape != order:
+        return [*found, f"{name}'s steps are {shape!r}, not {order!r}"]
+    (checkout, guide_, plan, round_, session, token_, snapshot_, action_, report_, measure,
+     answer, upload) = steps  # fmt: skip
+    found += used_step_problems(checkout, SESSION_CHECKOUT, f"{name}'s checkout")
+    found += used_step_problems(guide_, GUIDE, "the guide's checkout")
+    for step, given in zip((plan, round_), SESSION_DOWNLOADS, strict=True):
+        found += used_step_problems(step, given, f"{name}'s download of {given['name']}")
+    found += own_step_problems(session, SESSION, SESSION_SHA256, repr(SESSION_NAME))
+    found += token_problems(token_, TOKEN_INPUTS, name)
+    found += own_step_problems(snapshot_, SNAPSHOT, SNAPSHOT_SHA256, repr(SNAPSHOT_NAME))
+    found += own_step_problems(report_, REPORT, REPORT_SHA256, "the denials report")
+    found += own_step_problems(measure, MEASURE, MEASURE_SHA256, repr(MEASURE_NAME))
+    found += own_step_problems(answer, ANSWER, ANSWER_SHA256, repr(ANSWER_NAME))
+    found += used_step_problems(upload, RECORD_UPLOAD, f"{name}'s record", "${{ !cancelled() }}")
+    found += action_problems(action_)
+    return found
+
+
+def action_problems(step: dict[str, Any]) -> list[str]:
+    found = []
+    if not PINNED.match(str(step.get("uses"))):
+        found.append(f"{step.get('uses')!r} isn't pinned to a full commit SHA")
+    if step.get("id") != "review":
+        found.append(f"the action's step id is {step.get('id')!r}, not review")
+    # A session that runs out of turns leaves its files to the follow-up (D10).
+    if step.get("continue-on-error") is not True:
+        found.append("the action can fail its job, so a session that stops leaves no record")
+    others = sorted(set(step) - {"uses", "id", "with", "continue-on-error", "name"})
+    if others:
+        found.append(f"the action's step also has {others}")
+    inputs = step.get("with") or {}
+    if json_schema(inputs) != SCHEMA:
+        found.append("Claude's structured output isn't the schema this test pins (SCHEMA)")
+    prompt = str(inputs.get("prompt", ""))
+    for path in (".org-guide/CONTRIBUTING.md", "org-profile/CONTRIBUTING.md"):
+        if path not in prompt:
+            found.append(f"the prompt doesn't name {path}")
+    if GUIDE_URL in prompt:
+        found.append("the prompt names the guide by URL, which the review has no tool to fetch")
+    flat = " ".join(prompt.split())
+    for sentence in PROMPT_READS:
+        if sentence not in flat:
+            found.append(f"the prompt doesn't say {sentence!r}")
+    if PROMPT_NOT in flat:
+        found.append(f"the prompt still says {PROMPT_NOT!r} with `gh pr diff`")
+    for name, value in CREDENTIALS.items():
+        if inputs.get(name) != value:
+            found.append(f"the action's {name} is {inputs.get(name)!r}, not {value!r}")
+    for name in sorted(REFUSED_INPUTS & set(inputs)):
+        found.append(f"the action is given {name}")
+    if not prompt.strip():
+        found.append("the action has no prompt, so nothing says what the review checks")
+    tools, sources, others = claude_args(inputs)
+    if sources != SETTING_SOURCES:
+        found.append(f"Claude loads settings from {sources!r}, not {SETTING_SOURCES!r} only")
+    if tools != TOOLS:
+        found.append(f"Claude's tools add {sorted(tools - TOOLS)} and drop {sorted(TOOLS - tools)}")
+    if others:
+        found.append(
+            f"claude_args has {others!r} besides --allowedTools, --max-turns, --model, "
+            "--setting-sources and --json-schema"
+        )
+    if "--max-turns" not in str(inputs.get("claude_args", "")):
+        found.append("claude_args has no --max-turns")
+    elif f"--max-turns {MAX_TURNS}" not in str(inputs.get("claude_args", "")):
+        found.append(f"--max-turns isn't {MAX_TURNS}, the turns the session's part needs (D11)")
+    if f"--model {MODEL_ARG}" not in str(inputs.get("claude_args", "")):
+        found.append(f"--model isn't {MODEL_ARG}, the checked repository variable (D6)")
+    return found
+
+
+def planner_job_problems(name: str, job: dict[str, Any]) -> list[str]:
+    """A follow-up planner: the plan, the rounds and the records downloaded, gathered, and the
+    next round's list uploaded when it has parts; no token, no checkout, no Claude
+    (review-splits-large-prs design D4, D10)."""
+    found = job_problems(name, job)
+    if job.get("outputs") != PLANNER_OUTPUTS:
+        found.append(f"{name}'s outputs are {job.get('outputs')!r}, not {PLANNER_OUTPUTS!r}")
+    if job.get("env") != {"NEXT_ROUND": NEXT_ROUNDS[name]}:
+        found.append(f"{name}'s env is {job.get('env')!r}, not round {NEXT_ROUNDS[name]}'s")
+    steps = job.get("steps") or []
+    shape = [label(s) for s in steps]
+    wanted = ["download", "download", "download", GATHER_NAME, "upload"]
+    if shape != wanted:
+        return [*found, f"{name}'s steps are {shape!r}, not {wanted!r}"]
+    *downloads, gather_, upload = steps
+    for step, given in zip(downloads, GATHER_DOWNLOADS, strict=True):
+        found += used_step_problems(step, given, f"{name}'s download")
+    found += own_step_problems(gather_, GATHER, GATHER_SHA256, f"{name}'s {GATHER_NAME!r}")
+    found += used_step_problems(upload, ROUND_UPLOAD, f"{name}'s upload", ROUND_UPLOAD_IF)
+    return found
+
+
+def resolve_job_problems(job: dict[str, Any]) -> list[str]:
+    """The report job: after the last round, minting the write token, reading the conversations
+    again, gathering what every session read, then resolving and posting the one summary; no
+    checkout, no Claude, nothing else (design D4a; review-splits-large-prs design D6, D7, D9)."""
+    found = job_problems("resolve", job)
+    if job.get("outputs") != RESOLVE_OUTPUTS:
+        found.append(f"resolve's outputs are {job.get('outputs')!r}, not {RESOLVE_OUTPUTS!r}")
+    steps = job.get("steps") or []
+    shape = [label(s) for s in steps]
+    wanted = ["token", SNAPSHOT_NAME, "download", "download", "download", GATHER_NAME,
+              RESOLVER_NAME, POST_NAME]  # fmt: skip
+    if shape != wanted:
+        return [*found, f"resolve's steps are {shape!r}, not {wanted!r}, in that order"]
+    minted, read, *rest = steps
+    downloads, (gather_, resolving, posting) = rest[:3], rest[3:]
+    found += token_problems(minted, RESOLVE_TOKEN_INPUTS, "resolve")
+    found += own_step_problems(read, SNAPSHOT, SNAPSHOT_SHA256, f"resolve's {SNAPSHOT_NAME!r}")
+    for step, given in zip(downloads, GATHER_DOWNLOADS, strict=True):
+        found += used_step_problems(step, given, "resolve's download")
+    found += own_step_problems(gather_, GATHER, GATHER_SHA256, f"resolve's {GATHER_NAME!r}")
+    found += own_step_problems(resolving, RESOLVER, RESOLVER_SHA256, repr(RESOLVER_NAME))
+    found += own_step_problems(posting, POST, POST_SHA256, repr(POST_NAME))
     return found
 
 
@@ -471,16 +764,7 @@ def completed_job_problems(job: dict[str, Any]) -> list[str]:
             f"completed runs when {job.get('if')!r}, not {COMPLETED_IF!r}: after a cancelled "
             "review too, and never for a comment's run or a merge group"
         )
-    if job.get("permissions") != {}:
-        found.append(
-            f"completed's GITHUB_TOKEN permissions are {job.get('permissions')!r}, not none"
-        )
-    if "concurrency" in job:
-        found.append("completed is in a concurrency group, so a newer review could cancel it")
-    if "environment" in job:
-        found.append(f"completed runs in environment {job['environment']!r}; it needs none")
-    if not isinstance(job.get("timeout-minutes"), int):
-        found.append("completed has no timeout-minutes")
+    found += job_problems("completed", job, permissions={})
     steps = job.get("steps") or []
     if [s.get("name") for s in steps] != [COMPLETED_STEP_NAME] or "uses" in steps[0]:
         return [*found, f"completed's steps aren't the one step {COMPLETED_STEP_NAME!r}"]
@@ -510,187 +794,26 @@ def problems(workflow: dict[str, Any]) -> list[str]:
         found.append(
             f"the default permissions are {workflow.get('permissions')!r}, not {PERMISSIONS!r}"
         )
-
-    jobs = workflow.get("jobs") or {}
-    if set(jobs) != {"gate", "review", "resolve", "completed"}:
-        return [*found, f"its jobs are {sorted(jobs)}, not gate, review, resolve and completed"]
-    job = jobs["review"]
-    found += gate_job_problems(jobs["gate"])
-    found += resolve_job_problems(jobs["resolve"])
-    found += completed_job_problems(jobs["completed"])
-    if job.get("needs") != REVIEW_NEEDS:
-        found.append(f"review needs {job.get('needs')!r}, not {REVIEW_NEEDS!r}")
-    if job.get("outputs") != REVIEW_OUTPUTS:
-        found.append(f"review's outputs are {job.get('outputs')!r}, not {REVIEW_OUTPUTS!r}")
-
-    if job.get("if") != REVIEW_IF:
-        found.append(f"review runs when {job.get('if')!r}, not only on the gate's yes")
-    if job.get("permissions") != PERMISSIONS:
-        found.append(
-            f"review's GITHUB_TOKEN permissions are {job.get('permissions')!r}, not {PERMISSIONS!r}"
-        )
-    if "environment" in job:
-        found.append(f"review runs in environment {job['environment']!r}; it needs none")
     if "concurrency" in workflow:
         found.append(
             "its concurrency group is at the workflow level, where a run whose review is skipped "
             "joins it and cancels a running review"
         )
-    for name in ("review", "resolve"):
-        if jobs[name].get("concurrency") != CONCURRENCY:
-            found.append(
-                f"{name}'s concurrency is {jobs[name].get('concurrency')!r}, not one run per pull "
-                "request, cancelling the last"
-            )
-    if not isinstance(job.get("timeout-minutes"), int):
-        found.append("review has no timeout-minutes")
-    elif job["timeout-minutes"] != REVIEW_TIMEOUT:
-        found.append(
-            f"review's timeout-minutes is {job['timeout-minutes']}, not {REVIEW_TIMEOUT}, "
-            "which the turn cap needs"
-        )
-
-    steps = job.get("steps") or []
-    reports = []
-    for step in steps:
-        uses = step.get("uses")
-        if uses is not None and not PINNED.match(str(uses)):
-            found.append(f"{uses!r} isn't pinned to a full commit SHA")
-        if "run" in step and step.get("name") == REPORT_NAME:
-            reports.append(step)
-        elif "run" in step and step.get("name") not in OWN_STEPS:
-            found.append(
-                f"review runs a command of its own ({step['run']!r}); only the action, the "
-                "conversation steps and the denials report run"
-            )
-    checkouts = [s for s in steps if str(s.get("uses", "")).startswith("actions/checkout@")]
-    for step in checkouts:
-        if (step.get("with") or {}).get("persist-credentials") is not False:
-            found.append(
-                "the checkout leaves its token in .git/config (persist-credentials isn't false)"
-            )
-    if len(checkouts) != 2:
-        found.append(
-            f"review checks out {len(checkouts)} times, not the pull request and the guide"
-        )
-    else:
-        own, guide = (dict(step.get("with") or {}) for step in checkouts)
-        if "repository" in own:
-            found.append(f"the first checkout is {own['repository']!r}, not the pull request's own")
-        elif own.get("fetch-depth") != CHECKOUT_DEPTH:
-            found.append(
-                f"the pull request's checkout has fetch-depth {own.get('fetch-depth')!r}, not "
-                f"{CHECKOUT_DEPTH}, so the diff step has no base to diff against"
-            )
-        if guide != GUIDE:
-            found.append(f"the guide's checkout is {guide!r}, not {GUIDE!r}")
-    tokens = [step for step in steps if str(step.get("uses", "")).startswith(f"{MINTER}@")]
-    actions = [step for step in steps if str(step.get("uses", "")).startswith(f"{ACTION}@")]
-    if len(tokens) != 1:
-        found.append(f"review mints {len(tokens)} App tokens, not the review App's one")
-    else:
-        token = tokens[0]
-        if token.get("id") != "app-token":
-            found.append(f"the token step's id is {token.get('id')!r}, not app-token")
-        given = dict(token.get("with") or {})
-        client_id = str(given.pop("client-id", ""))
-        if not REVIEW_APP_CLIENT_ID.match(client_id):
-            found.append(f"the review App's client ID is {client_id!r}, not one written here")
-        if given != TOKEN_INPUTS:
-            found.append(f"the review App's token is minted with {given!r}, not {TOKEN_INPUTS!r}")
-        if actions and steps.index(token) > steps.index(actions[0]):
-            found.append("the review App's token is minted after the action runs")
-    if len(actions) != 1:
-        return [*found, f"review uses {ACTION} {len(actions)} times, not once"]
-    inputs = actions[0].get("with") or {}
-
-    if actions[0].get("id") != "review":
-        found.append(f"the action's step id is {actions[0].get('id')!r}, not review")
-    if len(reports) != 1:
-        found.append(f"review has {len(reports)} denials reports, not one")
-    for report in reports:
-        given = {key: report.get(key) for key in REPORT}
-        if given != REPORT:
-            found.append(f"the denials report is given {given!r}, not {REPORT!r}")
-        others = sorted(set(report) - {*REPORT, "name", "run"})
-        if others:
-            found.append(f"the denials report also has {others}")
-        script = str(report["run"])
-        if "${{" in script:
-            found.append("the denials report's script interpolates an expression; use its env")
-        if hashlib.sha256(script.encode()).hexdigest() != REPORT_SHA256:
-            found.append("the denials report's script isn't the one this test pins (REPORT_SHA256)")
-        if steps.index(report) < steps.index(actions[0]):
-            found.append("the denials report runs before the action")
-    named = [step for step in steps if step.get("name") == SNAPSHOT_NAME and "run" in step]
-    if len(named) != 1:
-        found.append(f"review has {len(named)} steps named {SNAPSHOT_NAME!r}, not one")
-    else:
-        found += own_step_problems(named[0], SNAPSHOT, SNAPSHOT_SHA256, repr(SNAPSHOT_NAME))
-        at = steps.index(named[0])
-        if not (tokens and steps.index(tokens[0]) < at < steps.index(actions[0])):
-            found.append(f"{SNAPSHOT_NAME!r} doesn't run between minting the token and the action")
-    diffs = [step for step in steps if step.get("name") == DIFF_NAME and "run" in step]
-    if len(diffs) != 1:
-        found.append(f"review has {len(diffs)} steps named {DIFF_NAME!r}, not one")
-    else:
-        found += own_step_problems(diffs[0], DIFF, DIFF_SHA256, repr(DIFF_NAME))
-        at = steps.index(diffs[0])
-        if checkouts and not (steps.index(checkouts[-1]) < at < steps.index(actions[0])):
-            found.append(f"{DIFF_NAME!r} doesn't run between the checkouts and the action")
-    measures = [step for step in steps if step.get("name") == COVERAGE_NAME and "run" in step]
-    if len(measures) != 1:
-        found.append(f"review has {len(measures)} steps named {COVERAGE_NAME!r}, not one")
-    else:
-        found += own_step_problems(measures[0], COVERAGE, COVERAGE_SHA256, repr(COVERAGE_NAME))
-        if steps.index(measures[0]) < steps.index(actions[0]):
-            found.append(f"{COVERAGE_NAME!r} runs before the action")
-    models = [step for step in steps if step.get("name") == MODEL_NAME and "run" in step]
-    if len(models) != 1:
-        found.append(f"review has {len(models)} steps named {MODEL_NAME!r}, not one")
-    else:
-        found += own_step_problems(models[0], MODEL, MODEL_SHA256, repr(MODEL_NAME))
-        if steps.index(models[0]) > steps.index(actions[0]):
-            found.append(f"{MODEL_NAME!r} runs after the action")
-    if json_schema(inputs) != SCHEMA:
-        found.append("Claude's structured output isn't the schema this test pins (SCHEMA)")
-
-    prompt = str(inputs.get("prompt", ""))
-    for path in (".org-guide/CONTRIBUTING.md", "org-profile/CONTRIBUTING.md"):
-        if path not in prompt:
-            found.append(f"the prompt doesn't name {path}")
-    if GUIDE_URL in prompt:
-        found.append("the prompt names the guide by URL, which the review has no tool to fetch")
-    flat = " ".join(prompt.split())
-    for sentence in PROMPT_READS:
-        if sentence not in flat:
-            found.append(f"the prompt doesn't say {sentence!r}")
-    if PROMPT_NOT in flat:
-        found.append(f"the prompt still says {PROMPT_NOT!r} with `gh pr diff`")
-
-    for name, value in CREDENTIALS.items():
-        if inputs.get(name) != value:
-            found.append(f"the action's {name} is {inputs.get(name)!r}, not {value!r}")
-    for name in sorted(REFUSED_INPUTS & set(inputs)):
-        found.append(f"the action is given {name}")
-    if not str(inputs.get("prompt", "")).strip():
-        found.append("the action has no prompt, so nothing says what the review checks")
-    tools, sources, others = claude_args(inputs)
-    if sources != SETTING_SOURCES:
-        found.append(f"Claude loads settings from {sources!r}, not {SETTING_SOURCES!r} only")
-    if tools != TOOLS:
-        found.append(f"Claude's tools add {sorted(tools - TOOLS)} and drop {sorted(TOOLS - tools)}")
-    if others:
-        found.append(
-            f"claude_args has {others!r} besides --allowedTools, --max-turns, --model, "
-            "--setting-sources and --json-schema"
-        )
-    if "--max-turns" not in str(inputs.get("claude_args", "")):
-        found.append("claude_args has no --max-turns")
-    elif f"--max-turns {MAX_TURNS}" not in str(inputs.get("claude_args", "")):
-        found.append(f"--max-turns isn't {MAX_TURNS}, the turns the diff needs (D5)")
-    if f"--model {MODEL_ARG}" not in str(inputs.get("claude_args", "")):
-        found.append(f"--model isn't {MODEL_ARG}, the checked repository variable (D6)")
+    jobs = workflow.get("jobs") or {}
+    if set(jobs) != JOBS:
+        return [*found, f"its jobs are {sorted(jobs)}, not {sorted(JOBS)}"]
+    found += gate_job_problems(jobs["gate"])
+    found += plan_job_problems(jobs["plan"])
+    for name in SESSIONS:
+        found += session_job_problems(name, jobs[name])
+    # One list of steps for every round, so a follow-up session is a session (D10).
+    for name in SESSIONS[1:]:
+        if jobs[name].get("steps") != jobs["review"].get("steps"):
+            found.append(f"{name}'s steps aren't the first round's")
+    for name in PLANNERS:
+        found += planner_job_problems(name, jobs[name])
+    found += resolve_job_problems(jobs["resolve"])
+    found += completed_job_problems(jobs["completed"])
     return found
 
 
@@ -703,8 +826,17 @@ def test_it_starts_with_its_source() -> None:
     assert first.startswith("# Source: troupe-run/infrastructure."), first
 
 
+def step_named(w: dict[str, Any], job_name: str, name: str) -> dict[str, Any]:
+    step = next(s for s in w["jobs"][job_name]["steps"] if label(s) == name)
+    return step  # type: ignore[no-any-return]
+
+
 def job(w: dict[str, Any]) -> dict[str, Any]:
     return w["jobs"]["review"]  # type: ignore[no-any-return]
+
+
+def plan_job(w: dict[str, Any]) -> dict[str, Any]:
+    return w["jobs"]["plan"]  # type: ignore[no-any-return]
 
 
 def gate_job(w: dict[str, Any]) -> dict[str, Any]:
@@ -712,8 +844,7 @@ def gate_job(w: dict[str, Any]) -> dict[str, Any]:
 
 
 def gate(w: dict[str, Any]) -> dict[str, Any]:
-    step = next(s for s in gate_job(w)["steps"] if s.get("name") == GATE_NAME)
-    return step  # type: ignore[no-any-return]
+    return step_named(w, "gate", GATE_NAME)
 
 
 def gate_token(w: dict[str, Any]) -> dict[str, Any]:
@@ -721,8 +852,7 @@ def gate_token(w: dict[str, Any]) -> dict[str, Any]:
 
 
 def action_step(w: dict[str, Any]) -> dict[str, Any]:
-    step = next(s for s in job(w)["steps"] if str(s.get("uses", "")).startswith(ACTION))
-    return step  # type: ignore[no-any-return]
+    return step_named(w, "review", "action")
 
 
 def action(w: dict[str, Any]) -> dict[str, Any]:
@@ -730,43 +860,54 @@ def action(w: dict[str, Any]) -> dict[str, Any]:
 
 
 def report(w: dict[str, Any]) -> dict[str, Any]:
-    step = next(s for s in job(w)["steps"] if s.get("name") == REPORT_NAME)
-    return step  # type: ignore[no-any-return]
+    return step_named(w, "review", REPORT_NAME)
 
 
 def guide(w: dict[str, Any]) -> dict[str, Any]:
-    step = next(s for s in job(w)["steps"] if (s.get("with") or {}).get("repository"))
-    return step["with"]  # type: ignore[no-any-return]
+    return step_named(w, "review", "guide checkout")["with"]  # type: ignore[no-any-return]
 
 
-def move(w: dict[str, Any], step: dict[str, Any], to: int) -> None:
-    steps = job(w)["steps"]
+def move(w: dict[str, Any], step: dict[str, Any], to: int, job_name: str = "review") -> None:
+    steps = w["jobs"][job_name]["steps"]
     steps.insert(to, steps.pop(steps.index(step)))
 
 
 def snapshot(w: dict[str, Any]) -> dict[str, Any]:
-    step = next(s for s in job(w)["steps"] if s.get("name") == SNAPSHOT_NAME)
-    return step  # type: ignore[no-any-return]
+    return step_named(w, "review", SNAPSHOT_NAME)
 
 
-def diff_step(w: dict[str, Any]) -> dict[str, Any]:
-    step = next(s for s in job(w)["steps"] if s.get("name") == DIFF_NAME)
-    return step  # type: ignore[no-any-return]
-
-
-def coverage_step(w: dict[str, Any]) -> dict[str, Any]:
-    step = next(s for s in job(w)["steps"] if s.get("name") == COVERAGE_NAME)
-    return step  # type: ignore[no-any-return]
+def plan_step(w: dict[str, Any]) -> dict[str, Any]:
+    return step_named(w, "plan", PLAN_NAME)
 
 
 def model_step(w: dict[str, Any]) -> dict[str, Any]:
-    step = next(s for s in job(w)["steps"] if s.get("name") == MODEL_NAME)
-    return step  # type: ignore[no-any-return]
+    return step_named(w, "plan", MODEL_NAME)
 
 
-def diff_script(w: dict[str, Any], old: str, new: str) -> None:
-    assert old in str(diff_step(w)["run"]), old
-    diff_step(w)["run"] = str(diff_step(w)["run"]).replace(old, new)
+def session_step(w: dict[str, Any]) -> dict[str, Any]:
+    return step_named(w, "review", SESSION_NAME)
+
+
+def measure_step(w: dict[str, Any]) -> dict[str, Any]:
+    return step_named(w, "review", MEASURE_NAME)
+
+
+def answer_step(w: dict[str, Any]) -> dict[str, Any]:
+    return step_named(w, "review", ANSWER_NAME)
+
+
+def gather_step(w: dict[str, Any], job_name: str = "resolve") -> dict[str, Any]:
+    return step_named(w, job_name, GATHER_NAME)
+
+
+def plan_script(w: dict[str, Any], old: str, new: str) -> None:
+    assert old in str(plan_step(w)["run"]), old
+    plan_step(w)["run"] = str(plan_step(w)["run"]).replace(old, new)
+
+
+def script(step: dict[str, Any], old: str, new: str) -> None:
+    assert old in str(step["run"]), old
+    step["run"] = str(step["run"]).replace(old, new)
 
 
 def resolve_job(w: dict[str, Any]) -> dict[str, Any]:
@@ -774,18 +915,19 @@ def resolve_job(w: dict[str, Any]) -> dict[str, Any]:
 
 
 def resolver(w: dict[str, Any]) -> dict[str, Any]:
-    step = next(s for s in resolve_job(w)["steps"] if s.get("name") == RESOLVER_NAME)
-    return step  # type: ignore[no-any-return]
+    return step_named(w, "resolve", RESOLVER_NAME)
+
+
+def poster(w: dict[str, Any]) -> dict[str, Any]:
+    return step_named(w, "resolve", POST_NAME)
 
 
 def resolve_token(w: dict[str, Any]) -> dict[str, Any]:
-    step = resolve_job(w)["steps"][0]
-    return step  # type: ignore[no-any-return]
+    return resolve_job(w)["steps"][0]  # type: ignore[no-any-return]
 
 
 def token(w: dict[str, Any]) -> dict[str, Any]:
-    step = next(s for s in job(w)["steps"] if str(s.get("uses", "")).startswith(MINTER))
-    return step  # type: ignore[no-any-return]
+    return step_named(w, "review", "token")
 
 
 def completed_job(w: dict[str, Any]) -> dict[str, Any]:
@@ -811,564 +953,525 @@ def sources(w: dict[str, Any], change: str) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    ("change", "named"),
-    [
-        (lambda w: w.update({"on": {"pull_request_target": None}}), "not on pull_request, pull"),
-        (lambda w: w["on"].update({"push": None}), "not on pull_request, pull"),
-        (lambda w: w["on"].update({"issue_comment": None}), "not on pull_request, pull"),
-        (lambda w: w["on"].update({"pull_request_review": None}), "not on pull_request, pull"),
-        (lambda w: w["on"].pop("pull_request_review_comment"), "not on pull_request, pull"),
-        (
-            lambda w: w["on"]["pull_request_review_comment"]["types"].append("edited"),
-            "pull_request_review_comment ['created', 'edited'], not ['created']",
-        ),
-        (
-            lambda w: w["on"]["pull_request_review_comment"].pop("types"),
-            "pull_request_review_comment None",
-        ),
-        (lambda w: w["on"]["pull_request"]["types"].append("edited"), "not ['opened'"),
-        (lambda w: w["on"]["pull_request"]["types"].remove("synchronize"), "not ['opened'"),
-        (lambda w: w["on"]["pull_request"]["types"].append("ready_for_review"), "not ['opened'"),
-        (lambda w: w.update({"permissions": {"contents": "write"}}), "default permissions"),
-        (lambda w: w.pop("permissions"), "default permissions"),
-        (lambda w: gate_job(w).pop("if"), "not skipping bots, forks, outsiders"),
-        (
-            lambda w: gate_job(w).update({"if": "github.event.pull_request.user.type != 'Bot'"}),
-            "not skipping bots, forks, outsiders",
-        ),
-        (lambda w: job(w).pop("if"), "not only on the gate's yes"),
-        (lambda w: job(w).update({"if": "always()"}), "not only on the gate's yes"),
-        (lambda w: job(w).pop("needs"), "review needs None"),
-        (lambda w: w["jobs"].pop("gate"), "not gate, review, resolve"),
-        (
-            lambda w: gate_job(w).update({"concurrency": copy.deepcopy(CONCURRENCY)}),
-            "gate is in a concurrency group",
-        ),
-        (lambda w: gate_job(w).update({"needs": "review"}), "it runs first"),
-        (
-            lambda w: gate_job(w)["permissions"].update({"pull-requests": "read"}),
-            "gate's GITHUB_TOKEN permissions",
-        ),
-        (
-            lambda w: gate_token(w)["with"].update({"permission-pull-requests": "write"}),
-            "gate's token is minted with",
-        ),
-        (
-            lambda w: gate_token(w)["with"].update({"permission-contents": "write"}),
-            "gate's token is minted with",
-        ),
-        (lambda w: gate_job(w).pop("outputs"), "gate's outputs are None"),
-        (lambda w: gate_job(w).pop("timeout-minutes"), "gate has no timeout-minutes"),
-        (
-            lambda w: gate(w).update({"run": str(gate(w)["run"]) + "\nprint()\n"}),
-            "script isn't the one this test pins",
-        ),
-        (
-            lambda w: gate(w)["env"].update({"REPLY_TO": "${{ github.event.comment.id }}"}),
-            f"{GATE_NAME!r} is given",
-        ),
-        (
-            lambda w: gate_job(w)["steps"].append({"run": "echo hi"}),
-            "gate's steps are",
-        ),
-        (
-            lambda w: unskip(w, "github.event.comment.in_reply_to_id != null && "),
-            "not skipping bots, forks, outsiders",
-        ),
-        (
-            lambda w: unskip(w, " && github.event.comment.user.type != 'Bot'"),
-            "not skipping bots, forks, outsiders",
-        ),
-        (
-            lambda w: unskip(
-                w,
-                "github.event.comment.user.type != 'Bot'",
-                "github.event.comment.user.type != 'Bot' && "
-                "github.event.comment.author_association != 'NONE'",
-            ),
-            "not skipping bots, forks, outsiders",
-        ),
-        (
-            lambda w: gate(w)["env"].update({"COMMENTER": "${{ github.actor }}"}),
-            f"{GATE_NAME!r} is given",
-        ),
-        (
-            lambda w: unskip(
-                w, "github.event.pull_request.head.repo.full_name == github.repository && "
-            ),
-            "not skipping bots, forks, outsiders",
-        ),
-        (
-            lambda w: unskip(w, "github.event_name == 'pull_request' || "),
-            "not skipping bots, forks, outsiders",
-        ),
-        (
-            lambda w: job(w)["permissions"].update({"id-token": "write"}),
-            "review's GITHUB_TOKEN permissions",
-        ),
-        (
-            lambda w: job(w)["permissions"].update({"contents": "write"}),
-            "review's GITHUB_TOKEN permissions",
-        ),
-        (
-            lambda w: job(w)["permissions"].update({"pull-requests": "write"}),
-            "review's GITHUB_TOKEN permissions",
-        ),
-        (
-            lambda w: token(w)["with"].update({"permission-contents": "write"}),
-            "the review App's token is minted with",
-        ),
-        (
-            lambda w: token(w)["with"].update({"permission-issues": "write"}),
-            "the review App's token is minted with",
-        ),
-        (
-            lambda w: token(w)["with"].pop("repositories"),
-            "the review App's token is minted with",
-        ),
-        (
-            lambda w: token(w)["with"].update(
-                {"private-key": "${{ secrets.DOCS_APP_PRIVATE_KEY }}"}
-            ),
-            "the review App's token is minted with",
-        ),
-        (lambda w: token(w).update({"id": "token"}), "not app-token"),
-        (
-            lambda w: token(w)["with"].update({"client-id": "${{ vars.REVIEW_APP_CLIENT_ID }}"}),
-            "client ID is",
-        ),
-        (
-            lambda w: job(w)["steps"].remove(token(w)),
-            "review mints 0 App tokens",
-        ),
-        (
-            lambda w: job(w)["steps"].append(job(w)["steps"].pop(job(w)["steps"].index(token(w)))),
-            "minted after the action runs",
-        ),
-        (lambda w: job(w).pop("permissions"), "review's GITHUB_TOKEN permissions"),
-        (lambda w: job(w).update({"environment": "plan-pr"}), "it needs none"),
-        (lambda w: job(w).pop("concurrency"), "review's concurrency is None"),
-        (lambda w: resolve_job(w).pop("concurrency"), "resolve's concurrency is None"),
-        (
-            lambda w: job(w)["concurrency"].update({"cancel-in-progress": False}),
-            "review's concurrency",
-        ),
-        (
-            lambda w: resolve_job(w)["concurrency"].update({"group": "claude-resolve"}),
-            "resolve's concurrency",
-        ),
-        (
-            lambda w: w.update({"concurrency": job(w).pop("concurrency")}),
-            "at the workflow level",
-        ),
-        (lambda w: job(w).pop("timeout-minutes"), "no timeout-minutes"),
-        (lambda w: w["jobs"].update({"other": {}}), "not gate, review, resolve"),
-        (
-            lambda w: job(w)["steps"].append({"run": "git push"}),
-            "runs a command of its own",
-        ),
-        (
-            lambda w: job(w)["steps"][0].update({"uses": "actions/checkout@v7"}),
-            "isn't pinned",
-        ),
-        (lambda w: action_step(w).update({"uses": f"{ACTION}@v1"}), "isn't pinned"),
-        (lambda w: action_step(w).update({"id": "claude"}), "not review"),
-        (lambda w: job(w)["steps"].remove(report(w)), "0 denials reports"),
-        (
-            lambda w: job(w)["steps"].append({**report(w), "run": "print('x')"}),
-            "2 denials reports",
-        ),
-        (
-            lambda w: report(w).update(
-                {"run": str(report(w)["run"]) + "print(open('x').read())\n"}
-            ),
-            "isn't the one this test pins",
-        ),
-        (
-            lambda w: report(w).update(
-                {
-                    "run": str(report(w)["run"]).replace(
-                        'os.environ.get("EXECUTION_FILE", "")',
-                        '"${{ steps.review.outputs.execution_file }}"',
-                    )
-                }
-            ),
-            "interpolates an expression",
-        ),
-        (lambda w: report(w).pop("continue-on-error"), "the denials report is given"),
-        (lambda w: report(w).update({"if": "${{ always() }}"}), "the denials report is given"),
-        (lambda w: report(w).update({"shell": "bash"}), "the denials report is given"),
-        (
-            lambda w: report(w)["env"].update({"TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"}),
-            "the denials report is given",
-        ),
-        (
-            lambda w: report(w).update({"working-directory": ".org-guide"}),
-            "also has ['working-directory']",
-        ),
-        (lambda w: move(w, report(w), 0), "runs before the action"),
-        (lambda w: action(w).update({"display_report": "true"}), "given display_report"),
-        (lambda w: guide(w).update({"persist-credentials": True}), "persist-credentials"),
-        (lambda w: guide(w).update({"repository": "troupe-run/troupe"}), "the guide's checkout"),
-        (lambda w: guide(w).update({"path": "../guide"}), "the guide's checkout"),
-        (lambda w: guide(w).update({"path": "/tmp/guide"}), "the guide's checkout"),  # noqa: S108
-        (lambda w: guide(w).pop("sparse-checkout"), "the guide's checkout"),
-        (lambda w: move(w, job(w)["steps"][0], 2), "the first checkout is 'troupe-run/.github'"),
-        (
-            lambda w: job(w)["steps"].insert(0, copy.deepcopy(job(w)["steps"][0])),
-            "checks out 3 times",
-        ),
-        (lambda w: tools(w, "Bash(gh pr view:*),WebFetch"), "add ['WebFetch']"),
-        (
-            lambda w: action(w).update(
-                {
-                    "prompt": str(action(w)["prompt"]).replace(
-                        ".org-guide/CONTRIBUTING.md", GUIDE_URL
-                    )
-                }
-            ),
-            "names the guide by URL",
-        ),
-        (
-            lambda w: action(w).update(
-                {"prompt": str(action(w)["prompt"]).replace("org-profile/CONTRIBUTING.md", "")}
-            ),
-            "doesn't name org-profile/CONTRIBUTING.md",
-        ),
-        (lambda w: action(w).pop("github_token"), "github_token"),
-        (
-            lambda w: action(w).update({"github_token": "${{ secrets.SOME_PAT }}"}),
-            "github_token",
-        ),
-        (
-            lambda w: action(w).update({"github_token": "${{ secrets.GITHUB_TOKEN }}"}),
-            "github_token",
-        ),
-        (lambda w: action(w).pop("claude_code_oauth_token"), "claude_code_oauth_token"),
-        (
-            lambda w: action(w).update({"anthropic_api_key": "${{ secrets.ANTHROPIC_API_KEY }}"}),
-            "given anthropic_api_key",
-        ),
-        (lambda w: action(w).update({"allowed_bots": "*"}), "given allowed_bots"),
-        (
-            lambda w: action(w).update({"allowed_non_write_users": "*"}),
-            "given allowed_non_write_users",
-        ),
-        (
-            lambda w: action(w).update({"additional_permissions": "contents: write"}),
-            "given additional_permissions",
-        ),
-        (lambda w: action(w).update({"show_full_output": "true"}), "given show_full_output"),
-        (lambda w: action(w).pop("prompt"), "no prompt"),
-        (lambda w: tools(w, "Bash(gh pr view:*),Edit"), "add ['Edit']"),
-        (lambda w: tools(w, "Bash(gh pr view:*),Write"), "add ['Write']"),
-        (lambda w: tools(w, "Bash(gh pr view:*),Bash(git push:*)"), "add ['Bash(git push:*)']"),
-        (
-            lambda w: tools(w, "Bash(gh pr view:*),Bash(gh pr review:*)"),
-            "add ['Bash(gh pr review:*)']",
-        ),
-        (lambda w: tools(w, "Bash(gh:*)"), "add ['Bash(gh:*)']"),
-        (lambda w: tools(w, "Bash(gh pr view:*),Read"), "add ['Read']"),
-        (
-            lambda w: action(w).update(
-                {"claude_args": str(action(w)["claude_args"]).replace("Grep(./**)", "Grep")}
-            ),
-            "add ['Grep']",
-        ),
-        (
-            lambda w: job(w)["steps"][0]["with"].pop("persist-credentials"),
-            "persist-credentials isn't false",
-        ),
-        (
-            lambda w: job(w)["steps"][0]["with"].update({"persist-credentials": True}),
-            "persist-credentials isn't false",
-        ),
-        (lambda w: tools(w, 'Bash(gh pr view:*)" --dangerously-skip-permissions "'), "besides"),
-        (
-            lambda w: action(w).update(
-                {
-                    "claude_args": str(action(w)["claude_args"]).replace(
-                        f"--max-turns {MAX_TURNS}", ""
-                    )
-                }
-            ),
-            "no --max-turns",
-        ),
-        (lambda w: job(w)["steps"].remove(snapshot(w)), '0 steps named "Read the pull'),
-        (lambda w: resolve_job(w)["steps"].remove(resolver(w)), "resolve's steps are"),
-        (lambda w: w["jobs"].pop("resolve"), "not gate, review, resolve"),
-        (lambda w: resolve_job(w).pop("needs"), "resolve needs None"),
-        (lambda w: resolve_job(w).update({"if": "always()"}), "resolve runs when 'always()'"),
-        (
-            lambda w: resolve_job(w)["permissions"].update({"contents": "write"}),
-            "resolve's GITHUB_TOKEN permissions",
-        ),
-        (
-            lambda w: resolve_job(w)["steps"].insert(0, copy.deepcopy(job(w)["steps"][0])),
-            "resolve's steps are",
-        ),
-        (
-            lambda w: resolve_job(w)["steps"].append(copy.deepcopy(action_step(w))),
-            "resolve's steps are",
-        ),
-        (
-            lambda w: resolve_token(w)["with"].update({"permission-administration": "write"}),
-            "resolve's token is minted with",
-        ),
-        (
-            lambda w: resolve_token(w)["with"].update({"permission-contents": "read"}),
-            "resolve's token is minted with",
-        ),
-        (lambda w: job(w).pop("outputs"), "review's outputs are None"),
-        (lambda w: job(w)["steps"].append(copy.deepcopy(resolver(w))), "runs a command of its own"),
-        (lambda w: move(w, snapshot(w), len(job(w)["steps"])), "doesn't run between minting"),
-        (lambda w: move(w, snapshot(w), 0), "doesn't run between minting"),
-        (
-            lambda w: resolve_job(w)["steps"].insert(
-                1, resolve_job(w)["steps"].pop(resolve_job(w)["steps"].index(resolver(w)))
-            ),
-            "resolve's steps are",
-        ),
-        (
-            lambda w: resolver(w)["env"].update({"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"}),
-            "'Resolve and re-tier what Claude named' is given",
-        ),
-        (
-            lambda w: snapshot(w)["env"].update(
-                {"CLAUDE": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"}
-            ),
-            'review conversations" is given',
-        ),
-        (
-            lambda w: resolver(w).update({"if": "${{ always() }}"}),
-            "'Resolve and re-tier what Claude named' also has ['if']",
-        ),
-        (
-            lambda w: resolver(w).update({"continue-on-error": True}),
-            "also has ['continue-on-error']",
-        ),
-        (
-            lambda w: resolver(w).update(
-                {
-                    "run": str(resolver(w)["run"]).replace(
-                        'if current not in ("must-fix", "nit"):', "if False:"
-                    )
-                }
-            ),
-            "'Resolve and re-tier what Claude named''s script isn't the one this test pins",
-        ),
-        # Widened to decisions, which are the owner's (review-resolves-fixed-nits design D2).
-        (
-            lambda w: resolver(w).update(
-                {
-                    "run": str(resolver(w)["run"]).replace(
-                        '("must-fix", "nit")', '("must-fix", "nit", "decision")'
-                    )
-                }
-            ),
-            "'Resolve and re-tier what Claude named''s script isn't the one this test pins",
-        ),
-        (
-            lambda w: resolver(w).update(
-                {
-                    "run": str(resolver(w)["run"]).replace(
-                        'os.environ.get("STRUCTURED_OUTPUT", "")',
-                        "'${{ steps.review.outputs.structured_output }}'",
-                    )
-                }
-            ),
-            "interpolates an expression",
-        ),
-        (
-            lambda w: snapshot(w).update({"run": str(snapshot(w)["run"]) + "print(1)\n"}),
-            "review conversations\"'s script isn't the one this test pins",
-        ),
-        (lambda w: tools(w, "Bash(gh pr view:*),Bash(gh api:*)"), "add ['Bash(gh api:*)']"),
-        (
-            lambda w: action(w).update(
-                {"claude_args": re.sub(r"--json-schema '[^']*'", "", str(action(w)["claude_args"]))}
-            ),
-            "isn't the schema this test pins",
-        ),
-        (
-            lambda w: action(w).update(
-                {
-                    "claude_args": str(action(w)["claude_args"]).replace(
-                        '"decision"]', '"decision","owner"]'
-                    )
-                }
-            ),
-            "isn't the schema this test pins",
-        ),
-        (lambda w: w["on"].pop("merge_group"), "not on pull_request, pull"),
-        (lambda w: w["on"].update({"merge_group": {"types": ["checks_requested"]}}), "not every"),
-        (lambda w: w["jobs"].pop("completed"), "not gate, review, resolve"),
-        (lambda w: completed_job(w).update({"name": "review completed"}), "required-checks.json"),
-        (lambda w: completed_job(w).update({"needs": ["review", "resolve"]}), "completed needs"),
-        (lambda w: completed_job(w).update({"needs": "resolve"}), "completed needs"),
-        # Without always(), a cancelled or failed review skips it, which counts as passed.
-        (
-            lambda w: completed_job(w).update({"if": "github.event_name == 'pull_request'"}),
-            "after a cancelled review too",
-        ),
-        (lambda w: completed_job(w).pop("if"), "after a cancelled review too"),
-        # A merge group or a comment's run reporting it: a merge group must skip it, and a
-        # comment's run reports what GitHub ignores (design D4, D5).
-        (lambda w: completed_job(w).update({"if": "always()"}), "never for a comment's run"),
-        (
-            lambda w: completed_job(w).update(
-                {"if": "always() && github.event_name != 'merge_group'"}
-            ),
-            "never for a comment's run",
-        ),
-        (
-            lambda w: completed_job(w).update({"permissions": {"actions": "read"}}),
-            "completed's GITHUB_TOKEN permissions",
-        ),
-        (lambda w: completed_job(w).pop("permissions"), "completed's GITHUB_TOKEN permissions"),
-        (
-            lambda w: completed_job(w).update({"concurrency": copy.deepcopy(CONCURRENCY)}),
-            "completed is in a concurrency group",
-        ),
-        (lambda w: completed_job(w).pop("timeout-minutes"), "completed has no timeout-minutes"),
-        (
-            lambda w: completed_job(w)["steps"].insert(
-                0, {"uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"}
-            ),
-            "completed's steps aren't the one step",
-        ),
-        (
-            lambda w: completed(w)["env"].update(
-                {"TOKEN": "${{ secrets.REVIEW_APP_PRIVATE_KEY }}"}
-            ),
-            f"{COMPLETED_STEP_NAME!r} is given",
-        ),
-        (
-            lambda w: completed(w)["env"].update({"REVIEW": "${{ needs.gate.result }}"}),
-            f"{COMPLETED_STEP_NAME!r} is given",
-        ),
-        (
-            lambda w: completed(w).update({"run": str(completed(w)["run"]) + "\nsys.exit(0)\n"}),
-            "complete?''s script isn't the one this test pins",
-        ),
-        # The diff the review reads, and the turns it needs (review-covers-the-diff D2, D5).
-        (lambda w: job(w)["steps"][0]["with"].update({"fetch-depth": 1}), "fetch-depth 1, not 2"),
-        (lambda w: job(w)["steps"].remove(diff_step(w)), '0 steps named "Write each'),
-        (lambda w: move(w, diff_step(w), len(job(w)["steps"])), "between the checkouts and"),
-        (lambda w: move(w, diff_step(w), 0), "between the checkouts and the action"),
-        (lambda w: diff_step(w).update({"id": "files"}), '"Write each changed file\'s diff" is'),
-        (
-            lambda w: diff_step(w).update({"env": {"T": "${{ secrets.GITHUB_TOKEN }}"}}),
-            "also has ['env']",
-        ),
-        (lambda w: diff_script(w, '"uv.lock", ', '"uv.lock", "x.py", '), "this test pins"),
-        (lambda w: diff_script(w, "MAX_TURNS = 400", "MAX_TURNS = 9999"), "this test pins"),
-        (lambda w: diff_script(w, "READ_CHUNK_BYTES = 20_000", "READ_CHUNK_BYTES = 10**9"), "pins"),
-        (
-            lambda w: action(w).update(
-                {"claude_args": str(action(w)["claude_args"]).replace(MAX_TURNS, "30")}
-            ),
-            "--max-turns isn't",
-        ),
-        # What the prompt says about reading (D7, D7a).
-        *[
-            (
-                lambda w, s=sentence: action(w).update(
-                    {"prompt": " ".join(str(action(w)["prompt"]).split()).replace(s, "")}
-                ),
-                f"the prompt doesn't say {sentence!r}",
-            )
-            for sentence in PROMPT_READS
-        ],
-        (
-            lambda w: action(w).update(
-                {"prompt": str(action(w)["prompt"]) + "\nRead the diff with `gh pr diff`.\n"}
-            ),
-            "the prompt still says",
-        ),
-        # What the review read (D3, D4).
-        (lambda w: job(w)["steps"].remove(coverage_step(w)), "0 steps named 'Measure what"),
-        (lambda w: move(w, coverage_step(w), 0), "runs before the action"),
-        (
-            lambda w: coverage_step(w)["env"].update(
-                {"EXECUTION_FILE": "${{ steps.review.outputs.structured_output }}"}
-            ),
-            "'Measure what the review read' is given",
-        ),
-        (
-            lambda w: coverage_step(w)["env"].update(
-                {"SAID": "${{ steps.review.outputs.structured_output }}"}
-            ),
-            "'Measure what the review read' is given",
-        ),
-        (lambda w: coverage_step(w).pop("continue-on-error"), "the review read' is given"),
-        (lambda w: coverage_step(w).update({"if": "${{ success() }}"}), "review read' is given"),
-        (
-            lambda w: coverage_step(w).update(
-                {"run": str(coverage_step(w)["run"]) + "print(text)\n"}
-            ),
-            "the review read''s script isn't the one this test pins",
-        ),
-        (lambda w: job(w)["outputs"].pop("coverage"), "review's outputs are"),
-        (lambda w: job(w).update({"timeout-minutes": 20}), "timeout-minutes is 20, not 90"),
-        # The model, from the checked variable (D6).
-        (lambda w: job(w)["steps"].remove(model_step(w)), '0 steps named "Check the review'),
-        (lambda w: move(w, model_step(w), len(job(w)["steps"])), "runs after the action"),
-        (
-            lambda w: model_step(w)["env"].update({"MODEL": "claude-opus-5-5"}),
-            '"Check the review\'s model" is given',
-        ),
-        (
-            lambda w: action(w).update(
-                {
-                    "claude_args": str(action(w)["claude_args"]).replace(
-                        MODEL_ARG, "${{ vars.CLAUDE_REVIEW_MODEL }}"
-                    )
-                }
-            ),
-            "--model isn't",
-        ),
-        (
-            lambda w: action(w).update(
-                {"claude_args": str(action(w)["claude_args"]).replace(f"--model {MODEL_ARG}", "")}
-            ),
-            "--model isn't",
-        ),
-        # The check judges what the review read (D4).
-        (lambda w: completed(w)["env"].pop("COVERAGE"), f"{COMPLETED_STEP_NAME!r} is given"),
-        # The floor is judged from the coverage step's output (review-coverage-floor design D3).
-        (lambda w: completed(w)["env"].pop("CODE"), f"{COMPLETED_STEP_NAME!r} is given"),
-        (
-            lambda w: completed(w)["env"].update({"CODE": "read"}),
-            f"{COMPLETED_STEP_NAME!r} is given",
-        ),
-        (
-            lambda w: job(w)["outputs"].pop("code"),
-            "outputs",
-        ),
-        (
-            lambda w: completed(w)["env"].update({"COVERAGE": "complete"}),
-            f"{COMPLETED_STEP_NAME!r} is given",
-        ),
-        (
-            lambda w: completed(w)["env"].update(
-                {"COVERAGE": "${{ needs.review.outputs.structured_output }}"}
-            ),
-            f"{COMPLETED_STEP_NAME!r} is given",
-        ),
-        (
-            lambda w: completed(w).update(
-                {"run": str(completed(w)["run"]).replace('if code == "unread":', "if False:")}
-            ),
-            "complete?''s script isn't the one this test pins",
-        ),
-        (lambda w: sources(w, ""), "from None"),
-        (lambda w: sources(w, "--setting-sources user,project"), "from 'user,project'"),
-        (lambda w: sources(w, "--setting-sources project"), "from 'project'"),
+def claude(w: dict[str, Any], old: str, new: str) -> None:
+    assert old in str(action(w)["claude_args"]), old
+    action(w)["claude_args"] = str(action(w)["claude_args"]).replace(old, new)
+
+
+def prompt(w: dict[str, Any], old: str, new: str) -> None:
+    flat = " ".join(str(action(w)["prompt"]).split())
+    assert old in flat, old
+    action(w)["prompt"] = flat.replace(old, new)
+
+
+def unshare(w: dict[str, Any], name: str) -> list[dict[str, Any]]:
+    """A copy of a round's steps of its own, which a change can then make differ."""
+    w["jobs"][name]["steps"] = copy.deepcopy(w["jobs"][name]["steps"])
+    return w["jobs"][name]["steps"]  # type: ignore[no-any-return]
+
+
+Change = Callable[[dict[str, Any]], object]
+CASES: list[tuple[Change, str]] = [
+    (lambda w: w.update({"on": {"pull_request_target": None}}), "not on pull_request, pull"),
+    (lambda w: w["on"].update({"push": None}), "not on pull_request, pull"),
+    (lambda w: w["on"].update({"issue_comment": None}), "not on pull_request, pull"),
+    (lambda w: w["on"].update({"pull_request_review": None}), "not on pull_request, pull"),
+    (lambda w: w["on"].pop("pull_request_review_comment"), "not on pull_request, pull"),
+    (
+        lambda w: w["on"]["pull_request_review_comment"]["types"].append("edited"),
+        "pull_request_review_comment ['created', 'edited'], not ['created']",
+    ),
+    (lambda w: w["on"]["pull_request_review_comment"].pop("types"), "review_comment None"),
+    (lambda w: w["on"]["pull_request"]["types"].append("edited"), "not ['opened'"),
+    (lambda w: w["on"]["pull_request"]["types"].remove("synchronize"), "not ['opened'"),
+    (lambda w: w["on"]["pull_request"]["types"].append("ready_for_review"), "not ['opened'"),
+    (lambda w: w["on"].pop("merge_group"), "not on pull_request, pull"),
+    (lambda w: w["on"].update({"merge_group": {"types": ["checks_requested"]}}), "not every"),
+    (lambda w: w.update({"permissions": {"contents": "write"}}), "default permissions"),
+    (lambda w: w.pop("permissions"), "default permissions"),
+    (lambda w: w.update({"concurrency": job(w)["concurrency"]}), "at the workflow level"),
+    (lambda w: w["jobs"].update({"other": {}}), "its jobs are"),
+    *[(lambda w, n=n: w["jobs"].pop(n), "its jobs are") for n in sorted(JOBS)],
+    # The gate (review-judge-reply-on-post design D2, D2a).
+    (lambda w: gate_job(w).pop("if"), "not skipping bots, forks, outsiders"),
+    (
+        lambda w: gate_job(w).update({"if": "github.event.pull_request.user.type != 'Bot'"}),
+        "not skipping bots, forks, outsiders",
+    ),
+    (
+        lambda w: gate_job(w).update({"concurrency": copy.deepcopy(job(w)["concurrency"])}),
+        "gate is in a concurrency group",
+    ),
+    (lambda w: gate_job(w).update({"needs": "review"}), "it runs first"),
+    (
+        lambda w: gate_job(w)["permissions"].update({"pull-requests": "read"}),
+        "gate's GITHUB_TOKEN permissions",
+    ),
+    (
+        lambda w: gate_token(w)["with"].update({"permission-pull-requests": "write"}),
+        "gate's token is minted with",
+    ),
+    (
+        lambda w: gate_token(w)["with"].update({"permission-contents": "write"}),
+        "gate's token is minted with",
+    ),
+    (lambda w: gate_job(w).pop("outputs"), "gate's outputs are None"),
+    (lambda w: gate_job(w).pop("timeout-minutes"), "gate has no timeout-minutes"),
+    (
+        lambda w: gate(w).update({"run": str(gate(w)["run"]) + "\nprint()\n"}),
+        "script isn't the one this test pins",
+    ),
+    (
+        lambda w: gate(w)["env"].update({"REPLY_TO": "${{ github.event.comment.id }}"}),
+        f"{GATE_NAME!r} is given",
+    ),
+    (lambda w: gate_job(w)["steps"].append({"run": "echo hi"}), "gate's steps are"),
+    (
+        lambda w: unskip(w, "github.event.comment.in_reply_to_id != null && "),
+        "not skipping bots, forks, outsiders",
+    ),
+    (
+        lambda w: unskip(w, " && github.event.comment.user.type != 'Bot'"),
+        "not skipping bots, forks, outsiders",
+    ),
+    (
+        lambda w: unskip(
+            w,
+            "github.event.comment.user.type != 'Bot'",
+            "github.event.comment.user.type != 'Bot' && "
+            "github.event.comment.author_association != 'NONE'",
+        ),
+        "not skipping bots, forks, outsiders",
+    ),
+    (
+        lambda w: gate(w)["env"].update({"COMMENTER": "${{ github.actor }}"}),
+        f"{GATE_NAME!r} is given",
+    ),
+    (
+        lambda w: unskip(
+            w, "github.event.pull_request.head.repo.full_name == github.repository && "
+        ),
+        "not skipping bots, forks, outsiders",
+    ),
+    (
+        lambda w: unskip(w, "github.event_name == 'pull_request' || "),
+        "not skipping bots, forks, outsiders",
+    ),
+    # When each job runs, and what it waits for (review-splits-large-prs design D4, D10).
+    *[(lambda w, n=n: w["jobs"][n].pop("if"), f"{n} runs when None") for n in IFS],
+    *[
+        (lambda w, n=n: w["jobs"][n].update({"if": "always()"}), f"{n} runs when 'always()'")
+        for n in IFS
     ],
-)
-def test_each_way_the_workflow_can_go_wrong_is_named(change: Any, named: str) -> None:  # noqa: ANN401
+    *[(lambda w, n=n: w["jobs"][n].pop("needs"), f"{n} needs None") for n in NEEDS],
+    (
+        lambda w: w["jobs"]["resolve"].update(
+            {"if": str(IFS["resolve"]).replace("needs.follow-1.outputs.parts == '[]' || ", "")}
+        ),
+        "resolve runs when",
+    ),
+    # Each job's token and group (design D1, D3; review-splits-large-prs design D8).
+    *[
+        (
+            lambda w, n=n: w["jobs"][n]["permissions"].update({"contents": "write"}),
+            f"{n}'s GITHUB_TOKEN permissions",
+        )
+        for n in ("plan", "review", "follow-1", "resolve")
+    ],
+    (lambda w: job(w)["permissions"].update({"id-token": "write"}), "review's GITHUB_TOKEN"),
+    (lambda w: job(w)["permissions"].update({"pull-requests": "write"}), "review's GITHUB_TOKEN"),
+    (lambda w: job(w).pop("permissions"), "review's GITHUB_TOKEN permissions"),
+    (lambda w: job(w).update({"environment": "plan-pr"}), "it needs none"),
+    *[
+        (lambda w, n=n: w["jobs"][n].pop("concurrency"), f"{n}'s concurrency is None")
+        for n in GROUPS
+    ],
+    (
+        lambda w: job(w).update(
+            {"concurrency": {"group": f"claude-review-{PR}", "cancel-in-progress": True}}
+        ),
+        "review's concurrency is",
+    ),
+    (
+        lambda w: job(w)["concurrency"].update({"cancel-in-progress": False}),
+        "review's concurrency",
+    ),
+    (
+        lambda w: resolve_job(w)["concurrency"].update({"group": "claude-resolve"}),
+        "resolve's concurrency",
+    ),
+    (lambda w: job(w).pop("timeout-minutes"), "no timeout-minutes"),
+    (lambda w: job(w).update({"timeout-minutes": 20}), "timeout-minutes is 20, not 90"),
+    # The plan job (review-splits-large-prs design D1 to D4).
+    (lambda w: plan_job(w).pop("outputs"), "plan's outputs are None"),
+    (lambda w: plan_job(w)["outputs"].pop("model"), "plan's outputs are"),
+    (lambda w: plan_job(w)["steps"][0]["with"].update({"fetch-depth": 1}), "plan's checkout"),
+    (
+        lambda w: plan_job(w)["steps"][0]["with"].update({"persist-credentials": True}),
+        "plan's checkout",
+    ),
+    (lambda w: plan_job(w)["steps"].remove(plan_step(w)), "plan's steps are"),
+    (lambda w: move(w, plan_step(w), 0, "plan"), "plan's steps are"),
+    (lambda w: plan_step(w).update({"id": "files"}), f"{PLAN_NAME!r} is given"),
+    (lambda w: plan_step(w).update({"env": {"T": "${{ secrets.GITHUB_TOKEN }}"}}), "also has"),
+    (lambda w: plan_script(w, '"uv.lock", ', '"uv.lock", "x.py", '), "this test pins"),
+    (lambda w: plan_script(w, "MAX_TURNS = 400", "MAX_TURNS = 9999"), "this test pins"),
+    (lambda w: plan_script(w, "READ_CHUNK_BYTES = 20_000", "READ_CHUNK_BYTES = 10**9"), "pins"),
+    (lambda w: plan_script(w, "PART_READS = 40", "PART_READS = 4000"), "this test pins"),
+    (
+        lambda w: plan_script(w, '"data suffixes": (".json"', '"data suffixes": (".py", ".json"'),
+        "this test pins",
+    ),
+    (lambda w: plan_script(w, "and not named(path)", ""), "this test pins"),
+    (
+        lambda w: plan_job(w)["steps"][3]["with"].update({"include-hidden-files": False}),
+        "plan's upload of review-plan",
+    ),
+    (
+        lambda w: plan_job(w)["steps"][3]["with"].update({"retention-days": 90}),
+        "plan's upload of review-plan",
+    ),
+    (lambda w: plan_job(w)["steps"].pop(4), "plan's steps are"),
+    # The model, from the checked variable (review-covers-the-diff design D6).
+    (lambda w: plan_job(w)["steps"].remove(model_step(w)), "plan's steps are"),
+    (
+        lambda w: model_step(w)["env"].update({"MODEL": "claude-opus-5-5"}),
+        f"{MODEL_NAME!r} is given",
+    ),
+    (lambda w: claude(w, MODEL_ARG, "${{ vars.CLAUDE_REVIEW_MODEL }}"), "--model isn't"),
+    (lambda w: claude(w, f"--model {MODEL_ARG}", ""), "--model isn't"),
+    # A session (design D1 to D9; review-splits-large-prs design D4 to D8, D11).
+    (lambda w: job(w).pop("strategy"), "review's strategy is None"),
+    (lambda w: job(w)["strategy"].update({"fail-fast": True}), "review's strategy is"),
+    (
+        lambda w: job(w)["strategy"]["matrix"].update({"include": MATRICES["review-2"]}),
+        "review's strategy is",
+    ),
+    (lambda w: job(w).update({"outputs": {"x": "y"}}), "its records are artifacts"),
+    (lambda w: unshare(w, "review-2").pop(), "review-2's steps"),
+    (lambda w: unshare(w, "review-3")[0]["with"].update({"fetch-depth": 2}), "review-3's steps"),
+    (lambda w: job(w)["steps"].remove(token(w)), "review's steps are"),
+    (lambda w: move(w, token(w), len(job(w)["steps"])), "review's steps are"),
+    (lambda w: token(w)["with"].update({"permission-contents": "write"}), "token is minted"),
+    (lambda w: token(w)["with"].update({"permission-issues": "write"}), "token is minted"),
+    (lambda w: token(w)["with"].pop("repositories"), "token is minted"),
+    (
+        lambda w: token(w)["with"].update({"private-key": "${{ secrets.DOCS_APP_PRIVATE_KEY }}"}),
+        "token is minted",
+    ),
+    (lambda w: token(w).update({"id": "token"}), "not app-token"),
+    (
+        lambda w: token(w)["with"].update({"client-id": "${{ vars.REVIEW_APP_CLIENT_ID }}"}),
+        "client ID is",
+    ),
+    (lambda w: job(w)["steps"].append({"run": "git push"}), "review's steps are"),
+    (lambda w: job(w)["steps"][0].update({"uses": "actions/checkout@v7"}), "isn't pinned"),
+    (lambda w: job(w)["steps"][0]["with"].pop("persist-credentials"), "review's checkout"),
+    (
+        lambda w: job(w)["steps"][0]["with"].update({"persist-credentials": True}),
+        "review's checkout",
+    ),
+    (lambda w: action_step(w).update({"uses": f"{ACTION}@v1"}), "isn't pinned"),
+    (lambda w: action_step(w).update({"id": "claude"}), "not review"),
+    (lambda w: action_step(w).pop("continue-on-error"), "leaves no record"),
+    (lambda w: action_step(w).update({"if": "${{ always() }}"}), "the action's step also has"),
+    # The plan and the round's list, checked before Claude (review-splits-large-prs design D4).
+    (lambda w: job(w)["steps"].remove(session_step(w)), "review's steps are"),
+    (lambda w: move(w, session_step(w), 0), "review's steps are"),
+    (
+        lambda w: session_step(w)["env"].update({"FILES_SHA256": ""}),
+        f"{SESSION_NAME!r} is given",
+    ),
+    (
+        lambda w: script(session_step(w), "!= os.environ.get(digest", "== os.environ.get(digest"),
+        "this test pins",
+    ),
+    (
+        lambda w: job(w)["steps"][2]["with"].update({"name": "review-plan-elsewhere"}),
+        "download of review-plan",
+    ),
+    (
+        lambda w: job(w)["steps"][3]["with"].update({"name": "review-round-1"}),
+        "download of review-round",
+    ),
+    # The denials report (review-denials-and-guide design D1 to D3).
+    (lambda w: job(w)["steps"].remove(report(w)), "review's steps are"),
+    (
+        lambda w: report(w).update({"run": str(report(w)["run"]) + "print(open('x').read())\n"}),
+        "isn't the one this test pins",
+    ),
+    (
+        lambda w: script(
+            report(w),
+            'os.environ.get("EXECUTION_FILE", "")',
+            '"${{ steps.review.outputs.execution_file }}"',
+        ),
+        "interpolates an expression",
+    ),
+    (lambda w: report(w).pop("continue-on-error"), "the denials report is given"),
+    (lambda w: report(w).update({"if": "${{ always() }}"}), "the denials report is given"),
+    (lambda w: report(w).update({"shell": "bash"}), "the denials report is given"),
+    (
+        lambda w: report(w)["env"].update({"TOKEN": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"}),
+        "the denials report is given",
+    ),
+    (lambda w: report(w).update({"working-directory": ".org-guide"}), "also has ['working"),
+    (lambda w: move(w, report(w), 0), "review's steps are"),
+    # The guide (review-denials-and-guide design D4).
+    (lambda w: guide(w).update({"persist-credentials": True}), "the guide's checkout"),
+    (lambda w: guide(w).update({"repository": "troupe-run/troupe"}), "the guide's checkout"),
+    (lambda w: guide(w).update({"path": "../guide"}), "the guide's checkout"),
+    (lambda w: guide(w).update({"path": "/tmp/guide"}), "the guide's checkout"),  # noqa: S108
+    (lambda w: guide(w).pop("sparse-checkout"), "the guide's checkout"),
+    (
+        lambda w: job(w)["steps"].insert(0, copy.deepcopy(job(w)["steps"][0])),
+        "review's steps are",
+    ),
+    # The action's inputs (design D1, D3, D4, D8, D9).
+    (lambda w: action(w).update({"display_report": "true"}), "given display_report"),
+    (lambda w: prompt(w, ".org-guide/CONTRIBUTING.md", GUIDE_URL), "names the guide by URL"),
+    (lambda w: prompt(w, "org-profile/CONTRIBUTING.md", ""), "doesn't name org-profile"),
+    (lambda w: action(w).pop("github_token"), "github_token"),
+    (lambda w: action(w).update({"github_token": "${{ secrets.SOME_PAT }}"}), "github_token"),
+    (lambda w: action(w).update({"github_token": "${{ secrets.GITHUB_TOKEN }}"}), "github_token"),
+    (lambda w: action(w).pop("claude_code_oauth_token"), "claude_code_oauth_token"),
+    (
+        lambda w: action(w).update({"anthropic_api_key": "${{ secrets.ANTHROPIC_API_KEY }}"}),
+        "given anthropic_api_key",
+    ),
+    (lambda w: action(w).update({"allowed_bots": "*"}), "given allowed_bots"),
+    (lambda w: action(w).update({"allowed_non_write_users": "*"}), "given allowed_non_write"),
+    (
+        lambda w: action(w).update({"additional_permissions": "contents: write"}),
+        "given additional_permissions",
+    ),
+    (lambda w: action(w).update({"show_full_output": "true"}), "given show_full_output"),
+    (lambda w: action(w).pop("prompt"), "no prompt"),
+    (lambda w: tools(w, "Bash(gh pr view:*),WebFetch"), "add ['WebFetch']"),
+    (lambda w: tools(w, "Bash(gh pr view:*),Edit"), "add ['Edit']"),
+    (lambda w: tools(w, "Bash(gh pr view:*),Write"), "add ['Write']"),
+    (lambda w: tools(w, "Bash(gh pr view:*),Bash(git push:*)"), "add ['Bash(git push:*)']"),
+    (lambda w: tools(w, "Bash(gh pr view:*),Bash(gh pr review:*)"), "add ['Bash(gh pr review"),
+    # One summary, posted by the report job (review-splits-large-prs design D6).
+    (lambda w: tools(w, "Bash(gh pr view:*),Bash(gh pr comment:*)"), "add ['Bash(gh pr comment"),
+    (lambda w: tools(w, "Bash(gh:*)"), "add ['Bash(gh:*)']"),
+    (lambda w: tools(w, "Bash(gh pr view:*),Read"), "add ['Read']"),
+    (lambda w: tools(w, "Bash(gh pr view:*),Bash(gh api:*)"), "add ['Bash(gh api:*)']"),
+    (lambda w: claude(w, "Grep(./**)", "Grep"), "add ['Grep']"),
+    (lambda w: tools(w, 'Bash(gh pr view:*)" --dangerously-skip-permissions "'), "besides"),
+    (lambda w: claude(w, f"--max-turns {MAX_TURNS}", ""), "no --max-turns"),
+    (lambda w: claude(w, MAX_TURNS, "30"), "--max-turns isn't"),
+    (lambda w: claude(w, '"required":["summary",', '"required":['), "the schema this test pins"),
+    (lambda w: claude(w, '"decision"]', '"decision","owner"]'), "the schema this test pins"),
+    (
+        lambda w: action(w).update(
+            {"claude_args": re.sub(r"--json-schema '[^']*'", "", str(action(w)["claude_args"]))}
+        ),
+        "the schema this test pins",
+    ),
+    (lambda w: sources(w, ""), "from None"),
+    (lambda w: sources(w, "--setting-sources user,project"), "from 'user,project'"),
+    (lambda w: sources(w, "--setting-sources project"), "from 'project'"),
+    # What the prompt says about reading (D7, D7a; review-splits-large-prs design D5, D6).
+    *[
+        (lambda w, s=sentence: prompt(w, s, ""), f"the prompt doesn't say {sentence!r}")
+        for sentence in PROMPT_READS
+    ],
+    (
+        lambda w: action(w).update(
+            {"prompt": str(action(w)["prompt"]) + "\nRead the diff with `gh pr diff`.\n"}
+        ),
+        "the prompt still says",
+    ),
+    # What the session read, and what Claude named (review-covers-the-diff design D3, D4;
+    # review-splits-large-prs design D4, D6).
+    (lambda w: job(w)["steps"].remove(measure_step(w)), "review's steps are"),
+    (lambda w: move(w, measure_step(w), 0), "review's steps are"),
+    (
+        lambda w: measure_step(w)["env"].update(
+            {"EXECUTION_FILE": "${{ steps.review.outputs.structured_output }}"}
+        ),
+        f"{MEASURE_NAME!r} is given",
+    ),
+    (
+        lambda w: measure_step(w)["env"].update(
+            {"SAID": "${{ steps.review.outputs.structured_output }}"}
+        ),
+        f"{MEASURE_NAME!r} is given",
+    ),
+    (lambda w: measure_step(w).pop("continue-on-error"), f"{MEASURE_NAME!r} is given"),
+    (lambda w: measure_step(w).update({"if": "${{ success() }}"}), f"{MEASURE_NAME!r} is given"),
+    (
+        lambda w: measure_step(w).update({"run": str(measure_step(w)["run"]) + "print(text)\n"}),
+        f"{MEASURE_NAME!r}'s script isn't the one this test pins",
+    ),
+    (lambda w: job(w)["steps"].remove(answer_step(w)), "review's steps are"),
+    (
+        lambda w: answer_step(w)["env"].update({"EXECUTION_FILE": "x"}),
+        f"{ANSWER_NAME!r} is given",
+    ),
+    (lambda w: job(w)["steps"].pop(), "review's steps are"),
+    (lambda w: job(w)["steps"][-1].pop("if"), "review's record runs when None"),
+    (
+        lambda w: job(w)["steps"][-1]["with"].update({"name": "review-record"}),
+        "review's record is given",
+    ),
+    # The planners (review-splits-large-prs design D4, D10).
+    (lambda w: w["jobs"]["follow-1"].pop("env"), "follow-1's env is None"),
+    (lambda w: w["jobs"]["follow-2"].update({"env": {"NEXT_ROUND": "2"}}), "follow-2's env is"),
+    (lambda w: w["jobs"]["follow-1"].pop("outputs"), "follow-1's outputs are None"),
+    (lambda w: w["jobs"]["follow-1"]["steps"][-1].pop("if"), "follow-1's upload runs when None"),
+    (
+        lambda w: script(gather_step(w, "follow-1"), "MAX_PARTS = 6", "MAX_PARTS = 60"),
+        "this test pins",
+    ),
+    (
+        lambda w: script(
+            gather_step(w, "follow-1"),
+            "elif unmeasured and code_unread:",
+            "elif False:",
+        ),
+        "this test pins",
+    ),
+    (lambda w: w["jobs"]["follow-1"]["steps"].pop(2), "follow-1's steps are"),
+    # The report job (design D4a; review-splits-large-prs design D6, D7, D9).
+    (lambda w: resolve_job(w).pop("outputs"), "resolve's outputs are None"),
+    (lambda w: resolve_job(w)["outputs"].pop("unread"), "resolve's outputs are"),
+    (lambda w: resolve_job(w)["steps"].remove(resolver(w)), "resolve's steps are"),
+    (lambda w: resolve_job(w)["steps"].remove(poster(w)), "resolve's steps are"),
+    (lambda w: resolve_job(w)["steps"].remove(gather_step(w)), "resolve's steps are"),
+    (
+        lambda w: resolve_job(w)["steps"].insert(0, copy.deepcopy(job(w)["steps"][0])),
+        "resolve's steps are",
+    ),
+    (
+        lambda w: resolve_job(w)["steps"].append(copy.deepcopy(action_step(w))),
+        "resolve's steps are",
+    ),
+    (
+        lambda w: resolve_token(w)["with"].update({"permission-administration": "write"}),
+        "resolve's token is minted with",
+    ),
+    (
+        lambda w: resolve_token(w)["with"].update({"permission-contents": "read"}),
+        "resolve's token is minted with",
+    ),
+    (lambda w: move(w, resolver(w), 1, "resolve"), "resolve's steps are"),
+    (
+        lambda w: resolver(w)["env"].update({"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"}),
+        f"{RESOLVER_NAME!r} is given",
+    ),
+    (
+        lambda w: resolver(w)["env"].update(
+            {"STRUCTURED_OUTPUT": "${{ needs.review.outputs.structured_output }}"}
+        ),
+        f"{RESOLVER_NAME!r} is given",
+    ),
+    (lambda w: resolver(w).update({"if": "${{ always() }}"}), f"{RESOLVER_NAME!r} also has"),
+    (lambda w: resolver(w).update({"continue-on-error": True}), "also has ['continue-on-error']"),
+    (
+        lambda w: script(resolver(w), 'if current not in ("must-fix", "nit"):', "if False:"),
+        f"{RESOLVER_NAME!r}'s script isn't the one this test pins",
+    ),
+    # Widened to decisions, which are the owner's (review-resolves-fixed-nits design D2).
+    (
+        lambda w: script(resolver(w), '("must-fix", "nit")', '("must-fix", "nit", "decision")'),
+        f"{RESOLVER_NAME!r}'s script isn't the one this test pins",
+    ),
+    # Widened past the session's part (review-splits-large-prs design D7).
+    (
+        lambda w: script(resolver(w), "elif not ours(thread, round_, part):", "elif False:"),
+        f"{RESOLVER_NAME!r}'s script isn't the one this test pins",
+    ),
+    (
+        lambda w: snapshot(w)["env"].update({"CLAUDE": "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"}),
+        f"{SNAPSHOT_NAME!r} is given",
+    ),
+    (
+        lambda w: snapshot(w).update({"run": str(snapshot(w)["run"]) + "print(1)\n"}),
+        f"{SNAPSHOT_NAME!r}'s script isn't the one this test pins",
+    ),
+    (lambda w: move(w, snapshot(w), len(job(w)["steps"])), "review's steps are"),
+    (lambda w: poster(w)["env"].update({"HEAD_SHA": "${{ github.sha }}"}), f"{POST_NAME!r} is"),
+    (
+        lambda w: poster(w).update({"run": str(poster(w)["run"]) + "print(1)\n"}),
+        f"{POST_NAME!r}'s script isn't the one this test pins",
+    ),
+    # The required check (review-completed-check design D2 to D5; review-splits-large-prs D9).
+    (lambda w: completed_job(w).update({"name": "review completed"}), "required-checks.json"),
+    (lambda w: completed_job(w).update({"needs": ["review", "resolve"]}), "completed needs"),
+    (lambda w: completed_job(w).update({"needs": "resolve"}), "completed needs"),
+    # Without always(), a cancelled or failed review skips it, which counts as passed.
+    (
+        lambda w: completed_job(w).update({"if": "github.event_name == 'pull_request'"}),
+        "after a cancelled review too",
+    ),
+    (lambda w: completed_job(w).pop("if"), "after a cancelled review too"),
+    # A merge group or a comment's run reporting it: a merge group must skip it, and a comment's
+    # run reports what GitHub ignores (design D4, D5).
+    (lambda w: completed_job(w).update({"if": "always()"}), "never for a comment's run"),
+    (
+        lambda w: completed_job(w).update({"if": "always() && github.event_name != 'merge_group'"}),
+        "never for a comment's run",
+    ),
+    (
+        lambda w: completed_job(w).update({"permissions": {"actions": "read"}}),
+        "completed's GITHUB_TOKEN permissions",
+    ),
+    (lambda w: completed_job(w).pop("permissions"), "completed's GITHUB_TOKEN permissions"),
+    (
+        lambda w: completed_job(w).update({"concurrency": copy.deepcopy(job(w)["concurrency"])}),
+        "completed is in a concurrency group",
+    ),
+    (lambda w: completed_job(w).pop("timeout-minutes"), "completed has no timeout-minutes"),
+    (
+        lambda w: completed_job(w)["steps"].insert(
+            0, {"uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"}
+        ),
+        "completed's steps aren't the one step",
+    ),
+    (
+        lambda w: completed(w)["env"].update({"TOKEN": "${{ secrets.REVIEW_APP_PRIVATE_KEY }}"}),
+        f"{COMPLETED_STEP_NAME!r} is given",
+    ),
+    (
+        lambda w: completed(w)["env"].update({"REVIEW": "${{ needs.gate.result }}"}),
+        f"{COMPLETED_STEP_NAME!r} is given",
+    ),
+    (
+        lambda w: completed(w).update({"run": str(completed(w)["run"]) + "\nsys.exit(0)\n"}),
+        f"{COMPLETED_STEP_NAME!r}'s script isn't the one this test pins",
+    ),
+    *[
+        (lambda w, k=k: completed(w)["env"].pop(k), f"{COMPLETED_STEP_NAME!r} is given")
+        for k in ("COVERAGE", "CODE", "UNREAD", "FOLLOW_1_PARTS", "REVIEW_3")
+    ],
+    (lambda w: completed(w)["env"].update({"CODE": "all"}), f"{COMPLETED_STEP_NAME!r} is given"),
+    (
+        lambda w: completed(w)["env"].update({"COVERAGE": "complete"}),
+        f"{COMPLETED_STEP_NAME!r} is given",
+    ),
+    (
+        lambda w: completed(w)["env"].update(
+            {"COVERAGE": "${{ needs.review.outputs.structured_output }}"}
+        ),
+        f"{COMPLETED_STEP_NAME!r} is given",
+    ),
+    # A source or test file left unread passes (review-splits-large-prs design D9).
+    (
+        lambda w: script(completed(w), 'if code == "unread":', "if False:"),
+        f"{COMPLETED_STEP_NAME!r}'s script isn't the one this test pins",
+    ),
+    # A follow-up round that was needed but skipped passes (D10).
+    (
+        lambda w: script(completed(w), 'first != "[]"),', "False),"),
+        f"{COMPLETED_STEP_NAME!r}'s script isn't the one this test pins",
+    ),
+]
+
+
+@pytest.mark.parametrize(("change", "named"), CASES)
+def test_each_way_the_workflow_can_go_wrong_is_named(change: Change, named: str) -> None:
     workflow = copy.deepcopy(review())
     change(workflow)
     assert any(named in problem for problem in problems(workflow)), problems(workflow)
@@ -1376,21 +1479,35 @@ def test_each_way_the_workflow_can_go_wrong_is_named(change: Any, named: str) ->
 
 def run_completed(tmp_path: Path, **results: str) -> subprocess.CompletedProcess[str]:
     """Run the required check's step, as a pull request event's run of a member's own pull request
-    would, with the needs' results given here instead of a completed review's."""
+    would, with the needs' results given here instead of a completed review's: by default, one
+    round that read everything, so no follow-up ran."""
     env = {
         "RUN_ID": "41258918187",
         "AUTHOR_TYPE": "User",
         "HEAD_REPOSITORY": "troupe-run/infrastructure",
         "GATE": "success",
         "WANTS_REVIEW": "true",
+        "PLAN": "success",
         "REVIEW": "success",
+        "FOLLOW_1": "success",
+        "FOLLOW_1_PARTS": "[]",
+        "REVIEW_2": "skipped",
+        "FOLLOW_2": "skipped",
+        "FOLLOW_2_PARTS": "",
+        "REVIEW_3": "skipped",
         "RESOLVE": "success",
         "COVERAGE": "complete",
-        "CODE": "read",
+        "CODE": "all",
         "UNREAD": "[]",
+        "UNMEASURED": '""',
         **results,
     }
     return run_step(completed(review()), tmp_path, tmp_path, env)
+
+
+SKIPPED_ALL = {"PLAN": "skipped", "REVIEW": "skipped", "FOLLOW_1": "skipped", "FOLLOW_1_PARTS": "",
+               "RESOLVE": "skipped"}  # fmt: skip
+PARTS = '[{"round":2,"part":1}]'
 
 
 def test_the_check_passes_when_the_review_and_its_resolving_job_succeeded(tmp_path: Path) -> None:
@@ -1399,14 +1516,37 @@ def test_the_check_passes_when_the_review_and_its_resolving_job_succeeded(tmp_pa
     assert "::error" not in done.stdout
 
 
+def test_the_check_passes_after_both_follow_up_rounds_ran(tmp_path: Path) -> None:
+    done = run_completed(tmp_path, FOLLOW_1_PARTS=PARTS, REVIEW_2="success", FOLLOW_2="success",
+                         FOLLOW_2_PARTS=PARTS, REVIEW_3="success")  # fmt: skip
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
 @pytest.mark.parametrize(
     ("results", "named"),
     [
-        ({"REVIEW": "cancelled", "RESOLVE": "cancelled"}, "claude review (cancelled)"),
-        ({"REVIEW": "failure", "RESOLVE": "skipped"}, "claude review (failure)"),
-        ({"RESOLVE": "failure"}, "resolve review conversations (failure)"),
-        ({"RESOLVE": "cancelled"}, "resolve review conversations (cancelled)"),
+        ({"REVIEW": "cancelled", "FOLLOW_1": "skipped"}, "claude review (cancelled)"),
+        ({"REVIEW": "failure"}, "claude review (failure)"),
+        ({"PLAN": "failure"}, "plan the review (failure)"),
+        ({"FOLLOW_1": "failure"}, "plan follow-up 1 (failure)"),
+        ({"RESOLVE": "failure"}, "resolve and report (failure)"),
+        ({"RESOLVE": "cancelled"}, "resolve and report (cancelled)"),
         ({"REVIEW": "", "RESOLVE": ""}, "claude review (no result)"),
+        # A follow-up round its planner asked for that didn't run, or failed (D10).
+        ({"FOLLOW_1_PARTS": PARTS}, "claude review, follow-up 1 (skipped)"),
+        ({"FOLLOW_1_PARTS": PARTS, "REVIEW_2": "failure"}, "claude review, follow-up 1 (failure)"),
+        ({"FOLLOW_1_PARTS": PARTS, "REVIEW_2": "success"}, "plan follow-up 2 (skipped)"),
+        (
+            {
+                "FOLLOW_1_PARTS": PARTS,
+                "REVIEW_2": "success",
+                "FOLLOW_2": "success",
+                "FOLLOW_2_PARTS": PARTS,
+            },
+            "claude review, follow-up 2 (skipped)",
+        ),
+        # A planner whose answer isn't there can't say no round was needed.
+        ({"FOLLOW_1_PARTS": ""}, "claude review, follow-up 1 (skipped)"),
     ],
 )
 def test_a_review_that_didn_t_complete_fails_naming_the_run_to_re_run(
@@ -1423,13 +1563,13 @@ def test_a_review_that_didn_t_complete_fails_naming_the_run_to_re_run(
 @pytest.mark.parametrize(
     "results",
     [
-        {"GATE": "failure", "WANTS_REVIEW": "", "REVIEW": "skipped", "RESOLVE": "skipped"},
-        {"GATE": "cancelled", "WANTS_REVIEW": "", "REVIEW": "skipped", "RESOLVE": "skipped"},
+        {"GATE": "failure", "WANTS_REVIEW": "", **SKIPPED_ALL},
+        {"GATE": "cancelled", "WANTS_REVIEW": "", **SKIPPED_ALL},
         # A pull request event's gate always says yes; anything else isn't an answer to trust.
-        {"WANTS_REVIEW": "false", "REVIEW": "skipped", "RESOLVE": "skipped"},
-        {"WANTS_REVIEW": "", "REVIEW": "skipped", "RESOLVE": "skipped"},
+        {"WANTS_REVIEW": "false", **SKIPPED_ALL},
+        {"WANTS_REVIEW": "", **SKIPPED_ALL},
         # Skipped by the gate's own if:, but the pull request is a member's, not a bot's or fork's.
-        {"GATE": "skipped", "WANTS_REVIEW": "", "REVIEW": "skipped", "RESOLVE": "skipped"},
+        {"GATE": "skipped", "WANTS_REVIEW": "", **SKIPPED_ALL},
     ],
 )
 def test_a_gate_that_didn_t_say_yes_fails_the_check(
@@ -1453,8 +1593,7 @@ def test_a_gate_that_didn_t_say_yes_fails_the_check(
 def test_a_bot_s_or_a_fork_s_pull_request_passes_with_its_review_skipped(
     tmp_path: Path, who: dict[str, str]
 ) -> None:
-    skipped = {"GATE": "skipped", "WANTS_REVIEW": "", "REVIEW": "skipped", "RESOLVE": "skipped"}
-    done = run_completed(tmp_path, **skipped, **who)
+    done = run_completed(tmp_path, GATE="skipped", WANTS_REVIEW="", **SKIPPED_ALL, **who)
     assert done.returncode == 0, done.stdout + done.stderr
     assert "isn't reviewed" in done.stdout
 
@@ -1784,15 +1923,38 @@ SNAPSHOT_THREADS = [
 ]  # fmt: skip
 
 
+def kept_answer(answer: object) -> object:
+    """An answer as the step that keeps it stores it: parsed, or null when it isn't an object."""
+    if isinstance(answer, str):
+        try:
+            answer = json.loads(answer)
+        except ValueError:
+            return None
+    return answer if isinstance(answer, dict) else None
+
+
 def resolve_run(
-    tmp_path: Path, answer: object, fail_when: str = ""
+    tmp_path: Path,
+    answer: object,
+    fail_when: str = "",
+    *,
+    sessions: Mapping[tuple[int, int], object] | None = None,
+    rounds: Mapping[int, dict[str, int]] | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
+    """Run the resolving step on the snapshot, with each session's kept answer and each round's
+    list in RUNNER_TEMP; by default one session, whose list holds the conversations' file."""
     temp = tmp_path / "runner-temp"
-    temp.mkdir(parents=True, exist_ok=True)
+    records = temp / "review" / "records"
+    records.mkdir(parents=True, exist_ok=True)
     (temp / "review-threads.json").write_text(json.dumps(SNAPSHOT_THREADS), encoding="utf-8")
+    for number, assign in (rounds if rounds is not None else {1: {"scripts/guard.py": 1}}).items():
+        plan = {"round": number, "assign": assign, "parts": []}
+        (temp / "review" / f"round-{number}.json").write_text(json.dumps(plan), encoding="utf-8")
+    for (number, part), given in (sessions or {(1, 1): answer}).items():
+        kept = {"round": number, "part": part, "answer": kept_answer(given)}
+        (records / f"answer-{number}-{part}.json").write_text(json.dumps(kept), encoding="utf-8")
     bin_dir = stub_gh(tmp_path / "bin", {"fail_when": fail_when})
-    output = answer if isinstance(answer, str) else json.dumps(answer)
-    done = run_step(resolver(review()), tmp_path, bin_dir, {"STRUCTURED_OUTPUT": output})
+    done = run_step(resolver(review()), tmp_path, bin_dir, {})
     return done, gh_calls(bin_dir)
 
 
@@ -1876,13 +2038,74 @@ def test_a_conversation_named_to_resolve_and_re_tier_is_only_resolved(tmp_path: 
 @pytest.mark.parametrize(
     "answer", ["", "not json", {"resolve": "PRRT_mustfix", "retier": []}, {"retier": []}]
 )
-def test_an_unreadable_answer_resolves_nothing_and_fails_the_step(
-    tmp_path: Path, answer: object
-) -> None:
+def test_an_unreadable_answer_resolves_nothing_and_says_so(tmp_path: Path, answer: object) -> None:
     done, calls = resolve_run(tmp_path, answer)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert calls == []
+    assert done.stdout.startswith("::warning title=Nothing resolved::Round 1 part 1's answer")
+
+
+def test_without_the_plan_nothing_is_resolved_and_the_step_fails(tmp_path: Path) -> None:
+    done, calls = resolve_run(tmp_path, {"resolve": ["PRRT_mustfix"], "retier": []}, rounds={})
     assert done.returncode == 1
     assert calls == []
     assert done.stdout.startswith("::warning title=Nothing resolved::")
+
+
+# A session judges only the conversations on its own files (review-splits-large-prs design D7).
+TWO_PARTS = {1: {"scripts/guard.py": 1, "README.md": 1, "scripts/check.py": 2}}
+
+
+def test_a_session_can_t_resolve_a_conversation_on_another_part_s_file(tmp_path: Path) -> None:
+    sessions = {(1, 1): {"resolve": [], "retier": []},
+                (1, 2): {"resolve": ["PRRT_mustfix"], "retier": []}}  # fmt: skip
+    done, calls = resolve_run(tmp_path, None, sessions=sessions, rounds=TWO_PARTS)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert calls == []
+    assert "isn't on the list of round 1 part 2, the session that named it" in done.stdout
+
+
+def test_the_session_whose_list_holds_the_file_resolves_it(tmp_path: Path) -> None:
+    sessions = {(1, 1): {"resolve": ["PRRT_mustfix"], "retier": []},
+                (1, 2): {"resolve": [], "retier": []}}  # fmt: skip
+    _, calls = resolve_run(tmp_path, None, sessions=sessions, rounds=TWO_PARTS)
+    assert resolved(calls) == ["PRRT_mustfix"]
+
+
+def test_a_conversation_on_a_file_on_no_list_is_the_lead_s(tmp_path: Path) -> None:
+    rounds = {1: {"src/elsewhere.py": 1, "scripts/check.py": 2}}
+    sessions = {(1, 1): {"resolve": ["PRRT_nit"], "retier": []},
+                (1, 2): {"resolve": ["PRRT_mustfix"], "retier": []}}  # fmt: skip
+    done, calls = resolve_run(tmp_path, None, sessions=sessions, rounds=rounds)
+    assert resolved(calls) == ["PRRT_nit"]
+    assert "the session that named it" in done.stdout
+
+
+def test_a_follow_up_session_resolves_on_the_files_it_was_given(tmp_path: Path) -> None:
+    rounds = {1: {"scripts/guard.py": 1}, 2: {"scripts/guard.py": 1}}
+    sessions = {(1, 1): {"resolve": [], "retier": []},
+                (2, 1): {"resolve": ["PRRT_mustfix"], "retier": []}}  # fmt: skip
+    _, calls = resolve_run(tmp_path, None, sessions=sessions, rounds=rounds)
+    assert resolved(calls) == ["PRRT_mustfix"]
+
+
+def test_a_conversation_two_sessions_name_is_resolved_once(tmp_path: Path) -> None:
+    rounds = {1: {"scripts/guard.py": 1}, 2: {"scripts/guard.py": 1}}
+    sessions = {(1, 1): {"resolve": ["PRRT_nit"], "retier": []},
+                (2, 1): {"resolve": ["PRRT_nit"], "retier": []}}  # fmt: skip
+    _, calls = resolve_run(tmp_path, None, sessions=sessions, rounds=rounds)
+    assert resolved(calls) == ["PRRT_nit"]
+
+
+def test_one_session_s_resolve_beats_another_s_re_tier(tmp_path: Path) -> None:
+    rounds = {1: {"scripts/guard.py": 1}, 2: {"scripts/guard.py": 1}}
+    item = {"thread": "PRRT_mustfix", "tier": "nit", "title": "a", "reason": "r"}
+    sessions = {(1, 1): {"resolve": [], "retier": [item]},
+                (2, 1): {"resolve": ["PRRT_mustfix"], "retier": []}}  # fmt: skip
+    done, calls = resolve_run(tmp_path, None, sessions=sessions, rounds=rounds)
+    assert resolved(calls) == ["PRRT_mustfix"]
+    assert len(calls) == 1
+    assert "it was only resolved" in done.stdout
 
 
 def test_a_hostile_id_stays_inside_one_warning(tmp_path: Path) -> None:
@@ -2057,23 +2280,43 @@ def merged(tmp_path: Path, base: Mapping[str, bytes], head: Mapping[str, bytes |
 Ran = tuple[subprocess.CompletedProcess[str], dict[str, Any] | None, str]
 
 
-def run_diff(workspace: Path) -> Ran:
-    """Run the diff step in the workspace: its result, the list it left in RUNNER_TEMP, and its
-    outputs."""
-    runner_temp = workspace.parent / "runner-temp"
-    runner_temp.mkdir(exist_ok=True)
+def run_plan(
+    workspace: Path,
+) -> tuple[
+    subprocess.CompletedProcess[str],
+    dict[str, Any] | None,
+    dict[str, Any] | None,
+    list[dict[str, Any]] | None,
+]:
+    """Run the plan step in the workspace: its result, the list and round 1's parts it left in
+    .review-diff/, and the matrix it output."""
     outputs = workspace.parent / "outputs"
     outputs.write_text("", encoding="utf-8")
-    script = workspace.parent / "diff.py"
-    script.write_text(str(diff_step(review())["run"]), encoding="utf-8")
-    env = {**clean_env(), "RUNNER_TEMP": str(runner_temp), "GITHUB_OUTPUT": str(outputs)}
+    script = workspace.parent / "plan.py"
+    script.write_text(str(plan_step(review())["run"]), encoding="utf-8")
+    env = {**clean_env(), "GITHUB_OUTPUT": str(outputs)}
     done = subprocess.run(
         [sys.executable, str(script)], cwd=workspace, capture_output=True, text=True,
         encoding="utf-8", env=env, check=False,
     )  # fmt: skip
-    listed = runner_temp / "review-files.json"
-    data = json.loads(listed.read_text(encoding="utf-8")) if listed.exists() else None
-    return done, data, outputs.read_text(encoding="utf-8")
+    if done.returncode != 0:
+        return done, None, None, None
+    folder = workspace / ".review-diff"
+    data = json.loads((folder / "files.json").read_text(encoding="utf-8"))
+    plan = json.loads((folder / "round-1.json").read_text(encoding="utf-8"))
+    said = dict(line.split("=", 1) for line in outputs.read_text(encoding="utf-8").splitlines())
+    return done, data, plan, json.loads(said["parts"])
+
+
+def run_diff(workspace: Path) -> Ran:
+    """The plan step's result, its list, and the turn limits of its parts, as one string."""
+    done, data, _, matrix = run_plan(workspace)
+    turns = ",".join(str(p["max_turns"]) for p in matrix or [])
+    return done, data, f"max_turns={turns}\n" if matrix is not None else ""
+
+
+def reads(data: dict[str, Any]) -> int:
+    return sum(len(t["reads"]) for f in data["files"] for t in f["targets"])
 
 
 def targets(data: dict[str, Any]) -> dict[str, list[str]]:
@@ -2211,7 +2454,7 @@ def test_nothing_to_read_gets_the_base_turns(tmp_path: Path) -> None:
     done, data, outputs = run_diff(merged(tmp_path, {"uv.lock": b"a\n"}, {"uv.lock": b"b\n"}))
     assert done.returncode == 0, done.stdout + done.stderr
     assert data is not None
-    assert (data["reads"], outputs) == (0, "max_turns=40\n")
+    assert (reads(data), outputs) == (0, "max_turns=40\n")
 
 
 def test_the_turns_follow_the_reads_planned_up_to_the_cap(tmp_path: Path) -> None:
@@ -2220,8 +2463,9 @@ def test_the_turns_follow_the_reads_planned_up_to_the_cap(tmp_path: Path) -> Non
     done, data, outputs = run_diff(merged(tmp_path, {}, {"big.txt": big}))
     assert done.returncode == 0, done.stdout + done.stderr
     assert data is not None
-    assert (data["reads"], outputs) == (3, "max_turns=46\n")
-    huge = {f"f{i}.txt": (b"y" * 99 + b"\n") * 800 for i in range(60)}
+    assert (reads(data), outputs) == (3, "max_turns=46\n")
+    # One 8 MB file needs 400 Reads, in one part of its own, whose turns stop at the cap.
+    huge = {"huge.py": (b"y" * 99 + b"\n") * 80_000}
     done, _, outputs = run_diff(merged(tmp_path / "huge", {}, huge))
     assert done.returncode == 0, done.stdout + done.stderr
     assert outputs == "max_turns=400\n"
@@ -2247,7 +2491,7 @@ def test_each_target_lists_the_reads_that_cover_it(tmp_path: Path) -> None:
         {"offset": 2, "limit": 1},
         {"offset": 3, "limit": 1},
     ]
-    assert data["reads"] == 6
+    assert reads(data) == 6
 
 
 def test_a_diff_larger_than_one_read_is_written_whole(tmp_path: Path) -> None:
@@ -2278,6 +2522,239 @@ def test_a_checkout_with_no_base_fails_saying_so(tmp_path: Path) -> None:
     assert done.returncode == 1
     assert done.stdout.startswith("::error title=Diff not made::git diff exited with")
     assert data is None
+
+
+# Each changed file's kind, and the parts the plan splits them into (review-splits-large-prs
+# design D1 to D3).
+def kinds(data: dict[str, Any]) -> dict[str, str | None]:
+    return {f["path"]: f.get("kind") for f in data["files"]}
+
+
+USES = b"open('replies.json'); open('events.json'); open('stream-error'); load('run.jsonl')\n"
+
+
+@pytest.mark.parametrize(
+    ("path", "kind"),
+    [
+        ("src/runner/conversation.py", "source and test"),
+        ("tests/test_conversation.py", "source and test"),
+        (".github/workflows/ci.yml", "source and test"),
+        ("src/pages/index.astro", "source and test"),
+        ("pyproject.toml", "source and test"),
+        ("README.md.py", "source and test"),
+        ("fixtures.py", "source and test"),
+        # Code in a fixtures folder is code.
+        ("tests/fixtures/conftest.py", "source and test"),
+        # JSON that configures something (owner, 2026-11-11).
+        ("package.json", "source and test"),
+        ("web/tsconfig.base.json", "source and test"),
+        ("tofu/required-checks.json", "source and test"),
+        (".github/dependabot.json", "source and test"),
+        # Prose.
+        ("README.md", "prose"),
+        ("contributing/runners.md", "prose"),
+        ("docs/page.mdx", "prose"),
+        ("notes.txt", "prose"),
+        ("public/logo.svg", "prose"),
+        ("LICENSE", "prose"),
+        ("plugins/runner-openai/LICENSE-CONTENT", "prose"),
+        ("openspec/changes/x/.openspec.yaml", "prose"),
+        ("openspec/specs/pr-review/spec.md", "prose"),
+        # Data that a test names.
+        ("fixtures/responses/refusal/replies.json", "data"),
+        ("plugins/r/fixtures/ollama/thinking/events.json", "data"),
+        ("plugins/r/fixtures/claude/stream-error", "data"),
+        ("streams/run.jsonl", "data"),
+    ],
+)
+def test_each_file_s_kind_comes_from_the_declared_list(
+    tmp_path: Path, path: str, kind: str
+) -> None:
+    workspace = merged(tmp_path, {}, {path: b"a\nb\n", "tests/test_uses.py": USES})
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert kinds(data)[path] == kind
+
+
+def test_files_with_nothing_to_read_have_no_kind(tmp_path: Path) -> None:
+    workspace = merged(
+        tmp_path,
+        {"uv.lock": b"a\n"},
+        {"uv.lock": b"b\n", "logo.png": b"\x89PNG\r\n\x1a\n\0\xff\xfe", "pkg/__init__.py": b""},
+    )
+    done, data, _ = run_diff(workspace)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert kinds(data) == {"uv.lock": None, "logo.png": None, "pkg/__init__.py": None}
+
+
+@pytest.mark.parametrize(
+    ("files", "why"),
+    [
+        # Nothing names it, or its folder.
+        ({"notes/old-export.json": b"{}\n"}, "nothing names it"),
+        # Named only by another data file and by a proposal: neither is a use (D3).
+        (
+            {"export/old-export.json": b"{}\n", "fixtures/index.json": b'["old-export.json"]\n',
+             "openspec/changes/x/proposal.md": b"old-export.json, in export\n"},
+            "nothing names it",
+        ),
+    ],
+)  # fmt: skip
+def test_data_that_nothing_names_is_read_as_source_and_test(
+    tmp_path: Path, files: dict[str, bytes], why: str
+) -> None:
+    path = next(iter(files))
+    done, data, _ = run_diff(merged(tmp_path, {}, files))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    entry = next(f for f in data["files"] if f["path"] == path)
+    assert (entry["kind"], entry["why"]) == ("source and test", why)
+
+
+def test_data_whose_folder_a_test_names_is_left_to_its_tests(tmp_path: Path) -> None:
+    files = {
+        "fixtures/responses/refusal/replies.json": b"{}\n",
+        "tests/test_replay.py": b"@pytest.mark.parametrize('case', ['refusal', 'rate-limit'])\n",
+    }
+    done, data, _ = run_diff(merged(tmp_path, {}, files))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    entry = data["files"][0]
+    assert (entry["path"], entry["kind"], "why" in entry) == (
+        "fixtures/responses/refusal/replies.json",
+        "data",
+        False,
+    )
+
+
+def lines_of(count: int) -> bytes:
+    # A file that needs `count` Reads, of 200 lines of 100 bytes each.
+    return (b"q" * 99 + b"\n") * (200 * count)
+
+
+def test_a_small_pull_request_is_one_part_holding_its_prose(tmp_path: Path) -> None:
+    files = {"a.py": b"a\n", "b.py": b"b\n", "c.py": b"c\n", "README.md": b"r\n"}
+    done, data, plan, matrix = run_plan(merged(tmp_path, {"README.md": b"base\n"}, files))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert plan is not None
+    assert matrix is not None
+    assert plan["assign"] == {"a.py": 1, "b.py": 1, "c.py": 1, "README.md": 1}
+    # Three added files, and the modified README and its diff.
+    assert [(p["part"], p["of"], p["reads"]) for p in plan["parts"]] == [(1, 1, 5)]
+    assert [p["round"] for p in matrix] == [1]
+    assert {f["path"]: f.get("part") for f in data["files"]}["README.md"] == 1
+
+
+def test_source_and_test_files_are_split_into_parts_of_at_most_forty_reads(
+    tmp_path: Path,
+) -> None:
+    files = {f"src/m{i:02}.py": lines_of(5) for i in range(26)}
+    done, _, plan, matrix = run_plan(merged(tmp_path, {}, files))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert plan is not None
+    assert matrix is not None
+    # 130 Reads: three parts of 40 and one of 10, each file in one part, in path order.
+    assert [p["reads"] for p in plan["parts"]] == [40, 40, 40, 10]
+    assert [p["max_turns"] for p in plan["parts"]] == [120, 120, 120, 60]
+    assert sorted(plan["assign"]) == sorted(files)
+    assert [plan["assign"][f"src/m{i:02}.py"] for i in (0, 7, 8, 24, 25)] == [1, 1, 2, 4, 4]
+    assert [(m["part"], m["of"]) for m in matrix] == [(1, 4), (2, 4), (3, 4), (4, 4)]
+    assert len({m["files_sha256"] for m in matrix}) == 1
+    assert len({m["round_sha256"] for m in matrix}) == 1
+
+
+def test_more_than_six_parts_of_reads_make_six_larger_parts(tmp_path: Path) -> None:
+    files = {f"src/m{i:02}.py": lines_of(5) for i in range(80)}
+    done, _, plan, _ = run_plan(merged(tmp_path, {}, files))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert plan is not None
+    assert len(plan["parts"]) == 6
+    assert sum(p["reads"] for p in plan["parts"]) == 400
+    assert sorted(plan["assign"]) == sorted(files)
+
+
+def test_a_file_larger_than_a_part_gets_a_part_of_its_own(tmp_path: Path) -> None:
+    files = {"a.py": lines_of(2), "big.py": lines_of(60), "c.py": lines_of(2)}
+    done, _, plan, _ = run_plan(merged(tmp_path, {}, files))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert plan is not None
+    assert plan["assign"] == {"a.py": 1, "big.py": 2, "c.py": 3}
+    assert [p["reads"] for p in plan["parts"]] == [2, 60, 2]
+
+
+def test_prose_and_data_alone_make_one_part_with_no_source(tmp_path: Path) -> None:
+    files = {"README.md": b"r\n", "openspec/x/tasks.md": b"t\n", "fixtures/a/events.json": b"{}\n"}
+    # The test that loads the fixture is on the base branch, unchanged.
+    base = {"tests/test_x.py": b"open('events.json')\n"}
+    done, data, plan, matrix = run_plan(merged(tmp_path, base, files))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert plan is not None
+    assert matrix is not None
+    assert plan["assign"] == {"README.md": 1, "openspec/x/tasks.md": 1}
+    assert len(matrix) == 1
+    assert kinds(data)["fixtures/a/events.json"] == "data"
+
+
+def test_nothing_to_read_still_gets_one_session(tmp_path: Path) -> None:
+    done, _, plan, matrix = run_plan(merged(tmp_path, {"uv.lock": b"a\n"}, {"uv.lock": b"b\n"}))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert plan is not None
+    assert matrix is not None
+    assert (plan["assign"], [p["max_turns"] for p in plan["parts"]]) == ({}, [40])
+
+
+# troupe#325's 39 files (run 43017411898): a protocol change whose 16 Python files are source and
+# test, whose 10 JSON schemas are data that its tests load, and whose docs and OpenSpec are prose.
+PR_325_CODE = [
+    "packages/troupe-plugin-sdk/src/troupe_plugin_sdk/runner.py",
+    "packages/troupe-plugin-sdk/tests/test_runner_types.py",
+    *[f"packages/troupe/src/troupe/core/{m}.py" for m in
+      ("client/messages", "runners/outcome", "runs/aggregate", "runs/projections")],
+    *[f"packages/troupe/tests/test_{m}.py" for m in
+      ("cli_runs", "client_messages", "client_schemas", "event_payloads", "event_schemas",
+       "perform", "run_aggregate", "run_changes_recording", "run_notices", "run_queries")],
+]  # fmt: skip
+PR_325_SCHEMAS = [
+    f"{root}/{name}.schema.json"
+    for root in ("packages/troupe/src/troupe/protocol", "protocol/schemas")
+    for name in ("client/run", "events/run-ended", "events/run-started",
+                 "events/run-worktree-made", "runner/run-event")
+]  # fmt: skip
+PR_325_PROSE = [
+    "contributing/runners.md", "contributing/runs.md", "docs/prompt-book/events.md",
+    *[f"openspec/changes/archive/2026-11-08-require-always-written-fields/{n}" for n in
+      (".openspec.yaml", "design.md", "proposal.md", "specs/client-protocol/spec.md",
+       "specs/runner-protocol/spec.md", "specs/runs/spec.md", "tasks.md")],
+    "openspec/specs/client-protocol/spec.md", "openspec/specs/runner-protocol/spec.md",
+    "openspec/specs/runs/spec.md",
+]  # fmt: skip
+
+
+def test_troupe_325_s_files_make_one_part_of_code_with_its_schemas_left_to_its_tests(
+    tmp_path: Path,
+) -> None:
+    paths = PR_325_CODE + PR_325_SCHEMAS + PR_325_PROSE
+    assert len(paths) == 39
+    base = {p: b"before\n" for p in paths}
+    head = {p: b"after\n" for p in paths}
+    # The schemas' tests load them by folder, as troupe's do.
+    head["packages/troupe/tests/test_event_schemas.py"] = (
+        b"SCHEMAS / 'events'; 'client'; 'runner'\n"
+    )
+    done, data, plan, matrix = run_plan(merged(tmp_path, base, head))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert data is not None
+    assert plan is not None
+    assert matrix is not None
+    found = kinds(data)
+    assert {p for p, k in found.items() if k == "data"} == set(PR_325_SCHEMAS)
+    assert {p for p, k in found.items() if k == "source and test"} == set(PR_325_CODE)
+    assert {p for p, k in found.items() if k == "prose"} == set(PR_325_PROSE)
+    assert len(matrix) == 1
 
 
 # The model step: the variable checked before Claude starts (D6).
@@ -2328,7 +2805,7 @@ def test_a_value_that_isn_t_a_model_name_fails_and_reaches_nothing(
     assert outputs == ""
 
 
-# The coverage step, run on execution files shaped as the probe recorded (review-covers-the-diff
+# The measuring step, run on execution files shaped as the probe recorded (review-covers-the-diff
 # design D3, Probe results): a Read is a tool_use block in an assistant message, its result a
 # tool_result block in the next user message, each returned line numbered "<n>" and a tab.
 def call(ident: str, name: str, given: dict[str, Any]) -> dict[str, Any]:
@@ -2344,26 +2821,51 @@ def result(ident: str, text: str, *, error: bool = False) -> dict[str, Any]:
 
 
 class Session:
-    """A workspace, the list the diff step left in RUNNER_TEMP, and the session's messages."""
+    """A workspace, the plan in RUNNER_TEMP as each session's step keeps it, and the messages of
+    each session of the review, by round and part; it measures each, then gathers what they read
+    together, as the report job does (review-splits-large-prs design D4)."""
 
-    def __init__(self, tmp_path: Path, files: list[dict[str, Any]]) -> None:
+    def __init__(
+        self, tmp_path: Path, files: list[dict[str, Any]], parts: Mapping[str, int] | None = None
+    ) -> None:
         self.tmp_path = tmp_path
         self.workspace = tmp_path / "workspace"
         self.workspace.mkdir(parents=True)
-        (tmp_path / "runner-temp").mkdir()
-        listed = tmp_path / "runner-temp" / "review-files.json"
-        listed.write_text(json.dumps({"files": files}), encoding="utf-8")
-        self.messages: list[dict[str, Any]] = []
+        self.kept = tmp_path / "runner-temp" / "review"
+        (self.kept / "records").mkdir(parents=True)
+        self.files = files
+        (self.kept / "files.json").write_text(json.dumps({"files": files}), encoding="utf-8")
+        assign = (
+            dict(parts)
+            if parts is not None
+            else {f["path"]: 1 for f in files if f.get("kind") in ("source and test", "prose")}
+        )
+        self.plan_round(1, assign)
+        self.messages: dict[tuple[int, int], list[dict[str, Any]]] = {(1, 1): []}
+        self.current = (1, 1)
         self.count = 0
-        # The floor's output after run(): none, read, unread or unknown (review-coverage-floor D1).
+        # The check's outputs after run(): code is none, all, unread or unknown (design D9).
         self.code = ""
+        self.unmeasured = ""
+
+    def plan_round(self, number: int, assign: Mapping[str, int]) -> None:
+        count = max(assign.values(), default=1)
+        plan = {"round": number, "assign": dict(assign),
+                "parts": [{"part": p, "of": count, "reads": 1, "max_turns": 42}
+                          for p in range(1, count + 1)]}  # fmt: skip
+        (self.kept / f"round-{number}.json").write_text(json.dumps(plan), encoding="utf-8")
+
+    def session(self, number: int, part: int) -> None:
+        """Make the messages that follow the given session's."""
+        self.current = (number, part)
+        self.messages.setdefault(self.current, [])
 
     def read(self, path: str, lines: range, *, arrow: bool = False, error: bool = False) -> None:
         self.count += 1
         ident = f"toolu_{self.count}"
         mark = "→" if arrow else "\t"
         text = "\n".join(f"{n}{mark}text {n}" for n in lines)
-        self.messages += [
+        self.messages[self.current] += [
             call(ident, "Read", {"file_path": str(self.workspace / path)}),
             result(ident, "File does not exist." if error else text, error=error),
         ]
@@ -2371,46 +2873,91 @@ class Session:
     def grep(self, pattern: str) -> None:
         self.count += 1
         ident = f"toolu_{self.count}"
-        self.messages += [
+        self.messages[self.current] += [
             call(ident, "Grep", {"pattern": pattern, "path": str(self.workspace)}),
             result(ident, "1:found"),
         ]
 
     def finish(self, text: str = "Done.") -> None:
-        self.messages.append({"type": "result", "subtype": "success", "result": text})
+        self.messages[self.current].append({"type": "result", "subtype": "success", "result": text})
 
-    def run(self, content: str | None = None) -> tuple[str, list[Any], str, str]:
-        """The coverage and unread outputs, the run summary, and the log."""
-        execution = self.tmp_path / "claude-execution-output.json"
+    def measure(self, number: int, part: int, content: str | None = None) -> str:
+        """Run the measuring step for one session; its log."""
+        execution = self.tmp_path / f"claude-execution-{number}-{part}.json"
         execution.write_text(
-            json.dumps(self.messages) if content is None else content, encoding="utf-8"
+            json.dumps(self.messages.get((number, part), [])) if content is None else content,
+            encoding="utf-8",
         )
+        env = {"EXECUTION_FILE": str(execution), "ROUND": str(number), "PART": str(part)}
+        done = run_step(measure_step(review()), self.tmp_path, self.tmp_path, env)
+        assert done.returncode == 0, done.stdout + done.stderr
+        return done.stdout
+
+    def gather(self, next_round: str = "") -> tuple[dict[str, str], str, str]:
+        """Run the gathering step; its outputs, the run summary and the log."""
         outputs = self.tmp_path / "outputs"
         summary = self.tmp_path / "summary.md"
         outputs.write_text("", encoding="utf-8")
-        env = {
-            "EXECUTION_FILE": str(execution),
-            "GITHUB_OUTPUT": str(outputs),
-            "GITHUB_STEP_SUMMARY": str(summary),
-        }
-        done = run_step(coverage_step(review()), self.tmp_path, self.tmp_path, env)
+        summary.write_text("", encoding="utf-8")
+        env = {"GITHUB_OUTPUT": str(outputs), "GITHUB_STEP_SUMMARY": str(summary)}
+        if next_round:
+            env["NEXT_ROUND"] = next_round
+        done = run_step(gather_step(review()), self.tmp_path, self.tmp_path, env)
         assert done.returncode == 0, done.stdout + done.stderr
         said = dict(line.split("=", 1) for line in outputs.read_text(encoding="utf-8").splitlines())
+        return said, summary.read_text(encoding="utf-8"), done.stdout
+
+    def run(self, content: str | None = None) -> tuple[str, list[Any], str, str]:
+        """Measure every session planned, then gather: the coverage and unread outputs, the run
+        summary, and the log."""
+        for number in (1, 2, 3):
+            path = self.kept / f"round-{number}.json"
+            if path.exists():
+                plan = json.loads(path.read_text(encoding="utf-8"))
+                for item in plan["parts"]:
+                    self.measure(number, item["part"], content)
+        said, summary, out = self.gather()
         self.code = said["code"]
-        return (
-            said["coverage"],
-            json.loads(said["unread"]),
-            summary.read_text(encoding="utf-8"),
-            done.stdout,
-        )
+        self.unmeasured = json.loads(said["unmeasured"])
+        return said["coverage"], json.loads(said["unread"]), summary, out
+
+    def follow_up(self, next_round: str) -> list[dict[str, Any]]:
+        """Measure the sessions so far, then plan the next round: its matrix, and its list kept
+        where its sessions find it."""
+        for number in range(1, int(next_round)):
+            path = self.kept / f"round-{number}.json"
+            plan = json.loads(path.read_text(encoding="utf-8"))
+            for item in plan["parts"]:
+                self.measure(number, item["part"])
+        said, _, _ = self.gather(next_round)
+        made = self.tmp_path / "runner-temp" / "next" / f"round-{next_round}.json"
+        if made.exists():
+            (self.kept / made.name).write_bytes(made.read_bytes())
+        return json.loads(said["parts"])  # type: ignore[no-any-return]
 
 
-def listed(path: str, status: str, *targets: tuple[str, int]) -> dict[str, Any]:
-    return {
+def listed(
+    path: str, status: str, *targets: tuple[str, int], kind: str | None = ""
+) -> dict[str, Any]:
+    """A listed file, as the plan step lists it; its kind source and test unless given, or none
+    when it has no line to read."""
+    lines = sum(n for _, n in targets)
+    entry: dict[str, Any] = {
         "path": path,
         "status": status,
-        "targets": [{"path": p, "lines": n, "bytes": n * 10} for p, n in targets],
-    }
+        "targets": [
+            {"path": p, "lines": n, "bytes": n * 10,
+             "reads": [{"offset": 1, "limit": n}] if n else []}
+            for p, n in targets
+        ],
+    }  # fmt: skip
+    if kind is None or not lines:
+        return entry
+    return {**entry, "kind": kind or "source and test"}
+
+
+def code(path: str, read: str) -> dict[str, str]:
+    return {"path": path, "read": read, "kind": "source and test"}
 
 
 MODIFIED = listed("src/a.py", "modified", ("src/a.py", 30), (".review-diff/src/a.py.diff", 12))
@@ -2426,9 +2973,10 @@ def test_every_target_read_is_complete(tmp_path: Path) -> None:
     session.read("src/b.py", range(2001, 2502))
     session.finish()
     coverage, unread, summary, _ = session.run()
-    assert (coverage, unread) == ("complete", [])
-    assert "| src/a.py | modified | source or test | in full |" in summary
+    assert (coverage, unread, session.code) == ("complete", [], "all")
+    assert "| src/a.py | modified | source and test | in full |" in summary
     assert "| uv.lock | on the skip list | - | nothing to read |" in summary
+    assert "Source and test files read in full: 2 of 2." in summary
 
 
 def test_two_reads_that_leave_a_gap_are_in_part(tmp_path: Path) -> None:
@@ -2436,29 +2984,21 @@ def test_two_reads_that_leave_a_gap_are_in_part(tmp_path: Path) -> None:
     session.read("src/b.py", range(1, 1001))
     session.read("src/b.py", range(1501, 2501))
     coverage, unread, _, out = session.run()
-    assert (coverage, unread) == (
-        "incomplete",
-        [{"path": "src/b.py", "read": "in part", "code": True}],
-    )
-    assert "  in part: src/b.py" in out.splitlines()
+    assert (coverage, unread) == ("incomplete", [code("src/b.py", "in part")])
+    assert "  in part (source and test): src/b.py" in out.splitlines()
 
 
 def test_a_modified_file_whose_diff_was_read_but_not_the_file_is_in_part(tmp_path: Path) -> None:
     session = Session(tmp_path, [MODIFIED])
     session.read(".review-diff/src/a.py.diff", range(1, 13))
-    assert session.run()[:2] == (
-        "incomplete",
-        [{"path": "src/a.py", "read": "in part", "code": True}],
-    )
+    assert session.run()[:2] == ("incomplete", [code("src/a.py", "in part")])
+    assert session.code == "unread"
 
 
 def test_a_read_that_failed_counts_for_nothing(tmp_path: Path) -> None:
     session = Session(tmp_path, [ADDED])
     session.read("src/b.py", range(1, 2501), error=True)
-    assert session.run()[:2] == (
-        "incomplete",
-        [{"path": "src/b.py", "read": "not read", "code": True}],
-    )
+    assert session.run()[:2] == ("incomplete", [code("src/b.py", "not read")])
 
 
 def test_the_earlier_arrow_numbering_counts_too(tmp_path: Path) -> None:
@@ -2471,13 +3011,12 @@ def test_an_unchanged_file_read_is_reported_not_counted(tmp_path: Path) -> None:
     session = Session(tmp_path, [ADDED])
     session.read("src/caller.py", range(1, 2501))
     session.read(".review-threads.json", range(1, 5))
+    session.read(".review-diff/session.json", range(1, 5))
     coverage, unread, summary, _ = session.run()
-    assert (coverage, unread) == (
-        "incomplete",
-        [{"path": "src/b.py", "read": "not read", "code": True}],
-    )
+    assert (coverage, unread) == ("incomplete", [code("src/b.py", "not read")])
     assert "- Read src/caller.py, which the pull request didn't change" in summary
     assert ".review-threads.json" not in summary
+    assert "session.json" not in summary
 
 
 def test_a_read_outside_the_workspace_counts_for_nothing(tmp_path: Path) -> None:
@@ -2514,174 +3053,416 @@ def test_a_list_planted_in_the_workspace_is_ignored(tmp_path: Path) -> None:
     planted = session.workspace / ".review-diff" / "files.json"
     planted.parent.mkdir()
     planted.write_text(json.dumps({"files": []}), encoding="utf-8")
-    assert session.run()[:2] == (
-        "incomplete",
-        [{"path": "src/b.py", "read": "not read", "code": True}],
-    )
+    assert session.run()[:2] == ("incomplete", [code("src/b.py", "not read")])
 
 
 @pytest.mark.parametrize("content", ["not json", '{"type": "result"}', ""])
 def test_an_unreadable_record_counts_nothing_as_read(tmp_path: Path, content: str) -> None:
     session = Session(tmp_path, [MODIFIED, SKIPPED])
     coverage, unread, summary, _ = session.run(content)
-    assert (coverage, unread) == (
+    assert (coverage, unread, session.code) == (
         "unknown",
-        [{"path": "src/a.py", "read": "not read", "code": True}],
+        [code("src/a.py", "not read")],
+        "unknown",
     )
-    assert "Coverage isn't known" in summary
+    assert session.unmeasured == "round 1 part 1"
+    assert "Coverage isn't known: no record of what round 1 part 1 read" in summary
 
 
-def test_no_execution_file_counts_nothing_as_read(tmp_path: Path) -> None:
-    Session(tmp_path, [MODIFIED])
-    outputs = tmp_path / "outputs"
-    outputs.write_text("", encoding="utf-8")
-    env = {"EXECUTION_FILE": "", "GITHUB_OUTPUT": str(outputs)}
-    done = run_step(coverage_step(review()), tmp_path, tmp_path, env)
-    assert done.returncode == 0, done.stdout + done.stderr
-    assert outputs.read_text(encoding="utf-8") == (
-        "coverage=unknown\ncode=unknown\n"
-        'unread=[{"path":"src/a.py","read":"not read","code":true}]\n'
-    )
+def test_a_missing_record_leaves_coverage_unknown_naming_the_session(tmp_path: Path) -> None:
+    session = Session(tmp_path, [MODIFIED, ADDED], parts={"src/a.py": 1, "src/b.py": 2})
+    session.read("src/a.py", range(1, 31))
+    session.read(".review-diff/src/a.py.diff", range(1, 13))
+    session.measure(1, 1)
+    said, _, _ = session.gather()
+    assert (said["coverage"], said["code"]) == ("unknown", "unknown")
+    assert json.loads(said["unmeasured"]) == "round 1 part 2"
+
+
+def test_a_missing_record_doesn_t_matter_once_everything_is_read(tmp_path: Path) -> None:
+    session = Session(tmp_path, [MODIFIED, ADDED], parts={"src/a.py": 1, "src/b.py": 2})
+    session.read("src/a.py", range(1, 31))
+    session.read(".review-diff/src/a.py.diff", range(1, 13))
+    session.read("src/b.py", range(1, 2501))
+    session.measure(1, 1)
+    said, _, _ = session.gather()
+    assert (said["coverage"], said["code"]) == ("complete", "all")
 
 
 def test_a_path_that_holds_a_workflow_command_stays_inside_its_line(tmp_path: Path) -> None:
     hostile = listed("x\n::error::forged", "added", ("x\n::error::forged", 3))
     session = Session(tmp_path, [hostile])
     _, unread, _, out = session.run()
-    assert unread == [{"path": "x\n::error::forged", "read": "not read", "code": True}]
+    assert unread == [code("x\n::error::forged", "not read")]
     assert not any(line.startswith("::") for line in out.splitlines()), out
 
 
-# Which changed files are source and test, for the check's floor (review-coverage-floor design D1,
-# D2): data and prose don't count, everything else with a line to read does.
-PROSE = listed("README.md", "modified", ("README.md", 40), (".review-diff/README.md.diff", 6))
-SPEC = listed("openspec/changes/x/tasks.md", "added", ("openspec/changes/x/tasks.md", 20))
+# What the check needs read: every source and test file; prose is reported, and data is left to
+# its tests (review-splits-large-prs design D2, D9).
+PROSE = listed("README.md", "modified", ("README.md", 40), (".review-diff/README.md.diff", 6),
+               kind="prose")  # fmt: skip
+SPEC = listed("openspec/changes/x/tasks.md", "added", ("openspec/changes/x/tasks.md", 20),
+              kind="prose")  # fmt: skip
 FIXTURE = listed(
     "plugins/r/fixtures/ollama/thinking/events.json",
     "modified",
     ("plugins/r/fixtures/ollama/thinking/events.json", 300),
     (".review-diff/plugins/r/fixtures/ollama/thinking/events.json.diff", 40),
+    kind="data",
 )
 
 
-@pytest.mark.parametrize(
-    "path",
-    [
-        "plugins/r/fixtures/ollama/thinking/events.json",
-        "plugins/r/fixtures/ollama/thinking/provenance.json",
-        "a/fixtures/b.py",
-        "streams/run.jsonl",
-        "streams/run.ndjson",
-        "README.md",
-        "contributing/runners.md",
-        "docs/page.mdx",
-        "notes.txt",
-        "public/logo.svg",
-        "LICENSE",
-        "LICENSE-CONTENT",
-        "plugins/runner-openai/LICENSE",
-        "openspec/changes/x/.openspec.yaml",
-        "openspec/specs/pr-review/spec.md",
-        "tofu/labels/troupe.json",
-    ],
-)
-def test_data_and_prose_don_t_count_as_source_or_test(tmp_path: Path, path: str) -> None:
-    session = Session(tmp_path, [listed(path, "added", (path, 10))])
-    _, unread, summary, _ = session.run()
-    assert session.code == "none"
-    assert unread == [{"path": path, "read": "not read", "code": False}]
-    assert "| data or prose | not read |" in summary
-    assert (
-        "Source and test files read in full: none changed, so the floor doesn't apply." in summary
-    )
-
-
-@pytest.mark.parametrize(
-    "path",
-    [
-        "plugins/r/src/troupe_runner_ollama/conversation.py",
-        "plugins/r/tests/test_ollama_conversation.py",
-        ".github/workflows/ci.yml",
-        "src/pages/index.astro",
-        "hooks/pre-push",
-        "pyproject.toml",
-        "docs/openspec/notes.py",
-        "fixtures.py",
-        "README.md.py",
-    ],
-)
-def test_any_other_kind_counts_as_source_or_test(tmp_path: Path, path: str) -> None:
-    session = Session(tmp_path, [listed(path, "added", (path, 10))])
-    _, unread, summary, _ = session.run()
-    assert session.code == "unread"
-    assert unread == [{"path": path, "read": "not read", "code": True}]
-    assert "| source or test | not read |" in summary
-    assert "Source and test files read in full: none of 1, so `claude review completed` fails." in (
-        summary
-    )
-
-
-def test_one_source_file_read_in_full_meets_the_floor_beside_unread_data(tmp_path: Path) -> None:
+def test_every_source_file_read_beside_unread_data_and_prose_needs_only_the_prose(
+    tmp_path: Path,
+) -> None:
     session = Session(tmp_path, [ADDED, FIXTURE, PROSE, MODIFIED])
     session.read("src/b.py", range(1, 2501))
+    session.read("src/a.py", range(1, 31))
     session.read(".review-diff/src/a.py.diff", range(1, 13))
     coverage, unread, summary, out = session.run()
-    assert (coverage, session.code) == ("incomplete", "read")
-    assert unread == [
-        {"path": FIXTURE["path"], "read": "not read", "code": False},
-        {"path": "README.md", "read": "not read", "code": False},
-        {"path": "src/a.py", "read": "in part", "code": True},
-    ]
-    assert "Source and test files read in full: 1 of 2." in summary
-    assert "to read were read in full, 1 of 2 source and test file(s);" in out
+    assert (coverage, session.code) == ("incomplete", "all")
+    assert unread == [{"path": "README.md", "read": "not read", "kind": "prose"}]
+    assert "| data | left to its tests |" in summary
+    assert "Source and test files read in full: 2 of 2." in summary
+    assert "1 data file(s) left to their tests" in out
 
 
-def test_source_read_only_in_part_doesn_t_meet_the_floor(tmp_path: Path) -> None:
+def test_source_read_only_in_part_leaves_the_code_unread(tmp_path: Path) -> None:
     session = Session(tmp_path, [MODIFIED, SPEC])
     session.read("openspec/changes/x/tasks.md", range(1, 21))
     session.read(".review-diff/src/a.py.diff", range(1, 13))
-    coverage, _, _, _ = session.run()
+    coverage, unread, _, _ = session.run()
     assert (coverage, session.code) == ("incomplete", "unread")
+    assert unread == [code("src/a.py", "in part")]
 
 
-def test_everything_read_meets_the_floor(tmp_path: Path) -> None:
+def test_one_source_file_read_of_two_leaves_the_code_unread(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED, MODIFIED])
+    session.read("src/b.py", range(1, 2501))
+    coverage, unread, _, _ = session.run()
+    assert (coverage, session.code) == ("incomplete", "unread")
+    assert unread == [code("src/a.py", "not read")]
+
+
+def test_everything_read_is_complete(tmp_path: Path) -> None:
     session = Session(tmp_path, [ADDED, SPEC])
     session.read("src/b.py", range(1, 2501))
     session.read("openspec/changes/x/tasks.md", range(1, 21))
     assert session.run()[:2] == ("complete", [])
-    assert session.code == "read"
+    assert session.code == "all"
 
 
-def test_an_empty_file_read_for_nothing_doesn_t_meet_the_floor(tmp_path: Path) -> None:
+def test_an_empty_file_read_for_nothing_counts_for_nothing(tmp_path: Path) -> None:
     """An added empty file has one target of 0 lines, which counts as read in full with no Read.
-    If it counted as source, adding one would meet the floor for nothing (design D2)."""
+    It has no kind, so it doesn't count among the source and test files (design D2)."""
     empty = listed("src/pkg/__init__.py", "added", ("src/pkg/__init__.py", 0))
     session = Session(tmp_path, [empty, ADDED])
     coverage, unread, summary, _ = session.run()
     assert (coverage, session.code) == ("incomplete", "unread")
-    assert unread == [{"path": "src/b.py", "read": "not read", "code": True}]
+    assert unread == [code("src/b.py", "not read")]
     assert "| src/pkg/\\_\\_init\\_\\_.py | added | - | in full |" in summary
 
 
-def test_only_files_with_nothing_to_read_leave_the_floor_nothing_to_check(tmp_path: Path) -> None:
+def test_only_files_with_nothing_to_read_leave_nothing_to_check(tmp_path: Path) -> None:
     binary = {"path": "img/logo.png", "status": "added", "skipped": "binary", "targets": []}
     session = Session(tmp_path, [SKIPPED, binary])
     assert session.run()[:2] == ("complete", [])
     assert session.code == "none"
 
 
-def test_an_unreadable_record_leaves_the_floor_unknown(tmp_path: Path) -> None:
+def test_no_source_or_test_file_changed_leaves_only_prose_to_report(tmp_path: Path) -> None:
+    session = Session(tmp_path, [PROSE, SPEC, FIXTURE])
+    session.read("openspec/changes/x/tasks.md", range(1, 21))
+    coverage, unread, _, _ = session.run()
+    assert (coverage, session.code) == ("incomplete", "none")
+    assert unread == [{"path": "README.md", "read": "not read", "kind": "prose"}]
+
+
+# The follow-up rounds (review-splits-large-prs design D4, D10).
+def test_a_follow_up_round_takes_only_the_source_and_test_files_left_unread(
+    tmp_path: Path,
+) -> None:
+    session = Session(tmp_path, [ADDED, MODIFIED, PROSE, FIXTURE])
+    session.read("src/b.py", range(1, 2501))
+    session.read(".review-diff/src/a.py.diff", range(1, 13))
+    matrix = session.follow_up("2")
+    plan = json.loads((session.kept / "round-2.json").read_text(encoding="utf-8"))
+    assert plan["assign"] == {"src/a.py": 1}
+    assert [(m["round"], m["part"], m["of"]) for m in matrix] == [(2, 1, 1)]
+    # Its turns are its own: the base and two Reads, the file and its diff.
+    assert matrix[0]["max_turns"] == 44
+    listing = (session.kept / "files.json").read_bytes()
+    assert matrix[0]["files_sha256"] == hashlib.sha256(listing).hexdigest()
+    assert (
+        matrix[0]["round_sha256"]
+        == hashlib.sha256((session.kept / "round-2.json").read_bytes()).hexdigest()
+    )
+
+
+def test_no_follow_up_when_every_source_and_test_file_was_read(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED, PROSE])
+    session.read("src/b.py", range(1, 2501))
+    assert session.follow_up("2") == []
+    assert not (session.kept / "round-2.json").exists()
+
+
+def test_a_session_whose_record_is_missing_has_its_files_read_again(tmp_path: Path) -> None:
+    session = Session(tmp_path, [MODIFIED, ADDED], parts={"src/a.py": 1, "src/b.py": 2})
+    session.read("src/a.py", range(1, 31))
+    session.read(".review-diff/src/a.py.diff", range(1, 13))
+    session.measure(1, 1)
+    said, _, out = session.gather("2")
+    assert [m["part"] for m in json.loads(said["parts"])] == [1]
+    plan = json.loads((tmp_path / "runner-temp" / "next" / "round-2.json").read_text("utf-8"))
+    assert plan["assign"] == {"src/b.py": 1}
+    assert "by session(s) whose record is missing: round 1 part 2" in out
+
+
+def test_a_file_read_across_two_rounds_is_read_in_full(tmp_path: Path) -> None:
     session = Session(tmp_path, [MODIFIED])
-    coverage, _, _, _ = session.run("not json")
-    assert (coverage, session.code) == ("unknown", "unknown")
+    session.read(".review-diff/src/a.py.diff", range(1, 13))
+    assert session.follow_up("2") != []
+    session.session(2, 1)
+    session.read("src/a.py", range(1, 31))
+    coverage, unread, summary, _ = session.run()
+    assert (coverage, unread, session.code) == ("complete", [], "all")
+    assert "Sessions: round 1 part 1, round 2 part 1." in summary
 
 
-# The check judges what the review read (review-covers-the-diff design D4): until #280, it fails
-# only on the floor or unmeasured coverage, and warns on the rest (review-coverage-floor design D3).
+def test_round_three_takes_what_round_two_left(tmp_path: Path) -> None:
+    session = Session(tmp_path, [MODIFIED, ADDED])
+    assert len(session.follow_up("2")) == 1
+    session.session(2, 1)
+    session.read("src/b.py", range(1, 2501))
+    matrix = session.follow_up("3")
+    plan = json.loads((session.kept / "round-3.json").read_text(encoding="utf-8"))
+    assert plan["assign"] == {"src/a.py": 1}
+    assert [m["round"] for m in matrix] == [3]
+
+
+def test_source_unread_after_round_three_leaves_the_code_unread(tmp_path: Path) -> None:
+    session = Session(tmp_path, [MODIFIED])
+    session.follow_up("2")
+    session.follow_up("3")
+    coverage, unread, _, _ = session.run()
+    assert (coverage, session.code) == ("incomplete", "unread")
+    assert unread == [code("src/a.py", "not read")]
+
+
+@pytest.mark.parametrize("value", ["4", "x", "1"])
+def test_a_round_that_isn_t_two_or_three_fails_the_planner(tmp_path: Path, value: str) -> None:
+    Session(tmp_path, [ADDED])
+    outputs = tmp_path / "outputs"
+    outputs.write_text("", encoding="utf-8")
+    env = {"GITHUB_OUTPUT": str(outputs), "NEXT_ROUND": value}
+    done = run_step(gather_step(review(), "follow-1"), tmp_path, tmp_path, env)
+    assert done.returncode == 1
+    assert done.stdout.startswith("::error title=Round unknown::")
+
+
+def test_the_planners_and_the_report_gather_with_one_script() -> None:
+    w = review()
+    scripts = {str(gather_step(w, name)["run"]) for name in ("follow-1", "follow-2", "resolve")}
+    assert len(scripts) == 1
+
+
+def function(source: str, name: str) -> str:
+    tree = ast.parse(source)
+    node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name)
+    return ast.unparse(node)
+
+
+def constants(source: str, names: set[str]) -> dict[str, object]:
+    found = {}
+    for node in ast.parse(source).body:
+        if (
+            isinstance(node, ast.Assign)
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id in names
+        ):
+            found[node.targets[0].id] = ast.literal_eval(node.value)
+    return found
+
+
+def test_the_planners_split_and_budget_as_the_plan_step_does() -> None:
+    w = review()
+    plan, gathered = str(plan_step(w)["run"]), str(gather_step(w)["run"])
+    for name in ("pack", "size"):
+        assert function(plan, name) == function(gathered, name), name
+    limits = {"BASE_TURNS", "TURNS_PER_READ", "MAX_TURNS", "PART_READS", "MAX_PARTS"}
+    assert constants(plan, limits) == constants(gathered, limits)
+    assert set(constants(plan, limits)) == limits
+
+
+# The session's own list, checked against its matrix entry before Claude starts
+# (review-splits-large-prs design D4, D5).
+def run_session(
+    tmp_path: Path, files: list[dict[str, Any]], plan: dict[str, Any], **env: str
+) -> tuple[subprocess.CompletedProcess[str], dict[str, Any] | None]:
+    folder = tmp_path / "workspace" / ".review-diff"
+    folder.mkdir(parents=True, exist_ok=True)
+    listing = json.dumps({"files": files}).encode()
+    number = int(env["ROUND"]) if env.get("ROUND", "").isdigit() else 1
+    rounds = json.dumps(plan).encode()
+    (folder / "files.json").write_bytes(listing)
+    (folder / f"round-{number}.json").write_bytes(rounds)
+    given = {"ROUND": "1", "PART": "1", "OF": "1",
+             "FILES_SHA256": hashlib.sha256(listing).hexdigest(),
+             "ROUND_SHA256": hashlib.sha256(rounds).hexdigest(), **env}  # fmt: skip
+    done = run_step(session_step(review()), tmp_path, tmp_path, given)
+    made = folder / "session.json"
+    return done, json.loads(made.read_text(encoding="utf-8")) if made.exists() else None
+
+
+THREE = [ADDED, MODIFIED, PROSE, FIXTURE]
+THREE_PLAN = {"round": 1, "assign": {"src/b.py": 1, "README.md": 1, "src/a.py": 2}, "parts": []}
+
+
+@pytest.mark.parametrize(
+    ("number", "part", "role", "paths"),
+    [
+        ("1", "1", "lead", ["src/b.py", "README.md"]),
+        ("1", "2", "part", ["src/a.py"]),
+        ("2", "1", "follow-up", ["src/b.py", "README.md"]),
+    ],
+)
+def test_each_session_is_told_its_role_and_its_own_list(
+    tmp_path: Path, number: str, part: str, role: str, paths: list[str]
+) -> None:
+    done, made = run_session(tmp_path, THREE, THREE_PLAN, ROUND=number, PART=part, OF="2")
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert made is not None
+    assert (made["role"], made["round"], made["part"], made["of"]) == (role, int(number),
+                                                                       int(part), 2)  # fmt: skip
+    assert [f["path"] for f in made["read"]] == sorted(paths, key=[f["path"] for f in THREE].index)
+    assert made["data"] == [FIXTURE["path"]]
+    kept = tmp_path / "runner-temp" / "review"
+    assert (kept / "files.json").exists()
+    assert (kept / f"round-{number}.json").exists()
+
+
+@pytest.mark.parametrize(
+    ("env", "said"),
+    [
+        ({"FILES_SHA256": "0" * 64}, "files.json isn't the file its job planned"),
+        ({"ROUND_SHA256": ""}, "round-1.json isn't the file its job planned"),
+        ({"ROUND": "x"}, "ROUND is 'x', not a number"),
+        ({"PART": "0"}, "PART is '0', not a number"),
+    ],
+)
+def test_a_plan_that_isn_t_the_one_planned_fails_before_claude(
+    tmp_path: Path, env: dict[str, str], said: str
+) -> None:
+    done, made = run_session(tmp_path, THREE, THREE_PLAN, **env)
+    assert done.returncode == 1
+    assert done.stdout.startswith("::error title=Plan not read::")
+    assert said in done.stdout
+    assert made is None
+
+
+# What Claude gave back, kept for the report (review-splits-large-prs design D6).
+@pytest.mark.parametrize(
+    ("given", "kept"),
+    [
+        ('{"summary": "s", "resolve": [], "retier": []}', {"summary": "s", "resolve": [],
+                                                           "retier": []}),
+        ("", None),
+        ("not json", None),
+        ("[1]", None),
+    ],
+)  # fmt: skip
+def test_claude_s_answer_is_kept_or_kept_as_missing(
+    tmp_path: Path, given: str, kept: object
+) -> None:
+    env = {"STRUCTURED_OUTPUT": given, "ROUND": "2", "PART": "3"}
+    done = run_step(answer_step(review()), tmp_path, tmp_path, env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    path = tmp_path / "runner-temp" / "review" / "records" / "answer-2-3.json"
+    assert json.loads(path.read_text(encoding="utf-8")) == {"round": 2, "part": 3, "answer": kept}
+
+
+def test_the_measurement_never_reads_claude_s_answer() -> None:
+    w = review()
+    assert "STRUCTURED_OUTPUT" not in str(measure_step(w)["run"])
+    assert "STRUCTURED_OUTPUT" not in measure_step(w)["env"]
+    assert "structured_output" not in str(gather_step(w)["run"])
+
+
+# The review's one summary (review-splits-large-prs design D6).
+def run_post(
+    tmp_path: Path, answers: Mapping[tuple[int, int], object], gathered: dict[str, Any]
+) -> tuple[subprocess.CompletedProcess[str], str, list[list[str]]]:
+    records = tmp_path / "runner-temp" / "review" / "records"
+    records.mkdir(parents=True, exist_ok=True)
+    (records.parent / "gathered.json").write_text(json.dumps(gathered), encoding="utf-8")
+    for (number, part), answer in answers.items():
+        kept = {"round": number, "part": part, "answer": answer}
+        (records / f"answer-{number}-{part}.json").write_text(json.dumps(kept), encoding="utf-8")
+    bin_dir = stub_gh(tmp_path / "bin", {})
+    done = run_step(poster(review()), tmp_path, bin_dir, {"HEAD_SHA": "0123456789abcdef"})
+    body = tmp_path / "runner-temp" / "review-summary.md"
+    return done, body.read_text(encoding="utf-8") if body.exists() else "", gh_calls(bin_dir)
+
+
+GATHERED = {"coverage": "incomplete", "code": 3, "read_code": 3, "unmeasured": "",
+            "unread": [{"path": "README.md", "read": "not read", "kind": "prose"}],
+            "data": ["fixtures/a.json"], "sessions": [[1, 1], [1, 2], [2, 1]]}  # fmt: skip
+
+
+def test_one_comment_holds_every_session_s_summary_and_what_was_read(tmp_path: Path) -> None:
+    answers = {(1, 1): {"summary": "No findings in part one."},
+               (1, 2): {"summary": "One must-fix in part two."},
+               (2, 1): {"summary": "Read what was left."}}  # fmt: skip
+    done, body, calls = run_post(tmp_path, answers, GATHERED)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert len(calls) == 1
+    assert calls[0][:5] == ["pr", "comment", "7", "-R", "troupe-run/infrastructure"]
+    assert calls[0][5:] == ["--body-file", str(tmp_path / "runner-temp" / "review-summary.md")]
+    assert body.startswith("## Claude's review of 0123456789ab\n")
+    order = ["### Part 1 of 2", "No findings in part one.", "### Part 2 of 2",
+             "One must-fix in part two.", "### Follow-up 1, part 1 of 1", "Read what was left.",
+             "Source and test files read in full: 3 of 3", "Prose not read in full: `README.md`",
+             "Data left to the code and tests that use it: `fixtures/a.json`"]  # fmt: skip
+    at = [body.index(text) for text in order]
+    assert at == sorted(at)
+
+
+def test_a_missing_summary_is_named_in_the_comment(tmp_path: Path) -> None:
+    done, body, _ = run_post(tmp_path, {(1, 1): {"summary": "x"}, (1, 2): None}, GATHERED)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "_Part 2 of 2's summary is missing: the session gave back no summary._" in body
+    assert "_Follow-up 1, part 1 of 1's summary is missing" in body
+
+
+def test_one_session_s_summary_stands_alone(tmp_path: Path) -> None:
+    gathered = {**GATHERED, "sessions": [[1, 1]], "unread": [], "data": []}
+    done, body, _ = run_post(tmp_path, {(1, 1): {"summary": "Nothing found."}}, gathered)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "### Part" not in body
+    assert "Nothing found." in body
+
+
+def test_unknown_coverage_is_said_in_the_comment(tmp_path: Path) -> None:
+    gathered = {**GATHERED, "coverage": "unknown", "unmeasured": "round 1 part 2",
+                "unread": [code("src/a.py", "not read")]}  # fmt: skip
+    _, body, _ = run_post(tmp_path, {}, gathered)
+    assert "Coverage isn't known: no record of what round 1 part 2 read." in body
+    assert "Source and test files not read in full: `src/a.py`." in body
+
+
+def test_without_what_was_gathered_nothing_is_posted(tmp_path: Path) -> None:
+    (tmp_path / "runner-temp" / "review").mkdir(parents=True)
+    bin_dir = stub_gh(tmp_path / "bin", {})
+    done = run_step(poster(review()), tmp_path, bin_dir, {"HEAD_SHA": "x"})
+    assert done.returncode == 1
+    assert gh_calls(bin_dir) == []
+
+
+# The check judges what the sessions read together (review-splits-large-prs design D9).
 SOURCE_UNREAD = [
-    {"path": "src/a.py", "read": "in part", "code": True},
-    {"path": "fixtures/x/events.json", "read": "not read", "code": False},
-    {"path": "src/b.py", "read": "not read", "code": True},
+    code("src/a.py", "in part"),
+    {"path": "README.md", "read": "not read", "kind": "prose"},
+    code("src/b.py", "not read"),
 ]
 
 
@@ -2693,17 +3474,19 @@ def warnings_and_errors(out: str) -> list[str]:
     ("results", "said"),
     [
         (
-            {"COVERAGE": "unknown", "CODE": "unknown"},
-            "couldn't be measured, so nothing counts as read",
+            {"COVERAGE": "unknown", "CODE": "unknown", "UNMEASURED": '"round 1 part 2"'},
+            "couldn't be measured (no record of what round 1 part 2 read), so nothing they were "
+            "to read counts as read",
         ),
         (
-            {"COVERAGE": "unknown", "CODE": "read"},
-            "couldn't be measured, so nothing counts as read",
+            {"COVERAGE": "unknown", "CODE": "all"},
+            "couldn't be measured, so nothing they were to read counts as read",
         ),
-        ({"COVERAGE": "", "CODE": "read"}, "wasn't measured"),
-        ({"COVERAGE": "complete-ish", "CODE": "read"}, "wasn't measured"),
+        ({"COVERAGE": "", "CODE": "all"}, "wasn't measured"),
+        ({"COVERAGE": "complete-ish", "CODE": "all"}, "wasn't measured"),
         ({"COVERAGE": "incomplete", "CODE": ""}, "wasn't measured"),
-        ({"COVERAGE": "complete", "CODE": "some"}, "wasn't measured"),
+        # The floor's word from before: no longer one the check accepts.
+        ({"COVERAGE": "complete", "CODE": "read"}, "wasn't measured"),
     ],
 )
 def test_coverage_that_wasn_t_measured_fails_naming_the_files(
@@ -2713,13 +3496,13 @@ def test_coverage_that_wasn_t_measured_fails_naming_the_files(
     assert done.returncode == 1
     assert done.stdout.startswith("::error title=Review didn't read the code::")
     assert (
-        f"what it read {said}: src/a.py (in part), fixtures/x/events.json (not read), "
-        "src/b.py (not read)." in done.stdout
+        f"what it read {said}: src/a.py (in part), README.md (not read), src/b.py (not read)."
+        in done.stdout
     )
     assert "gh run rerun 41258918187" in done.stdout
 
 
-def test_a_review_that_read_no_changed_code_fails_naming_only_the_code(tmp_path: Path) -> None:
+def test_a_review_that_left_code_unread_fails_naming_only_the_code(tmp_path: Path) -> None:
     done = run_completed(
         tmp_path, COVERAGE="incomplete", CODE="unread", UNREAD=json.dumps(SOURCE_UNREAD)
     )
@@ -2727,35 +3510,32 @@ def test_a_review_that_read_no_changed_code_fails_naming_only_the_code(tmp_path:
     assert warnings_and_errors(done.stdout) == done.stdout.splitlines()[:1]
     assert done.stdout.startswith("::error title=Review didn't read the code::")
     assert (
-        "it read none of the changed source and test files in full: src/a.py (in part), "
-        "src/b.py (not read)." in done.stdout
+        "its sessions didn't read every changed source and test file in full: src/a.py (in "
+        "part), src/b.py (not read)." in done.stdout
     )
-    assert "events.json" not in done.stdout
+    assert "README.md" not in done.stdout
+    assert "smaller" not in done.stdout
     assert "gh run rerun 41258918187" in done.stdout
 
 
-def test_the_floor_fails_even_when_coverage_says_complete(tmp_path: Path) -> None:
+def test_code_unread_fails_even_when_coverage_says_complete(tmp_path: Path) -> None:
     done = run_completed(tmp_path, COVERAGE="complete", CODE="unread", UNREAD="[]")
     assert done.returncode == 1
     assert ": files unnamed." in done.stdout
 
 
-def test_a_review_that_read_some_code_passes_with_one_warning(tmp_path: Path) -> None:
-    done = run_completed(
-        tmp_path, COVERAGE="incomplete", CODE="read", UNREAD=json.dumps(SOURCE_UNREAD)
-    )
+def test_a_review_that_left_only_prose_unread_passes_with_one_warning(tmp_path: Path) -> None:
+    unread = [{"path": "README.md", "read": "not read", "kind": "prose"}]
+    done = run_completed(tmp_path, COVERAGE="incomplete", CODE="all", UNREAD=json.dumps(unread))
     assert done.returncode == 0, done.stdout
     found = warnings_and_errors(done.stdout)
     assert len(found) == 1, done.stdout
     assert found[0].startswith("::warning title=Review didn't read every changed file::")
-    assert (
-        "didn't read every changed file in full: src/a.py (in part), fixtures/x/events.json "
-        "(not read), src/b.py (not read). The check passes: until #280" in found[0]
-    )
+    assert "didn't read every changed prose file in full: README.md (not read)." in found[0]
 
 
 def test_a_pull_request_with_no_changed_code_passes_with_a_warning(tmp_path: Path) -> None:
-    unread = [{"path": "README.md", "read": "not read", "code": False}]
+    unread = [{"path": "README.md", "read": "not read", "kind": "prose"}]
     done = run_completed(tmp_path, COVERAGE="incomplete", CODE="none", UNREAD=json.dumps(unread))
     assert done.returncode == 0, done.stdout
     found = warnings_and_errors(done.stdout)
@@ -2764,22 +3544,21 @@ def test_a_pull_request_with_no_changed_code_passes_with_a_warning(tmp_path: Pat
     assert "README.md (not read)" in found[0]
 
 
-@pytest.mark.parametrize("code", ["read", "none"])
-def test_a_review_that_read_everything_passes_with_no_warning(tmp_path: Path, code: str) -> None:
-    done = run_completed(tmp_path, COVERAGE="complete", CODE=code, UNREAD="[]")
+@pytest.mark.parametrize("found_code", ["all", "none"])
+def test_a_review_that_read_everything_passes_with_no_warning(
+    tmp_path: Path, found_code: str
+) -> None:
+    done = run_completed(tmp_path, COVERAGE="complete", CODE=found_code, UNREAD="[]")
     assert done.returncode == 0, done.stdout
     assert warnings_and_errors(done.stdout) == []
 
 
-@pytest.mark.parametrize(
-    ("results", "code"),
-    [({"CODE": "read"}, 0), ({"CODE": "unread"}, 1)],
-)
+@pytest.mark.parametrize(("results", "outcome"), [({"CODE": "all"}, 0), ({"CODE": "unread"}, 1)])
 def test_an_unread_list_that_isn_t_one_names_files_unnamed(
-    tmp_path: Path, results: dict[str, str], code: int
+    tmp_path: Path, results: dict[str, str], outcome: int
 ) -> None:
     done = run_completed(tmp_path, COVERAGE="incomplete", UNREAD="not json", **results)
-    assert done.returncode == code
+    assert done.returncode == outcome
     assert ": files unnamed." in done.stdout
 
 
@@ -2790,23 +3569,31 @@ def test_an_unread_item_without_its_kind_names_files_unnamed(tmp_path: Path) -> 
     assert ": files unnamed." in done.stdout
 
 
-@pytest.mark.parametrize(("code", "outcome"), [("read", 0), ("unread", 1)])
+@pytest.mark.parametrize(
+    ("found_code", "kind", "outcome"), [("all", "prose", 0), ("unread", "source and test", 1)]
+)
 def test_more_than_fifty_unread_files_are_cut_short(
-    tmp_path: Path, code: str, outcome: int
+    tmp_path: Path, found_code: str, kind: str, outcome: int
 ) -> None:
-    unread = [{"path": f"f{i}.py", "read": "not read", "code": True} for i in range(60)]
-    done = run_completed(tmp_path, COVERAGE="incomplete", CODE=code, UNREAD=json.dumps(unread))
+    unread = [{"path": f"f{i}.py", "read": "not read", "kind": kind} for i in range(60)]
+    done = run_completed(
+        tmp_path, COVERAGE="incomplete", CODE=found_code, UNREAD=json.dumps(unread)
+    )
     assert done.returncode == outcome
     assert "f49.py (not read), and 10 more." in done.stdout
     assert "f50.py" not in done.stdout
 
 
-@pytest.mark.parametrize(("code", "outcome"), [("read", 0), ("unread", 1)])
+@pytest.mark.parametrize(
+    ("found_code", "kind", "outcome"), [("all", "prose", 0), ("unread", "source and test", 1)]
+)
 def test_a_hostile_unread_path_stays_inside_its_one_line(
-    tmp_path: Path, code: str, outcome: int
+    tmp_path: Path, found_code: str, kind: str, outcome: int
 ) -> None:
-    unread = [{"path": "x\n::notice::forged", "read": "not read", "code": True}]
-    done = run_completed(tmp_path, COVERAGE="incomplete", CODE=code, UNREAD=json.dumps(unread))
+    unread = [{"path": "x\n::notice::forged", "read": "not read", "kind": kind}]
+    done = run_completed(
+        tmp_path, COVERAGE="incomplete", CODE=found_code, UNREAD=json.dumps(unread)
+    )
     assert done.returncode == outcome
     assert len([line for line in done.stdout.splitlines() if line.startswith("::")]) == 1
     assert "::notice" not in "\n".join(
@@ -2820,9 +3607,9 @@ def test_a_bot_s_pull_request_passes_whatever_the_coverage(tmp_path: Path) -> No
 
 
 def test_a_review_that_says_it_didn_t_read_the_code_fails_the_check(tmp_path: Path) -> None:
-    """#268: troupe#283's reviews said "not checked" for its code and still passed. A session
-    that reads only the task list, and says so in its result, leaves the check failed, naming
-    the code it didn't read, whatever its summary says: the floor holds it (#281)."""
+    """#268: troupe#283's reviews said "not checked" for its code and still passed. A review whose
+    sessions read only the task list, and say so, leaves the check failed, naming the code they
+    didn't read, whatever their summaries say."""
     files = [
         MODIFIED,
         ADDED,
@@ -2831,6 +3618,7 @@ def test_a_review_that_says_it_didn_t_read_the_code_fails_the_check(tmp_path: Pa
             "modified",
             ("openspec/changes/x/tasks.md", 20),
             (".review-diff/openspec/changes/x/tasks.md.diff", 8),
+            kind="prose",
         ),
     ]
     session = Session(tmp_path / "session", files)
@@ -2850,8 +3638,8 @@ def test_a_review_that_says_it_didn_t_read_the_code_fails_the_check(tmp_path: Pa
 
 
 # troupe#318's 23 files (troupe-run/infrastructure#281): four of its five review runs failed on
-# coverage alone with nothing open. Each is rebuilt from its run's unread list, and now passes with
-# a warning (review-coverage-floor design D6).
+# coverage alone with nothing open. Each is rebuilt from its run's unread list. Its fixtures are
+# data now; what's left is its code (review-splits-large-prs design D2).
 PR_318_SOURCE = [
     "plugins/runner-ollama/src/troupe_runner_ollama/conversation.py",
 ]
@@ -2885,6 +3673,12 @@ PR_318_SPECS = [
 ] + ["openspec/specs/ollama-runner/spec.md"]
 
 
+def pr_318_kind(path: str) -> str:
+    if path in PR_318_FIXTURES:
+        return "data"
+    return "prose" if path in PR_318_PROSE + PR_318_SPECS else "source and test"
+
+
 def pr_318_session(tmp_path: Path, in_part: list[str], not_read: list[str]) -> Session:
     """A session over #318's files, each modified (the file and its diff), that read every one in
     full except those given: the diff alone for one in part, nothing for one not read."""
@@ -2892,8 +3686,9 @@ def pr_318_session(tmp_path: Path, in_part: list[str], not_read: list[str]) -> S
     assert len(paths) == 23
     session = Session(
         tmp_path / "session",
-        [listed(p, "modified", (p, 50), (f".review-diff/{p}.diff", 10)) for p in paths],
-    )
+        [listed(p, "modified", (p, 50), (f".review-diff/{p}.diff", 10), kind=pr_318_kind(p))
+         for p in paths],
+    )  # fmt: skip
     for path in paths:
         if path in not_read:
             continue
@@ -2906,9 +3701,6 @@ def pr_318_session(tmp_path: Path, in_part: list[str], not_read: list[str]) -> S
 @pytest.mark.parametrize(
     ("run", "in_part", "not_read"),
     [
-        # 78688ad, run 42369296173: 16 in part (fixtures, the README, contributing/runners.md
-        # and the four test files).
-        ("78688ad", PR_318_FIXTURES + PR_318_PROSE + PR_318_TESTS, []),
         # c6c651b, run 42378496586, and f6566be, run 42379121357: the 10 fixtures not read.
         ("c6c651b", [], PR_318_FIXTURES),
         # c6c651b's re-run: the 10 fixtures in part.
@@ -2916,17 +3708,92 @@ def pr_318_session(tmp_path: Path, in_part: list[str], not_read: list[str]) -> S
         ("f6566be", [], PR_318_FIXTURES),
     ],
 )
-def test_troupe_318_s_failing_runs_now_pass_with_a_warning(
+def test_troupe_318_s_runs_that_skipped_only_fixtures_pass_with_no_warning(
     tmp_path: Path, run: str, in_part: list[str], not_read: list[str]
 ) -> None:
     session = pr_318_session(tmp_path, in_part, not_read)
     session.finish("No findings.")
+    assert session.follow_up("2") == [], run
     coverage, unread, _, _ = session.run()
-    assert (coverage, session.code) == ("incomplete", "read"), run
-    assert len(unread) == len(in_part) + len(not_read)
+    assert (coverage, session.code, unread) == ("complete", "all", []), run
     done = run_completed(tmp_path, COVERAGE=coverage, CODE=session.code, UNREAD=json.dumps(unread))
     assert done.returncode == 0, done.stdout
-    found = warnings_and_errors(done.stdout)
-    assert len(found) == 1, done.stdout
-    assert found[0].startswith("::warning"), done.stdout
-    assert all(path in found[0] for path in in_part + not_read)
+    assert warnings_and_errors(done.stdout) == []
+
+
+def test_troupe_318_s_run_that_skimmed_its_tests_gets_a_follow_up_over_them(
+    tmp_path: Path,
+) -> None:
+    # 78688ad, run 42369296173: 16 in part (fixtures, the README, contributing/runners.md and the
+    # four test files).
+    session = pr_318_session(tmp_path, PR_318_FIXTURES + PR_318_PROSE + PR_318_TESTS, [])
+    matrix = session.follow_up("2")
+    plan = json.loads((session.kept / "round-2.json").read_text(encoding="utf-8"))
+    assert sorted(plan["assign"]) == sorted(PR_318_TESTS)
+    assert len(matrix) == 1
+    session.session(2, 1)
+    for path in PR_318_TESTS:
+        session.read(path, range(1, 51))
+    coverage, unread, _, _ = session.run()
+    assert (coverage, session.code) == ("incomplete", "all")
+    assert sorted(u["path"] for u in unread) == sorted(PR_318_PROSE)
+    done = run_completed(tmp_path, COVERAGE=coverage, CODE=session.code, UNREAD=json.dumps(unread),
+                         FOLLOW_1_PARTS=json.dumps(matrix), REVIEW_2="success",
+                         FOLLOW_2="success", FOLLOW_2_PARTS="[]")  # fmt: skip
+    assert done.returncode == 0, done.stdout
+    assert len(warnings_and_errors(done.stdout)) == 1
+
+
+# troupe#325 (run 43017411898): each of three attempts' sessions stopped by itself after 13 to 47
+# of 210 turns, having read some prose and none of its 16 source and test files in full. A
+# follow-up round now reads them (review-splits-large-prs design D10, proposal's table).
+def pr_325_session(tmp_path: Path) -> Session:
+    files = (
+        [listed(p, "modified", (p, 40), (f".review-diff/{p}.diff", 8)) for p in PR_325_CODE]
+        + [listed(p, "modified", (p, 30), (f".review-diff/{p}.diff", 6), kind="data")
+           for p in PR_325_SCHEMAS]
+        + [listed(p, "modified", (p, 60), (f".review-diff/{p}.diff", 9), kind="prose")
+           for p in PR_325_PROSE]
+    )  # fmt: skip
+    session = Session(tmp_path / "session", files)
+    # Attempt 3: seven prose files in full, and the diffs of the source files.
+    for path in PR_325_PROSE[:7]:
+        session.read(path, range(1, 61))
+        session.read(f".review-diff/{path}.diff", range(1, 10))
+    for path in PR_325_CODE:
+        session.read(f".review-diff/{path}.diff", range(1, 9))
+    session.finish("No findings.")
+    return session
+
+
+def test_troupe_325_s_stopped_session_is_followed_by_one_over_its_code(tmp_path: Path) -> None:
+    session = pr_325_session(tmp_path)
+    matrix = session.follow_up("2")
+    plan = json.loads((session.kept / "round-2.json").read_text(encoding="utf-8"))
+    assert sorted(plan["assign"]) == sorted(PR_325_CODE)
+    assert [(m["round"], m["part"]) for m in matrix] == [(2, 1)]
+    session.session(2, 1)
+    for path in PR_325_CODE:
+        session.read(path, range(1, 41))
+    coverage, unread, summary, _ = session.run()
+    assert (coverage, session.code) == ("incomplete", "all")
+    assert {u["kind"] for u in unread} == {"prose"}
+    assert "Source and test files read in full: 16 of 16." in summary
+    done = run_completed(tmp_path, COVERAGE=coverage, CODE=session.code, UNREAD=json.dumps(unread),
+                         FOLLOW_1_PARTS=json.dumps(matrix), REVIEW_2="success",
+                         FOLLOW_2="success", FOLLOW_2_PARTS="[]")  # fmt: skip
+    assert done.returncode == 0, done.stdout
+
+
+def test_troupe_325_fails_if_its_follow_ups_stop_early_too(tmp_path: Path) -> None:
+    session = pr_325_session(tmp_path)
+    first = session.follow_up("2")
+    second = session.follow_up("3")
+    assert len(first) == len(second) == 1
+    coverage, unread, _, _ = session.run()
+    assert (coverage, session.code) == ("incomplete", "unread")
+    done = run_completed(tmp_path, COVERAGE=coverage, CODE=session.code, UNREAD=json.dumps(unread),
+                         FOLLOW_1_PARTS=json.dumps(first), REVIEW_2="success", FOLLOW_2="success",
+                         FOLLOW_2_PARTS=json.dumps(second), REVIEW_3="success")  # fmt: skip
+    assert done.returncode == 1
+    assert all(path in done.stdout for path in PR_325_CODE[:10])

@@ -2,7 +2,7 @@
 
 ## 1. The plan sorts files into kinds and splits them into parts (design D1, D2, D3, D11)
 
-- [ ] 1.1 Add a `plan the review` job after `gate`, holding the checkout, "Check the review's model" and "Write each
+- [x] 1.1 Add a `plan the review` job after `gate`, holding the checkout, "Check the review's model" and "Write each
   changed file's diff". The diff step and the model check move into this job. The `.org-guide` checkout stays in
   each review job.
   - In the diff step, declare `KINDS`: prose, data, and the configuration that isn't data, with D2's reason in a
@@ -15,7 +15,7 @@
   - Write `files.json` with `kind` and `part` per entry, and `parts` holding `{part, of, reads, max_turns}`.
   - Upload it as `review-plan` (retention 1 day). Output the `parts` matrix and the file's SHA-256.
   - Verify with `uv run pytest scripts/tests/test_claude_review_workflow.py -k plan` after 1.2.
-- [ ] 1.2 Add `Session`-style plan tests in `scripts/tests/test_claude_review_workflow.py`, each named for what its
+- [x] 1.2 Add `Session`-style plan tests in `scripts/tests/test_claude_review_workflow.py`, each named for what its
   body checks, run on a merged scratch repository as `run_diff` does today:
   - **Kinds.** `.py`, `.yml` and `.astro` are source and test. `README.md`, `LICENSE`, `.txt` and
     `openspec/x/.openspec.yaml` are prose. `events.json`, a `.jsonl`, a `.csv` and an extensionless
@@ -38,7 +38,7 @@
 
 ## 2. Each part is its own session, and records what it read (design D4, D5, D6, D8, D11)
 
-- [ ] 2.1 Make the review job a matrix over `needs.plan.outputs.parts` with `fail-fast: false`, named
+- [x] 2.1 Make the review job a matrix over `needs.plan.outputs.parts` with `fail-fast: false`, named
   `claude review (part ${{ matrix.part }} of ${{ matrix.of }})`, with the group
   `claude-review-<pr>-1-${{ matrix.part }}`.
   - Before the action, add a step that downloads `review-plan`, checks its SHA-256 against the plan's output (failing
@@ -53,7 +53,7 @@
     status `measured` or `unknown`, and the structured output from the action's output) into `RUNNER_TEMP`, and
     uploads it. It no longer writes the job outputs the check reads.
   - Verify with `uv run pytest scripts/tests/test_claude_review_workflow.py` after 2.2.
-- [ ] 2.2 Update the structural checks (`problems()` and the named-weakening cases):
+- [x] 2.2 Update the structural checks (`problems()` and the named-weakening cases):
   - The matrix, `fail-fast: false`, and the per-part group.
   - The digest check before Claude.
   - The tool list without `gh pr comment`, with a weakening case that adds it back, naming the tool.
@@ -72,7 +72,7 @@
 
 ## 3. Two follow-up rounds read what the parts left (design D4, D10)
 
-- [ ] 3.1 Add `plan follow-up 1` (needs `plan` and `review`) and `plan follow-up 2` (needs follow-up 1), each
+- [x] 3.1 Add `plan follow-up 1` (needs `plan` and `review`) and `plan follow-up 2` (needs follow-up 1), each
   `always()` once `plan` succeeded, running one script that downloads every `review-record-*` so far and the plan,
   and takes the union of covered lines.
   - A missing or `unknown` record leaves all of its part's files unread.
@@ -81,7 +81,7 @@
     earlier session didn't read these"), and the group `claude-review-<pr>-<round>-<part>`. Each runs only when its
     matrix isn't empty.
   - Verify with `uv run pytest scripts/tests/test_claude_review_workflow.py -k follow` after 3.2.
-- [ ] 3.2 Add tests for the follow-up planner, each named for its outcome:
+- [x] 3.2 Add tests for the follow-up planner, each named for its outcome:
   - troupe#325's three attempts' records (33, 13 and 47 turns; 0 of 16 source and test files in full) give a follow-up
     over the 16 files.
   - Everything read gives `[]`.
@@ -95,7 +95,7 @@
 
 ## 4. One report and resolves limited to each part (design D6, D7, D9)
 
-- [ ] 4.1 Widen the resolving job into `resolve and report`, needing the review, both follow-up planners and both
+- [x] 4.1 Widen the resolving job into `resolve and report`, needing the review, both follow-up planners and both
   follow-up jobs.
   - It downloads every record, and applies each record's `resolve` and `retier` only for threads whose `path` is on
     that session's list. A thread on no list goes to part 1 of round 1 only. Each skipped one is named in a warning.
@@ -105,7 +105,7 @@
   - It outputs `coverage` (`complete`, `incomplete` or `unknown`), `code` (`none`, `all` or `unread`) and `unread`
     (`path`, `read`, `kind`; source, test and prose only).
   - Verify with `uv run pytest scripts/tests/test_claude_review_workflow.py -k report` after 4.2.
-- [ ] 4.2 Add tests, each named for its outcome:
+- [x] 4.2 Add tests, each named for its outcome:
   - A part-2 resolve on a part-1 file is skipped with a warning.
   - A part-1 resolve on `README.md` is carried out.
   - A thread named by two sessions is resolved once.
@@ -121,7 +121,7 @@
 
 ## 5. The check needs every source and test file (design D9)
 
-- [ ] 5.1 Point `completed`'s `needs` and env at the new jobs and the report job's outputs. Rewrite its coverage part
+- [x] 5.1 Point `completed`'s `needs` and env at the new jobs and the report job's outputs. Rewrite its coverage part
   as D9:
   - `unknown` or an unrecognised value fails.
   - `code=unread` fails naming the source and test files (up to `SHOWN`).
@@ -135,7 +135,7 @@
   - A job that was cancelled or failed still fails as now. A follow-up job that was skipped because its matrix was
     empty counts as completed.
   - Verify with `uv run pytest scripts/tests/test_claude_review_workflow.py -k completed` after 5.2.
-- [ ] 5.2 Rewrite the `run_completed` tests:
+- [x] 5.2 Rewrite the `run_completed` tests:
   - `all` passes with no warning.
   - Prose unread passes with one warning.
   - `unread` fails naming only source and test files.
@@ -157,7 +157,7 @@
 
 ## 6. Docs say what a passing review means (development-workflow delta)
 
-- [ ] 6.1 Rewrite the coverage paragraphs of "Claude's review" in `docs/development-workflow.md`:
+- [x] 6.1 Rewrite the coverage paragraphs of "Claude's review" in `docs/development-workflow.md`:
   - A pass means every changed source and test file was read in full across the run's sessions.
   - Which files are prose and data, and D3's rule.
   - How a large pull request is split into parts, with up to two follow-up rounds.
@@ -171,11 +171,17 @@
 
 ## 7. Whole-change checks
 
-- [ ] 7.1 Run `uv run scripts/check.py`: ruff, mypy `--strict`, the tests, and `openspec validate --strict`. Verify it
+- [x] 7.1 Run `uv run scripts/check.py`: ruff, mypy `--strict`, the tests, and `openspec validate --strict`. Verify it
   passes, and cite its output.
-- [ ] 7.2 Before delivery, run troupe's `uv run scripts/check.py` and website's
+  - Done 2026-11-12: all gates passed (ruff, ruff format, mypy --strict, 3132 tests passed and 14 skipped, tofu
+    fmt, init and validate), and `openspec validate review-splits-large-prs --strict` is valid.
+- [x] 7.2 Before delivery, run troupe's `uv run scripts/check.py` and website's
   `npx vitest run tests/unit/workflow-node-version.test.ts` with the new workflow in place, as the workflow's header
   asks. Verify that both pass, and cite their output.
+  - Done 2026-11-11 on fresh clones of troupe's and website's main: troupe's `uv run scripts/check.py`
+    passed (5643 passed, 16 skipped; all gates passed), and website's `npx vitest run
+    tests/unit/workflow-node-version.test.ts` passed (8 of 8). Only the workflow's header comment changed after
+    troupe's run.
 - [ ] 7.3 On this pull request's own review run, which runs the new workflow, record:
   - the plan's parts;
   - each session's turns and coverage;

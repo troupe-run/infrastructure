@@ -67,10 +67,10 @@ def test_the_docs_say_a_fixed_must_fix_gets_no_reply_and_a_discussion_comes_befo
 
 
 def test_the_docs_say_what_a_passing_review_means() -> None:
-    """review-covers-the-diff (#268), review-coverage-floor (#282): "Claude's review" says what a
-    passing check means while coverage is advisory with a floor, what it doesn't mean, what isn't
-    listed, what a warning means, and what to do when it fails for coverage, naming the check as
-    its workflow does."""
+    """review-covers-the-diff (#268), review-splits-large-prs (#279): "Claude's review" says what a
+    passing check means, which files are which kind, how a large pull request's reading is split,
+    what it doesn't mean, what isn't listed, what a warning means, and what to do when it fails for
+    coverage, naming the check as its workflow does."""
     workflow = yaml.safe_load(
         (REPO / ".github" / "workflows" / "claude-review.yml").read_text(encoding="utf-8")
     )
@@ -81,12 +81,23 @@ def test_the_docs_say_what_a_passing_review_means() -> None:
     assert "A passing review means the review read the code; it doesn't mean the code is right" in (
         section
     )
-    # Advisory with a floor until #280 (review-coverage-floor, #281).
+    # Every source and test file read, across the run's sessions (review-splits-large-prs D9).
     assert (
-        f"`{name}` fails when the review read none of the changed source and test files in full"
-        in section
+        f"`{name}` fails when, after the follow-ups, a changed source or test file wasn't read in "
+        "full" in section
     )
-    assert "is named in a warning on the check, which still passes" in section
+    assert "its sessions together read every changed source and test file in full" in section
+    assert (
+        "Prose that wasn't read in full is named in a warning on the check, which still passes"
+        in (section)
+    )
+    # The kinds, and the split (review-splits-large-prs D1 to D3, D10).
+    assert "left to the code and tests that use it (decision #278)" in section
+    assert "is read as source and test, since nothing uses it" in section
+    assert "split into parts of at most 40 Reads, up to six parts" in section
+    assert "goes to a follow-up session, and what that leaves to a second follow-up" in section
+    assert "So several `claude review (...)` jobs in a run are one review" in section
+    assert "make the pull request smaller" not in section
     assert "When the check passes with a warning, it has passed" in section
     assert "It doesn't mean the code has no bugs, that the review checked the callers" in section
     assert "`uv.lock`, `package-lock.json`, `.terraform.lock.hcl`" in section

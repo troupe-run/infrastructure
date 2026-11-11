@@ -36,7 +36,18 @@ STATE_FILE = "tofu/terraform.tfstate"
 # unexpanded name (run-checks-by-path design D6). Of the review's jobs, only whether the review of
 # the head completed is required, never the review itself (review-completed-check design D2).
 REQUIRED_WORKFLOWS = ("ci.yml", "guard.yml", "tofu.yml", "claude-review.yml")
-NOT_REQUIRED = {"changes", "guard-tests", "gate", "review", "resolve"}
+NOT_REQUIRED = {
+    "changes",
+    "guard-tests",
+    "gate",
+    "plan",
+    "review",
+    "follow-1",
+    "review-2",
+    "follow-2",
+    "review-3",
+    "resolve",
+}
 
 MATRIX_REF = re.compile(r"\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}")
 EXPRESSION = re.compile(r"\$\{\{.*?\}\}")
@@ -128,6 +139,11 @@ def job_names(job_id: str, job: dict[str, Any]) -> list[str]:
     if not matrix:
         if EXPRESSION.search(name):
             raise ValueError(f"job {job_id}'s name has an expression this test can't evaluate")
+        return [name]
+    if isinstance(matrix.get("include"), str):
+        # Legs another job's output lists (claude-review.yml's sessions, review-splits-large-prs
+        # design D4): this test can't name them, so the job's own name stands for them, as a
+        # skipped matrix job reports.
         return [name]
     names = []
     for combo in matrix_combinations(matrix):
