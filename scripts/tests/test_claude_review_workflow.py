@@ -191,7 +191,7 @@ MODEL = {"id": "model", "shell": "python3 {0}", "env": {"MODEL": "${{ vars.CLAUD
 MODEL_SHA256 = "1566ed73c892e39e9531b83bb147ed5778ed215c939496f13718ae7e7b3424a2"
 PLAN_NAME = "Plan what each session reads"
 PLAN = {"id": "plan", "shell": "python3 {0}"}
-PLAN_SHA256 = "566916c3d9f926994f39a41a19c14f94c98824f9852798ee7bc1bcb64da84183"
+PLAN_SHA256 = "21a6a5d21940357fece81bacd035082a31701842820b9c077ed24b9802ee3c9c"
 SESSION_NAME = "Choose this session's files"
 SESSION = {
     "id": "session",
@@ -254,7 +254,7 @@ ANSWER_SHA256 = "815aaab9d79a0f0870bc3aa850f069eae46423fc60c5f1a96272e39328ff18a
 # What the sessions read together, in each planner and in the report job: one script (D4).
 GATHER_NAME = "Gather what the sessions read"
 GATHER = {"id": "gather", "shell": "python3 {0}"}
-GATHER_SHA256 = "411e4b1d5208b3ac51657afb7d7bb1e248183602b2825c12c67be735ad7bc4ed"
+GATHER_SHA256 = "7e47adad6234946dc2c428c3e470907706763710b5704dd8ab53559ecce38f99"
 # Resolve and re-tier what Claude names, checked against conversations read again in the report
 # job, and only on a file of that session's list (design D4, D4a; review-splits-large-prs D7).
 RESOLVER_NAME = "Resolve and re-tier what Claude named"
@@ -1117,7 +1117,7 @@ CASES: list[tuple[Change, str]] = [
     (lambda w: plan_script(w, '"uv.lock", ', '"uv.lock", "x.py", '), "this test pins"),
     (lambda w: plan_script(w, "MAX_TURNS = 400", "MAX_TURNS = 9999"), "this test pins"),
     (lambda w: plan_script(w, "READ_CHUNK_BYTES = 20_000", "READ_CHUNK_BYTES = 10**9"), "pins"),
-    (lambda w: plan_script(w, "PART_READS = 40", "PART_READS = 4000"), "this test pins"),
+    (lambda w: plan_script(w, "PART_READS = 100", "PART_READS = 4000"), "this test pins"),
     (
         lambda w: plan_script(w, '"data suffixes": (".json"', '"data suffixes": (".py", ".json"'),
         "this test pins",
@@ -1322,7 +1322,7 @@ CASES: list[tuple[Change, str]] = [
     (lambda w: w["jobs"]["follow-1"].pop("outputs"), "follow-1's outputs are None"),
     (lambda w: w["jobs"]["follow-1"]["steps"][-1].pop("if"), "follow-1's upload runs when None"),
     (
-        lambda w: script(gather_step(w, "follow-1"), "MAX_PARTS = 6", "MAX_PARTS = 60"),
+        lambda w: script(gather_step(w, "follow-1"), "MAX_PARTS = 3", "MAX_PARTS = 60"),
         "this test pins",
     ),
     (
@@ -2648,7 +2648,19 @@ def test_a_small_pull_request_is_one_part_holding_its_prose(tmp_path: Path) -> N
     assert {f["path"]: f.get("part") for f in data["files"]}["README.md"] == 1
 
 
-def test_source_and_test_files_are_split_into_parts_of_at_most_forty_reads(
+def test_one_session_reads_what_one_session_reliably_covers(tmp_path: Path) -> None:
+    """troupe#297's committed sessions read 133 and 151 Reads in one go, so up to 100 Reads of
+    source and test is one part (owner, 2026-11-12)."""
+    files = {f"src/m{i:02}.py": lines_of(5) for i in range(20)}
+    done, _, plan, matrix = run_plan(merged(tmp_path, {}, files))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert plan is not None
+    assert matrix is not None
+    assert [(p["reads"], p["max_turns"]) for p in plan["parts"]] == [(100, 240)]
+    assert [(m["part"], m["of"]) for m in matrix] == [(1, 1)]
+
+
+def test_source_and_test_files_are_split_into_parts_of_at_most_a_hundred_reads(
     tmp_path: Path,
 ) -> None:
     files = {f"src/m{i:02}.py": lines_of(5) for i in range(26)}
@@ -2656,33 +2668,33 @@ def test_source_and_test_files_are_split_into_parts_of_at_most_forty_reads(
     assert done.returncode == 0, done.stdout + done.stderr
     assert plan is not None
     assert matrix is not None
-    # 130 Reads: three parts of 40 and one of 10, each file in one part, in path order.
-    assert [p["reads"] for p in plan["parts"]] == [40, 40, 40, 10]
-    assert [p["max_turns"] for p in plan["parts"]] == [120, 120, 120, 60]
+    # 130 Reads: one part of 100 and one of 30, each file in one part, in path order.
+    assert [p["reads"] for p in plan["parts"]] == [100, 30]
+    assert [p["max_turns"] for p in plan["parts"]] == [240, 100]
     assert sorted(plan["assign"]) == sorted(files)
-    assert [plan["assign"][f"src/m{i:02}.py"] for i in (0, 7, 8, 24, 25)] == [1, 1, 2, 4, 4]
-    assert [(m["part"], m["of"]) for m in matrix] == [(1, 4), (2, 4), (3, 4), (4, 4)]
+    assert [plan["assign"][f"src/m{i:02}.py"] for i in (0, 19, 20, 25)] == [1, 1, 2, 2]
+    assert [(m["part"], m["of"]) for m in matrix] == [(1, 2), (2, 2)]
     assert len({m["files_sha256"] for m in matrix}) == 1
     assert len({m["round_sha256"] for m in matrix}) == 1
 
 
-def test_more_than_six_parts_of_reads_make_six_larger_parts(tmp_path: Path) -> None:
+def test_more_than_three_parts_of_reads_make_three_larger_parts(tmp_path: Path) -> None:
     files = {f"src/m{i:02}.py": lines_of(5) for i in range(80)}
     done, _, plan, _ = run_plan(merged(tmp_path, {}, files))
     assert done.returncode == 0, done.stdout + done.stderr
     assert plan is not None
-    assert len(plan["parts"]) == 6
+    assert len(plan["parts"]) == 3
     assert sum(p["reads"] for p in plan["parts"]) == 400
     assert sorted(plan["assign"]) == sorted(files)
 
 
 def test_a_file_larger_than_a_part_gets_a_part_of_its_own(tmp_path: Path) -> None:
-    files = {"a.py": lines_of(2), "big.py": lines_of(60), "c.py": lines_of(2)}
+    files = {"a.py": lines_of(2), "big.py": lines_of(120), "c.py": lines_of(2)}
     done, _, plan, _ = run_plan(merged(tmp_path, {}, files))
     assert done.returncode == 0, done.stdout + done.stderr
     assert plan is not None
     assert plan["assign"] == {"a.py": 1, "big.py": 2, "c.py": 3}
-    assert [p["reads"] for p in plan["parts"]] == [2, 60, 2]
+    assert [p["reads"] for p in plan["parts"]] == [2, 120, 2]
 
 
 def test_prose_and_data_alone_make_one_part_with_no_source(tmp_path: Path) -> None:

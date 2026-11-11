@@ -109,14 +109,15 @@ modified or renamed file whole and its diff, and a deleted file's diff. Lockfile
   since nothing uses it.
 
 **A large pull request's reading is split across sessions** (review-splits-large-prs design D1 to D10). The source and
-test files are split into parts of at most 40 Reads, up to six parts, and each part is read by its own session, all at
-once. The first part's session also reads the prose and does the checks of the whole pull request. Once the sessions
-finish, the run works out what they read together, from the action's record of each session's tool calls, never from
-what Claude says. Any source or test file that wasn't read in full goes to a follow-up session, and what that leaves to
-a second follow-up; there's no third. Each session posts its findings inline, and the review's one summary comment,
-from its report job, holds every session's summary and what was read. So several `claude review (...)` jobs in a run
-are one review. The run's summary shows a table of each file, its kind, and whether it was read in full, in part or
-not at all.
+test files are split into parts of at most 100 Reads, about what one session reliably reads, up to three parts, and each
+part is read by its own session, all at once. Past 300 Reads the parts grow rather than add sessions, which bounds what
+one run spends. The first part's session also reads the prose and does the checks of the whole pull request. Once the
+sessions finish, the run works out what they read together, from the action's record of each session's tool calls, never
+from what Claude says. Any source or test file that wasn't read in full goes to a follow-up session, and what that
+leaves to a second follow-up; there's no third. Each session posts its findings inline, and the review's one summary
+comment, from its report job, holds every session's summary and what was read. So several `claude review (...)` jobs in
+a run are one review. The run's summary shows a table of each file, its kind, and whether it was read in full, in part
+or not at all.
 
 `claude review completed` fails when, after the follow-ups, a changed source or test file wasn't read in full, naming
 each, or when what was read couldn't be measured. Prose that wasn't read in full is named in a warning on the check,

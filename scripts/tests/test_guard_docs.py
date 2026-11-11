@@ -94,7 +94,10 @@ def test_the_docs_say_what_a_passing_review_means() -> None:
     # The kinds, and the split (review-splits-large-prs D1 to D3, D10).
     assert "left to the code and tests that use it (decision #278)" in section
     assert "is read as source and test, since nothing uses it" in section
-    assert "split into parts of at most 40 Reads, up to six parts" in section
+    assert (
+        "split into parts of at most 100 Reads, about what one session reliably reads, up to three "
+        "parts" in section
+    )
     assert "goes to a follow-up session, and what that leaves to a second follow-up" in section
     assert "So several `claude review (...)` jobs in a run are one review" in section
     assert "make the pull request smaller" not in section
