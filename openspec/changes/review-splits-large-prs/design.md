@@ -89,6 +89,10 @@ Two changes from #282's list:
 
 Both make the check stricter, never looser.
 
+JSON elsewhere that configures a tool stays data: `.claude/settings.json` (the guard's Claude Code hooks),
+`.mcp.json`, `.claude.json`, `renovate.json` and the like. Claude's review of #299 raised it as a decision, and the
+owner chose to leave them as data (2026-11-12): the guard's own tests and the owner's review cover them.
+
 ### D3. Data stays data only if something that isn't data names it
 
 For each data file, the plan step runs `git grep -F -l` over the checkout for the file's name, then for the name of

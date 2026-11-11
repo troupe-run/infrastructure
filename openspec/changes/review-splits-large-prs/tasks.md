@@ -182,7 +182,7 @@
     passed (5643 passed, 16 skipped; all gates passed), and website's `npx vitest run
     tests/unit/workflow-node-version.test.ts` passed (8 of 8). Only the workflow's header comment changed after
     troupe's run.
-- [ ] 7.3 On this pull request's own review run, which runs the new workflow, record:
+- [x] 7.3 On this pull request's own review run, which runs the new workflow, record:
   - the plan's parts;
   - each session's turns and coverage;
   - whether follow-ups ran;
@@ -190,6 +190,17 @@
   - `claude review completed`'s result.
 
   Verify by citing the run ID and its summary table in the pull request.
+  - Done 2026-11-12, run 43031243264 on a3c9c64:
+    - The plan listed 14 files (4 source and test, 10 prose, 0 data), as one part of 54 Reads with
+      `--max-turns 148`.
+    - The lead session read all 14 in full in 66 turns.
+    - `plan follow-up 1` found 0 of 4 source and test files unread, so both follow-up rounds were skipped, as was
+      `plan follow-up 2`.
+    - `resolve and report` posted one summary comment, reporting 4 of 4 source and test files read in full.
+    - `claude review completed` passed.
+    - GitHub accepted the YAML anchors the three rounds share.
+    - Not exercised live: more than one part, and a follow-up round. The behaviour tests cover those (troupe#325's
+      and #318's shapes).
 
 ## Workflow follow-up
 
