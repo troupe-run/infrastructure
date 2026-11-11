@@ -66,8 +66,9 @@ status; OpenSpec holds what the system does and how each change will do it.
    open must-fixes, so a must-fix answered with a reply alone is judged when the reply is posted. A required check,
    `claude review completed`, holds the pull request until the review of its head has completed and read changed
    code it was given, measured from its tool calls; if the review was cancelled or failed, its run is re-run, and if
-   it read none of the changed source and test files in full, the pull request isn't reviewed yet. Until
-   troupe-run/infrastructure#280, other files it didn't read in full are named in a warning, and the check passes. Once the review of the last push
+   its sessions didn't together read every changed source and test file in full, the pull request isn't reviewed
+   yet. A large pull request's reading is split across sessions, and data such as fixtures is left to the tests
+   that use it; prose it didn't read in full is named in a warning, and the check passes. Once the review of the last push
    leaves no must-fix or decision open, the pull request is marked ready for review, so CI's full run,
    and the plan where there is one, test the code the review has finished with. The pull request can't merge while
    any conversation is open.
