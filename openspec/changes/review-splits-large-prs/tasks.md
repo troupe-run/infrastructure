@@ -10,8 +10,8 @@
   - Give each entry a `kind` (`source and test`, `prose`, `data` or none), with a `why` when data was turned into
     source and test by D3.
   - Run D3's `git grep -F -l` check per data file, ignoring the file itself, other data files and `openspec/`.
-  - Pack the source and test files into parts per D1 (`PART_READS = 40`, `MAX_PARTS = 6`). Part 1 also gets the
-    prose.
+  - Pack the source and test files into parts per D1 (`PART_READS = 100`, `MAX_PARTS = 3`; first 40 and 6, changed by
+    the owner on 2026-11-12). Part 1 also gets the prose.
   - Write `files.json` with `kind` and `part` per entry, and `parts` holding `{part, of, reads, max_turns}`.
   - Upload it as `review-plan` (retention 1 day). Output the `parts` matrix and the file's SHA-256.
   - Verify with `uv run pytest scripts/tests/test_claude_review_workflow.py -k plan` after 1.2.
@@ -25,10 +25,10 @@
   - **Data nothing names.** A JSON file named by no file is source and test with "nothing names it". One named only by
     another JSON file, or only under `openspec/`, is source and test. One whose folder a test names is data.
   - **Parts.**
-    - 8 Reads make one part.
-    - 130 Reads of source and test files make 4 parts of at most 40, each file in one part, folders together.
-    - 400 Reads make 6 parts with no file dropped.
-    - One 60-Read file gets a part of its own.
+    - 8 Reads make one part, and so do 100.
+    - 130 Reads of source and test files make 2 parts of at most 100, each file in one part, folders together.
+    - 400 Reads make 3 parts with no file dropped.
+    - One 120-Read file gets a part of its own.
     - A prose-and-data-only pull request makes one part with no source or test file.
     - Each part's `max_turns` follows its own Reads plus part 1's prose.
   - **troupe#325's 39 files.** The source and test files land in 1 part, the 10 JSON schemas are data, and the 16

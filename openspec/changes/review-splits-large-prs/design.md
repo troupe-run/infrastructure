@@ -41,24 +41,29 @@ Two things carry over from earlier changes:
 
 ## Decisions
 
-### D1. Parts of at most 40 Reads, at most 6 parts
+### D1. Parts of at most 100 Reads, at most 3 parts
 
-`PART_READS = 40`, `MAX_PARTS = 6`, declared in the plan step.
+`PART_READS = 100`, `MAX_PARTS = 3`, declared in the plan step (owner, 2026-11-12).
 
-- **Why 40.** The failed sessions read 1 to 39 files before stopping. Sessions that committed read 150 Reads. A
-  narrower list makes "read all of these" a short task, which is what we want each session to do.
-- **When there's more.** Past 6 × 40 = 240 Reads, the parts grow evenly instead of adding sessions, which bounds the
-  cost of one run.
+- **Why 100.** The sessions that committed to the list read 133 and 151 Reads in one go, and the ones that failed
+  stopped early whatever their size (troupe#325 had 85 Reads in all). Size isn't what stops a session; the
+  follow-up rounds (D10) deal with that. So a part is about what one session reliably reads, and troupe#325 and
+  #297 are one session each. Every session runs on the one Claude subscription token the three repositories share,
+  and until #280 every push reads all the code again, so a smaller part would mostly buy parallel sessions and spend
+  quota.
+- **When there's more.** Past 3 × 100 = 300 Reads, the parts grow evenly instead of adding sessions, which bounds the
+  cost of one run to three sessions a round.
 - **How files are packed.**
   - Each file's targets stay together.
   - Files are taken in path order, so one folder's files tend to share a part. A test and its module may still land
     in different parts, and that's what the uses search is for.
-  - A new part starts when adding the next file would pass 40 Reads, unless the part is empty: one file larger than
-    40 Reads gets a part of its own.
+  - A new part starts when adding the next file would pass 100 Reads, unless the part is empty: one file larger than
+    100 Reads gets a part of its own.
 - **Alternatives considered.**
   - One part per folder, which gives uneven sizes and no bound on how many parts there are.
-  - A larger part, around 100 Reads. The evidence says size isn't what stops a session, so the smaller part costs
-    little and makes each session's task shorter.
+  - Parts of 40 Reads, up to six, which this change first proposed. The owner chose 100 and 3 (2026-11-12): six
+    parallel sessions of a short list each cost more quota than they bought, since size isn't what stops a
+    session.
 
 ### D2. Files are sorted into kinds before the session starts, so Claude is told what to read
 
@@ -105,9 +110,8 @@ If nothing names the file or its folder, it counts as source and test, and the s
 
 The folder's name counts as a match because troupe loads fixtures by folder, for example
 `fixtures/responses/<case>/replies.json`. That's a permissive test: a folder called `responses` is likely named
-somewhere. It's still enough to catch a stray export or an orphaned recording. The owner chose the file or folder name over
-the file name alone (2026-11-11). It does this at no cost, and it can
-only add files to the must-read list.
+somewhere. It's still enough to catch a stray export or an orphaned recording. The owner chose the file or folder name
+over the file name alone (2026-11-11). It does this at no cost, and it can only add files to the must-read list.
 
 Alternatives considered:
 - An explicit marker, such as a `.review-data` manifest. It needs every repository to maintain one, and it's a list
@@ -248,11 +252,11 @@ no longer suggests a smaller pull request (#278, option C, not chosen).
 
 ### D10. Two follow-up rounds
 
-The owner chose two rounds (2026-11-11), over one. If the second follow-up also stops early, the check fails and the agent re-runs the
-run. A re-run starts from round 1, since nothing carries over until #280.
+The owner chose two rounds (2026-11-11), over one. If the second follow-up also stops early, the check fails and the
+agent re-runs the run. A re-run starts from round 1, since nothing carries over until #280.
 
-Any bound is arbitrary. Two rounds at most triple a large review's cost, and fewer runs need re-running by hand. #297's history suggests a second
-session over a short list will usually read it.
+Any bound is arbitrary. Two rounds at most triple a large review's cost, and fewer runs need re-running by hand. #297's
+history suggests a second session over a short list will usually read it.
 
 ### D11. Turn budget per session
 

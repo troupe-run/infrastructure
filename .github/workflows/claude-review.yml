@@ -327,8 +327,8 @@ jobs:
           }
           # The parts the source and test files are split into, one session each: at most PART_READS
           # Reads a part while MAX_PARTS parts hold them, larger parts past that (design D1).
-          PART_READS = 40
-          MAX_PARTS = 6
+          PART_READS = 100
+          MAX_PARTS = 3
 
 
           def escape(text):
@@ -1192,8 +1192,8 @@ jobs:
           BASE_TURNS = 40
           TURNS_PER_READ = 2
           MAX_TURNS = 400
-          PART_READS = 40
-          MAX_PARTS = 6
+          PART_READS = 100
+          MAX_PARTS = 3
 
 
           def escape(text):
@@ -1578,8 +1578,8 @@ jobs:
           BASE_TURNS = 40
           TURNS_PER_READ = 2
           MAX_TURNS = 400
-          PART_READS = 40
-          MAX_PARTS = 6
+          PART_READS = 100
+          MAX_PARTS = 3
 
 
           def escape(text):

@@ -38,9 +38,10 @@ stops early has to be followed by another session over what it left unread.
   its file name or its folder. Otherwise it goes on the must-read list as source and test, so a stray data file is read
   rather than waved through.
 - **The reading is split into parts.** The source and test files are split into parts of at most a declared number of
-  Reads, each read by its own session, in parallel. The first part also does the whole-pull-request checks (OpenSpec
-  tasks, the issue, commits, `CLAUDE.md`, the org guide) and reads the prose. A small pull request is one part, as
-  today.
+  Reads (100, about what one session reliably reads), up to three parts, each read by its own session, in parallel
+  (owner, 2026-11-12). The first part also does the whole-pull-request checks (OpenSpec tasks, the issue, commits,
+  `CLAUDE.md`, the org guide) and reads the prose. A small pull request is one part, as today, and so are troupe#325
+  and #297.
 - **Follow-up sessions read what was left.** After the parts finish, the run measures what they read together. If
   any source or test file isn't read in full, a round of follow-up sessions takes only those files, and a second
   round takes whatever the first left (owner, 2026-11-11: two rounds). That's how a session
@@ -95,6 +96,6 @@ None.
   `org-profile/CONTRIBUTING.md`'s delivery to troupe-run/.github.
 - `scripts/tests/test_claude_review_workflow.py`: the jobs' structure, new hash pins, and behaviour tests that run the
   plan, merge and check scripts against troupe#325's and #297's shapes.
-- A large pull request costs more: several sessions, plus up to two follow-up rounds when a session stops early. Each session
-  starts by reading `CLAUDE.md`, the pull request and the conversations again.
+- A large pull request costs more: several sessions, plus up to two follow-up rounds when a session stops early. Each
+  session starts by reading `CLAUDE.md`, the pull request and the conversations again.
 - No new secret, App permission or dependency. Claude has one tool fewer.
