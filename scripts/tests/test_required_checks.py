@@ -286,6 +286,10 @@ def test_a_job_confined_to_other_events_isn_t_counted() -> None:
     names = pull_request_checks(workflows)
     assert "plan (main)" not in names
     assert "apply (main)" not in names
+    # Judged by the events they run on, not by NOT_REQUIRED, which also names claude-review.yml's
+    # own `plan` job (review-splits-large-prs).
+    assert not runs_on_pull_requests(workflows["tofu.yml"], "plan")
+    assert not runs_on_pull_requests(workflows["tofu.yml"], "apply")
 
 
 def test_the_matrix_expands_with_exclude_and_include() -> None:
