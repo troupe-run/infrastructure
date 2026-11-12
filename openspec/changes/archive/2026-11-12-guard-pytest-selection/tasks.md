@@ -53,10 +53,12 @@
   with no `guard:` line both ways on the new one. The full suite ran with `-n 4`, not 10, to keep load down on a
   machine other sessions share: 6022 passed, 16 skipped, no `guard:` line
 - [x] 3.2 Run `uv run scripts/check.py` and `openspec validate guard-pytest-selection --strict`, and verify both pass
-- [ ] 3.3 Run `uv run scripts/tofu.py plan` after rebasing onto `origin/main`, and verify it shows only
+- [x] 3.3 Run `uv run scripts/tofu.py plan` after rebasing onto `origin/main`, and verify it shows only
   `scripts/guard_pytest.py` updated in place in troupe and website. Keep it for the pull request
   The local plan failed: 1Password's authorization timed out in this session. The plan-pr run's comment stands in
-  for it, once the pull request is ready and the owner approves that run
+  for it. Its plan for 5975dcd (run 43220982404, PR comment 6824101404), on the branch merged onto `main`: 0 to add,
+  2 to change, 0 to destroy, `github_repository_file.guard["troupe:scripts/guard_pytest.py"]` and
+  `["website:scripts/guard_pytest.py"]` updated in place, no modes to set
 
 ## Workflow follow-up
 
