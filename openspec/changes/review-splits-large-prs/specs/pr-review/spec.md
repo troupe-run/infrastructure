@@ -120,8 +120,9 @@ how to get a review that reads the code.
 - **THEN** `claude review completed` passes
 
 #### Scenario: The lead session died
-- **WHEN** a pull request changes only Markdown, and its one session fails having read nothing, for example because
-  the Claude token expired, so its action step fails without failing its job
+- **WHEN** a pull request changes only Markdown, and its one session fails having read none of the changed files and
+  diffs listed, only `CLAUDE.md` or nothing at all, for example because the Claude token expired, so its action step
+  fails without failing its job
 - **THEN** `claude review completed` fails, saying coverage couldn't be measured and naming round 1 part 1
 
 #### Scenario: The check is weakened
