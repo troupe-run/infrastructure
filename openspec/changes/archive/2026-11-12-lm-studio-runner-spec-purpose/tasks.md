@@ -12,18 +12,24 @@
 
 ## 2. Verify against troupe's main
 
-- [ ] 2.1 Once troupe#379 has merged (design D3), re-read the Purpose from troupe's `main`
+- [x] 2.1 Once troupe#379 has merged (design D3), re-read the Purpose from troupe's `main`
       (`gh api repos/troupe-run/troupe/contents/openspec/specs/lm-studio-runner/spec.md`, through `purpose()`) and compare
       it with the record. Verify the spec's `Capability:` line still names `cap:actor-runners` alone. If the Purpose
       changed, update the record, check design D2 against the new text, and re-run 1.1's checks. Stop and revise the
       change if the spec is renamed, dropped or names other labels
-- [ ] 2.2 Fast-forward the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports nothing about
+      Done 2026-11-12, after troupe#379 merged (025928d4): `purpose()` of `main`'s spec equals the record, and its
+      `Capability:` line is `cap:actor-runners` alone.
+- [x] 2.2 Fast-forward the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports nothing about
       troupe's specs or Purposes. Keep the output for the pull request. Stop and revise the change if it reports
       anything of this change's
-- [ ] 2.3 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it shows nothing
+      Done 2026-11-12 on `origin/main`: "oob: no differences (... troupe specs, troupe label descriptions, ...)".
+- [x] 2.3 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it shows nothing
       of this change's created, changed or deleted (any change listed is another pending one of `main`'s, named in
       the tick), or that no plan ran because only `oob/` and `openspec/` changed
-- [ ] 2.4 Run `openspec validate lm-studio-runner-spec-purpose --strict` and verify it passes
+      Done: no plan ran. "does it need a plan?" passed and `plan (pull request)` was skipped, since only `oob/` and
+      `openspec/` change.
+- [x] 2.4 Run `openspec validate lm-studio-runner-spec-purpose --strict` and verify it passes
+      Done 2026-11-12: it passes.
 
 ## Workflow follow-up
 
