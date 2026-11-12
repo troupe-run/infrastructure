@@ -258,13 +258,15 @@ agent re-runs the run. A re-run starts from round 1, since nothing carries over 
 Any bound is arbitrary. Two rounds at most triple a large review's cost, and fewer runs need re-running by hand. #297's
 history suggests a second session over a short list will usually read it.
 
-A failed session doesn't fail its job (the action step continues on error, so a session that runs out of turns
-still leaves a record). So the measuring step keeps the action step's outcome, and a dead lead session (round 1, part
-1) makes coverage unknown, which fails the check: one that left no record, or failed having read nothing (an expired
-token, a crash). The lead does the checks of the whole pull request, so without it there was no review, even when
-nothing it was to read is source or test. Claude's review of #299 found the gap. A lead that ran out of turns having
-read is not dead: what it didn't read goes to the follow-ups, and the check passes if they read it (owner, 2026-11-12,
-over failing any lead that didn't finish). Another part that failed is caught by the follow-ups in the same way.
+A failed session doesn't fail its job (the action step continues on error, so a session that runs out of turns still
+leaves a record). So the measuring step keeps the action step's outcome, and a dead lead session (round 1, part 1) makes
+coverage unknown, which fails the check: one that left no record, or failed having read none of the changed files and
+diffs listed (an expired token, a crash). An unchanged file, such as the `CLAUDE.md` the prompt reads first, doesn't
+count, since the whole-PR checks come after it (owner, 2026-11-12, on #299's review). The lead does the checks of the
+whole pull request, so without it there was no review, even when nothing it was to read is source or test. Claude's
+review of #299 found the gap. A lead that ran out of turns having read is not dead: what it didn't read goes to the
+follow-ups, and the check passes if they read it (owner, 2026-11-12, over failing any lead that didn't finish). Another
+part that failed is caught by the follow-ups in the same way.
 
 ### D11. Turn budget per session
 

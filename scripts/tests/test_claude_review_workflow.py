@@ -234,8 +234,8 @@ MEASURE = {
     "shell": "python3 {0}",
     "env": {
         "EXECUTION_FILE": "${{ steps.review.outputs.execution_file }}",
-        # The session's own outcome: a lead that failed having read nothing fails the check
-        # (#299's review).
+        # The session's own outcome: a lead that failed having read none of its listed files
+        # fails the check (#299's review).
         "OUTCOME": "${{ steps.review.outcome }}",
         "ROUND": "${{ matrix.round }}",
         "PART": "${{ matrix.part }}",
@@ -257,7 +257,7 @@ ANSWER_SHA256 = "815aaab9d79a0f0870bc3aa850f069eae46423fc60c5f1a96272e39328ff18a
 # What the sessions read together, in each planner and in the report job: one script (D4).
 GATHER_NAME = "Gather what the sessions read"
 GATHER = {"id": "gather", "shell": "python3 {0}"}
-GATHER_SHA256 = "e432d78cf149afb12b7c7011a8d94a76302fc268f73785073126b875b94b1d85"
+GATHER_SHA256 = "43ef56ffcce0c40c5663f973935da847cc38d26a5f2a2f9b5e4173d2410319de"
 # Resolve and re-tier what Claude names, checked against conversations read again in the report
 # job, and only on a file of that session's list (design D4, D4a; review-splits-large-prs D7).
 RESOLVER_NAME = "Resolve and re-tier what Claude named"
@@ -3154,12 +3154,15 @@ def test_a_lead_that_ran_out_of_turns_having_read_is_caught_up_by_its_follow_up(
     assert (said["coverage"], said["code"]) == ("complete", "all")
 
 
-def test_a_lead_that_failed_having_read_only_unchanged_files_isn_t_dead(tmp_path: Path) -> None:
+def test_a_lead_that_died_having_read_only_unchanged_files_is_dead(tmp_path: Path) -> None:
+    """The prompt's first step is reading CLAUDE.md: a lead that got that far and then died never
+    did the whole-PR checks, so only a read of a listed file counts (owner, 2026-11-12)."""
     session = Session(tmp_path, [PROSE_ONLY])
     session.read("CLAUDE.md", range(1, 30))
     session.measure(1, 1, outcome="failure")
     said, _, _ = session.gather()
-    assert (said["coverage"], said["code"]) == ("incomplete", "none")
+    assert (said["coverage"], said["code"]) == ("unknown", "unknown")
+    assert json.loads(said["unmeasured"]) == "round 1 part 1"
 
 
 @pytest.mark.parametrize("files", [[], [SKIPPED]])
