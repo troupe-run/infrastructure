@@ -2,10 +2,10 @@
 
 ### Requirement: The workflow docs say what a passing review means
 `docs/development-workflow.md`, under "Claude's review", SHALL say that a passing `claude review completed` means the
-review of the head finished and its sessions together read every changed source and test file in full, that a warning
-names prose it didn't read, that data is left to its tests, and that a pass doesn't mean the code has no bugs, call
-sites were checked, or the owner's review can be skipped. It SHALL say which files are which kind, how a large pull
-request's reading is split, and what to do when the check fails.
+head's review finished and its sessions read every changed source and test file in full, that a warning names unread
+prose, that data is left to its tests, and that a pass doesn't mean the code has no bugs or the owner's review can be
+skipped. It SHALL say which files are which kind, how a large pull request's reading is split, and what to do when the
+check fails.
 
 #### Scenario: An agent's check fails for coverage
 - **WHEN** an agent's pull request shows no open finding, and `claude review completed` fails because changed source
