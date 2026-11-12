@@ -3506,7 +3506,8 @@ def lock_versions(name: str, text: str, dependency: str) -> list[str] | str:
 def lock_move(root: Path, sha: str, path: str, dependency: str) -> tuple[str, str] | str:
     """The one version of ``dependency`` that ``path`` moves from and the one it moves to, read
     from the file at the commit's parent and at the commit; or why it can't be read (design D2.2).
-    Versions are compared as multisets, so an entry that stays the same doesn't count."""
+    Entries are compared as multisets, so one that stays the same doesn't count, and the versions
+    that go and come are counted once each: copies of one version moving together are one move."""
     name = path.rsplit("/", 1)[-1]
     sides: list[list[str]] = []
     for revision in (f"{sha}^", sha):
@@ -3519,8 +3520,10 @@ def lock_move(root: Path, sha: str, path: str, dependency: str) -> tuple[str, st
             return f"{path} {versions}"
         sides.append(versions)
     before, after = sides
-    gone = [v for v in before if before.count(v) > after.count(v)]
-    came = [v for v in after if after.count(v) > before.count(v)]
+    # Distinct versions, so entries at one version that all move to another (hoisted and nested
+    # copies) count as one move (review on #302).
+    gone = sorted({v for v in before if before.count(v) > after.count(v)})
+    came = sorted({v for v in after if after.count(v) > before.count(v)})
     if len(gone) != 1 or len(came) != 1:
         return (
             f"{path} doesn't move one version of {dependency} to one other "

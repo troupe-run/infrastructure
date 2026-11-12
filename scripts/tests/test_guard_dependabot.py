@@ -1387,6 +1387,21 @@ def test_a_short_subject_whose_lock_moves_two_versions_fails_naming_the_file(
     assert "package-lock.json doesn't move one version of zod to one other" in problem
 
 
+def test_a_short_subject_whose_lock_moves_two_copies_of_one_version_passes(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, _ = dependabot_repo(make_repo, tmp_path)
+    nested = '"node_modules/a/node_modules/zod": {"version": "4.6.5"},\n    "node_modules/zod"'
+    edit(repo, "package-lock.json", '"node_modules/zod"', nested)
+    git(repo.path, "commit", "-q", "--no-verify", "-am", "chore: a hoisted and a nested zod")
+    git(repo.path, "push", "-q", "origin", "main")
+    base = repo.head()
+    repo.switch(ZOD_SHORT_BRANCH)
+    edit(repo, "package-lock.json", '"version": "4.6.5"', '"version": "4.6.7"')
+    commit(repo, short_message("chore(deps): Bump zod", zod_bumps("4.6.5", "4.6.7")))
+    assert ci(repo, base, ZOD_SHORT_BRANCH) == []
+
+
 def test_a_short_subject_whose_lock_can_t_be_parsed_fails_naming_the_file(
     make_repo: Callable[[], Repo], tmp_path: Path
 ) -> None:

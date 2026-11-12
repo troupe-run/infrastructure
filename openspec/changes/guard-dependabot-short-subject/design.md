@@ -65,7 +65,8 @@ For a short-subject commit naming dependency X (compared under PEP 503's normal 
 2. **Lock files.** For each `uv.lock` and `package-lock.json` the commit changes, the file is parsed at the commit's
    parent and at the commit (`tomllib`, `json`; both standard library). X's versions are collected from each: in
    `uv.lock`, every `[[package]]` whose `name` is X; in `package-lock.json`, every `packages` key whose last
-   `node_modules/` segment is X. Exactly one version must disappear and one appear (as multisets), giving A to B.
+   `node_modules/` segment is X. Exactly one distinct version must disappear and one appear (entries compared as multisets, so copies of
+   one version moving together, hoisted and nested, are one move), giving A to B.
    Anything else in a changed lock file (unparseable, no `packages`, X not moving, several versions moving) is
    unreadable and refuses the commit, naming the file. Each lock file is its own reading of the versions, and they
    must agree with each other.
