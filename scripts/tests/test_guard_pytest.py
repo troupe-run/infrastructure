@@ -1,5 +1,6 @@
 """commit-check-paths tasks 4.3-4.4: the pytest plugin checks each test's tags against its reads,
-and scope-test-directories tasks 3.1-3.2: it tags the tests under a scope's `tests` directories.
+and scope-test-directories tasks 3.1-3.2: it tags the tests under a scope's `tests` directories,
+and guard-pytest-selection tasks 1.1-1.4: a selection by node id charges a test only its reads.
 
 Each test runs pytest in a subprocess, on a throwaway project holding this repository's guard.py
 and guard_pytest.py, as a governed repository would (design D9).
@@ -388,3 +389,121 @@ def test_the_scope_s_marker_says_which_directories_it_runs(tmp_path: Path) -> No
     result = run_pytest(suites(tmp_path), "--markers")
     assert "@pytest.mark.sa: reads docs/**; runs suites/a/**, suites/shared/**" in result.stdout
     assert "@pytest.mark.sb: reads path1/**; runs suites/b/**, suites/shared/**" in result.stdout
+
+
+# Tests selected by node id across scopes (guard-pytest-selection tasks 1.1-1.4, design D3, #298)
+
+PACKAGES = (
+    DECLARATION
+    + """
+[scopes.alpha]
+paths = ["alpha/**"]
+tests = ["alpha/tests/**"]
+
+[scopes.beta]
+paths = ["beta/**"]
+tests = ["beta/tests/**"]
+"""
+)
+
+ALPHA = """\
+from pathlib import Path
+
+ROOT = Path(__file__).parents[2]
+
+
+def test_alpha_reads_its_own_data():
+    assert (ROOT / "alpha/data.txt").read_text()
+
+
+def test_alpha_reads_the_docs_untagged():
+    assert (ROOT / "docs/a.md").read_text()
+"""
+
+ALPHA_AT_IMPORT = """\
+from pathlib import Path
+
+TEXT = (Path(__file__).parents[2] / "docs/a.md").read_text()
+
+
+def test_alpha_uses_the_docs_read_at_import():
+    assert TEXT
+"""
+
+BETA_CONFTEST = """\
+from pathlib import Path
+
+import pytest
+
+
+@pytest.fixture
+def beta_data():
+    return (Path(__file__).parents[2] / "beta/data.txt").read_text()
+"""
+
+BETA = 'def test_beta_reads_its_own_data(beta_data):\n    assert beta_data == "beta\\n"\n'
+
+ALPHA_TEST = "alpha/tests/test_alpha.py::test_alpha_reads_its_own_data"
+DOCS_TEST = "alpha/tests/test_alpha.py::test_alpha_reads_the_docs_untagged"
+IMPORT_TEST = "alpha/tests/test_at_import.py::test_alpha_uses_the_docs_read_at_import"
+BETA_TEST = "beta/tests/test_beta.py::test_beta_reads_its_own_data"
+
+
+def packages(tmp_path: Path) -> Path:
+    """Two scopes, each with its own tests directory, one of them with a conftest.py."""
+    return project(
+        tmp_path,
+        "def test_root():\n    pass\n",
+        declaration=PACKAGES,
+        files={
+            "alpha/data.txt": "alpha\n",
+            "alpha/tests/test_alpha.py": ALPHA,
+            "alpha/tests/test_at_import.py": ALPHA_AT_IMPORT,
+            "beta/data.txt": "beta\n",
+            "beta/tests/conftest.py": BETA_CONFTEST,
+            "beta/tests/test_beta.py": BETA,
+        },
+    )
+
+
+def guard_lines(result: subprocess.CompletedProcess[str]) -> list[str]:
+    return [line for line in result.stdout.splitlines() if line.startswith("guard:")]
+
+
+@pytest.mark.xfail(strict=True, reason="#298: charged with the other module's collection reads")
+@pytest.mark.parametrize("parallel", PARALLEL)
+def test_tests_from_two_scopes_selected_by_node_id_pass(
+    tmp_path: Path, parallel: tuple[str, ...]
+) -> None:
+    result = run_pytest(packages(tmp_path), "-rA", ALPHA_TEST, BETA_TEST, *parallel)
+    assert result.returncode == 0, result.stdout
+    assert guard_lines(result) == []
+    assert passed(result) == {ALPHA_TEST, BETA_TEST}
+
+
+@pytest.mark.xfail(strict=True, reason="#298: charged with the other module's collection reads")
+@pytest.mark.parametrize("parallel", PARALLEL)
+def test_a_module_level_read_in_a_selection_by_node_id_counts_for_its_module_only(
+    tmp_path: Path, parallel: tuple[str, ...]
+) -> None:
+    result = run_pytest(packages(tmp_path), "-rA", IMPORT_TEST, BETA_TEST, *parallel)
+    assert result.returncode == 1, result.stdout
+    lines = guard_lines(result)
+    assert len(lines) == 1, lines
+    assert lines[0].startswith(f"guard: {IMPORT_TEST} reads docs/a.md"), lines
+    assert "`docs`" in lines[0]
+    assert passed(result) == {BETA_TEST}
+
+
+@pytest.mark.xfail(strict=True, reason="#298: charged with the other module's collection reads")
+@pytest.mark.parametrize("parallel", PARALLEL)
+def test_an_untagged_read_in_a_selection_by_node_id_fails_only_that_test(
+    tmp_path: Path, parallel: tuple[str, ...]
+) -> None:
+    result = run_pytest(packages(tmp_path), "-rA", ALPHA_TEST, BETA_TEST, DOCS_TEST, *parallel)
+    assert result.returncode == 1, result.stdout
+    lines = guard_lines(result)
+    assert len(lines) == 1, lines
+    assert lines[0].startswith(f"guard: {DOCS_TEST} reads docs/a.md"), lines
+    assert "`docs`" in lines[0]
+    assert passed(result) == {ALPHA_TEST, BETA_TEST}
