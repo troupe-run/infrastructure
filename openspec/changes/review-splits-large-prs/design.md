@@ -259,10 +259,12 @@ Any bound is arbitrary. Two rounds at most triple a large review's cost, and few
 history suggests a second session over a short list will usually read it.
 
 A failed session doesn't fail its job (the action step continues on error, so a session that runs out of turns
-still leaves a record). So the measuring step keeps the action step's outcome, and a lead session (round 1, part 1)
-that failed, or left no record, makes coverage unknown, which fails the check. The lead does the checks of the whole
-pull request, so without it there was no review, even when nothing it was to read is source or test. Another part that
-failed is caught by the follow-ups, which re-read its source and test files. Claude's review of #299 found the gap.
+still leaves a record). So the measuring step keeps the action step's outcome, and a dead lead session (round 1, part
+1) makes coverage unknown, which fails the check: one that left no record, or failed having read nothing (an expired
+token, a crash). The lead does the checks of the whole pull request, so without it there was no review, even when
+nothing it was to read is source or test. Claude's review of #299 found the gap. A lead that ran out of turns having
+read is not dead: what it didn't read goes to the follow-ups, and the check passes if they read it (owner, 2026-11-12,
+over failing any lead that didn't finish). Another part that failed is caught by the follow-ups in the same way.
 
 ### D11. Turn budget per session
 
@@ -299,6 +301,23 @@ session. The jobs' `timeout-minutes` stays 90.
 
 Rollback: revert the commit and deliver again. `claude review completed` keeps its name, so required checks don't
 change.
+
+## Probe results
+
+**Artifact names survive a re-run** (2026-11-12, on troupe-run/infra-probe-rerun-artifacts, since deleted). Claude's
+review of #299 asked whether `upload-artifact` refuses a second upload of the same name in one run, which would break
+the documented `gh run rerun` remedy. On `upload-artifact` v7.0.2 and `download-artifact` v8.0.2, as this workflow pins
+them:
+
+- **A full re-run** (`gh run rerun <id>`, or "Re-run all jobs") starts with no artifacts. Every job uploaded its fixed
+  name again, with no conflict. A pattern download saw only the second attempt's artifacts: one uploaded only by the
+  first attempt wasn't there.
+- **Re-running only the failed jobs** carries over the artifacts of the jobs it doesn't re-run, as their results are
+  carried over. A re-run job that had uploaded a name before failing uploaded it again, with no conflict, and the
+  download got the new one.
+
+So the fixed names stay. A full re-run never merges an earlier attempt's records, and a partial one keeps the records
+of the sessions it didn't re-run, which read the same commit.
 
 ## Open Questions
 
