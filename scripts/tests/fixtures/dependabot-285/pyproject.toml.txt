@@ -1,0 +1,53 @@
+# Repository tooling only: the OpenTofu wrapper, the out-of-band drift checks and scripts/check.py.
+# Not a distributable package. See openspec/changes/archive/2026-10-11-adopt-org/design.md (D4, D6, D8).
+[project]
+name = "troupe-infrastructure"
+version = "0"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.4",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "hypothesis>=6.170.14",
+    "pyyaml>=6.0.3",
+    "types-pyyaml>=6.0.12.20260906",
+    "pytest-xdist>=3.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["scripts"]
+# ruff formats the Python in Markdown too. scripts/check-paths.toml skips openspec/ because no gate reads it, and CI
+# skips the check for a pull request that changes only openspec/, so ruff mustn't read it either (run-checks-by-path).
+extend-exclude = ["openspec"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "RUF", "PT", "N", "ANN", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, and drive the scripts through subprocess with trusted arguments.
+"scripts/tests/**" = ["S101", "S603", "S607"]
+# Repository scripts run fixed tools (tofu, op, gh, uv) from PATH.
+"scripts/**" = ["S603", "S607"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = ["scripts"]
+explicit_package_bases = true
+mypy_path = ["scripts", "scripts/tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["scripts/tests"]
+pythonpath = ["scripts"]
+# guard_pytest checks each test's markers against what it reads (scripts/check-paths.toml).
+addopts = ["-ra", "--strict-markers", "--strict-config", "-p", "guard_pytest"]
+xfail_strict = true

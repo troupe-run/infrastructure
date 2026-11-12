@@ -2,13 +2,13 @@
 
 ## 1. Pin what must not change, and reproduce #285
 
-- [ ] 1.1 Before touching `scripts/guard.py`, add `scripts/tests/fixtures/dependabot-285/`: `pyproject.toml` and
+- [x] 1.1 Before touching `scripts/guard.py`, add `scripts/tests/fixtures/dependabot-285/`: `pyproject.toml` and
   `uv.lock` from `0b0f7d9`, and `b25fc2f.patch` from `git format-patch -1 b25fc2f`. Add a test in
   `scripts/tests/test_guard_dependabot.py` that commits the two files on main, applies the patch with `git am` on
   `dependabot/uv/types-pyyaml-6.0.12.20261030`, and asserts `run_ci` for `troupe-run/infrastructure` doesn't refuse
   it (spec scenario "A subject that leaves out its versions"). Run it on the unchanged guard and verify it fails with
   #301's reason (`b25fc2f's subject 'chore(deps-dev): Bump types-pyyaml' doesn't give one dependency's versions`)
-- [ ] 1.2 On the unchanged guard, run the existing Dependabot tests (`test_guard_dependabot.py`,
+- [x] 1.2 On the unchanged guard, run the existing Dependabot tests (`test_guard_dependabot.py`,
   `test_dependabot_issues.py`) and verify they pass, so they pin today's outcomes for every subject that gives its
   versions (design D6)
 
