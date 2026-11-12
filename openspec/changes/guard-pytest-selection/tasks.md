@@ -45,12 +45,18 @@
 
 ## 3. Integration
 
-- [ ] 3.1 Copy the new `scripts/guard_pytest.py` into a scratch clone of troupe's `main`. Run troupe#365's command
+- [x] 3.1 Copy the new `scripts/guard_pytest.py` into a scratch clone of troupe's `main`. Run troupe#365's command
   (tests from several packages by node id) serially and with `-n 2`, and verify no `guard:` line. Then run troupe's
   full suite with `-n 10`, and verify it reports no guard failure the unchanged guard doesn't. Record both
-- [ ] 3.2 Run `uv run scripts/check.py` and `openspec validate guard-pytest-selection --strict`, and verify both pass
+  At troupe `bbcf114`: #365's three node ids gave 3 passed, 2 errors serially and with `-n 2` on the unchanged guard
+  (`test_ollama_runner.py` charged with `test_git_state_cache.py`, its `.pyc` and `troupe_vcs_git`'s), and 3 passed
+  with no `guard:` line both ways on the new one. The full suite ran with `-n 4`, not 10, to keep load down on a
+  machine other sessions share: 6022 passed, 16 skipped, no `guard:` line
+- [x] 3.2 Run `uv run scripts/check.py` and `openspec validate guard-pytest-selection --strict`, and verify both pass
 - [ ] 3.3 Run `uv run scripts/tofu.py plan` after rebasing onto `origin/main`, and verify it shows only
   `scripts/guard_pytest.py` updated in place in troupe and website. Keep it for the pull request
+  The local plan failed: 1Password's authorization timed out in this session. The plan-pr run's comment stands in
+  for it, once the pull request is ready and the owner approves that run
 
 ## Workflow follow-up
 
