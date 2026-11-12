@@ -12,8 +12,9 @@
   - Run D3's `git grep -F -l` check per data file, ignoring the file itself, other data files and `openspec/`.
   - Pack the source and test files into parts per D1 (`PART_READS = 100`, `MAX_PARTS = 3`; first 40 and 6, changed by
     the owner on 2026-11-12). Part 1 also gets the prose.
-  - Write `files.json` with `kind` and `part` per entry, and `parts` holding `{part, of, reads, max_turns}`.
-  - Upload it as `review-plan` (retention 1 day). Output the `parts` matrix and the file's SHA-256.
+  - Write `files.json` with `kind` and `part` per entry, and `round-1.json` with `assign` (each file's part) and
+    `parts` holding `{part, of, reads, max_turns}`.
+  - Upload them as `review-plan` (retention 1 day). Output the `parts` matrix, with both files' SHA-256 in each entry.
   - Verify with `uv run pytest scripts/tests/test_claude_review_workflow.py -k plan` after 1.2.
 - [x] 1.2 Add `Session`-style plan tests in `scripts/tests/test_claude_review_workflow.py`, each named for what its
   body checks, run on a merged scratch repository as `run_diff` does today:
@@ -49,9 +50,10 @@
   - The `--json-schema` gains a required `summary` string. The last paragraph asks for the summary there, naming each
     file on its list not read in full.
   - `Bash(gh pr comment:*)` comes off `--allowedTools`. `--max-turns` comes from the session's own part.
-  - The coverage step measures only this session, writes `review-record-1-<part>.json` (covered lines per target,
-    status `measured` or `unknown`, and the structured output from the action's output) into `RUNNER_TEMP`, and
-    uploads it. It no longer writes the job outputs the check reads.
+  - The measuring step measures only this session and writes `coverage-<round>-<part>.json` (covered lines per
+    target, status `measured` or `unknown`, and the action step's outcome). A step of its own writes
+    `answer-<round>-<part>.json` (the structured output). Both are uploaded as the artifact
+    `review-record-<round>-<part>`. The measuring step no longer writes the job outputs the check reads.
   - Verify with `uv run pytest scripts/tests/test_claude_review_workflow.py` after 2.2.
 - [x] 2.2 Update the structural checks (`problems()` and the named-weakening cases):
   - The matrix, `fail-fast: false`, and the per-part group.
@@ -150,8 +152,9 @@
 
   Add weakening cases:
   - the `unread` condition replaced by `False`;
-  - a part's record dropped from the union;
-  - coverage read from `summary`.
+  - the gather script's rule for a missing record weakened (`elif unmeasured and code_unread:` made `elif False:`),
+    which fails its hash pin;
+  - coverage read from Claude's structured output (`COVERAGE` set to `needs.review.outputs.structured_output`).
 
   Rename any test whose name still says the floor alone decides. Verify that
   `uv run pytest scripts/tests/test_claude_review_workflow.py` passes.
@@ -168,8 +171,9 @@
   Make the same point, more briefly, in `CLAUDE.md`, `README.md` and `org-profile/CONTRIBUTING.md` wherever they
   describe the check. Update the docs test's expected phrases. Verify that
   `uv run pytest scripts/tests/test_guard_docs.py` passes (`test_the_docs_say_what_a_passing_review_means`), and that
-  `grep -rn "Until #280\|floor"` over those four files shows no stale wording. Its one expected match is
-  `docs/development-workflow.md`'s "Until #280 carries coverage across a pull request's runs", which is still true.
+  `grep -rn "Until #280\|floor"` over those four files shows no stale wording. Its two expected matches are in `docs/development-workflow.md`: "Until #280 carries
+  coverage across a pull request's runs", which is still true, and the citation of `review-coverage-floor`, the
+  archived change.
 
 ## 7. Whole-change checks
 
