@@ -987,6 +987,9 @@ jobs:
         shell: python3 {0}
         env:
           EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
+          # Whether the session itself finished: the action step can't fail the job (D10), so its
+          # outcome is kept, and a lead session that failed fails the check (#299's review).
+          OUTCOME: ${{ steps.review.outcome }}
           ROUND: ${{ matrix.round }}
           PART: ${{ matrix.part }}
         run: |
@@ -1085,6 +1088,7 @@ jobs:
                       covered[path].add(int(match.group(1)))
           status = "unknown" if files is None or calls is None else "measured"
           out = {"round": int(round_), "part": int(part), "status": status,
+                 "outcome": os.environ.get("OUTCOME", ""),
                  "covered": {path: sorted(seen) for path, seen in covered.items() if seen},
                  "searches": searches, "others": sorted(others)}
           os.makedirs(os.path.join(kept, "records"), exist_ok=True)
@@ -1259,11 +1263,17 @@ jobs:
               if isinstance(plan, dict):
                   rounds[number] = plan
           covered, sessions, unmeasured, searches, others = {}, [], [], [], set()
+          # The lead session, round 1's part 1, does the checks of the whole pull request: if it
+          # failed, or left no record, there was no review, whatever else was read (#299's review).
+          lead = "measured"
           for number, plan in sorted(rounds.items()):
               for item in plan.get("parts", []):
                   part = item["part"]
                   sessions.append((number, part))
                   _, got = load(os.path.join(folder, "records", f"coverage-{number}-{part}.json"))
+                  if (number, part) == (1, 1) and (not isinstance(got, dict) or
+                                                   got.get("outcome") != "success"):
+                      lead = "failed"
                   if not isinstance(got, dict) or got.get("status") != "measured":
                       unmeasured.append((number, part))
                       continue
@@ -1323,11 +1333,12 @@ jobs:
               for item in code_unread[:SHOWN]:
                   print(f"  {item['read']}: {escape(item['path'])}")
               sys.exit(0)
-          # The final count (design D9). A session whose record is missing or unmeasured makes coverage
-          # unknown, unless every source and test file was read in full anyway, which no missing record
-          # can undo.
-          if files is None or not rounds:
+          # The final count (design D9). A failed lead session makes coverage unknown. Another session
+          # whose record is missing or unmeasured makes it unknown, unless every source and test file
+          # was read in full anyway, which no missing record can undo.
+          if files is None or not rounds or lead != "measured":
               coverage, floor = "unknown", "unknown"
+              unmeasured = sorted(set(unmeasured) | ({(1, 1)} if lead != "measured" else set()))
           elif unmeasured and code_unread:
               coverage, floor = "unknown", "unknown"
           else:
@@ -1340,7 +1351,7 @@ jobs:
           read_code = len(code) - len(code_unread)
           lines = ["## What the review read", ""]
           if coverage == "unknown":
-              lines += ["Coverage isn't known: " + (f"no record of what {named} read, and " if named else "")
+              lines += ["Coverage isn't known: " + (f"no completed record of what {named} read, and " if named else "")
                         + "the files they were to read aren't all read in full, so they count as unread.",
                         ""]
           lines += [f"Sessions: {', '.join(f'round {r} part {p}' for r, p in sessions) or 'none'}.", ""]
@@ -1645,11 +1656,17 @@ jobs:
               if isinstance(plan, dict):
                   rounds[number] = plan
           covered, sessions, unmeasured, searches, others = {}, [], [], [], set()
+          # The lead session, round 1's part 1, does the checks of the whole pull request: if it
+          # failed, or left no record, there was no review, whatever else was read (#299's review).
+          lead = "measured"
           for number, plan in sorted(rounds.items()):
               for item in plan.get("parts", []):
                   part = item["part"]
                   sessions.append((number, part))
                   _, got = load(os.path.join(folder, "records", f"coverage-{number}-{part}.json"))
+                  if (number, part) == (1, 1) and (not isinstance(got, dict) or
+                                                   got.get("outcome") != "success"):
+                      lead = "failed"
                   if not isinstance(got, dict) or got.get("status") != "measured":
                       unmeasured.append((number, part))
                       continue
@@ -1709,11 +1726,12 @@ jobs:
               for item in code_unread[:SHOWN]:
                   print(f"  {item['read']}: {escape(item['path'])}")
               sys.exit(0)
-          # The final count (design D9). A session whose record is missing or unmeasured makes coverage
-          # unknown, unless every source and test file was read in full anyway, which no missing record
-          # can undo.
-          if files is None or not rounds:
+          # The final count (design D9). A failed lead session makes coverage unknown. Another session
+          # whose record is missing or unmeasured makes it unknown, unless every source and test file
+          # was read in full anyway, which no missing record can undo.
+          if files is None or not rounds or lead != "measured":
               coverage, floor = "unknown", "unknown"
+              unmeasured = sorted(set(unmeasured) | ({(1, 1)} if lead != "measured" else set()))
           elif unmeasured and code_unread:
               coverage, floor = "unknown", "unknown"
           else:
@@ -1726,7 +1744,7 @@ jobs:
           read_code = len(code) - len(code_unread)
           lines = ["## What the review read", ""]
           if coverage == "unknown":
-              lines += ["Coverage isn't known: " + (f"no record of what {named} read, and " if named else "")
+              lines += ["Coverage isn't known: " + (f"no completed record of what {named} read, and " if named else "")
                         + "the files they were to read aren't all read in full, so they count as unread.",
                         ""]
           lines += [f"Sessions: {', '.join(f'round {r} part {p}' for r, p in sessions) or 'none'}.", ""]
@@ -1995,7 +2013,7 @@ jobs:
                         else f"_{title}'s summary is missing: the session gave back no summary._", ""]
           lines += ["### What the review read", ""]
           if gathered["coverage"] == "unknown":
-              lines.append("Coverage isn't known" + (f": no record of what {gathered['unmeasured']} read"
+              lines.append("Coverage isn't known" + (f": no completed record of what {gathered['unmeasured']} read"
                                                       if gathered["unmeasured"] else "") + ".")
           lines.append(f"Source and test files read in full: {gathered['read_code']} of {gathered['code']}"
                        " (measured from the sessions' Read calls).")
@@ -2156,7 +2174,7 @@ jobs:
                       missing = json.loads(os.environ.get("UNMEASURED", ""))
                   except ValueError:
                       missing = ""
-                  said = ("couldn't be measured" + (f" (no record of what {missing} read)"
+                  said = ("couldn't be measured" + (f" (no completed record of what {missing} read)"
                                                     if isinstance(missing, str) and missing else "")
                           + ", so nothing they were to read counts as read")
               else:

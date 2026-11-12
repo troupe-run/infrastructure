@@ -114,6 +114,11 @@ how to get a review that reads the code.
 - **WHEN** a session's record of its tool calls can't be read, or a part's coverage record is missing
 - **THEN** `claude review completed` fails, saying coverage couldn't be measured, and naming the part
 
+#### Scenario: The lead session failed
+- **WHEN** a pull request changes only Markdown, and its one session fails, for example because the Claude token
+  expired, so its action step fails without failing its job
+- **THEN** `claude review completed` fails, saying coverage couldn't be measured and naming round 1 part 1
+
 #### Scenario: The check is weakened
 - **WHEN** a change lets the check pass with a source or test file unread, drops a part's record from the union, or
   reads Claude's structured output or summary to decide coverage
