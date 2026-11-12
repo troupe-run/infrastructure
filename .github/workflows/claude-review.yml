@@ -988,7 +988,8 @@ jobs:
         env:
           EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
           # Whether the session itself finished: the action step can't fail the job (D10), so its
-          # outcome is kept, and a lead session that failed fails the check (#299's review).
+          # outcome is kept, and a lead session that failed having read nothing fails the check
+          # (#299's review).
           OUTCOME: ${{ steps.review.outcome }}
           ROUND: ${{ matrix.round }}
           PART: ${{ matrix.part }}
@@ -1264,15 +1265,19 @@ jobs:
                   rounds[number] = plan
           covered, sessions, unmeasured, searches, others = {}, [], [], [], set()
           # The lead session, round 1's part 1, does the checks of the whole pull request: if it
-          # failed, or left no record, there was no review, whatever else was read (#299's review).
+          # left no record, or failed having read nothing, it died (an expired token, a crash), and
+          # there was no review, whatever else was read. A lead that ran out of turns having read
+          # leaves what it didn't read to the follow-ups (owner, 2026-11-12, on #299's review).
           lead = "measured"
           for number, plan in sorted(rounds.items()):
               for item in plan.get("parts", []):
                   part = item["part"]
                   sessions.append((number, part))
                   _, got = load(os.path.join(folder, "records", f"coverage-{number}-{part}.json"))
-                  if (number, part) == (1, 1) and (not isinstance(got, dict) or
-                                                   got.get("outcome") != "success"):
+                  died = not isinstance(got, dict) or got.get("status") != "measured" or (
+                      got.get("outcome") != "success" and not got.get("covered")
+                      and not got.get("others"))
+                  if (number, part) == (1, 1) and died:
                       lead = "failed"
                   if not isinstance(got, dict) or got.get("status") != "measured":
                       unmeasured.append((number, part))
@@ -1333,7 +1338,7 @@ jobs:
               for item in code_unread[:SHOWN]:
                   print(f"  {item['read']}: {escape(item['path'])}")
               sys.exit(0)
-          # The final count (design D9). A failed lead session makes coverage unknown. Another session
+          # The final count (design D9). A dead lead session makes coverage unknown. Another session
           # whose record is missing or unmeasured makes it unknown, unless every source and test file
           # was read in full anyway, which no missing record can undo.
           if files is None or not rounds or lead != "measured":
@@ -1657,15 +1662,19 @@ jobs:
                   rounds[number] = plan
           covered, sessions, unmeasured, searches, others = {}, [], [], [], set()
           # The lead session, round 1's part 1, does the checks of the whole pull request: if it
-          # failed, or left no record, there was no review, whatever else was read (#299's review).
+          # left no record, or failed having read nothing, it died (an expired token, a crash), and
+          # there was no review, whatever else was read. A lead that ran out of turns having read
+          # leaves what it didn't read to the follow-ups (owner, 2026-11-12, on #299's review).
           lead = "measured"
           for number, plan in sorted(rounds.items()):
               for item in plan.get("parts", []):
                   part = item["part"]
                   sessions.append((number, part))
                   _, got = load(os.path.join(folder, "records", f"coverage-{number}-{part}.json"))
-                  if (number, part) == (1, 1) and (not isinstance(got, dict) or
-                                                   got.get("outcome") != "success"):
+                  died = not isinstance(got, dict) or got.get("status") != "measured" or (
+                      got.get("outcome") != "success" and not got.get("covered")
+                      and not got.get("others"))
+                  if (number, part) == (1, 1) and died:
                       lead = "failed"
                   if not isinstance(got, dict) or got.get("status") != "measured":
                       unmeasured.append((number, part))
@@ -1726,7 +1735,7 @@ jobs:
               for item in code_unread[:SHOWN]:
                   print(f"  {item['read']}: {escape(item['path'])}")
               sys.exit(0)
-          # The final count (design D9). A failed lead session makes coverage unknown. Another session
+          # The final count (design D9). A dead lead session makes coverage unknown. Another session
           # whose record is missing or unmeasured makes it unknown, unless every source and test file
           # was read in full anyway, which no missing record can undo.
           if files is None or not rounds or lead != "measured":

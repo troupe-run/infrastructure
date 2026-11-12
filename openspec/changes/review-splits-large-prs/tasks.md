@@ -73,7 +73,8 @@
 ## 3. Two follow-up rounds read what the parts left (design D4, D10)
 
 - [x] 3.1 Add `plan follow-up 1` (needs `plan` and `review`) and `plan follow-up 2` (needs follow-up 1), each
-  `always()` once `plan` succeeded, running one script that downloads every `review-record-*` so far and the plan,
+  running once the round before it succeeded (`needs.review.result == 'success'`, `needs.review-2.result ==
+  'success'`), running one script that downloads every `review-record-*` so far and the plan,
   and takes the union of covered lines.
   - A missing or `unknown` record leaves all of its part's files unread.
   - It packs the source and test files not read in full into follow-up parts per D1, and outputs that matrix, or `[]`.

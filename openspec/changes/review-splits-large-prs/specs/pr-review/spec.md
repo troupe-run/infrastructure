@@ -111,12 +111,17 @@ how to get a review that reads the code.
 - **THEN** `claude review completed` passes once the review completes, with a warning naming any file not read
 
 #### Scenario: Coverage unknown
-- **WHEN** a session's record of its tool calls can't be read, or a part's coverage record is missing
+- **WHEN** a part's record of its tool calls is missing or can't be read, and a source or test file it was to read is
+  still not read in full after the follow-up rounds
 - **THEN** `claude review completed` fails, saying coverage couldn't be measured, and naming the part
 
-#### Scenario: The lead session failed
-- **WHEN** a pull request changes only Markdown, and its one session fails, for example because the Claude token
-  expired, so its action step fails without failing its job
+#### Scenario: A missing record that the follow-ups made up for
+- **WHEN** the second part's record is missing, and a follow-up session reads every source and test file on its list
+- **THEN** `claude review completed` passes
+
+#### Scenario: The lead session died
+- **WHEN** a pull request changes only Markdown, and its one session fails having read nothing, for example because
+  the Claude token expired, so its action step fails without failing its job
 - **THEN** `claude review completed` fails, saying coverage couldn't be measured and naming round 1 part 1
 
 #### Scenario: The check is weakened
@@ -196,8 +201,9 @@ when they cover some, and as not read otherwise. The run's summary SHALL list ea
 - **THEN** it counts for nothing
 
 #### Scenario: The record can't be read
-- **WHEN** the action left no record of the session's tool calls, or one that can't be parsed
-- **THEN** every file on that session's list counts as not read by it, and the review's coverage is unknown
+- **WHEN** the action left no record of a session's tool calls, or one that can't be parsed
+- **THEN** every file on that session's list counts as not read by it, so the follow-up rounds read its source and
+  test files again
 
 ### Requirement: The review's turn budget scales with the reading needed
 Each session's turn limit SHALL be a base plus an amount for each Read call its own list needs, at the Read tool's
@@ -226,7 +232,8 @@ that runs out of turns or time SHALL leave its unread source and test files to t
 Before any session starts, the plan step SHALL sort each listed file with a line to read into source and test, prose
 or data, from one declared list. Prose is Markdown, plain text, SVG, licence files and anything under `openspec/`.
 Data is JSON, recorded streams and tables, and files with no suffix in a `fixtures/` folder, except declared
-configuration. Every other file counts as source and test, kinds the list doesn't name included. The run's summary SHALL show each file's kind.
+configuration. Every other file counts as source and test, kinds the list doesn't name included. The run's summary
+SHALL show each file's kind.
 
 #### Scenario: A module and its tests
 - **WHEN** a pull request changes `src/troupe_runner_ollama/conversation.py` and `tests/test_ollama_conversation.py`

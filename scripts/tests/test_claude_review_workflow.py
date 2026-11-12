@@ -234,7 +234,8 @@ MEASURE = {
     "shell": "python3 {0}",
     "env": {
         "EXECUTION_FILE": "${{ steps.review.outputs.execution_file }}",
-        # The session's own outcome: a lead that failed fails the check (#299's review).
+        # The session's own outcome: a lead that failed having read nothing fails the check
+        # (#299's review).
         "OUTCOME": "${{ steps.review.outcome }}",
         "ROUND": "${{ matrix.round }}",
         "PART": "${{ matrix.part }}",
@@ -256,7 +257,7 @@ ANSWER_SHA256 = "815aaab9d79a0f0870bc3aa850f069eae46423fc60c5f1a96272e39328ff18a
 # What the sessions read together, in each planner and in the report job: one script (D4).
 GATHER_NAME = "Gather what the sessions read"
 GATHER = {"id": "gather", "shell": "python3 {0}"}
-GATHER_SHA256 = "52a06084aa8757969d851243fbb985d55646ffefbf34e868928784c012c8610f"
+GATHER_SHA256 = "e432d78cf149afb12b7c7011a8d94a76302fc268f73785073126b875b94b1d85"
 # Resolve and re-tier what Claude names, checked against conversations read again in the report
 # job, and only on a file of that session's list (design D4, D4a; review-splits-large-prs D7).
 RESOLVER_NAME = "Resolve and re-tier what Claude named"
@@ -3115,13 +3116,14 @@ def test_a_missing_record_doesn_t_matter_once_everything_is_read(tmp_path: Path)
     assert (said["coverage"], said["code"]) == ("complete", "all")
 
 
-# A session that fails doesn't fail its job (D10), so the lead's failure must still fail the check,
-# even when nothing it was to read is source or test (#299's review).
+# A session that fails doesn't fail its job (D10), so a dead lead must still fail the check, even
+# when nothing it was to read is source or test (#299's review). A lead that ran out of turns
+# having read leaves the rest to the follow-ups (owner, 2026-11-12).
 @pytest.mark.parametrize("outcome", ["failure", "cancelled", ""])
-def test_a_lead_session_that_failed_leaves_coverage_unknown(tmp_path: Path, outcome: str) -> None:
+def test_a_lead_session_that_died_having_read_nothing_leaves_coverage_unknown(
+    tmp_path: Path, outcome: str
+) -> None:
     session = Session(tmp_path, [PROSE_ONLY])
-    session.read("README.md", range(1, 41))
-    session.read(".review-diff/README.md.diff", range(1, 7))
     session.measure(1, 1, outcome=outcome)
     said, summary, _ = session.gather()
     assert (said["coverage"], said["code"]) == ("unknown", "unknown")
@@ -3131,6 +3133,33 @@ def test_a_lead_session_that_failed_leaves_coverage_unknown(tmp_path: Path, outc
                          UNREAD=said["unread"], UNMEASURED=said["unmeasured"])  # fmt: skip
     assert done.returncode == 1
     assert "no completed record of what round 1 part 1 read" in done.stdout
+
+
+def test_a_lead_that_ran_out_of_turns_having_read_is_caught_up_by_its_follow_up(
+    tmp_path: Path,
+) -> None:
+    session = Session(tmp_path, [PROSE_ONLY, MODIFIED])
+    session.read("README.md", range(1, 41))
+    session.read(".review-diff/README.md.diff", range(1, 7))
+    session.measure(1, 1, outcome="failure")
+    said, _, _ = session.gather("2")
+    assert [m["part"] for m in json.loads(said["parts"])] == [1]
+    made = tmp_path / "runner-temp" / "next" / "round-2.json"
+    (session.kept / made.name).write_bytes(made.read_bytes())
+    session.session(2, 1)
+    session.read("src/a.py", range(1, 31))
+    session.read(".review-diff/src/a.py.diff", range(1, 13))
+    session.measure(2, 1)
+    said, _, _ = session.gather()
+    assert (said["coverage"], said["code"]) == ("complete", "all")
+
+
+def test_a_lead_that_failed_having_read_only_unchanged_files_isn_t_dead(tmp_path: Path) -> None:
+    session = Session(tmp_path, [PROSE_ONLY])
+    session.read("CLAUDE.md", range(1, 30))
+    session.measure(1, 1, outcome="failure")
+    said, _, _ = session.gather()
+    assert (said["coverage"], said["code"]) == ("incomplete", "none")
 
 
 @pytest.mark.parametrize("files", [[], [SKIPPED]])
