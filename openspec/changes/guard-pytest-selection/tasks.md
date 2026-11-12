@@ -25,18 +25,23 @@
 
 ## 2. Charge a collection read to the innermost collector (design D1, D2)
 
-- [ ] 2.1 In `scripts/guard_pytest.py`, add the `_COLLECTING` stack, make `pytest_make_collect_report` push and pop
+- [x] 2.1 In `scripts/guard_pytest.py`, add the `_COLLECTING` stack, make `pytest_make_collect_report` push and pop
   its window there (by identity), and make `_record` add to every `_RECORDING` window and to `_COLLECTING[-1]` only,
   returning early when both are empty. Update the docstrings of `_RECORDING`, `_COLLECTING` and the module to say
   what a collection read counts for. Verify by removing the xfail marks from section 1: every test in
   `scripts/tests/test_guard_pytest.py` passes, including the existing module-level and parametrize tests
-- [ ] 2.2 In `docs/development-workflow.md`, "Every test run checks the tags", add that a file opened while a module
+  (37 passed). The two tests of 1.3 and 1.4 first failed on their own assertion: the guard fails a test at teardown,
+  so `-rA` lists it as passed and as an error. They now check the errored set exactly, and still fail on the
+  unchanged guard (3 failed, serially)
+- [x] 2.2 In `docs/development-workflow.md`, "Every test run checks the tags", add that a file opened while a module
   is collected (its imports, a module-level read, parameters built from a file) counts for that module's tests only,
   however the run selects them. Verify the paragraph matches the delta spec's requirement
-- [ ] 2.3 Verify `uv run mypy --strict scripts` and `uv run ruff check scripts` are clean, and that `guard_pytest`
+- [x] 2.3 Verify `uv run mypy --strict scripts` and `uv run ruff check scripts` are clean, and that `guard_pytest`
   still imports nothing outside the standard library (`grep -n "^import\|^from" scripts/guard_pytest.py`)
-- [ ] 2.4 Time `uv run pytest scripts/tests/test_guard_pytest.py` three times before and after 2.1, and record both
-  here
+- [x] 2.4 Time `uv run pytest scripts/tests/test_guard_pytest.py` three times before and after 2.1, and record both
+  here. Before: 43.40, 31.03, 50.64 s (31 passed, 6 xfailed). After: 26.91, 153.66, 68.77 s (37 passed). Other
+  sessions' runs swung the load between 15 and 90, so wall time can't show a difference. CPU time (user + sys) on the
+  same 31 tests, back to back: 13.49 s before, 12.76 s after. No measurable cost
 
 ## 3. Integration
 

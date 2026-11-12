@@ -470,7 +470,16 @@ def guard_lines(result: subprocess.CompletedProcess[str]) -> list[str]:
     return [line for line in result.stdout.splitlines() if line.startswith("guard:")]
 
 
-@pytest.mark.xfail(strict=True, reason="#298: charged with the other module's collection reads")
+def errored(result: subprocess.CompletedProcess[str]) -> set[str]:
+    """The node ids `-rA` lists as errors. The guard fails a test at teardown, so its call is
+    listed as passed too."""
+    return {
+        line.split(" ", 1)[1].split(" - ", 1)[0].strip()
+        for line in result.stdout.splitlines()
+        if line.startswith("ERROR ")
+    }
+
+
 @pytest.mark.parametrize("parallel", PARALLEL)
 def test_tests_from_two_scopes_selected_by_node_id_pass(
     tmp_path: Path, parallel: tuple[str, ...]
@@ -478,10 +487,10 @@ def test_tests_from_two_scopes_selected_by_node_id_pass(
     result = run_pytest(packages(tmp_path), "-rA", ALPHA_TEST, BETA_TEST, *parallel)
     assert result.returncode == 0, result.stdout
     assert guard_lines(result) == []
+    assert errored(result) == set()
     assert passed(result) == {ALPHA_TEST, BETA_TEST}
 
 
-@pytest.mark.xfail(strict=True, reason="#298: charged with the other module's collection reads")
 @pytest.mark.parametrize("parallel", PARALLEL)
 def test_a_module_level_read_in_a_selection_by_node_id_counts_for_its_module_only(
     tmp_path: Path, parallel: tuple[str, ...]
@@ -492,10 +501,10 @@ def test_a_module_level_read_in_a_selection_by_node_id_counts_for_its_module_onl
     assert len(lines) == 1, lines
     assert lines[0].startswith(f"guard: {IMPORT_TEST} reads docs/a.md"), lines
     assert "`docs`" in lines[0]
-    assert passed(result) == {BETA_TEST}
+    assert errored(result) == {IMPORT_TEST}
+    assert passed(result) == {IMPORT_TEST, BETA_TEST}
 
 
-@pytest.mark.xfail(strict=True, reason="#298: charged with the other module's collection reads")
 @pytest.mark.parametrize("parallel", PARALLEL)
 def test_an_untagged_read_in_a_selection_by_node_id_fails_only_that_test(
     tmp_path: Path, parallel: tuple[str, ...]
@@ -506,4 +515,5 @@ def test_an_untagged_read_in_a_selection_by_node_id_fails_only_that_test(
     assert len(lines) == 1, lines
     assert lines[0].startswith(f"guard: {DOCS_TEST} reads docs/a.md"), lines
     assert "`docs`" in lines[0]
-    assert passed(result) == {ALPHA_TEST, BETA_TEST}
+    assert errored(result) == {DOCS_TEST}
+    assert passed(result) == {ALPHA_TEST, BETA_TEST, DOCS_TEST}

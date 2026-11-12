@@ -367,7 +367,9 @@ addopts = ["-p", "guard_pytest"]
 
 It registers each declared scope as a marker, so `--strict-markers` accepts them and the declaration is the one
 list. It records each test's file reads through Python's `open` audit event, counting only files inside the
-repository. Reads made by a subprocess the test starts aren't seen. A scope whose tests read that way keeps its tags
+repository. A file opened while a module is collected (its imports, a module-level read, parameters built from a
+file) counts for that module's tests only, whether the run is given no arguments, paths or node ids, with or without
+xdist. Reads made by a subprocess the test starts aren't seen. A scope whose tests read that way keeps its tags
 by hand, and its comment in `scripts/check-paths.toml` should say so.
 
 The rule itself is `guard.tag_violations`, which takes plain data: a test's id, its tags and the files it read.
