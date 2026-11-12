@@ -1072,10 +1072,22 @@ def pr_285_repo(make_repo: Callable[[], Repo], tmp_path: Path) -> tuple[Repo, st
     return repo, repo.head()
 
 
+def pr_285_message() -> str:
+    """b25fc2f's whole message, from the patch: it ends where format-patch's diffstat begins
+    ("---" then " pyproject.toml | ...")."""
+    patch = (PR_285 / "b25fc2f.patch").read_text(encoding="utf-8")
+    return patch.split("Subject: [PATCH] ", 1)[1].split("\n---\n ", 1)[0] + "\n"
+
+
 def apply_285(repo: Repo) -> None:
-    """b25fc2f as Dependabot made it: its message, its author and its diff (git format-patch)."""
+    """b25fc2f as Dependabot made it: its message, its author and its diff (git format-patch).
+    git am cuts a message at its first "---" line, which drops the updated-dependencies block
+    and the sign-off, so the whole message is put back (review on #302)."""
     repo.switch(PR_285_BRANCH)
     git(repo.path, "am", "-q", "--no-verify", "--keep-cr", str(PR_285 / "b25fc2f.patch"))
+    message = repo.path.parent / "b25fc2f-message.txt"
+    message.write_text(pr_285_message(), encoding="utf-8")
+    git(repo.path, "commit", "-q", "--amend", "--no-verify", "-F", str(message))
 
 
 def test_pr_285_s_real_commit_passes(make_repo: Callable[[], Repo], tmp_path: Path) -> None:
@@ -1083,6 +1095,11 @@ def test_pr_285_s_real_commit_passes(make_repo: Callable[[], Repo], tmp_path: Pa
     apply_285(repo)
     subject = git(repo.path, "log", "-1", "--format=%s").stdout.strip()
     assert subject == "chore(deps-dev): Bump types-pyyaml"
+    message = git(repo.path, "log", "-1", "--format=%B").stdout
+    assert "  update-type: version-update:semver-patch\n" in message
+    assert message.rstrip().endswith("Signed-off-by: dependabot[bot] <support@github.com>")
+    author = git(repo.path, "log", "-1", "--format=%an").stdout.strip()
+    assert author == "dependabot[bot]"
     # Before #301: "b25fc2f's subject 'chore(deps-dev): Bump types-pyyaml' doesn't give one
     # dependency's versions, so its kind of update can't be read."
     assert [d.problem for d in ci(repo, base, PR_285_BRANCH, "troupe-run/infrastructure")] == []
@@ -1094,9 +1111,7 @@ def test_pr_285_s_title_and_bumps_line_are_both_a_patch() -> None:
     title = "chore(deps-dev): Bump types-pyyaml from 6.0.12.20260906 to 6.0.12.20261030"
     pull = {"title": title, "head": {"ref": PR_285_BRANCH}}
     assert dependabot_issues.read_update(pull).kind == "patch"
-    patch = (PR_285 / "b25fc2f.patch").read_text(encoding="utf-8")
-    # The message ends where format-patch's diffstat begins ("---" then " pyproject.toml | ...").
-    message = patch.split("Subject: [PATCH] ", 1)[1].split("\n---\n ", 1)[0]
+    message = pr_285_message()
     assert message.rstrip().endswith("Signed-off-by: dependabot[bot] <support@github.com>")
     versions = guard.bumps_line_versions(message, "types-pyyaml")
     assert versions == ("6.0.12.20260906", "6.0.12.20261030")
