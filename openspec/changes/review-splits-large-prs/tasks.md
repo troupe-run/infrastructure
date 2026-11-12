@@ -167,8 +167,9 @@
 
   Make the same point, more briefly, in `CLAUDE.md`, `README.md` and `org-profile/CONTRIBUTING.md` wherever they
   describe the check. Update the docs test's expected phrases. Verify that
-  `uv run pytest scripts/tests/test_claude_review_workflow.py` passes, and that `grep -rn "Until #280\|floor"` over
-  those four files shows no stale wording.
+  `uv run pytest scripts/tests/test_guard_docs.py` passes (`test_the_docs_say_what_a_passing_review_means`), and that
+  `grep -rn "Until #280\|floor"` over those four files shows no stale wording. Its one expected match is
+  `docs/development-workflow.md`'s "Until #280 carries coverage across a pull request's runs", which is still true.
 
 ## 7. Whole-change checks
 
@@ -179,10 +180,10 @@
 - [x] 7.2 Before delivery, run troupe's `uv run scripts/check.py` and website's
   `npx vitest run tests/unit/workflow-node-version.test.ts` with the new workflow in place, as the workflow's header
   asks. Verify that both pass, and cite their output.
-  - Done 2026-11-11 on fresh clones of troupe's and website's main: troupe's `uv run scripts/check.py`
-    passed (5643 passed, 16 skipped; all gates passed), and website's `npx vitest run
-    tests/unit/workflow-node-version.test.ts` passed (8 of 8). Only the workflow's header comment changed after
-    troupe's run.
+  - Done 2026-11-12 with the final workflow, as committed in 2e13acc, in place on fresh clones of troupe's and
+    website's main. Troupe's `uv run scripts/check.py` passed (5643 passed, 16 skipped; all gates passed), and
+    website's `npx vitest run tests/unit/workflow-node-version.test.ts` passed (8 of 8). Earlier runs on a3c9c64 and
+    c2d1c30 passed the same way.
 - [x] 7.3 On this pull request's own review run, which runs the new workflow, record:
   - the plan's parts;
   - each session's turns and coverage;
@@ -191,17 +192,18 @@
   - `claude review completed`'s result.
 
   Verify by citing the run ID and its summary table in the pull request.
-  - Done 2026-11-12, run 43031243264 on a3c9c64:
-    - The plan listed 14 files (4 source and test, 10 prose, 0 data), as one part of 54 Reads with
-      `--max-turns 148`.
-    - The lead session read all 14 in full in 66 turns.
+  - Done 2026-11-12, run 43178957325 on 2e13acc, the final workflow (the first, 43031243264 on a3c9c64, matched it):
+    - The plan listed 14 files (4 source and test, 10 prose, 0 data), as one part of 55 Reads with
+      `--max-turns 150`.
+    - The lead session read all 14 in full in 67 turns, and its record kept the action step's outcome.
     - `plan follow-up 1` found 0 of 4 source and test files unread, so both follow-up rounds were skipped, as was
       `plan follow-up 2`.
     - `resolve and report` posted one summary comment, reporting 4 of 4 source and test files read in full.
     - `claude review completed` passed.
     - GitHub accepted the YAML anchors the three rounds share.
-    - Not exercised live: more than one part, and a follow-up round. The behaviour tests cover those (troupe#325's
-      and #318's shapes).
+    - Not exercised live, only by the behaviour tests: more than one part, a follow-up round, a dead lead, and a
+      missing record (troupe#325's and #318's shapes, and the failure cases). The re-run behaviour of the artifacts
+      was probed on a throwaway repository (design, Probe results).
 
 ## Workflow follow-up
 
