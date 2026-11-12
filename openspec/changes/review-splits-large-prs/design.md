@@ -258,6 +258,12 @@ agent re-runs the run. A re-run starts from round 1, since nothing carries over 
 Any bound is arbitrary. Two rounds at most triple a large review's cost, and fewer runs need re-running by hand. #297's
 history suggests a second session over a short list will usually read it.
 
+A failed session doesn't fail its job (the action step continues on error, so a session that runs out of turns
+still leaves a record). So the measuring step keeps the action step's outcome, and a lead session (round 1, part 1)
+that failed, or left no record, makes coverage unknown, which fails the check. The lead does the checks of the whole
+pull request, so without it there was no review, even when nothing it was to read is source or test. Another part that
+failed is caught by the follow-ups, which re-read its source and test files. Claude's review of #299 found the gap.
+
 ### D11. Turn budget per session
 
 A session's budget is `BASE_TURNS + TURNS_PER_READ × (its list's Reads)`, capped at `MAX_TURNS`, as now but per

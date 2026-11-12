@@ -234,11 +234,13 @@ MEASURE = {
     "shell": "python3 {0}",
     "env": {
         "EXECUTION_FILE": "${{ steps.review.outputs.execution_file }}",
+        # The session's own outcome: a lead that failed fails the check (#299's review).
+        "OUTCOME": "${{ steps.review.outcome }}",
         "ROUND": "${{ matrix.round }}",
         "PART": "${{ matrix.part }}",
     },
 }
-MEASURE_SHA256 = "d147391afa136c052903fedabbe8d71b988cc8f00eef7478b103ce08bfabbc88"
+MEASURE_SHA256 = "550a3e167f200dc1be6f3864a62b438986ce9d904fcf3d123ceff959601943ab"
 # After Claude: its summary and what it named, kept apart from the measurement (D6).
 ANSWER_NAME = "Keep what Claude named"
 ANSWER = {
@@ -254,7 +256,7 @@ ANSWER_SHA256 = "815aaab9d79a0f0870bc3aa850f069eae46423fc60c5f1a96272e39328ff18a
 # What the sessions read together, in each planner and in the report job: one script (D4).
 GATHER_NAME = "Gather what the sessions read"
 GATHER = {"id": "gather", "shell": "python3 {0}"}
-GATHER_SHA256 = "7e47adad6234946dc2c428c3e470907706763710b5704dd8ab53559ecce38f99"
+GATHER_SHA256 = "52a06084aa8757969d851243fbb985d55646ffefbf34e868928784c012c8610f"
 # Resolve and re-tier what Claude names, checked against conversations read again in the report
 # job, and only on a file of that session's list (design D4, D4a; review-splits-large-prs D7).
 RESOLVER_NAME = "Resolve and re-tier what Claude named"
@@ -266,7 +268,7 @@ POST = {
     "shell": "python3 {0}",
     "env": {**STEP_ENV, "HEAD_SHA": "${{ github.event.pull_request.head.sha }}"},
 }
-POST_SHA256 = "e7ad73b9163d8176d3d6152bef12020412ffe375c05de5a48dbb50b760b9d69b"
+POST_SHA256 = "288bbcc9b97b51ee5b1200de0038c91f17d323689a587d376a1f21aa97899631"
 # The artifacts that carry the plan and the records between jobs, written only by these steps
 # (review-splits-large-prs design D4).
 PLAN_UPLOADS: list[dict[str, Any]] = [
@@ -395,7 +397,7 @@ COMPLETED_STEP = {
         "UNMEASURED": "${{ needs.resolve.outputs.unmeasured }}",
     },
 }
-COMPLETED_SHA256 = "559a24cda4190e4e3feab104723ef69508f00f9010fc65e9277affce17a12002"
+COMPLETED_SHA256 = "5a5583f59cca88275099a99086dcb1be8f65e20c72efd93693f6eef85871b561"
 # What Claude returns, and all the report job reads from it (design D4; review-splits-large-prs
 # design D6).
 SCHEMA = {
@@ -1300,6 +1302,11 @@ CASES: list[tuple[Change, str]] = [
         f"{MEASURE_NAME!r} is given",
     ),
     (lambda w: measure_step(w).pop("continue-on-error"), f"{MEASURE_NAME!r} is given"),
+    (lambda w: measure_step(w)["env"].pop("OUTCOME"), f"{MEASURE_NAME!r} is given"),
+    (
+        lambda w: measure_step(w)["env"].update({"OUTCOME": "success"}),
+        f"{MEASURE_NAME!r} is given",
+    ),
     (lambda w: measure_step(w).update({"if": "${{ success() }}"}), f"{MEASURE_NAME!r} is given"),
     (
         lambda w: measure_step(w).update({"run": str(measure_step(w)["run"]) + "print(text)\n"}),
@@ -2893,14 +2900,18 @@ class Session:
     def finish(self, text: str = "Done.") -> None:
         self.messages[self.current].append({"type": "result", "subtype": "success", "result": text})
 
-    def measure(self, number: int, part: int, content: str | None = None) -> str:
-        """Run the measuring step for one session; its log."""
+    def measure(
+        self, number: int, part: int, content: str | None = None, outcome: str = "success"
+    ) -> str:
+        """Run the measuring step for one session, whose action step ended with the outcome
+        given; its log."""
         execution = self.tmp_path / f"claude-execution-{number}-{part}.json"
         execution.write_text(
             json.dumps(self.messages.get((number, part), [])) if content is None else content,
             encoding="utf-8",
         )
-        env = {"EXECUTION_FILE": str(execution), "ROUND": str(number), "PART": str(part)}
+        env = {"EXECUTION_FILE": str(execution), "ROUND": str(number), "PART": str(part),
+               "OUTCOME": outcome}  # fmt: skip
         done = run_step(measure_step(review()), self.tmp_path, self.tmp_path, env)
         assert done.returncode == 0, done.stdout + done.stderr
         return done.stdout
@@ -2975,6 +2986,9 @@ def code(path: str, read: str) -> dict[str, str]:
 MODIFIED = listed("src/a.py", "modified", ("src/a.py", 30), (".review-diff/src/a.py.diff", 12))
 ADDED = listed("src/b.py", "added", ("src/b.py", 2500))
 SKIPPED = {"path": "uv.lock", "status": "modified", "skipped": "on the skip list", "targets": []}
+PROSE_ONLY = listed(
+    "README.md", "modified", ("README.md", 40), (".review-diff/README.md.diff", 6), kind="prose"
+)
 
 
 def test_every_target_read_is_complete(tmp_path: Path) -> None:
@@ -3078,7 +3092,7 @@ def test_an_unreadable_record_counts_nothing_as_read(tmp_path: Path, content: st
         "unknown",
     )
     assert session.unmeasured == "round 1 part 1"
-    assert "Coverage isn't known: no record of what round 1 part 1 read" in summary
+    assert "Coverage isn't known: no completed record of what round 1 part 1 read" in summary
 
 
 def test_a_missing_record_leaves_coverage_unknown_naming_the_session(tmp_path: Path) -> None:
@@ -3099,6 +3113,58 @@ def test_a_missing_record_doesn_t_matter_once_everything_is_read(tmp_path: Path)
     session.measure(1, 1)
     said, _, _ = session.gather()
     assert (said["coverage"], said["code"]) == ("complete", "all")
+
+
+# A session that fails doesn't fail its job (D10), so the lead's failure must still fail the check,
+# even when nothing it was to read is source or test (#299's review).
+@pytest.mark.parametrize("outcome", ["failure", "cancelled", ""])
+def test_a_lead_session_that_failed_leaves_coverage_unknown(tmp_path: Path, outcome: str) -> None:
+    session = Session(tmp_path, [PROSE_ONLY])
+    session.read("README.md", range(1, 41))
+    session.read(".review-diff/README.md.diff", range(1, 7))
+    session.measure(1, 1, outcome=outcome)
+    said, summary, _ = session.gather()
+    assert (said["coverage"], said["code"]) == ("unknown", "unknown")
+    assert json.loads(said["unmeasured"]) == "round 1 part 1"
+    assert "no completed record of what round 1 part 1 read" in summary
+    done = run_completed(tmp_path, COVERAGE=said["coverage"], CODE=said["code"],
+                         UNREAD=said["unread"], UNMEASURED=said["unmeasured"])  # fmt: skip
+    assert done.returncode == 1
+    assert "no completed record of what round 1 part 1 read" in done.stdout
+
+
+@pytest.mark.parametrize("files", [[], [SKIPPED]])
+def test_a_lead_session_that_left_no_record_fails_even_with_nothing_to_read(
+    tmp_path: Path, files: list[dict[str, Any]]
+) -> None:
+    session = Session(tmp_path, files)
+    said, _, _ = session.gather()
+    assert (said["coverage"], said["code"]) == ("unknown", "unknown")
+    assert json.loads(said["unmeasured"]) == "round 1 part 1"
+
+
+def test_another_part_that_failed_is_caught_up_by_its_follow_up(tmp_path: Path) -> None:
+    session = Session(tmp_path, [MODIFIED, ADDED], parts={"src/a.py": 1, "src/b.py": 2})
+    session.read("src/a.py", range(1, 31))
+    session.read(".review-diff/src/a.py.diff", range(1, 13))
+    session.measure(1, 1)
+    session.measure(1, 2, outcome="failure")
+    said, _, _ = session.gather("2")
+    assert [m["part"] for m in json.loads(said["parts"])] == [1]
+    made = tmp_path / "runner-temp" / "next" / "round-2.json"
+    (session.kept / made.name).write_bytes(made.read_bytes())
+    session.session(2, 1)
+    session.read("src/b.py", range(1, 2501))
+    session.measure(2, 1)
+    said, _, _ = session.gather()
+    assert (said["coverage"], said["code"]) == ("complete", "all")
+
+
+def test_the_measurement_keeps_the_session_s_outcome(tmp_path: Path) -> None:
+    session = Session(tmp_path, [ADDED])
+    session.measure(1, 1, outcome="failure")
+    kept = json.loads((session.kept / "records" / "coverage-1-1.json").read_text("utf-8"))
+    assert (kept["status"], kept["outcome"]) == ("measured", "failure")
 
 
 def test_a_path_that_holds_a_workflow_command_stays_inside_its_line(tmp_path: Path) -> None:
@@ -3458,7 +3524,7 @@ def test_unknown_coverage_is_said_in_the_comment(tmp_path: Path) -> None:
     gathered = {**GATHERED, "coverage": "unknown", "unmeasured": "round 1 part 2",
                 "unread": [code("src/a.py", "not read")]}  # fmt: skip
     _, body, _ = run_post(tmp_path, {}, gathered)
-    assert "Coverage isn't known: no record of what round 1 part 2 read." in body
+    assert "Coverage isn't known: no completed record of what round 1 part 2 read." in body
     assert "Source and test files not read in full: `src/a.py`." in body
 
 
@@ -3487,8 +3553,8 @@ def warnings_and_errors(out: str) -> list[str]:
     [
         (
             {"COVERAGE": "unknown", "CODE": "unknown", "UNMEASURED": '"round 1 part 2"'},
-            "couldn't be measured (no record of what round 1 part 2 read), so nothing they were "
-            "to read counts as read",
+            "couldn't be measured (no completed record of what round 1 part 2 read), so nothing "
+            "they were to read counts as read",
         ),
         (
             {"COVERAGE": "unknown", "CODE": "all"},
