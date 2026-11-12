@@ -890,6 +890,25 @@ def test_a_requirement_commit_changing_another_file_fails_naming_it(
     assert "aren't dependency files: src/index.ts" in problem
 
 
+def test_a_requirement_commit_reports_its_first_problem_in_path_order(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    # packages/... sorts before src/..., so the unreadable line is reported, not the other file.
+    # Found by guard-dependabot-short-subject's differential run against main.
+    repo, base = requirement_commit(
+        make_repo,
+        tmp_path,
+        "chore(deps-dev): Update uv-build requirement",
+        [
+            (TROUPE, "uv_build>=0.13.0,<0.14", "uv_build~=0.13.5"),
+            ("src/index.ts", "export {};", "export { x };"),
+        ],
+    )
+    problem = requirement_refusal(repo, base)
+    assert "changes more than version numbers" in problem
+    assert "src/index.ts isn't a manifest or lock file" not in problem
+
+
 def test_an_update_type_that_disagrees_with_the_versions_fails(
     make_repo: Callable[[], Repo], tmp_path: Path
 ) -> None:
@@ -1059,7 +1078,6 @@ def apply_285(repo: Repo) -> None:
     git(repo.path, "am", "-q", "--no-verify", "--keep-cr", str(PR_285 / "b25fc2f.patch"))
 
 
-@pytest.mark.xfail(strict=True, reason="#301: a subject without versions is read as unknown")
 def test_pr_285_s_real_commit_passes(make_repo: Callable[[], Repo], tmp_path: Path) -> None:
     repo, base = pr_285_repo(make_repo, tmp_path)
     apply_285(repo)
@@ -1068,3 +1086,316 @@ def test_pr_285_s_real_commit_passes(make_repo: Callable[[], Repo], tmp_path: Pa
     # Before #301: "b25fc2f's subject 'chore(deps-dev): Bump types-pyyaml' doesn't give one
     # dependency's versions, so its kind of update can't be read."
     assert [d.problem for d in ci(repo, base, PR_285_BRANCH, "troupe-run/infrastructure")] == []
+
+
+def test_pr_285_s_title_and_commit_are_both_a_patch() -> None:
+    title = "chore(deps-dev): Bump types-pyyaml from 6.0.12.20260906 to 6.0.12.20261030"
+    pull = {"title": title, "head": {"ref": PR_285_BRANCH}}
+    assert dependabot_issues.read_update(pull).kind == "patch"
+    patch = (PR_285 / "b25fc2f.patch").read_text(encoding="utf-8")
+    message = patch.split("Subject: [PATCH] ", 1)[1].split("\n---\n diff", 1)[0]
+    versions = guard.bumps_line_versions(message, "types-pyyaml")
+    assert versions == ("6.0.12.20260906", "6.0.12.20261030")
+    assert guard.dependabot_update_kind(*versions) == "patch"
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "kind"),
+    [
+        ("6.0.12.20260906", "6.0.12.20261030", "patch"),  # the fourth part, a date
+        ("6.0.12.20261030", "6.0.13.20261101", "patch"),
+        ("6.0.12.20261030", "6.1.0.20261101", "minor"),
+        ("6.0.12.20261030", "7.0.0.20261101", "major"),
+        ("6.0", "6.0.0.1", "patch"),  # missing parts count as zero
+    ],
+)
+def test_four_part_versions_count_by_their_first_differing_part_in_both_readers(
+    old: str, new: str, kind: str
+) -> None:
+    assert guard.dependabot_update_kind(old, new) == kind
+    assert dependabot_issues.update_type(old, new) == kind
+
+
+SUBJECT_PREFIX = st.sampled_from(["", "chore(deps): ", "chore(deps-dev): ", "build(deps): "])
+NAME = st.from_regex(r"@?[a-z][a-z0-9._/-]{0,15}", fullmatch=True)
+WORD = st.from_regex(r"[!-~]{1,12}", fullmatch=True)
+
+
+@given(
+    prefix=SUBJECT_PREFIX,
+    verb=st.sampled_from(["Bump", "bump", "Update", "update"]),
+    dependency=NAME,
+    old=WORD,
+    new=WORD,
+    directory=st.none() | WORD,
+    requirement=st.booleans(),
+)
+def test_a_subject_that_gives_its_versions_never_takes_the_short_reading(
+    prefix: str,
+    verb: str,
+    dependency: str,
+    old: str,
+    new: str,
+    directory: str | None,
+    requirement: bool,
+) -> None:
+    subject = (
+        f"{prefix}{verb} {dependency}{' requirement' if requirement else ''} from {old} to {new}"
+    )
+    if directory is not None:
+        subject += f" in {directory}"
+    assert guard.DEPENDABOT_SUBJECT.fullmatch(subject) or guard.DEPENDABOT_REQUIREMENT.fullmatch(
+        subject
+    )
+    assert guard.dependabot_short_subject(subject) is None
+
+
+@given(prefix=SUBJECT_PREFIX, dependency=NAME)
+def test_a_requirement_subject_never_takes_the_short_reading(prefix: str, dependency: str) -> None:
+    subject = f"{prefix}Update {dependency} requirement"
+    assert guard.dependabot_short_subject(subject) is None
+
+
+@given(prefix=SUBJECT_PREFIX, dependency=NAME)
+def test_a_bump_subject_without_versions_names_its_dependency(prefix: str, dependency: str) -> None:
+    assert guard.dependabot_short_subject(f"{prefix}Bump {dependency}") == dependency
+    assert guard.dependabot_short_subject(f"{prefix}Bump {dependency} in /web") == dependency
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ("Bumps [zod](https://github.com/colinhacks/zod) from 4.6.5 to 4.6.7.", ("4.6.5", "4.6.7")),
+        ("Bumps zod from v4.6.5 to v4.6.7.", ("4.6.5", "4.6.7")),
+        ("Bumps [Zod](https://x) from 4.6.5 to 4.6.7", ("4.6.5", "4.6.7")),
+        (
+            "Bumps [vite](https://github.com/vitejs/vite) from 7.0.0 to 7.0.1.",
+            "names vite, not zod",
+        ),
+        ("Updates the requirements on [zod](https://x) to permit the latest version.", None),
+        ("", None),
+        # Only the first body line is read: a changelog's line further down isn't.
+        ("Release notes\n\nBumps [zod](https://x) from 4.6.5 to 4.6.7.", None),
+    ],
+    ids=["linked", "plain-v", "case", "other", "requirement", "empty", "changelog"],
+)
+def test_the_bumps_line_is_the_message_s_first_body_line(
+    body: str, expected: tuple[str, str] | str | None
+) -> None:
+    got = guard.bumps_line_versions(f"chore(deps): Bump zod\n\n{body}\n", "zod")
+    if isinstance(expected, str):
+        assert isinstance(got, str)
+        assert expected in got
+    else:
+        assert got == expected
+
+
+def test_a_uv_lock_s_versions_are_its_packages_of_that_name() -> None:
+    lock = (PR_285 / "uv.lock.txt").read_text(encoding="utf-8")
+    assert guard.lock_versions("uv.lock", lock, "types-pyyaml") == ["6.0.12.20260906"]
+    assert guard.lock_versions("uv.lock", lock, "types_PyYAML") == ["6.0.12.20260906"]
+    assert guard.lock_versions("uv.lock", lock, "types-pyyaml-extra") == []
+
+
+def test_a_package_lock_s_versions_include_nested_entries_but_not_near_names() -> None:
+    lock = json.dumps(
+        {
+            "packages": {
+                "": {"name": "site"},
+                "node_modules/zod": {"version": "4.6.5"},
+                "node_modules/a/node_modules/zod": {"version": "3.0.0"},
+                "node_modules/zod-extra": {"version": "1.0.0"},
+                "node_modules/@scope/zod": {"version": "2.0.0"},
+            }
+        }
+    )
+    assert guard.lock_versions("package-lock.json", lock, "zod") == ["4.6.5", "3.0.0"]
+    assert guard.lock_versions("package-lock.json", lock, "@scope/zod") == ["2.0.0"]
+
+
+@pytest.mark.parametrize(
+    ("name", "text", "why"),
+    [
+        ("uv.lock", "[[package]\n", "can't be parsed"),
+        ("uv.lock", 'package = "x"\n', "has no [[package]] list"),
+        ("package-lock.json", "{", "can't be parsed"),
+        ("package-lock.json", '{"dependencies": {}}', "has no packages"),
+        ("package-lock.json", "[]", "can't be parsed"),
+    ],
+)
+def test_a_lock_file_that_can_t_be_read_says_why(name: str, text: str, why: str) -> None:
+    got = guard.lock_versions(name, text, "zod")
+    assert isinstance(got, str)
+    assert why in got
+
+
+# Git-level: the readings of a short subject on a reserved branch (spec: "A Dependabot bump whose
+# subject leaves out its versions is read from two agreeing sources").
+
+ZOD_SHORT_BRANCH = "dependabot/npm_and_yarn/zod-4.6.7"
+
+
+def short_message(subject: str, bumps: str | None, metadata: str = "") -> str:
+    body = f"{bumps}\n- [Commits](https://github.com/colinhacks/zod/commits)\n" if bumps else ""
+    meta = f"---\nupdated-dependencies:\n{metadata}...\n\n" if metadata else ""
+    return f"{subject}\n\n{body}\n{meta}Signed-off-by: dependabot[bot] <support@github.com>\n"
+
+
+def zod_bumps(old: str, new: str) -> str:
+    return f"Bumps [zod](https://github.com/colinhacks/zod) from {old} to {new}."
+
+
+def short_zod(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    message: str,
+    lock_to: str | None = "4.6.7",
+    manifest_to: str | None = None,
+) -> list[guard.Decision]:
+    repo, base = dependabot_repo(make_repo, tmp_path)
+    repo.switch(ZOD_SHORT_BRANCH)
+    if lock_to is not None:
+        edit(repo, "package-lock.json", '"version": "4.6.5"', f'"version": "{lock_to}"')
+    if manifest_to is not None:
+        edit(repo, "package.json", '"zod": "4.6.5"', f'"zod": "{manifest_to}"')
+    commit(repo, message)
+    return ci(repo, base, ZOD_SHORT_BRANCH)
+
+
+def test_a_short_subject_whose_bumps_line_lock_and_manifest_agree_passes(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    message = short_message("chore(deps): Bump zod", zod_bumps("4.6.5", "4.6.7"))
+    assert short_zod(make_repo, tmp_path, message, manifest_to="4.6.7") == []
+
+
+def test_a_short_subject_whose_bumps_line_and_lock_agree_passes(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    message = short_message("chore(deps): Bump zod", zod_bumps("4.6.5", "4.6.7"))
+    assert short_zod(make_repo, tmp_path, message) == []
+
+
+def test_a_short_subject_whose_lock_and_manifest_agree_without_a_bumps_line_passes(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    message = short_message("chore(deps): Bump zod", None)
+    assert short_zod(make_repo, tmp_path, message, manifest_to="4.6.7") == []
+
+
+def test_a_short_subject_whose_bumps_line_and_lock_disagree_fails_naming_both(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    message = short_message("chore(deps): Bump zod", zod_bumps("4.6.5", "4.6.7"))
+    problem = refused_for(short_zod(make_repo, tmp_path, message, lock_to="4.7.0")).problem
+    assert "readings of zod's versions disagree" in problem
+    assert "its Bumps line says 4.6.5 to 4.6.7" in problem
+    assert "package-lock.json says 4.6.5 to 4.7.0" in problem
+
+
+def test_a_short_subject_with_one_reading_fails_saying_two_must_agree(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    message = short_message("chore(deps): Bump zod", None)
+    problem = refused_for(short_zod(make_repo, tmp_path, message)).problem
+    assert "gives no versions" in problem
+    assert "1 reading(s) of zod's, where two must agree (found: package-lock.json)" in problem
+
+
+def test_a_short_subject_s_metadata_alone_isn_t_a_reading(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    metadata = (
+        "- dependency-name: zod\n  dependency-version: 4.6.7\n"
+        "  dependency-type: direct:production\n  update-type: version-update:semver-patch\n"
+    )
+    message = short_message("chore(deps): Bump zod", None, metadata)
+    problem = refused_for(short_zod(make_repo, tmp_path, message)).problem
+    assert "1 reading(s) of zod's, where two must agree" in problem
+
+
+def test_a_short_subject_read_as_major_from_two_sources_fails_saying_so(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    message = short_message("chore(deps): Bump zod", zod_bumps("4.6.5", "5.0.0"))
+    problem = refused_for(short_zod(make_repo, tmp_path, message, lock_to="5.0.0")).problem
+    assert "zod 4.6.5 to 5.0.0) is a major update" in problem
+
+
+def test_a_short_subject_whose_versions_go_down_fails(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    message = short_message("chore(deps): Bump zod", zod_bumps("4.6.5", "4.6.4"))
+    problem = refused_for(short_zod(make_repo, tmp_path, message, lock_to="4.6.4")).problem
+    assert "4.6.5 to 4.6.4, can't be read as a minor or patch update" in problem
+
+
+def test_a_short_subject_whose_bumps_line_names_another_dependency_fails(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    message = short_message("chore(deps): Bump zod", "Bumps [vite](https://x) from 4.6.5 to 4.6.7.")
+    problem = refused_for(short_zod(make_repo, tmp_path, message)).problem
+    assert "its Bumps line names vite, not zod" in problem
+
+
+def test_a_short_subject_whose_manifest_moves_by_another_step_fails_naming_both(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, _ = dependabot_repo(make_repo, tmp_path)
+    edit(repo, "pyproject.toml", "eventsourcing==9.5.5", "eventsourcing>=9.5,<9.6")
+    git(repo.path, "commit", "-q", "--no-verify", "-am", "chore: a range")
+    git(repo.path, "push", "-q", "origin", "main")
+    base = repo.head()
+    branch = "dependabot/uv/eventsourcing-9.5.6"
+    repo.switch(branch)
+    edit(repo, "uv.lock", 'version = "9.5.5"', 'version = "9.5.6"')
+    edit(repo, "pyproject.toml", "eventsourcing>=9.5,<9.6", "eventsourcing>=9.6,<9.7")
+    bumps = "Bumps [eventsourcing](https://x) from 9.5.5 to 9.5.6."
+    commit(repo, short_message("chore(deps): Bump eventsourcing", bumps))
+    problem = refused_for(ci(repo, base, branch, "troupe-run/troupe")).problem
+    assert "manifest lines move eventsourcing by a minor step" in problem
+    assert "its versions 9.5.5 to 9.5.6 are a patch" in problem
+
+
+def test_a_short_subject_whose_manifest_line_can_t_be_read_fails_naming_it(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    message = short_message("chore(deps): Bump zod", zod_bumps("4.6.5", "4.6.7"))
+    problem = refused_for(short_zod(make_repo, tmp_path, message, manifest_to="^4.6.7")).problem
+    assert "manifest lines can't be read for zod" in problem
+    assert "package.json" in problem
+
+
+def test_a_short_subject_whose_lock_moves_two_versions_fails_naming_the_file(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo, _ = dependabot_repo(make_repo, tmp_path)
+    nested = '"node_modules/a/node_modules/zod": {"version": "4.6.4"},\n    "node_modules/zod"'
+    edit(repo, "package-lock.json", '"node_modules/zod"', nested)
+    git(repo.path, "commit", "-q", "--no-verify", "-am", "chore: two zods")
+    git(repo.path, "push", "-q", "origin", "main")
+    base = repo.head()
+    repo.switch(ZOD_SHORT_BRANCH)
+    edit(repo, "package-lock.json", '"version": "4.6.4"', '"version": "4.6.7"')
+    edit(repo, "package-lock.json", '"version": "4.6.5"', '"version": "4.6.7"')
+    commit(repo, short_message("chore(deps): Bump zod", zod_bumps("4.6.5", "4.6.7")))
+    problem = refused_for(ci(repo, base, ZOD_SHORT_BRANCH)).problem
+    assert "package-lock.json doesn't move one version of zod to one other" in problem
+
+
+def test_a_short_subject_whose_lock_can_t_be_parsed_fails_naming_the_file(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    message = short_message("chore(deps): Bump zod", zod_bumps("4.6.5", "4.6.7"))
+    problem = refused_for(short_zod(make_repo, tmp_path, message, lock_to='4.6.7",')).problem
+    assert "package-lock.json can't be parsed" in problem
+
+
+def test_a_subject_that_gives_its_versions_is_read_from_it_whatever_its_body_and_lock_say(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    # As before #301: the subject's patch counts, though the Bumps line and the lock say major.
+    message = short_message(
+        "chore(deps): Bump zod from 4.6.5 to 4.6.7", zod_bumps("4.6.5", "9.0.0")
+    )
+    assert short_zod(make_repo, tmp_path, message, lock_to="9.0.0") == []
