@@ -2,24 +2,26 @@
 
 ## 1. Reproduce the false report (#298)
 
-- [ ] 1.1 In `scripts/tests/test_guard_pytest.py`, add a project builder for design D3: the helper's declaration plus
+- [x] 1.1 In `scripts/tests/test_guard_pytest.py`, add a project builder for design D3: the helper's declaration plus
   scopes `alpha` (`alpha/**`, tests `alpha/tests/**`) and `beta` (`beta/**`, tests `beta/tests/**`), with
   `alpha/data.txt`, `beta/data.txt`, `alpha/tests/test_alpha.py` (a test reading `alpha/data.txt`, and one reading
   `docs/a.md`), and `beta/tests/conftest.py` with a fixture reading `beta/data.txt` that `beta/tests/test_beta.py`
   uses. Start from troupe's draft (`selection_test.py` from the #365 session), changed to the file's `project()` and
   `run_pytest` style
-- [ ] 1.2 Add `test_tests_from_two_scopes_selected_by_node_id_pass` over `PARALLEL`: select the clean `alpha` and
+- [x] 1.2 Add `test_tests_from_two_scopes_selected_by_node_id_pass` over `PARALLEL`: select the clean `alpha` and
   `beta` tests by node id, and assert the run passes with no `guard:` line. Verify it **fails** on the unchanged
   guard, charging a test with the other module's source or `.pyc`, and commit it marked
   `xfail(strict=True, reason="#298")` with the failure quoted in the commit message
-- [ ] 1.3 Add `test_a_module_level_read_in_a_selection_by_node_id_counts_for_its_module_only` over `PARALLEL`: a
+- [x] 1.3 Add `test_a_module_level_read_in_a_selection_by_node_id_counts_for_its_module_only` over `PARALLEL`: a
   module under `alpha/tests/` reads `docs/a.md` at import; select one of its tests and the `beta` test by node id, and
   assert that test fails naming `docs/a.md` and `docs`, and the `beta` test passes. Verify it **fails** on the
   unchanged guard (the `beta` test is charged too), and commit it with 1.2, marked the same way
-- [ ] 1.4 Add `test_an_untagged_read_in_a_selection_by_node_id_fails_only_that_test` over `PARALLEL`: the selection of
+- [x] 1.4 Add `test_an_untagged_read_in_a_selection_by_node_id_fails_only_that_test` over `PARALLEL`: the selection of
   1.2 plus the `alpha` test reading `docs/a.md`. Assert exactly one `guard:` line, naming that test, `docs/a.md` and
   the `docs` tag, and that the other two tests pass. Verify it passes on the unchanged guard serially, or record what
   it reports if the false report also fails the others, and mark it like 1.2 if so
+  It fails on the unchanged guard too, serially and with `-n 2`: the false report errors the two clean tests as
+  well (10 `guard:` lines, not 1), so it's marked like 1.2
 
 ## 2. Charge a collection read to the innermost collector (design D1, D2)
 
