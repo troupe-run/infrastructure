@@ -55,8 +55,9 @@
   change. Verify the section reads correctly against the spec
 - [x] 4.2 Run `uv run scripts/check.py` (ruff, mypy --strict, pytest, OpenSpec strict validation) and verify it
   passes
-- [ ] 4.3 Fast-forward onto `origin/main`, run a local plan, and verify it changes only the delivered
-  `scripts/guard.py` in troupe and website
+- [x] 4.3 Fast-forward onto `origin/main`, run a local plan, and verify it changes only the delivered
+  `scripts/guard.py` in troupe and website. Done at 4181509 (onto 78c1233): `github_repository_file.guard`'s
+  `troupe:scripts/guard.py` and `website:scripts/guard.py` updated in place; 0 to add, 2 to change, 0 to destroy
 
 ## Workflow follow-up
 
