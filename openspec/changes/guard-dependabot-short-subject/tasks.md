@@ -32,8 +32,8 @@
   up, the Bumps line's name, the subject routing, a manifest line that can't be read) each failed its test
 - [x] 2.5 Add the four-part scenario to the counting tests (`6.0.12.20260906` to `6.0.12.20261030` patch,
   `6.0.12.x` to `6.1.0.x` minor, `6.0` to `6.0.0.1` patch) in both readers; verify they pass
-- [x] 2.6 Add a test that #285's real title, read by `dependabot_issues.read_update`, and its real commit, read by the
-  guard, are both a patch; verify it passes
+- [x] 2.6 Add a test that #285's real title, read by `dependabot_issues.read_update`, and its real commit's `Bumps`
+  line, read by the guard, are both a patch (1.1's test reads the whole commit); verify it passes
 
 ## 3. The old path against the new
 

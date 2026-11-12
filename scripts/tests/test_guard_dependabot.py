@@ -1088,12 +1088,16 @@ def test_pr_285_s_real_commit_passes(make_repo: Callable[[], Repo], tmp_path: Pa
     assert [d.problem for d in ci(repo, base, PR_285_BRANCH, "troupe-run/infrastructure")] == []
 
 
-def test_pr_285_s_title_and_commit_are_both_a_patch() -> None:
+def test_pr_285_s_title_and_bumps_line_are_both_a_patch() -> None:
+    # The issue reads the title; this checks the guard's Bumps reading of the real message. Its
+    # lock and manifest readings are checked by test_pr_285_s_real_commit_passes.
     title = "chore(deps-dev): Bump types-pyyaml from 6.0.12.20260906 to 6.0.12.20261030"
     pull = {"title": title, "head": {"ref": PR_285_BRANCH}}
     assert dependabot_issues.read_update(pull).kind == "patch"
     patch = (PR_285 / "b25fc2f.patch").read_text(encoding="utf-8")
-    message = patch.split("Subject: [PATCH] ", 1)[1].split("\n---\n diff", 1)[0]
+    # The message ends where format-patch's diffstat begins ("---" then " pyproject.toml | ...").
+    message = patch.split("Subject: [PATCH] ", 1)[1].split("\n---\n ", 1)[0]
+    assert message.rstrip().endswith("Signed-off-by: dependabot[bot] <support@github.com>")
     versions = guard.bumps_line_versions(message, "types-pyyaml")
     assert versions == ("6.0.12.20260906", "6.0.12.20261030")
     assert guard.dependabot_update_kind(*versions) == "patch"
