@@ -1034,3 +1034,37 @@ def test_a_name_not_shaped_like_dependabot_s_isn_t_trusted(
     [refusal] = ci(repo, base, branch)
     assert refusal.rule == "commit-branch-change"
     assert "Dependabot" not in refusal.problem
+
+
+# guard-dependabot-short-subject: a "Bump X" subject that leaves out its versions (#301)
+
+PR_285 = FIXTURES.parent / "dependabot-285"
+PR_285_BRANCH = "dependabot/uv/types-pyyaml-6.0.12.20261030"
+
+
+def pr_285_repo(make_repo: Callable[[], Repo], tmp_path: Path) -> tuple[Repo, str]:
+    """infrastructure at #285's parent, 0b0f7d9: its real pyproject.toml and uv.lock on main."""
+    repo, _ = release_repo(make_repo, tmp_path)
+    repo.write("pyproject.toml", (PR_285 / "pyproject.toml.txt").read_text(encoding="utf-8"))
+    repo.write("uv.lock", (PR_285 / "uv.lock.txt").read_text(encoding="utf-8"))
+    git(repo.path, "add", "-A")
+    git(repo.path, "commit", "-q", "--no-verify", "-m", "chore: infrastructure at 0b0f7d9")
+    git(repo.path, "push", "-q", "origin", "main")
+    return repo, repo.head()
+
+
+def apply_285(repo: Repo) -> None:
+    """b25fc2f as Dependabot made it: its message, its author and its diff (git format-patch)."""
+    repo.switch(PR_285_BRANCH)
+    git(repo.path, "am", "-q", "--no-verify", "--keep-cr", str(PR_285 / "b25fc2f.patch"))
+
+
+@pytest.mark.xfail(strict=True, reason="#301: a subject without versions is read as unknown")
+def test_pr_285_s_real_commit_passes(make_repo: Callable[[], Repo], tmp_path: Path) -> None:
+    repo, base = pr_285_repo(make_repo, tmp_path)
+    apply_285(repo)
+    subject = git(repo.path, "log", "-1", "--format=%s").stdout.strip()
+    assert subject == "chore(deps-dev): Bump types-pyyaml"
+    # Before #301: "b25fc2f's subject 'chore(deps-dev): Bump types-pyyaml' doesn't give one
+    # dependency's versions, so its kind of update can't be read."
+    assert [d.problem for d in ci(repo, base, PR_285_BRANCH, "troupe-run/infrastructure")] == []
