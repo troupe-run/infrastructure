@@ -1061,11 +1061,17 @@ PR_285 = FIXTURES.parent / "dependabot-285"
 PR_285_BRANCH = "dependabot/uv/types-pyyaml-6.0.12.20261030"
 
 
+def lf_bytes(path: Path) -> bytes:
+    """A fixture's bytes as git stored them: a Windows checkout may have made its line endings
+    CRLF, and the patch only applies to the files it was made from."""
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
+
 def pr_285_repo(make_repo: Callable[[], Repo], tmp_path: Path) -> tuple[Repo, str]:
     """infrastructure at #285's parent, 0b0f7d9: its real pyproject.toml and uv.lock on main."""
     repo, _ = release_repo(make_repo, tmp_path)
-    repo.write("pyproject.toml", (PR_285 / "pyproject.toml.txt").read_text(encoding="utf-8"))
-    repo.write("uv.lock", (PR_285 / "uv.lock.txt").read_text(encoding="utf-8"))
+    (repo.path / "pyproject.toml").write_bytes(lf_bytes(PR_285 / "pyproject.toml.txt"))
+    (repo.path / "uv.lock").write_bytes(lf_bytes(PR_285 / "uv.lock.txt"))
     git(repo.path, "add", "-A")
     git(repo.path, "commit", "-q", "--no-verify", "-m", "chore: infrastructure at 0b0f7d9")
     git(repo.path, "push", "-q", "origin", "main")
@@ -1084,9 +1090,11 @@ def apply_285(repo: Repo) -> None:
     git am cuts a message at its first "---" line, which drops the updated-dependencies block
     and the sign-off, so the whole message is put back (review on #302)."""
     repo.switch(PR_285_BRANCH)
-    git(repo.path, "am", "-q", "--no-verify", "--keep-cr", str(PR_285 / "b25fc2f.patch"))
+    patch = repo.path.parent / "b25fc2f.patch"
+    patch.write_bytes(lf_bytes(PR_285 / "b25fc2f.patch"))
+    git(repo.path, "am", "-q", "--no-verify", str(patch))
     message = repo.path.parent / "b25fc2f-message.txt"
-    message.write_text(pr_285_message(), encoding="utf-8")
+    message.write_text(pr_285_message(), encoding="utf-8", newline="\n")
     git(repo.path, "commit", "-q", "--amend", "--no-verify", "-F", str(message))
 
 
