@@ -13,17 +13,20 @@
 
 ## 2. Verify against troupe's main
 
-- [ ] 2.1 Once troupe's `in-process-runner` pull request has merged (design D3), re-read the Purpose from troupe's
+- [x] 2.1 Once troupe's `in-process-runner` pull request has merged (design D3), re-read the Purpose from troupe's
       `main` (`gh api repos/troupe-run/troupe/contents/openspec/specs/mistralrs-runner/spec.md`, through `purpose()`)
       and compare it with the record. Verify the spec's `Capability:` line still names `cap:actor-runners` alone. If the
       Purpose changed, update the record, check design D2 against the new text, and re-run 1.1's checks. Stop and
-      revise the change if the spec is renamed, dropped or names other labels
-- [ ] 2.2 Rebase the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports nothing about
+      revise the change if the spec is renamed, dropped or names other labels. Done after troupe#422 merged
+      (f9ddd3cb): `purpose()` of main's spec equals the record, and its one `Capability:` line names
+      `cap:actor-runners` alone
+- [x] 2.2 Rebase the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports nothing about
       troupe's specs or Purposes. Keep the output for the pull request. Stop and revise the change if it reports
-      anything of this change's
+      anything of this change's. Rebased onto 323e4a1: `oob: no differences (... troupe specs, troupe label descriptions,
+      ...)`
 - [ ] 2.3 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it shows nothing
       of this change's created, changed or deleted, or that no plan ran because only `oob/` and `openspec/` changed
-- [ ] 2.4 Run `openspec validate mistralrs-runner-spec-purpose --strict` and verify it passes
+- [x] 2.4 Run `openspec validate mistralrs-runner-spec-purpose --strict` and verify it passes
 
 ## Workflow follow-up
 
