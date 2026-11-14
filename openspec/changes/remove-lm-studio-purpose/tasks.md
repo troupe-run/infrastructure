@@ -2,10 +2,10 @@
 
 ## 1. Remove the record
 
-- [ ] 1.1 Delete the `lm-studio-runner` line from `oob/troupe-spec-purposes.json` (design D1). Verify the file parses,
-      has one entry fewer, its keys are still sorted, and `git diff` shows only that line removed
-- [ ] 1.2 Leave `tofu/labels/troupe.json` unchanged (design D2). Verify `git diff tofu/` is empty and
-      `scripts/tests/test_labels.py` passes
+- [x] 1.1 Delete the `lm-studio-runner` line from `oob/troupe-spec-purposes.json` (design D1). Verify the file parses,
+      has one entry fewer, its keys are still sorted, and `git diff` shows only that line removed (33 entries, sorted, one line removed)
+- [x] 1.2 Leave `tofu/labels/troupe.json` unchanged (design D2). Verify `git diff tofu/` is empty and
+      `scripts/tests/test_labels.py` passes (empty; 24 passed)
 
 ## 2. Verify against troupe's main
 
