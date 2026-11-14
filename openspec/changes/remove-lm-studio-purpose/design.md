@@ -14,7 +14,7 @@ Evidence read on 2026-11-14:
 | | |
 |---|---|
 | troupe's `remove-lm-studio` change | proposed on branch `remove-lm-studio`. Removes every requirement of `lm-studio-runner` with `retire_capabilities: true`; its other deltas change no Purpose |
-| `oob/troupe-spec-purposes.json` | 34 entries, `lm-studio-runner` among them |
+| `oob/troupe-spec-purposes.json` | 34 entries, `lm-studio-runner` among them (35 once #303 landed, before the rebase) |
 | other mentions of LM Studio in this repository | none outside the archive and that entry |
 
 ## Goals / Non-Goals
