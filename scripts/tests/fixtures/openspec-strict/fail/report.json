@@ -11,7 +11,7 @@
           "message": "ADDED \"Runs pause\" must include at least one scenario"
         }
       ],
-      "durationMs": 16
+      "durationMs": 19
     },
     {
       "id": "steps",
@@ -24,7 +24,7 @@
           "message": "Requirement text is very long (>500 characters). Move examples and edge cases into scenarios, or split it into separate requirements that each state one behavior."
         }
       ],
-      "durationMs": 3
+      "durationMs": 4
     }
   ],
   "summary": {

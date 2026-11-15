@@ -85,7 +85,7 @@ Everything from here to step 5 runs in the worktree.
 
 ### 4. The change
 
-`/opsx:propose add-cap-<name>-label`, giving it the label, the description and both issues. It's a change with
+`/openspec-propose add-cap-<name>-label`, giving it the label, the description and both issues. It's a change with
 `skip_specs: true`, because a new label is data under the `labels` spec's existing requirements: a proposal saying
 why the capability needs a label and quoting the description, and one task:
 
@@ -97,7 +97,7 @@ If `oob.py` reports anything else about the label, follow [oob/README.md](../oob
 change. If the label would need a requirement changed, it isn't a standard change: stop and propose it the usual
 way.
 
-Then `/opsx:apply`, and `/opsx:archive`, each committed as the workflow says.
+Then `/openspec-apply-change`, and `/openspec-archive-change`, each committed as the workflow says.
 
 ### 5. The pull request
 
