@@ -24,8 +24,10 @@
       troupe's specs or Purposes. Keep the output for the pull request. Stop and revise the change if it reports
       anything of this change's. Rebased onto 323e4a1: `oob: no differences (... troupe specs, troupe label descriptions,
       ...)`
-- [ ] 2.3 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it shows nothing
-      of this change's created, changed or deleted, or that no plan ran because only `oob/` and `openspec/` changed
+- [x] 2.3 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it shows nothing
+      of this change's created, changed or deleted, or that no plan ran because only `oob/` and `openspec/` changed.
+      Done: no plan ran. tofu run 43678032504 on b14d60f set `plan=false` (`scripts/plan_needed.py`; the diff is
+      `oob/` and `openspec/` only), so `plan (pull request)` was skipped
 - [x] 2.4 Run `openspec validate mistralrs-runner-spec-purpose --strict` and verify it passes
 
 ## Workflow follow-up
