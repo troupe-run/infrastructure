@@ -1,7 +1,8 @@
 """Rule: openspec-strict, the guard check's strict OpenSpec validation (#123).
 
 The fixtures under fixtures/openspec-strict/ were captured from OpenSpec 1.14.3 on 2026-10-24 (task
-1.1): each holds the OpenSpec tree it was run on, and `openspec validate --all --strict --json
+1.1), and again from 2.0.0 on 2026-11-15, which changed only the durations (openspec-2 design D2).
+Each holds the OpenSpec tree it was run on, and `openspec validate --all --strict --json
 --no-interactive`'s output, exit status and error output there, with the root path in the report
 replaced by /probe/<name>. In `fail`, the main spec `steps` has a third requirement over the length
 limit, and the active change `add-thing` adds a requirement with no scenario.
@@ -31,7 +32,7 @@ def captured(name: str) -> guard.OpenSpecRun:
         status=int((base / "status").read_text(encoding="utf-8")),
         stdout=(base / "report.json").read_text(encoding="utf-8"),
         stderr=(base / "stderr").read_text(encoding="utf-8"),
-        version="1.14.3",
+        version="2.0.0",
     )
 
 
@@ -171,7 +172,7 @@ def test_the_captured_reports_are_read() -> None:
 def test_a_report_that_can_t_be_read_fails_naming_the_exit_status_and_error_output(
     stdout: str, status: int, said: str
 ) -> None:
-    run = guard.OpenSpecRun(status, stdout, "something on stderr\n", "1.14.3")
+    run = guard.OpenSpecRun(status, stdout, "something on stderr\n", "2.0.0")
     with pytest.raises(guard.UnreadableOpenSpecReportError, match=said):
         guard.read_openspec_report(run)
     decision = guard.openspec_strict(FAIL, EVERYTHING, running(run))
@@ -226,7 +227,7 @@ def test_one_failing_spec_s_fix_reproduces_it_with_the_version_that_ran() -> Non
     assert decision.problem.startswith("1 item(s) fail OpenSpec's strict validation: spec steps:")
     assert "add-thing" not in decision.problem
     assert decision.fix.startswith(
-        "Run `openspec validate steps --type spec --strict` with OpenSpec 1.14.3"
+        "Run `openspec validate steps --type spec --strict` with OpenSpec 2.0.0"
     )
     assert "split it" in decision.fix
 
@@ -242,7 +243,7 @@ def test_one_failing_change_s_fix_names_the_change() -> None:
 def test_several_failing_items_are_listed_and_the_fix_validates_everything() -> None:
     decision = guard.openspec_strict(FAIL, EVERYTHING, running(captured("fail")))
     assert decision.problem.startswith("2 item(s) fail")
-    assert "Run `openspec validate --all --strict` with OpenSpec 1.14.3" in decision.fix
+    assert "Run `openspec validate --all --strict` with OpenSpec 2.0.0" in decision.fix
 
 
 def test_a_failing_spec_outside_the_scope_doesn_t_fail_the_check() -> None:
@@ -261,8 +262,8 @@ def test_each_run_says_what_it_judged() -> None:
     guard.openspec_strict(PASS, EVERYTHING, running(captured("pass")), notes)
     guard.openspec_strict(FAIL, guard.OpenSpecScope(), never, notes)
     assert notes == [
-        "guard: openspec-strict: OpenSpec 1.14.3 validated 0 of 2 item(s), what the range touches.",
-        "guard: openspec-strict: OpenSpec 1.14.3 validated 1 of 1 item(s), every spec and active "
+        "guard: openspec-strict: OpenSpec 2.0.0 validated 0 of 2 item(s), what the range touches.",
+        "guard: openspec-strict: OpenSpec 2.0.0 validated 1 of 1 item(s), every spec and active "
         "change.",
         "guard: openspec-strict: no spec or active change in scope, so OpenSpec wasn't run.",
     ]
@@ -301,7 +302,7 @@ with log.open("a", encoding="utf-8") as calls:
         "dnt": os.environ.get("DO_NOT_TRACK"),
         "token": os.environ.get("GITHUB_TOKEN")}) + "\\n")
 if sys.argv[1:] == ["--version"]:
-    print("1.14.3")
+    print("2.0.0")
     sys.exit(0)
 time.sleep(config.get("sleep", 0))
 sys.stdout.write(config["stdout"])
@@ -410,7 +411,7 @@ def test_the_ci_entry_fails_a_pull_request_naming_the_requirement(
     assert result.returncode == 1, result.stderr
     assert "guard: openspec-strict: 2 item(s) fail" in result.stderr
     assert 'requirement "Steps are reported" (requirements[2])' in result.stderr
-    assert "with OpenSpec 1.14.3" in result.stderr
+    assert "with OpenSpec 2.0.0" in result.stderr
 
 
 def test_the_ci_entry_passes_a_pull_request_that_touches_no_spec(

@@ -223,7 +223,7 @@ def test_a_branch_without_a_matching_change_is_refused(make_repo: Callable[[], R
     repo = make_repo()
     decision = guard.commit_branch_change(repo.path, "add-thing")
     assert decision.rule == "commit-branch-change"
-    assert "/opsx:propose add-thing" in decision.fix
+    assert "/openspec-propose add-thing" in decision.fix
 
 
 def test_a_branch_with_its_change_is_allowed(make_repo: Callable[[], Repo]) -> None:

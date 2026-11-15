@@ -2,21 +2,21 @@
 
 ## 1. Regenerate this repository's OpenSpec files
 
-- [ ] 1.1 Verify `openspec --version` prints `2.0.0`. Run `openspec update --dry-run`, keep its list of 25 changes,
+- [x] 1.1 Verify `openspec --version` prints `2.0.0`. Run `openspec update --dry-run`, keep its list of 25 changes,
   and verify it lists no locally edited file to keep.
-- [ ] 1.2 Run `openspec update`. Verify `git status --short` matches the dry run's list exactly (six
+- [x] 1.2 Run `openspec update`. Verify `git status --short` matches the dry run's list exactly (six
   `.agents/skills/openspec-*/SKILL.md` and `.agents/skills/.openspec-target` added, six `.claude/commands/opsx/*.md`
   deleted, six `.claude/skills/openspec-*` now relative links into `.agents/skills/`), that `openspec/config.yaml` and
   `.claude/settings.json` are unchanged, and that a second run changes nothing.
 
 ## 2. Move the pin and the guard's names
 
-- [ ] 2.1 In `.github/workflows/guard.yml`, set `OPENSPEC_VERSION: 2.0.0`.
-- [ ] 2.2 In `scripts/guard.py`, replace `/opsx:propose` with `/openspec-propose` in the `commit-branch-change` and
+- [x] 2.1 In `.github/workflows/guard.yml`, set `OPENSPEC_VERSION: 2.0.0`.
+- [x] 2.2 In `scripts/guard.py`, replace `/opsx:propose` with `/openspec-propose` in the `commit-branch-change` and
   `edit-branch-change` fixes and in `WORKFLOW_SUMMARY`, and `/opsx:apply` with `/openspec-apply-change` there (design
   D3). Update `test_a_branch_without_a_matching_change_is_refused` to expect `/openspec-propose add-thing`, and run it
   first against the old message to see it fail.
-- [ ] 2.3 Re-capture `scripts/tests/fixtures/openspec-strict/{pass,fail}` with 2.0.0 (design D2): in a scratch copy
+- [x] 2.3 Re-capture `scripts/tests/fixtures/openspec-strict/{pass,fail}` with 2.0.0 (design D2): in a scratch copy
   of each fixture's `openspec/` tree run `openspec validate --all --strict --json --no-interactive` with
   `OPENSPEC_TELEMETRY=0`, replace the root path with `/probe/<name>`, and write `report.json`, `status` and `stderr`.
   Verify the diff against the 1.14.3 capture is only `durationMs`. Move `test_guard_openspec.py`'s docstring,
@@ -24,14 +24,14 @@
 
 ## 3. Rename the commands in the docs
 
-- [ ] 3.1 In `CLAUDE.md` and `docs/standard-changes.md`, replace `/opsx:propose`, `/opsx:apply` and `/opsx:archive`
+- [x] 3.1 In `CLAUDE.md` and `docs/standard-changes.md`, replace `/opsx:propose`, `/opsx:apply` and `/opsx:archive`
   with `/openspec-propose`, `/openspec-apply-change` and `/openspec-archive-change`, keeping lines within 120 columns.
   Verify `git grep -n '/opsx:' -- ':!openspec/changes' ':!scripts/tests/fixtures/plan-pr96.txt'` finds nothing.
 
 ## 4. Verify and commit
 
-- [ ] 4.1 Run `openspec validate --all --strict` with 2.0.0 and verify it passes.
-- [ ] 4.2 Run `uv run scripts/check.py` (load under ~40) and verify it passes. Commit, signed off.
+- [x] 4.1 Run `openspec validate --all --strict` with 2.0.0 and verify it passes.
+- [x] 4.2 Run `uv run scripts/check.py` (load under ~40) and verify it passes. Commit, signed off.
 
 ## Workflow follow-up
 

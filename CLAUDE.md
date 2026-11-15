@@ -11,8 +11,8 @@ Every change, however small, follows one path. The full guide is the org's
 [CONTRIBUTING.md](https://github.com/troupe-run/.github/blob/main/CONTRIBUTING.md).
 
 1. **An issue** says what and why.
-2. **An OpenSpec change** says how: `/opsx:propose <name>`, on a branch named exactly `<name>`.
-3. **`/opsx:apply`** builds it. A task is ticked only when its verification has run and passed.
+2. **An OpenSpec change** says how: `/openspec-propose <name>`, on a branch named exactly `<name>`.
+3. **`/openspec-apply-change`** builds it. A task is ticked only when its verification has run and passed.
 4. **A draft pull request** closes the issue (`Closes #n`): `gh pr create --draft`. Claude reviews it; CI's legs and
    the plan wait until it's marked ready.
 5. **Claude's review is acted on**, after the review of the last push: fix or answer each finding, resolve only nits,
@@ -25,7 +25,8 @@ Every change, however small, follows one path. The full guide is the org's
    if it failed, re-run the run it names, or see "Claude's review" in the workflow doc if it failed for what it read)
    and leaves no must-fix or decision open, **mark it ready** (`gh pr ready <n>`): CI runs, and posts its plan as
    evidence once the owner approves that run. A merge needs every conversation resolved ([docs/development-workflow.md](docs/development-workflow.md)).
-6. **`/opsx:archive`** runs on the branch before merging. The owner merges by rebase, through the merge queue.
+6. **`/openspec-archive-change`** runs on the branch before merging. The owner merges by rebase, through the merge
+   queue.
 7. **After the merge**, comment on the issue with the PR and the archived change.
 
 Commits are Conventional Commits, signed off, and `uv run scripts/check.py` passes before each one.
