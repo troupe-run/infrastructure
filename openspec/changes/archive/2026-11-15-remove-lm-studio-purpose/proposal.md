@@ -36,7 +36,7 @@ so the change sets `skip_specs`, as lm-studio-runner-spec-purpose and anthropic-
 
 ## Impact
 
-- `oob/troupe-spec-purposes.json`: one entry removed (35 → 34 after #303's `anthropic-runner` entry landed; 34 → 33 before it).
+- `oob/troupe-spec-purposes.json`: one entry removed (36 → 35, after #303's `anthropic-runner` and troupe#414's `mistralrs-runner` entries landed).
 - `tofu/labels/troupe.json`: unchanged. So the plan changes nothing on GitHub.
 - The drift job: red from troupe's `remove-lm-studio` merge until this merges (one record with no spec).
 - #305 is closed by this change's pull request.

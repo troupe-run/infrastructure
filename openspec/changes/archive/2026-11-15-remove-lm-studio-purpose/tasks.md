@@ -3,20 +3,20 @@
 ## 1. Remove the record
 
 - [x] 1.1 Delete the `lm-studio-runner` line from `oob/troupe-spec-purposes.json` (design D1). Verify the file parses,
-      has one entry fewer, its keys are still sorted, and `git diff` shows only that line removed (33 entries, sorted, one line removed; 34 after rebasing onto #303's entry)
+      has one entry fewer, its keys are still sorted, and `git diff` shows only that line removed (36 → 35 entries on today's main, sorted, one line removed)
 - [x] 1.2 Leave `tofu/labels/troupe.json` unchanged (design D2). Verify `git diff tofu/` is empty and
       `scripts/tests/test_labels.py` passes (empty; 24 passed)
 
 ## 2. Verify against troupe's main
 
-- [ ] 2.1 Once troupe's `remove-lm-studio` pull request has merged (design D3), check troupe's `main` has no
+- [x] 2.1 Once troupe's `remove-lm-studio` pull request has merged (design D3), check troupe's `main` has no
       `openspec/specs/lm-studio-runner/` (`gh api repos/troupe-run/troupe/contents/openspec/specs/lm-studio-runner`
-      returns 404). Stop and revise the change if it's still there
-- [ ] 2.2 Rebase the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports nothing about
-      troupe's specs or Purposes. Keep the output for the pull request
-- [ ] 2.3 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it shows nothing
-      created, changed or deleted, or that no plan ran because only `oob/` and `openspec/` changed
-- [ ] 2.4 Run `openspec validate remove-lm-studio-purpose --strict` and verify it passes
+      returns 404). Stop and revise the change if it's still there (404 after troupe#421 merged as b7f0dd4b, 2026-11-15)
+- [x] 2.2 Rebase the branch onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports nothing about
+      troupe's specs or Purposes. Keep the output for the pull request ("oob: no differences", every check, after rebasing onto e349dfd)
+- [x] 2.3 Once the owner approves the pull request's `plan-pr` run, read its plan comment and verify it shows nothing
+      created, changed or deleted, or that no plan ran because only `oob/` and `openspec/` changed (no plan ran: "does it need a plan?" passed and `plan (pull request)` was skipped)
+- [x] 2.4 Run `openspec validate remove-lm-studio-purpose --strict` and verify it passes (valid)
 
 ## Workflow follow-up
 
