@@ -5,6 +5,9 @@ These parts of the org can't be managed by OpenTofu, so this directory declares 
 difference and exits 1 if there are any. Fix the difference on GitHub, or change the
 declaration here in a pull request (design D6 in `openspec/changes/archive/2026-10-11-adopt-org/`).
 
+A change to this directory alone runs `scripts/check.py --scope oob` before its commit and in CI: the tests tagged
+`oob`, which are those that read a file here (`scripts/check-paths.toml`).
+
 Checked against provider `integrations/github` 6.13.0 with `tofu providers schema` (2026-10-11).
 
 | File | What it declares | Why OpenTofu can't manage it | Read with |
