@@ -1047,6 +1047,7 @@ def test_private_vulnerability_reporting_with_no_setting_is_an_error(oob_dir: Pa
     assert "'website'" in report.unreadable[0]
 
 
+@pytest.mark.oob
 def test_every_managed_repository_declares_private_vulnerability_reporting_on() -> None:
     declared = json.loads((oob.OOB / "private-vulnerability-reporting.json").read_text())
     assert declared == [
@@ -1121,6 +1122,7 @@ def test_repository_features_read_back_without_a_field_are_an_error(oob_dir: Pat
     assert "'.github'" in report.unreadable[0]
 
 
+@pytest.mark.oob
 def test_only_github_declares_pull_requests_off_and_none_declares_sponsorships() -> None:
     declared = json.loads((oob.OOB / "repository-features.json").read_text())
     assert {d["repository"]: d["hasPullRequestsEnabled"] for d in declared} == {

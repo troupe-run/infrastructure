@@ -223,6 +223,7 @@ def problems(w: dict[str, Any], declared: list[dict[str, Any]] | None = None) ->
     return found
 
 
+@pytest.mark.oob
 def test_the_workflow_is_as_designed() -> None:
     assert problems(workflow()) == []
 
@@ -356,6 +357,7 @@ Change = Callable[[dict[str, Any]], object]
         ),
     ],
 )
+@pytest.mark.oob
 def test_each_departure_is_named(change: Change, named: str) -> None:
     w = copy.deepcopy(workflow())
     change(w)
@@ -388,6 +390,7 @@ DeclarationChange = Callable[[list[dict[str, Any]]], object]
         (lambda d: d.append(copy.deepcopy(dependabot_app(d))), "isn't declared once"),
     ],
 )
+@pytest.mark.oob
 def test_a_declaration_the_token_doesnt_match_is_named(
     change: DeclarationChange, named: str
 ) -> None:

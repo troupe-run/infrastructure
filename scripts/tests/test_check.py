@@ -1,5 +1,7 @@
 """scripts/check.py stops at the first failing gate and returns its exit code."""
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -111,6 +113,45 @@ def test_two_scopes_select_tests_tagged_with_either() -> None:
 
 def test_the_full_check_gives_pytest_no_marker_expression() -> None:
     assert "-m" not in pytest_command(())
+
+
+# Parallel test workers (check-time design D1)
+
+
+def test_the_full_check_runs_its_tests_in_the_named_number_of_workers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(os, "cpu_count", lambda: check.TEST_WORKERS + 4)
+    command = pytest_command(())
+    assert command[1:3] == ["-n", str(check.TEST_WORKERS)]
+
+
+@pytest.mark.parametrize(("cpus", "workers"), [(2, "2"), (1, "1"), (None, "1")])
+def test_fewer_cpus_than_the_named_count_run_one_worker_per_cpu(
+    monkeypatch: pytest.MonkeyPatch, cpus: int | None, workers: str
+) -> None:
+    monkeypatch.setattr(os, "cpu_count", lambda: cpus)
+    assert pytest_command(())[1:3] == ["-n", workers]
+
+
+def test_a_scoped_check_runs_its_tagged_tests_in_workers_too() -> None:
+    command = pytest_command(("dns",))
+    assert "-n" in command
+    assert command[-2:] == ["-m", "dns"]
+
+
+def test_xdist_keeps_pytests_nothing_selected_exit_code(tmp_path: Path) -> None:
+    """A scope no test is tagged with exits 5 under workers too, which run_gates passes."""
+    (tmp_path / "pytest.ini").write_text("[pytest]\nmarkers = nothing_has_this\n")
+    (tmp_path / "test_one.py").write_text("def test_one():\n    pass\n")
+    done = subprocess.run(
+        [sys.executable, "-m", "pytest", "-p", "xdist", "-n", "2", "-m", "nothing_has_this"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == check.NO_TESTS_RAN, done.stdout + done.stderr
 
 
 # A scope no test is tagged with (commit-check-paths task 4.7, design D8)
