@@ -299,8 +299,8 @@ commit, SHALL NOT run them. The `guard` check's triggers are set by "The rules a
 
 ### Requirement: A change runs the checks its paths need
 This repository SHALL declare a scope, in its check-paths declaration, for each of its declarations that only some
-tests read: DNS records, milestones, labels, the OpenTofu configuration and the docs. A commit, and a pull request's
-`check` job, SHALL run what the guard's check-scope answer gives for the changed paths: nothing, those scopes, or the
+tests read: DNS records, milestones, labels, the OpenTofu configuration, the docs and the out-of-band declarations
+(`oob/`). A commit, and a pull request's `check` job, SHALL run what the guard's check-scope answer gives for the changed paths: nothing, those scopes, or the
 full check. Every non-test gate runs in a scoped check.
 
 #### Scenario: A DNS-only pull request
@@ -311,6 +311,10 @@ full check. Every non-test gate runs in a scoped check.
 #### Scenario: A DNS-only commit
 - **WHEN** a commit stages only `tofu/dns.json` and its change's `tasks.md`
 - **THEN** the pre-commit check runs `scripts/check.py --scope dns`, and the guard says so
+
+#### Scenario: An oob-only commit
+- **WHEN** a commit stages only files under `oob/`, with or without files under `openspec/`
+- **THEN** the pre-commit check runs `scripts/check.py --scope oob`, and only the tests tagged `oob` run
 
 #### Scenario: Two declarations change
 - **WHEN** a pull request changes `tofu/milestones.json` and a file under `tofu/labels/`
@@ -574,3 +578,19 @@ lets nothing land.
 - **WHEN** the job that decides what a pull request needs fails on a draft
 - **THEN** every leg and the full check run, and the plan asks for approval, as when that job fails on any pull
   request
+
+### Requirement: The check runs its tests in parallel workers
+This repository's check SHALL run its tests in a fixed number of parallel worker processes, set in one named place,
+and never more than the machine's CPUs. A full or scoped check SHALL run the same tests it would in one process.
+
+#### Scenario: The full check's tests
+- **WHEN** `scripts/check.py` runs on a machine with at least as many CPUs as the named worker count
+- **THEN** its tests run in that many worker processes
+
+#### Scenario: A machine with fewer CPUs
+- **WHEN** `scripts/check.py` runs where there are fewer CPUs than the named worker count
+- **THEN** its tests run in one worker per CPU
+
+#### Scenario: A scoped check's tests
+- **WHEN** `scripts/check.py --scope dns` runs
+- **THEN** the tests tagged `dns` run in parallel workers, and they are the same tests a run in one process selects
