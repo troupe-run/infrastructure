@@ -25,13 +25,14 @@ run one at a time.
 
 ## 3. Before and after
 
-- [ ] 3.1 Time `uv run scripts/check.py` on this branch (full check), and record each gate's time and the load averages
-      beside design's "before" table. Verify the full check takes under half the 600 s limit
-- [ ] 3.2 Make a commit touching only `docs/` and one touching only `oob/` (each with nothing else staged) and record
+- [x] 3.1 Time `uv run scripts/check.py` on this branch (full check), and record each gate's time and the load averages
+      beside design's "before" table. Verify the full check takes under half the 600 s limit. Done: 136 s through
+      the commit hook at load 10–14, 124 s by hand at load 9–15 (design's "After" table)
+- [x] 3.2 Make a commit touching only `docs/` and one touching only `oob/` (each with nothing else staged) and record
       the guard's announcement and its "passed in Ns" line. Verify each runs the scoped check and passes well under the
-      limit (under 120 s)
-- [ ] 3.3 Run `uv run scripts/check.py` (the full check) once more, and `openspec validate check-time --strict`. Verify
-      both pass
+      limit (under 120 s). Done: `--scope docs` passed in 4 s (c34380b), `--scope oob` in 3 s (77991d9)
+- [x] 3.3 Run `uv run scripts/check.py` (the full check) once more, and `openspec validate check-time --strict`. Verify
+      both pass. Done: all gates passed (3197 passed, 14 skipped, in 122.3 s); the change is valid
 
 ## Workflow follow-up
 
