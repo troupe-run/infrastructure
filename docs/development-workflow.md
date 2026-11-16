@@ -252,10 +252,11 @@ What isn't exempt, even in a throwaway repository:
 
 ## What a commit runs
 
-Before a commit, the guard runs `scripts/check.py`, the same check CI runs. Here the full check takes about 65
-seconds on macOS (measured 2026-10-15), plus a one-time dependency download on a fresh clone. Whatever runs is
-announced before it starts, its output streams as it runs, and it's stopped and the commit refused after 10 minutes
-(`CHECK_TIMEOUT_SECONDS` in `scripts/guard.py`).
+Before a commit, the guard runs `scripts/check.py`, the same check CI runs. Here the full check takes about 2-3
+minutes on macOS, nearly all of it the tests, which run in 4 worker processes (`TEST_WORKERS` in `scripts/check.py`):
+136 seconds at a load of 10-15 (measured 2026-11-16), against 564 seconds in one process. A fresh clone adds a
+one-time dependency and provider download. Whatever runs is announced before it starts, its output streams as it runs,
+and it's stopped and the commit refused after 10 minutes (`CHECK_TIMEOUT_SECONDS` in `scripts/guard.py`).
 
 A repository can say that some paths need less than the full check, in `scripts/check-paths.toml`. The file is the
 repository's own and isn't delivered, because what its tests read is its own knowledge:
@@ -294,7 +295,8 @@ both names. Then:
 
 With no `scripts/check-paths.toml`, every commit runs the full check. A commit that changes the declaration always
 runs the full check, so it can't widen itself and benefit in the same commit. This repository skips `openspec/**`,
-and scopes its declarations (`dns`, `milestones`, `labels`), its OpenTofu configuration (`tofu`) and its docs (`docs`).
+and scopes its declarations (`dns`, `milestones`, `labels`), its OpenTofu configuration (`tofu`), its docs (`docs`)
+and its out-of-band declarations (`oob`).
 
 **CI gets the same answer from the same code.** A workflow pipes the changed paths into `check-scope`:
 
