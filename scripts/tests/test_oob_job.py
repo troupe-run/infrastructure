@@ -137,6 +137,7 @@ def test_each_way_the_job_can_go_wrong_is_named(change: Any, named: str) -> None
 
 
 @pytest.mark.milestones
+@pytest.mark.oob
 def test_the_token_reaches_every_repository_oob_reads() -> None:
     step = token_step(tofu()["jobs"]["oob"])
     assert step is not None

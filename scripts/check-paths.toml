@@ -60,5 +60,10 @@ paths = [
   "tofu/required-checks.json",
 ]
 
+# The out-of-band declarations: what OpenTofu can't manage, which scripts/oob.py compares with GitHub
+# (spec: ci-apply), and the issue types the org profile's forms and guide must agree with (spec: org-profile).
+[scopes.oob]
+paths = ["oob/**"]
+
 [scopes.docs]
 paths = ["docs/**", "README.md", "CLAUDE.md"]

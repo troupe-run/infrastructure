@@ -85,6 +85,7 @@ def test_the_org_profile_has_the_bug_feature_and_decision_forms() -> None:
 
 @pytest.mark.labels
 @pytest.mark.parametrize("form", real_forms(), ids=lambda p: p.name)
+@pytest.mark.oob
 def test_each_forms_type_and_labels_are_declared_by_the_org(form: Path) -> None:
     assert form_problems(form, enabled_types(ISSUE_TYPES), label_names(WORKFLOW_LABELS)) == []
 
@@ -356,6 +357,7 @@ def guide_type_problems(guide: str, types: set[str]) -> list[str]:
     return problems
 
 
+@pytest.mark.oob
 def test_the_guides_issue_types_are_the_orgs_enabled_types() -> None:
     assert guide_type_problems(GUIDE.read_text(encoding="utf-8"), enabled_types(ISSUE_TYPES)) == []
 

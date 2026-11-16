@@ -2,6 +2,9 @@
 
 Usage: uv run scripts/check.py [--scope NAME ...]
 
+The tests run in TEST_WORKERS parallel worker processes (pytest-xdist), or one per CPU where
+there are fewer (check-time design D1).
+
 With --scope, every gate still runs, but the tests narrow to those marked with any of the scopes
 declared in scripts/check-paths.toml. The guard passes scopes when a commit stages only paths
 they cover (spec: development-workflow; commit-check-paths design D8).
@@ -12,6 +15,7 @@ has a scripts/check.py; the development-workflow guard runs it before every comm
 """
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -23,6 +27,16 @@ ROOT = Path(__file__).resolve().parent.parent
 BIN = Path(sys.executable).parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import guard  # noqa: E402  (scripts/guard.py reads the declaration and activates the hooks)
+
+TEST_WORKERS = 4
+"""How many processes the tests run in, at most. Small, not `auto`: the machine is shared, and the
+gain past 4 is small (check-time design D1). Only this gate uses it: a plain `pytest` runs in
+one process."""
+
+
+def worker_count() -> int:
+    """TEST_WORKERS, or one per CPU where the machine has fewer."""
+    return min(TEST_WORKERS, os.cpu_count() or 1)
 
 
 def tool(name: str, path: str | None = str(BIN)) -> str:
@@ -50,7 +64,7 @@ def requested_scopes(names: Sequence[str], declaration: guard.CheckPaths | None)
 
 def gates(scopes: tuple[str, ...] = ()) -> list[tuple[str, list[str]]]:
     tofu = tool("tofu", path=None)
-    pytest = [tool("pytest")]
+    pytest = [tool("pytest"), "-n", str(worker_count())]
     if scopes:
         pytest += ["-m", guard.marker_expression(scopes)]
     return [
