@@ -24,6 +24,20 @@ By file, the tests' time (summed over workers) is a long tail: `test_guard_pytes
 1–4 s because they build git repositories or run the guard in a subprocess. The wall time is twice the CPU time, so a
 serial run spends half of it waiting on process start-up and the disk, which is what parallel workers overlap.
 
+After (apply, 2026-11-16, same machine; load averages at the start and end of each run):
+
+| Run | Time |
+|---|---|
+| full check, by hand, load about 100 falling to 26 (other sessions) | 394 s (tests 388 s) |
+| full check, the commit hook on `a1112b8`, load 14 to 10 | 136 s (tests 134.5 s) |
+| full check, by hand, load 9 to 15 | 124 s (tests 122.8 s, 214% CPU) |
+| `--scope docs`, the commit hook on `c34380b` (6 tests) | 4 s |
+| `--scope oob`, the commit hook on `77991d9` (47 tests) | 3 s |
+| `--scope oob`, by hand, load about 45 | 18 s |
+
+Even at a load of 100, the parallel full check finished 200 s inside the limit; the serial one took 564 s at a load
+of 10–20.
+
 ## Goals / Non-Goals
 
 **Goals:**
