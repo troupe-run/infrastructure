@@ -3,8 +3,8 @@
 ### Requirement: A change runs the checks its paths need
 This repository SHALL declare a scope, in its check-paths declaration, for each of its declarations that only some
 tests read: DNS records, milestones, labels, the OpenTofu configuration, the docs and the out-of-band declarations
-(`oob/`). A commit, and a pull request's `check` job, SHALL run what the guard's check-scope answer gives for the changed paths: nothing, those scopes, or the
-full check. Every non-test gate runs in a scoped check.
+(`oob/`). A commit, and a pull request's `check` job, SHALL run what the guard's check-scope answer gives for the
+changed paths: nothing, those scopes, or the full check. Every non-test gate runs in a scoped check.
 
 #### Scenario: A DNS-only pull request
 - **WHEN** a pull request changes only `tofu/dns.json` and files under `openspec/`
