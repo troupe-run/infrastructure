@@ -1,0 +1,184 @@
+# Design
+
+## Context
+
+See proposal.md for why. What shapes the approach:
+
+- **The check.** `scripts/check.py` runs ruff, `ruff format --check`, `mypy --strict`, the tests, `tofu fmt -check
+  -recursive tofu`, `tofu init` and `tofu validate`, the same locally and in CI's `check` job (one Linux leg, Python
+  3.12). A scoped check runs every non-test gate (spec: ci-apply). `tofu` is found on the PATH, the Python tools in
+  the uv environment.
+- **The OpenTofu configuration uses OpenTofu-only syntax**: the `encryption` block in `tofu/versions.tf`, and
+  `removed` blocks. `tflint` is a Terraform linter (MPL-2.0, v0.66.0 as of 2026-11-08). It isn't in Homebrew on this
+  machine, so how a developer installs it is part of the change.
+- **How the org already files issues from a schedule.** `schedules.yml` (GITHUB_TOKEN, infrastructure's own issues)
+  and `dependabot-issues.yml` (the `troupe-run-dependabot` App, issues in all three repositories) each hand the issue
+  URLs to a `board` job, which adds them to the troupe roadmap board with the `troupe-run-board` App from the main-only
+  `board` environment (spec: board-credentials). Both scripts only read and print outside GitHub Actions.
+- **Code sizes** (2026-11-17): troupe's packages hold about 23k lines of Python (`packages/troupe/src` alone 17k),
+  infrastructure's `scripts/` 9.8k in 21 modules, website's `src/**/*.ts` 8 files plus `scripts/*.mjs` 24.
+- **mutmut 3.8.1** (Python ≥ 3.10, needs `fork`, so Linux) mutates functions that tests call, remembers results in
+  `mutants/`, and can resume. **Stryker 10.1.1** with its vitest runner covers website's unit tests; it doesn't mutate
+  `.astro` files.
+
+## Goals / Non-Goals
+
+**Goals:**
+- `tflint` blocks a pull request and a commit like any other gate, with nothing in `tofu/` failing it when it lands.
+- A weekly report that turns weak tests into board issues, one per module, kept up to date, without ever touching a
+  merge.
+- Every number the run judges by in one file, with conservative defaults the owner approves (D6).
+
+**Non-Goals:**
+- No change to troupe's or website's files for #325: the run reads their code at `main`.
+- No mutation run on pull requests, and no required check.
+- website's ESLint, Prettier and `tsc --noEmit` (a website change), coverage (#322), complexity and dependency audit
+  (#324).
+
+## Decisions
+
+### D1. `tflint` is a gate after `tofu validate`, found on the PATH like `tofu`
+
+`check.py` gains `("tflint", [tflint, "--chdir=tofu", "--recursive", "--config", <root>/.tflint.hcl])` after `tofu
+validate`. It's found with `tool("tflint", path=None)`, whose fix names the install route (D2). CI's `check` job
+installs it with `terraform-linters/setup-tflint`, at the version `.tflint.hcl`'s comment and the workflow both name,
+and a test holds the two together. It's a non-test gate, so it runs in scoped checks too, as `tofu fmt` does.
+
+`.tflint.hcl` enables the bundled `terraform` ruleset's `recommended` preset. No provider plugin: the
+`integrations/github` and Cloudflare providers have no TFLint ruleset worth the download, and a plugin is fetched code
+the check would run. A rule that can't read OpenTofu-only syntax, or a finding the owner accepts, is disabled in
+`.tflint.hcl` with a comment saying why: that file is the recorded baseline #323 allows. Anything else `tflint` finds
+is fixed in `tofu/` before the gate lands.
+
+*Alternatives:* run `tflint` only in CI (rejected: #321 says blocking locally too, and the check is the same script in
+both places, ci-apply design D8); `tofu fmt` alone (rejected by #321).
+
+### D2. Developers install `tflint` themselves; the check says how
+
+Like `tofu`, `tflint` isn't a Python package, so `uv sync` can't bring it. Homebrew no longer carries it here. The
+check's fix names `go install github.com/terraform-linters/tflint@<version>`, which builds the pinned release from
+source with the Go toolchain already used on the owner's machine, and the README's setup lists it. **Owner to
+confirm** (sent with D4 and D6): the route, or another one (the release binary, or a container).
+
+### D3. One workflow in infrastructure runs all three repositories
+
+`.github/workflows/mutation.yml`, on `schedule` (weekly, Sunday 03:23 UTC, off the hour) and `workflow_dispatch`
+(inputs: `repository` to run one, and `dry-run`, which reports without filing). Jobs:
+
+```
+  mutate (matrix: troupe, infrastructure, website)   no secret, contents: read
+     checkout troupe-run/<repo>@main → run the tool within the budget → mutation_report.py → artifact report-<repo>.json
+  issues   needs mutate, env mutation-issues (main only)   the credential of D4
+     checkout infrastructure@main only → mutation_issues.py over the reports → output issue-urls
+  board    needs issues, env board (main only)   troupe-run-board App, as schedules.yml
+```
+
+- **One place, not three.** Settings, the issue script and the workflow live together, and troupe and website need no
+  change. A workflow in each repository would copy the script three times and need a board key in troupe, which has
+  no `board` environment (spec: board-credentials). The constraint that a product repository's files change only by
+  pull request isn't touched: the run only reads them.
+- **The jobs that run other code hold nothing.** `mutate` runs each repository's tests on `main`'s code with a
+  read-only `GITHUB_TOKEN` and no environment. The `issues` job checks out only infrastructure and reads the reports
+  as data: `mutation_issues.py` validates each against a closed schema, and a malformed report is an error naming the
+  repository, never a skipped one.
+- **Python 3.15 on `ubuntu-latest`**, through `astral-sh/setup-uv`, for both Python legs; website's leg uses Node
+  from website's `.nvmrc`.
+- **mutmut per package.** troupe's tests live beside each package, so the troupe leg runs mutmut once per package
+  under `packages/`, each with its own `source_paths` and tests. The leg writes the run's `setup.cfg` `[mutmut]`
+  section into its throwaway checkout from `scripts/mutation.json`; nothing is committed to troupe.
+- **Stryker from the settings' pinned versions.** The website leg runs `npm ci`, then
+  `npx -p @stryker-mutator/core@<v> -p @stryker-mutator/vitest-runner@<v> stryker run` with a config written from
+  the settings: mutate `src/**/*.ts` and `scripts/**/*.mjs`, run `tests/unit`, JSON reporter.
+- **Results to one report.** `scripts/mutation_report.py` turns mutmut's per-mutant results or Stryker's
+  `mutation.json` into one shape: per module, the counts, the score, and each surviving mutant's name, line and diff
+  (from `mutmut show` or Stryker's replacement), plus whether the run finished within the budget.
+- **It stays in the schedule watch.** `scripts/watched-schedules.json` gains `mutation.yml` with `max_age_days: 8`,
+  so a paused schedule is reported like website's weekly link check.
+
+### D4. The issues are filed by a credential that can write all three repositories (owner's decision)
+
+`GITHUB_TOKEN` can only write infrastructure's issues, and the issues belong in the module's own repository. Options:
+
+| | Option | For | Against |
+|---|---|---|---|
+| **A** | **A new App `troupe-run-test-quality`**: Issues read and write, Metadata read, on troupe, website and infrastructure; key in a new main-only `mutation-issues` environment in infrastructure, no reviewers (spec: mutation-issue-credentials) | Narrow; mirrors `troupe-run-dependabot` exactly; a leaked key can only write issues | The owner creates the App and sets its key by hand (oob/README) |
+| B | The `troupe-run-dependabot` App, from a second environment | No new App | Its spec says it serves Dependabot's pull requests; reusing it blurs what the drift check and its spec guard |
+| C | The `troupe-run-infrastructure` App | Already installed with issues write | Its key also holds administration, contents and workflows write; today it's only in `plan-main` and the reviewed `apply`. An unattended weekly job beside it widens what a mistake can reach |
+| D | `GITHUB_TOKEN`, all issues in infrastructure | No credential at all | The issue isn't where the code is, so troupe's work tracking misses it |
+
+**Recommendation: A.** It's the least a leaked key can do, and it follows the pattern the org already uses. Issues
+opened by an App start no workflow trouble: no repository runs anything on `issues` events from it.
+
+### D5. One issue per module, found by a marker, updated in place
+
+- **Identity of a module:** `<repository>:<module>`, where a module is a Python dotted module (`troupe.store.events`)
+  or a website source path (`src/lib/site-path.ts`). The issue body starts with
+  `<!-- mutation-testing: <repository>:<module> -->`, and the script finds its issue by listing the repository's
+  issues labelled `test-quality` and reading that line, open or closed in the last 90 days. Only issues the
+  credential's App opened are read as its own (the login is checked), so a person's issue quoting the marker isn't
+  edited.
+- **Under the threshold, no open issue:** open one, type Task, label `test-quality`, title
+  `Mutation score <score>% in <module> (under <threshold>%)`. If the closed one is recent (90 days), reopen that
+  instead, so the history stays together. The URL goes to the `board` job.
+- **Under the threshold, open issue:** rewrite its body with this run's numbers and survivors, and add a comment only
+  when the score or the number of survivors changed, so a quiet week makes no noise.
+- **At or over the threshold, open issue:** comment with the new score and close it as completed.
+- **Not judged:** a module with fewer mutants than the floor (D6), or one the run didn't finish within its budget; an
+  open issue for it is left alone.
+- **The body** names the score, the counts (killed, survived, no tests, timed out), the threshold, the run's link, the
+  settings' link, and the surviving mutants: name, line and diff, the first 30, then "and N more" with the command
+  that lists them all (`mutmut results`, or Stryker's HTML report in the run's artifact).
+- **New issues per run are capped** (D6). The rest are named in the run's summary and raised in a later week, so a
+  first run can't flood the board.
+- **Errors:** a repository whose report is missing or malformed, or an API write that fails, fails the run after the
+  others are handled, like `dependabot_issues.py`. Outside GitHub Actions, or with `dry-run`, it only prints what it
+  would do.
+
+### D6. Proposed thresholds and budget (for the owner's approval)
+
+All in `scripts/mutation.json`, read by both scripts; the workflow's job timeout is derived from the budget by a test.
+
+| Setting | Proposed | Why |
+|---|---|---|
+| `threshold` (score per module) | **60%** | Conservative: far enough below typical well-tested code (70-85%) that an issue means real gaps, not noise; raise it once the first runs show where the code sits |
+| Score | caught ÷ (caught + survived + no tests); caught = killed, timed out or crashed; skipped and suspicious mutants don't count | Stryker's definition; untested code counts against a module |
+| `min_mutants` per module | **10** | A module with a handful of mutants swings 20 points on one survivor |
+| `budget_minutes` per repository | **240** | Weekly, well inside GitHub's 6-hour job limit; job timeout = budget + 30 for setup and the report |
+| `max_new_issues` per repository per run | **5** | 15 a week at most across the org; existing issues are always updated |
+| `reopen_window_days` | **90** | Reopens a recent issue instead of opening another |
+| Schedule | weekly, Sunday 03:23 UTC | #321: weekly; off the hour |
+| Tools | mutmut 3.8.1; Stryker 10.1.1 with its vitest runner | Current releases; pinned, moved by pull request |
+
+**Calibration:** the first run after merge is dispatched with `dry-run`. Its summary lists every module's score, so
+the owner sees how many issues 60% would open before any is filed, and the threshold can move in the same pull
+request that turns filing on. This repository's own scripts are trialled small locally (one module) before that.
+
+## Risks / Trade-offs
+
+- **`tflint` can't parse OpenTofu-only syntax** (the `encryption` block) → trialled in CI on the draft pull request
+  first; a file it can't read is excluded in `.tflint.hcl` with the reason, and if it can't read the configuration at
+  all, that goes back to the owner rather than a silent skip.
+- **mutmut or libcst has no Python 3.15 build yet** → trialled before the workflow lands; if not, the owner decides
+  between 3.14 for this job and waiting.
+- **troupe's packages take longer than the budget** → the report marks modules not finished, those aren't judged, and
+  mutmut's cache isn't kept between runs, so a package that never finishes shows in every summary. Then raise the
+  budget or split the leg; the summary says which.
+- **Flaky tests make mutants look killed or survived** → mutmut runs each mutant's tests once; a module's issue only
+  changes its comment on a change of score, so one flaky week shows as one comment.
+- **A first run opens many issues** → the cap (D6) and the dry run.
+- **The mutate job runs other repositories' code on infrastructure's runners** → it's their `main`, which passed
+  their own checks; the job holds no secret and a read-only token.
+
+## Migration Plan
+
+1. Land `tflint` with `tofu/` brought into line; the check fails for anyone without `tflint` until they install it
+   (README and the check's own fix say how).
+2. The owner creates the App (D4) and sets its key; the plan adds the environment, variable and label.
+3. Merge the workflow; dispatch it with `dry-run`; the owner confirms or moves the threshold.
+4. The weekly schedule files issues from then on.
+
+Rollback: `gh workflow disable mutation.yml` stops the run; removing `tflint` from `check.py` removes the gate.
+
+## Open Questions
+
+- The exact Sunday time can move if it clashes with other weekly jobs; nothing depends on it.
