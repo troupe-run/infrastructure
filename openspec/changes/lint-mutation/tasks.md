@@ -28,36 +28,36 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 
 ## 2. Settings, baselines and reports (design D3, D6, D7)
 
-- [ ] 2.1 `scripts/mutation.json` with D6's settings (no reopen window; `tolerance`, `pr_budget_minutes`) and each
+- [x] 2.1 `scripts/mutation.json` with D6's settings (no reopen window; `tolerance`, `pr_budget_minutes`) and each
       repository's targets; a loader with a closed schema that rejects unknown keys and out-of-range values, wired into
       the check through its tests. Tests first
-- [ ] 2.2 The `[mutation]` table of `quality-gates.toml`: read through #322's `read_config(path).mutation` (or a
+- [x] 2.2 The `[mutation]` table of `quality-gates.toml`: read through #322's `read_config(path).mutation` (or a
       `tomllib` stand-in under the same name until it's on main), validated as a closed schema; a malformed table fails
       naming the file, module and key. Tests first
 - [ ] 2.3 `scripts/mutation_report.py`: mutmut's results (per package) and Stryker's JSON report into the one report
       shape (per module: counts, score, survivors with location and change; finished or not). Tests first, from real
       output captured in a small local trial (one infrastructure module under mutmut, one website file under Stryker),
       saved as fixtures
-- [ ] 2.4 Verify the score rule against the spec's scenarios (untested function counts, skipped doesn't, small and
+- [x] 2.4 Verify the score rule against the spec's scenarios (untested function counts, skipped doesn't, small and
       unfinished modules not judged)
 
 ## 3. Issue upkeep and the ratchet (design D5, D7)
 
-- [ ] 3.1 `scripts/mutation_issues.py`: validate each report, judge each module against the threshold and its
+- [x] 3.1 `scripts/mutation_issues.py`: validate each report, judge each module against the threshold and its
       baseline, find the run's own issues by marker and author, open, update, comment, close on recovery, open a new
       one after a closed one, cap new issues, write the summary (with the baselines to raise) and the issue URLs. Only
       print outside GitHub Actions or with `--dry-run`. Tests first, with GitHub's calls faked, covering every scenario
       in `specs/mutation-testing` on issues, the cap and the baseline
-- [ ] 3.2 Verify a malformed or missing report, or mutation table, fails the run naming the repository, after the
+- [x] 3.2 Verify a malformed or missing report, or mutation table, fails the run naming the repository, after the
       others are handled
 - [ ] 3.3 Verify a dry run against the real repositories (local, read-only, with the trial reports) prints what it
       would do and writes nothing
 
 ## 4. W: attribution of new survivors (design D8)
 
-- [ ] 4.1 Blame each survivor's line at the tested commit and mark it new when its commit isn't an ancestor of the
+- [x] 4.1 Blame each survivor's line at the tested commit and mark it new when its commit isn't an ancestor of the
       previous run's tested commit; tests first, over a scratch git repository built in the test
-- [ ] 4.2 The issues job finds each new survivor's merged pull request (`commits/<sha>/pulls`), lists new survivors
+- [x] 4.2 The issues job finds each new survivor's merged pull request (`commits/<sha>/pulls`), lists new survivors
       first in the issue, and comments once on the pull request; tests first, with GitHub faked. Verify the first run
       (no previous report) calls nothing new
 
