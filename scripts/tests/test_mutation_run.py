@@ -55,7 +55,7 @@ def test_infrastructures_config_mutates_the_linked_source_but_not_its_tests_and_
     )
     assert "do_not_mutate=\n    src/tests/*\n" in config
     assert config.endswith(
-        "also_copy=\n    _mutation_children_plugin.py\n    .tflint.hcl\n    scripts\n    tofu\n"
+        "also_copy=\n    _mutation_children_plugin.py\n    .tflint.hcl\n    tofu\n"
     )
 
 
@@ -150,6 +150,9 @@ def test_a_pull_request_run_mutates_only_the_named_functions_within_its_own_budg
     assert cwd == tmp_path
     assert SETTINGS.pr_budget_minutes * 60 - 5 < timeout <= SETTINGS.pr_budget_minutes * 60
     assert not (tmp_path / "src").exists(), "the link is removed after the run"
+    # In mutmut's copy, scripts leads to the mutated source, never an unmutated copy.
+    assert (tmp_path / "mutants" / "scripts").is_symlink()
+    assert str((tmp_path / "mutants" / "scripts").readlink()) == "src"
 
 
 def test_a_pull_request_that_changed_no_unit_runs_nothing(tmp_path: Path) -> None:
@@ -243,3 +246,47 @@ def test_a_deselected_test_is_named_from_mutmuts_working_directory(tmp_path: Pat
     )
     workdir = tmp_path / "packages" / "troupe"
     assert run.deselected(workdir, tmp_path, package) == ["--deselect", "tests/test_a.py::test_b"]
+
+
+def limited_tree(tmp_path: Path) -> None:
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "calc.py").write_text(
+        "def add(a, b):\n    return a + b\n", encoding="utf-8"
+    )
+
+
+class MetaRecorder(Recorder):
+    """mutmut, as far as its meta file: one mutant run and killed, one left unrun."""
+
+    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+        code = super().__call__(command, cwd, timeout)
+        meta = cwd / "mutants" / "src" / "calc.py.meta"
+        meta.parent.mkdir(parents=True, exist_ok=True)
+        codes = {"calc.x_add__mutmut_1": 1, "calc.x_add__mutmut_2": None}
+        meta.write_text(json.dumps({"exit_code_by_key": codes}), encoding="utf-8")
+        return code
+
+
+@pytest.mark.parametrize(("code", "finished"), [(0, True), (-1, False)])
+def test_a_limited_run_is_finished_unless_its_budget_stopped_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, code: int, finished: bool
+) -> None:
+    limited_tree(tmp_path)
+    monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
+    only = {"scripts": ["calc.x_add__mutmut_*"]}
+    modules = run.collect(
+        SETTINGS.repositories["infrastructure"], tmp_path, SETTINGS, only, MetaRecorder(code)
+    )
+    assert modules["calc"].finished is finished
+    assert modules["calc"].counted == 1
+
+
+def test_a_whole_run_with_unrun_mutants_isnt_finished(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    limited_tree(tmp_path)
+    monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
+    modules = run.collect(
+        SETTINGS.repositories["infrastructure"], tmp_path, SETTINGS, None, MetaRecorder(0)
+    )
+    assert not modules["calc"].finished

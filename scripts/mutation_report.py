@@ -282,11 +282,17 @@ def mutated_line(diff: str, start: int) -> tuple[int, str]:
     return start + offset - 1, change
 
 
-def from_mutmut(root: Path, source: str, show: Callable[[str], str]) -> dict[str, Module]:
-    """Each module's counts and survivors from mutmut's `mutants/` tree, for one unit's `source`."""
+def from_mutmut(
+    root: Path, source: str, show: Callable[[str], str], skip: tuple[str, ...] = ()
+) -> dict[str, Module]:
+    """Each module's counts and survivors from mutmut's `mutants/` tree, for one unit's `source`.
+    Paths starting with one in `skip` (the unit's tests, whose fixtures may hold mutmut's own
+    files) aren't read."""
     modules: dict[str, Module] = {}
     for meta in sorted((root / "mutants" / source).rglob("*.py.meta")):
         path = str(meta.relative_to(root / "mutants")).removesuffix(".meta")
+        if path.startswith(skip) or not (root / path).is_file():
+            continue
         codes = json.loads(meta.read_text(encoding="utf-8"))["exit_code_by_key"]
         counts = dict.fromkeys(COUNTS, 0)
         finished = True

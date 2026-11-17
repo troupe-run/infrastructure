@@ -91,7 +91,10 @@ def mutmut_config(workdir: Path, checkout: Path, unit: ms.Unit) -> str:
         # from their own place (a hand-kept list missed .tflint.hcl in the trial).
         tests = "src/" + os.path.relpath(checkout / unit.tests, checkout / unit.source)
         do_not_mutate.append(f"{tests}/*")
+        # The source's own name is linked to the mutated copy instead (run_mutmut): an unmutated
+        # copy under it would shadow the mutants for code that imports through it, as check.py does.
         skipped = {
+            unit.source.rstrip("/"),
             "src",
             ".git",
             ".venv",
@@ -153,6 +156,14 @@ def run_mutmut(
         shutil.copy2(CHILDREN_PLUGIN, plugin)
         (workdir / "setup.cfg").write_text(mutmut_config(workdir, checkout, unit), encoding="utf-8")
         shutil.rmtree(workdir / "mutants", ignore_errors=True)
+        if workdir == checkout:
+            # In mutmut's copy, the source's own name leads to the mutated source, so code that
+            # puts <root>/scripts on sys.path (check.py) imports the mutants, not the original
+            # (trial, 2026-11-18: every mutant read as untested until this).
+            (workdir / "mutants").mkdir()
+            (workdir / "mutants" / unit.source.rstrip("/")).symlink_to(
+                "src", target_is_directory=True
+            )
         mutmut = mutmut_bin()
         code = run([mutmut, "run", *names], workdir, deadline - time.monotonic())
         if code not in (0, -1):
@@ -166,7 +177,8 @@ def run_mutmut(
             )
             return done.stdout
 
-        modules = mr.from_mutmut(workdir, "src", show)
+        tests = os.path.relpath(checkout / unit.tests, checkout / unit.source)
+        modules = mr.from_mutmut(workdir, "src", show, skip=(f"src/{tests}/",))
         source = unit.source.rstrip("/")
         mapped = {}
         for name, module in modules.items():
@@ -174,9 +186,11 @@ def run_mutmut(
                 replace(survivor, path=source + survivor.path.removeprefix("src"))
                 for survivor in module.survivors
             )
-            # A run the budget stopped leaves its unrun mutants without a code, so from_mutmut
-            # already reports their modules as not finished.
-            mapped[name] = replace(module, survivors=survivors)
+            # A whole run the budget stopped leaves its unrun mutants without a code, so from_mutmut
+            # already reports their modules as not finished. A run limited to named functions
+            # leaves every other mutant unrun on purpose: it finished unless the budget stopped it.
+            finished = code != -1 if names else module.finished
+            mapped[name] = replace(module, survivors=survivors, finished=finished)
         return mapped
     finally:
         if workdir == checkout:

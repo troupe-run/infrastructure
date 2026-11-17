@@ -262,6 +262,17 @@ the owner can decide later whether it should block.
 Estimated cost per pull request, from today's CI timings: infrastructure ~10-15 min, troupe ~20-35 min, website
 ~5-10 min. The runtimes P records replace these estimates.
 
+**Measured locally (2026-11-18, macOS, load 5-30), infrastructure:** mutmut's stats pass runs the unit's whole suite
+serially with its hooks, about 3,300 tests: 13-20 minutes, before any mutant runs. A pull request touching two
+functions (22 mutants) took 26-31 minutes in all, and found what the small trial did: 20 killed, 2 survived, each on
+its source line. So the estimate above was low by about half: plan on ~25-30 minutes
+for an infrastructure pull request, most of it the stats pass, whatever the size of the change. Two more things the full trial taught: code that puts `<root>/scripts` on `sys.path`
+(`check.py`) must find the mutants there, so in mutmut's copy `scripts` links to the mutated `src`; and five tests
+that read git's view of the checkout, simulate Windows, or read the scripts' text can't run under mutmut's hooks, so
+they're deselected in `scripts/mutation.json`, each with its reason. Infrastructure's
+`scripts/` holds 18,967 mutants in all, which the weekly budget (240 minutes) has to cover; the first scheduled run
+shows whether it does, and a module not finished isn't judged.
+
 ### D10. A raised baseline reaches main by an ordinary pull request (owner, 2026-11-17: option C)
 
 The weekly run names the baselines it would raise in its summary and in each module's issue, and a person or agent

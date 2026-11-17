@@ -267,3 +267,12 @@ def test_a_real_mutmut_run_reads_back_with_every_survivor_on_its_source_line(
         removed = survivor.change.splitlines()[0]
         assert removed.startswith("-"), survivor.name
         assert lines[survivor.line - 1].strip() == removed[1:].strip(), survivor.name
+
+
+def test_mutmut_files_under_the_tests_are_skipped(tmp_path: Path) -> None:
+    root = mutmut_tree(tmp_path, {"pkg.calc.x_add__mutmut_1": 1})
+    fixture = root / "mutants" / "src" / "tests" / "fixtures" / "other.py.meta"
+    fixture.parent.mkdir(parents=True)
+    fixture.write_text(json.dumps({"exit_code_by_key": {}}), encoding="utf-8")
+    modules = mr.from_mutmut(root, "src", DIFFS.__getitem__, skip=("src/tests/",))
+    assert list(modules) == ["pkg.calc"]
