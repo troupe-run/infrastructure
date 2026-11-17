@@ -105,10 +105,11 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 
 ## 6b. This change's own test quality (owner, 2026-11-18)
 
-- [ ] 6b.1 Measure each of this change's new modules (the mutation scripts, and `check.py`'s changed functions) with
-      the pull request report's own run, locally: the "before" scores
-- [ ] 6b.2 Add tests that kill the surviving mutants, or exempt an equivalent mutant on its line with the reason,
-      until every judged module (at least 10 mutants) reaches the 60% weekly threshold
+- [x] 6b.1 Measure each of this change's new modules (the mutation scripts, and `check.py`'s changed functions) with
+      the pull request report's own run, locally: the "before" scores. Done: design D11
+- [x] 6b.2 Add tests that kill the surviving mutants, or exempt an equivalent mutant on its line with the reason,
+      until every judged module (at least 10 mutants) reaches the 60% weekly threshold. Done: every
+      module is over 60% after (design D11), with no exemption needed
 - [ ] 6b.3 Re-run the pull request report on the pushed result, and record each module's before and after scores in
       the design
 
