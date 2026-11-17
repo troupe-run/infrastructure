@@ -89,6 +89,7 @@ lists below are checked by hand in each App's settings, by any change that adds,
 | `troupe-run-dependabot` | `troupe`, `infrastructure`, `website` | 2026-10-27, by the App's own token (`GET /installation/repositories`, after the probe repository was deleted) |
 | `troupe-run-review` | `troupe`, `infrastructure`, `website` | 2026-10-26, owner |
 | `troupe-run-dispatch` | `infrastructure` | 2026-10-27, by the App's own token (`GET /installation/repositories`, after the probe repository was deleted) |
+| `troupe-run-test-quality` | `troupe`, `infrastructure`, `website` | 2026-11-18, owner |
 
 A repository the infrastructure App isn't installed on shows only its public view to OpenTofu (merge settings read as
 off, no security settings), so the first plan after adding one will show that it's missing from this list.
