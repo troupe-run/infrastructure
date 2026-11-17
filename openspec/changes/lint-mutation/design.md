@@ -31,7 +31,7 @@ See proposal.md for why. What shapes the approach:
 
 **Non-Goals:**
 - No change to troupe's or website's files for #325: the run reads their code at `main`.
-- No mutation run on pull requests, and no required check.
+- No required check: P reports and never blocks (D9).
 - website's ESLint, Prettier and `tsc --noEmit` (a website change), coverage (#322), complexity and dependency audit
   (#324).
 
@@ -145,17 +145,19 @@ opened by an App start no workflow trouble: no repository runs anything on `issu
   others are handled, like `dependabot_issues.py`. Outside GitHub Actions, or with `dry-run`, it only prints what it
   would do.
 
-### D6. Proposed thresholds and budget (with the owner)
+### D6. Thresholds and budget (owner, 2026-11-17; the ratchet in D7)
 
 All in `scripts/mutation.json`, read by both scripts; the workflow's job timeout is derived from the budget by a test.
 
 | Setting | Proposed | Why |
 |---|---|---|
-| `threshold` (score per module) | **60%** | Conservative: far enough below typical well-tested code (70-85%) that an issue means real gaps, not noise; raise it once the first runs show where the code sits |
+| `threshold` (score for a module with no baseline yet) | **60%** | Conservative: far enough below typical well-tested code (70-85%) that an issue means real gaps, not noise; raise it once the first runs show where the code sits |
 | Score | caught ÷ (caught + survived + no tests); caught = killed, timed out or crashed; skipped and suspicious mutants don't count | Stryker's definition; untested code counts against a module |
 | `min_mutants` per module | **10** | A module with a handful of mutants swings 20 points on one survivor |
 | `budget_minutes` per repository | **240** | Weekly, well inside GitHub's 6-hour job limit; job timeout = budget + 30 for setup and the report |
 | `max_new_issues` per repository per run | **5** | 15 a week at most across the org; existing issues are always updated |
+| `tolerance` | **0** points | The ratchet (D7): any drop below a module's baseline counts |
+| `pr_budget_minutes` | **45** | P's bound on one pull request's runner time (D9) |
 | Schedule | weekly, Sunday 03:23 UTC | #321: weekly; off the hour |
 | Tools | mutmut 3.8.1; Stryker 10.1.1 with its vitest runner | Current releases; pinned, moved by pull request |
 
@@ -163,61 +165,85 @@ All in `scripts/mutation.json`, read by both scripts; the workflow's job timeout
 the owner sees how many issues 60% would open before any is filed, and the threshold can move in the same pull
 request that turns filing on. This repository's own scripts are trialled small locally (one module) before that.
 
-### D7. A ratchet: each module's baseline only moves up (owner, 2026-11-17; how, proposed)
+### D7. A ratchet: each module's baseline only moves up (owner, 2026-11-17)
 
-The owner made the score a ratchet and dropped the 90-day reopen rule: (1) each module keeps a recorded baseline,
-its score must not fall below it, and the baseline only moves up; (2) new or changed code must not push the score
-down. How, as proposed for the owner's approval:
-
-**(1) The baseline.**
+The owner made the score a ratchet and dropped the 90-day reopen rule.
 
 - **When a module is judged** (≥ `min_mutants` mutants, finished within the budget), its baseline becomes
   max(baseline, score). A module with no baseline gets its first judged score.
 - **Its issue is open** while score < 60% (the starting `threshold`, for code that has never reached it) or
-  score < baseline − `tolerance` (default 0). So a module first measured at 40% has an issue for being under 60%, and
-  if it then falls to 35% the issue says it fell below its 40% baseline. When both conditions clear, the issue gets a
-  comment and closes. If it opens again later, a new issue is raised: no reopen window.
-- **Where the baselines live: one record issue in infrastructure**, "Mutation testing baselines", opened by the
-  test-quality App and labelled `test-quality`, holding the baselines as a JSON block under a marker. Each run reads
-  it, raises what moved up, and writes it back. GitHub keeps every edit, so each raise is visible, and the owner can
-  lower one deliberately (for example after deleting well-tested code) by editing it. A record that won't parse, or
-  that someone else's account last edited into a shape the schema doesn't allow, fails the run naming the field: it's
-  never reset to empty.
-  *Why not a file in the repository:* committing it needs contents write, which would widen the App from issues-only,
-  or a pull request every week. *Why not an Actions variable:* that needs the `troupe-run-infrastructure` App's
-  variables permission (D4, option C's problem).
-- **The dry run** reports the baselines it would record and every drop, and writes nothing.
+  score < baseline − `tolerance` (default 0 points). A module first measured at 40% has an issue for being under 60%;
+  if it falls to 35%, the issue says it fell below its 40% baseline. When both clear, the issue gets a comment and
+  closes. If it falls again later, a new issue is raised: no reopen window.
+- **Baselines live in each repository's committed `quality-gates.toml`** (owner), the file #322 keeps its coverage
+  baselines in, under a `[mutation]` table this change owns (agreed with #322's worker):
 
-**(2) New code can't push the score down: two ways, and what each costs.**
+  ```toml
+  [mutation.baselines."troupe.store.events"]
+  score = 71.2        # percent, one decimal
+  mutants = 140       # how many it was judged on
+  judged_at = "<sha>" # the commit of that repository's main it was judged at
+  ```
 
-- **W. Weekly attribution (recommended to build now, in this change).** For each surviving mutant, the weekly run
-  reads `git blame` for its line. If the line changed since the commit the previous run judged (recorded with the
-  baselines), the survivor is new: the module's issue lists it under "new since the last run" with its commit and pull
-  request, and the run comments on that merged pull request naming the survivors it added. Cost: no extra mutation
-  runs, only blame on the survivors' lines, seconds. Limit: it's after the merge, up to a week later, and it reports
-  rather than blocks.
-- **P. A diff-scoped run on each pull request (recommended as a separate Feature, report first).** On a ready pull
-  request that changes Python or TypeScript source, mutate only the functions (mutmut `run "<module>.<function>*"`) or
-  lines (Stryker `--mutate <file>:<lines>`) it changes, and fail on any surviving mutant there unless the line carries
-  the tool's own exemption with a reason (`# pragma: no mutate`, `// Stryker disable next-line ...: <reason>`).
-  Estimated cost per pull request, on one Linux runner (to be measured on real pull requests before anything blocks):
+  #322's loader reads the file strictly for its own tables and hands `[mutation]` over untouched; this change's code
+  validates it as a closed schema, so an unknown key or a malformed score fails, naming the file and key, and is never
+  read as "no baseline". The weekly run reads each repository's file at the `main` it tests.
+- **Raising them is a pull request** (owner): never a direct write, and the test-quality App doesn't get contents write.
+  Lowering one is an ordinary pull request too. The weekly run names the raises; a person or agent makes the pull
+  request (D10).
+- **The dry run** reports the baselines it would raise and every drop, and writes nothing.
 
-  | Repository | Today's check | mutmut's test-mapping pass (one traced serial run) | Changed functions' mutants (~5-20 functions × 10-20) | Total |
-  |---|---|---|---|---|
-  | infrastructure | ~1 min (4 workers) | ~5-8 min | ~2-5 min | **~10-15 min** |
-  | troupe | ~4-5 min (Linux leg) | ~15-25 min | ~3-10 min | **~20-35 min** |
-  | website | ~2.5 min (whole test job) | Stryker's per-test coverage run, ~1-2 min | ~2-5 min | **~5-10 min** |
+### D8. W: the weekly run names who added each new survivor (owner, 2026-11-17)
 
-  Blocking would add that to every source-changing pull request's path to merge, which is what #321 kept off the
-  blocking path; reporting (a check that's not required, with its survivors in the run's summary) costs the same
-  runner time but no waiting. It needs a workflow in each repository, so it's a change to troupe and website too.
-  **Recommendation:** raise P as its own Feature, run it as a report on the next ~10 source pull requests per
-  repository to measure the real cost and the false alarms (equivalent mutants), then the owner decides whether it
-  blocks. W ships now and covers the gap meanwhile.
+Each weekly report uploads as a run artifact (kept 90 days). The next run downloads the previous successful run's
+reports to learn the commit each repository was judged at. The `mutate` job checks out with full history, and for each
+surviving mutant runs `git blame --porcelain -L <line>,<line>` on its file at the tested commit. A survivor whose line
+was last changed by a commit that isn't an ancestor of the previously judged commit is **new**. The report carries the
+commit, and the `issues` job asks GitHub which merged pull request contains it (`commits/<sha>/pulls`). Then:
 
-**What the ratchet changes in D6:** `reopen_window_days` goes; `tolerance` (default 0 percentage points) is added. The
-rest stays: 60% `threshold` for modules with no baseline, `min_mutants` 10, `budget_minutes` 240, `max_new_issues` 5,
-weekly Sunday 03:23 UTC, the first run dry.
+- the module's issue lists new survivors first, under "New since the last run", each with its commit and pull request;
+- the merged pull request gets one comment naming the survivors it added, the module's score and the issue. A comment
+  on a pull request is an issue comment, which the test-quality App's issues permission covers.
+
+With no previous run (the first, or one older than 90 days), nothing is called new. Cost: one blame per survivor,
+seconds.
+
+### D9. P: each ready pull request's changed code is mutated, as a report (owner, 2026-11-17)
+
+On every pull request that's ready for review, in troupe, website and infrastructure, a workflow mutates only what the
+pull request changed and reports surviving mutants on changed lines. **It never blocks**: it isn't a required check,
+and it concludes success when it finds survivors; only its own failure to run turns it red. It records its runtime so
+the owner can decide later whether it should block.
+
+- **Delivered like the guard's files.** `.github/workflows/mutation-pr.yml`, `scripts/mutation_pr.py` and
+  `scripts/mutation.json` (the settings, read for the repository's own targets) join `guard_files` in
+  `tofu/guard_delivery.tf`, so troupe and website run the same files, delivered after an approved plan.
+- **Two jobs, so the job that runs the pull request's code holds nothing.** `mutate` checks out the pull request with
+  its base, has a read-only token, and writes a report artifact. `comment` checks out nothing, reads the report as data
+  against a closed schema, and writes one comment on the pull request, found by a marker and edited in place on later
+  pushes (GITHUB_TOKEN, `pull-requests: write`).
+- **What is mutated.** `git diff --unified=0 <base>...<head>` gives the changed lines of files in the repository's
+  targets. Python: the functions containing them (from `ast`), run as mutmut's name globs; TypeScript and JavaScript:
+  Stryker's `--mutate <file>:<start>-<end>` for each changed range. Only survivors whose mutated line is a changed line
+  are reported. The tools' own exemptions (`# pragma: no mutate`, `// Stryker disable next-line <mutator>: <reason>`)
+  are honoured by the tools themselves. A pull request that changes no target code says so and runs nothing.
+- **The comment and summary** give the survivors on changed lines (location and change, the first 30), the counts,
+  and the runtime of each step: mutmut's test-mapping pass, the mutants, the whole job. The report artifact holds the
+  same numbers for later reading.
+- **Its own budget**: `pr_budget_minutes` in the settings (proposed 45), so a pull request's runner time is bounded;
+  past it, the comment says the run didn't finish and which functions weren't reached.
+- **Drafts** run nothing, like CI; marking ready runs it.
+
+Estimated cost per pull request, from today's CI timings: infrastructure ~10-15 min, troupe ~20-35 min, website
+~5-10 min. The runtimes P records replace these estimates.
+
+### D10. A raised baseline reaches main by an ordinary pull request (owner, 2026-11-17: option C)
+
+The weekly run names the baselines it would raise in its summary and in each module's issue, and a person or agent
+raises them in an ordinary pull request, as #322 does for coverage. There's no bot pull request and no baselines App:
+opening one would need contents write and its own guard exemption. Rejected: **A** a new App (`troupe-run-baselines`)
+with a reserved branch prefix and a guard exemption, filed as a follow-up Feature; **B** GITHUB_TOKEN, whose pull
+requests start no workflows and so can't merge; **D** the release App with a new prefix, which blurs its purpose.
 
 ## Risks / Trade-offs
 
