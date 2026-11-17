@@ -305,8 +305,8 @@ changed paths: nothing, those scopes, or the full check. Every non-test gate run
 
 #### Scenario: A DNS-only pull request
 - **WHEN** a pull request changes only `tofu/dns.json` and files under `openspec/`
-- **THEN** its `check` job runs `scripts/check.py --scope dns`: ruff, mypy, `tofu fmt` and `tofu validate`, and only
-  the tests tagged `dns`, and the job reports success when they pass
+- **THEN** its `check` job runs `scripts/check.py --scope dns`: ruff, mypy, `tofu fmt`, `tofu validate` and `tflint`, and
+  only the tests tagged `dns`, and the job reports success when they pass
 
 #### Scenario: A DNS-only commit
 - **WHEN** a commit stages only `tofu/dns.json` and its change's `tasks.md`
@@ -615,3 +615,36 @@ source runs the full check.
 #### Scenario: Linux 3.12 is still tested
 - **WHEN** a pull request runs the guard's legs
 - **THEN** one of them runs on Linux with Python 3.12
+
+### Requirement: The check lints the OpenTofu configuration
+The check SHALL run `tflint` over the OpenTofu configuration, with its rules declared in one file in this repository,
+locally and in CI's `check` job, and SHALL fail when it reports a finding. A rule turned off, or a finding accepted,
+SHALL be recorded in that file with its reason.
+
+#### Scenario: A finding fails the check
+- **WHEN** a change adds a variable to `tofu/` that nothing uses
+- **THEN** `scripts/check.py` fails at the `tflint` gate, naming the file, the line and the rule
+
+#### Scenario: The configuration as it is passes
+- **WHEN** the check runs on `main` after this change
+- **THEN** `tflint` reports no finding
+
+### Requirement: CI always runs tflint; a local check may go without it
+CI SHALL install the `tflint` version the rules file names, and the check in GitHub Actions SHALL fail when `tflint` is
+missing. A local check without `tflint` SHALL say the gate is skipped and how to install it, and run the other gates.
+
+#### Scenario: tflint isn't installed in CI
+- **WHEN** the check runs in GitHub Actions with no `tflint` on the PATH
+- **THEN** it fails before any gate runs, naming `tflint`
+
+#### Scenario: tflint isn't installed locally
+- **WHEN** the check runs outside GitHub Actions with no `tflint` on the PATH
+- **THEN** it prints that the `tflint` gate is skipped and the command that installs it, and runs every other gate
+
+#### Scenario: An installed tflint that fails
+- **WHEN** `tflint` is installed locally and reports a finding
+- **THEN** the check fails at the `tflint` gate, as in CI
+
+#### Scenario: CI's version drifts from the declared one
+- **WHEN** the version CI installs and the version the rules file names differ
+- **THEN** this repository's tests fail, naming both
