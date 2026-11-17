@@ -20,8 +20,13 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
       still runs it. Verify they fail on the base code
 - [x] 1.2 Add the gate to `scripts/check.py` and `.tflint.hcl` (bundled `terraform` ruleset, `recommended` preset, the
       version in a comment). Verify 1.1's tests pass
-- [ ] 1.3 Run `tflint` over `tofu/` (first in the draft pull request's CI, D2); fix each finding in `tofu/`, or record it in `.tflint.hcl` with its reason. Verify
-      `tflint` exits 0 and `tofu validate` still passes, and that a deliberately unused variable fails the gate
+- [ ] 1.3 Run `tflint` over `tofu/` (first in the ready pull request's CI, D2); fix each finding in `tofu/`, or record
+      it in `.tflint.hcl` with its reason. First run (2026-11-18, CI run 44130445094): `tflint` read the configuration,
+      OpenTofu's `encryption` block included, and the gate failed the check on its 2 findings, both in
+      `tofu/modules/repository/main.tf` (`terraform_required_version`, `terraform_required_providers`). Both rules are
+      recorded off in `.tflint.hcl`: `tofu/versions.tf` is the one place the versions are pinned. To verify: the next
+      CI run's `tflint` passes. `terraform_unused_declarations`, the rule behind the spec's unused-variable scenario,
+      stays on in the `recommended` preset
 - [x] 1.4 Install `tflint` in CI's `check` job (`terraform-linters/setup-tflint`, version from `.tflint.hcl`), with a
       test that fails when the workflow's version and `.tflint.hcl`'s differ. Verify the test fails on a mismatch
 - [x] 1.5 README's setup and `docs/development-workflow.md`'s list of gates name `tflint` and how to install it
