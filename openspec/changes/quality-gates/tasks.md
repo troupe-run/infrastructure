@@ -17,7 +17,7 @@ complex than at the base.
 
 ## 1. The config (design D2)
 
-- [x] 1.1 Tests first, in `scripts/tests/test_quality_gates.py`: a valid config parses; a missing file, an unknown
+- [x] 1.1 Tests first, in `scripts/tests/test_guard_quality_gates.py`: a valid config parses; a missing file, an unknown
       table, an unknown key, a wrong type, a percentage outside 0–100, a negative tolerance, an unknown severity and two
       packages with overlapping paths each fail naming the key and what's valid. Verify they fail before 1.2
 - [x] 1.2 Write the config reader in `scripts/quality_gates.py` (stdlib only, delivered-file note at the top). Verify
@@ -83,8 +83,9 @@ complex than at the base.
 ## Workflow follow-up
 
 - troupe's and website's `quality-gates` changes, after the delivery is applied (design D9).
-- Once their `dependency-report.yml` files are on main, add them to `scripts/watched-schedules.json` here (a
-  workflow that doesn't exist yet would read as stopped).
+- Once each repository's `dependency-report.yml` has had its first scheduled run (infrastructure's included), add
+  it to `scripts/watched-schedules.json` here: the watch reads a workflow with no scheduled run as stopped (#328's
+  review). One follow-up pull request covers all three.
 - After the apply that creates troupe's `board` environment, the owner sets `BOARD_APP_PRIVATE_KEY` there
   (`oob/README.md`).
 - The after-merge comment on #322 and #324, and the board cards.

@@ -2,10 +2,8 @@
 holds the board App's key (spec: quality-gates, "Advisories no gate blocks on are reported weekly";
 quality-gates design D8)."""
 
-import json
 from typing import Any
 
-import pytest
 import yaml
 from conftest import REPO
 
@@ -57,13 +55,3 @@ def test_the_board_job_checks_the_url_it_is_handed() -> None:
     run = workflow()["jobs"]["board"]["steps"][-1]["run"]
     assert r"^https://github\.com/troupe-run/infrastructure/issues/[0-9]+$" in run
     assert run.strip().endswith('gh project item-add 1 --owner troupe-run --url "$ISSUE_URL"')
-
-
-@pytest.mark.schedules
-def test_the_schedule_watch_watches_it() -> None:
-    watched = json.loads((REPO / "scripts" / "watched-schedules.json").read_text(encoding="utf-8"))
-    assert {
-        "repository": "infrastructure",
-        "workflow": "dependency-report.yml",
-        "max_age_days": 8,
-    } in (watched)

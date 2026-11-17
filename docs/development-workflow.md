@@ -447,6 +447,7 @@ copies that the infrastructure App delivers straight to its `main`, after the ow
 
 - `scripts/guard.py`, `scripts/guard_pytest.py`, `.githooks/`, `.claude/settings.json` and
   `.github/workflows/guard.yml`;
+- `scripts/quality_gates.py`, the merge gates' measures (see "The merge gates");
 - `.github/guard-delivery.json`, which lists the delivered files. Its presence is what marks a repository as one that
   receives the guard.
 
