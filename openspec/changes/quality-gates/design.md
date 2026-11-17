@@ -154,8 +154,9 @@ issue by title and label among open issues, so it never opens a second. A separa
 board with the troupe-run-board App's token, as website's weekly link check does (`tofu/board.tf`). troupe has no
 `board` environment yet; this change adds it there (or #325, if it lands first, does).
 
-The report job's own failure (a tool or the network) fails the run, which the schedule watch (spec: schedule-watch)
-then reports.
+The report job's own failure (a tool or the network) fails the run. The schedule watch (spec: schedule-watch) is told
+about each report only after its first scheduled run, in a follow-up: it reads a workflow that has never run on its
+schedule as stopped (#328's review).
 
 ### D9. Sequencing
 
