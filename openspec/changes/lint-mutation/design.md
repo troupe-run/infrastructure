@@ -293,6 +293,27 @@ opening one would need contents write and its own guard exemption. Rejected: **A
 with a reserved branch prefix and a guard exemption, filed as a follow-up Feature; **B** GITHUB_TOKEN, whose pull
 requests start no workflows and so can't merge; **D** the release App with a new prefix, which blurs its purpose.
 
+### D11. This change's own code meets the weekly threshold before it merges (owner, 2026-11-18)
+
+The pull request report's first run on this pull request (CI run 44137631627, at ab692ae: 3,301 mutants in the
+changed functions, 852 surviving on changed lines, 25.6 minutes) became the list of tests to write. Each module was
+measured locally with the same run, mutating the whole of each new module and `check.py`'s changed functions:
+
+| Module | Before (ab692ae) | After (a77de7e) |
+|---|---|---|
+| `check` (`gates`, `tflint_gate`, `tflint_version`) | 55.9% (66 of 118) | 61.9% (73 of 118) |
+| `mutation_children` | 48.3% (29 of 60) | 73.3% (44 of 60) |
+| `mutation_issues` | 61.4% (496 of 808) | 85.1% (688 of 808) |
+| `mutation_pr` | 61.6% (383 of 622) | 89.7% (559 of 623) |
+| `mutation_report` | 89.3% (443 of 496) | 97.2% (484 of 498) |
+| `mutation_run` | 52.9% (380 of 718) | 81.6% (586 of 718) |
+| `mutation_settings` | 84.1% (403 of 479) | 99.0% (474 of 479) |
+
+The new tests pin what the survivors showed unchecked: the exact GitHub writes and error messages, the comment and
+issue text, the budget's edge, and each command line's run path over a scratch repository. No mutant needed an
+exemption. One real fix fell out: with no hunk to count from, a survivor's line was the one before its function.
+`mutation_children`'s remaining untested mutants are in the plugin hook itself, which only a mutation run exercises.
+
 ## Risks / Trade-offs
 
 - **`tflint` can't parse OpenTofu-only syntax** (the `encryption` block) → trialled in CI on the draft pull request
