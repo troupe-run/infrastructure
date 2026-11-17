@@ -455,13 +455,15 @@ class Counts:
 
 
 def _relative(path: str, root: Path) -> str:
-    candidate = Path(path)
-    if candidate.is_absolute():
-        try:
-            return candidate.relative_to(root).as_posix()
-        except ValueError:
-            return candidate.as_posix()
-    return candidate.as_posix()
+    """A report's path relative to the root, with forward slashes. Reports name files absolutely or
+    relatively, with either separator (Vitest on Windows writes C:\\... or C:/...), so this works
+    on the text; names compare case-insensitively on Windows."""
+    text = path.replace("\\", "/")
+    prefix = root.as_posix().replace("\\", "/").rstrip("/") + "/"
+    windows = sys.platform == "win32"
+    if (text.lower() if windows else text).startswith(prefix.lower() if windows else prefix):
+        return text[len(prefix) :]
+    return text
 
 
 def coveragepy_counts(report: Mapping[str, object], root: Path) -> dict[str, Counts]:

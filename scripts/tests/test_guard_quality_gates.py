@@ -323,6 +323,23 @@ def test_vitest_counts_are_made_relative_to_the_root() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("path", "root", "relative"),
+    [
+        ("/repo/src/a.ts", "/repo", "src/a.ts"),
+        ("src/a.ts", "/repo", "src/a.ts"),
+        ("C:\\work\\site\\src\\a.ts", "C:\\work\\site", "src/a.ts"),
+        ("C:/work/site/scripts/b.mjs", "C:/work/site", "scripts/b.mjs"),
+        ("/elsewhere/c.ts", "/repo", "/elsewhere/c.ts"),
+        ("/repo2/c.ts", "/repo", "/repo2/c.ts"),
+    ],
+)
+def test_report_paths_are_made_relative_whatever_their_separators(
+    path: str, root: str, relative: str
+) -> None:
+    assert qg._relative(path, Path(root)) == relative
+
+
 def test_coverage_below_baseline_by_more_than_the_tolerance_fails() -> None:
     files = {
         "packages/core/src/a.py": qg.Counts(892, 1000),

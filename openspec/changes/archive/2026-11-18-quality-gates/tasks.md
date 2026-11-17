@@ -61,10 +61,11 @@ complex than at the base.
       Verify they pass, and a local full check stays within a few seconds of today's. Done: the complexity gate
       takes 0.5 s; a simulated leg run (GITHUB_ACTIONS and the variable set) ran every gate, tests 130 s under
       coverage, audit 24 s
-- [ ] 5.3 Write `quality-gates.toml` with the approved defaults and the `scripts` baseline. The baseline is CI's:
+- [x] 5.3 Write `quality-gates.toml` with the approved defaults and the `scripts` baseline. The baseline is CI's:
       coverage and the audit run only on the `check` job (`QUALITY_GATES_LEG=true` under GitHub Actions; 5.2, design
       D5), so the verification is that job's run on this pull request. Set `baseline` to its measurement rounded down
-      to 0.1, run the job again on the same commit to settle the tolerance (design D4), and cite both runs
+      to 0.1, run the job again on the same commit to settle the tolerance (design D4), and cite both runs. Done:
+      runs 44185676354 (attempts 1 and 2) on 00a4557 both measured 91.0%; baseline 91.0, tolerance 0.1
 - [x] 5.4 CI: `check` on Python 3.15 with the base fetched and the flags passed; the guard's legs gain Linux 3.12.
       Update `scripts/tests/` workflow tests to match. Verify they pass
 
@@ -72,13 +73,14 @@ complex than at the base.
 
 - [x] 6.1 Tests first for `quality_gates.py report`: opens one issue when there are advisories, updates the open one,
       closes it when clear, never opens a second (a fake `gh`). Verify they fail, then implement, then pass
-- [ ] 6.2 Add `.github/workflows/dependency-report.yml` with its board job, and troupe's `board` environment and
-      variable in `tofu/board.tf`. Verify workflow tests pass and the plan shows the troupe environment
+- [x] 6.2 Add `.github/workflows/dependency-report.yml` with its board job, and troupe's `board` environment and
+      variable in `tofu/board.tf`. Verify workflow tests pass and the plan shows the troupe environment. Done: plan
+      run 44185676427 creates troupe's `board` environment, its main-only policy and `BOARD_APP_CLIENT_ID`
 
 ## 7. Delivery and docs
 
-- [ ] 7.1 Add `scripts/quality_gates.py` to `tofu/guard_delivery.tf`. Verify the plan delivers it to troupe and
-      website and nothing else changes
+- [x] 7.1 Add `scripts/quality_gates.py` to `tofu/guard_delivery.tf`. Verify the plan delivers it to troupe and
+      website and nothing else changes. Done: plan run 44185676427, 5 to add and 2 to change, nothing else
 - [x] 7.2 Document the gates in `docs/development-workflow.md` (what each blocks, where its thresholds live, how to
       raise a baseline). Verify the docs tests pass
 

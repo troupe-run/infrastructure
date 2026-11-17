@@ -5,14 +5,15 @@ version = 1
 
 # Branch coverage, measured on CI's `check` job only (Linux, Python 3.15). A package can't measure below its baseline
 # by more than the tolerance, and a package with no baseline must meet the floor. Raise a baseline by hand when the
-# check says it could be raised.
+# check says it could be raised. Baseline and tolerance from two runs of the leg on one commit, both 91.0%
+# (openspec/changes/quality-gates/design.md, D4).
 [coverage]
 floor = 80.0
-tolerance = 0.5
+tolerance = 0.1
 
 [coverage.packages.scripts]
 paths = ["scripts"]
-baseline = 91.5
+baseline = 91.0
 
 # Cyclomatic complexity (lizard) of each function a change adds or edits: above the limit, it may not be new or more
 # complex than before. guard.py is measured here, where it's the source.
