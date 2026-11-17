@@ -19,6 +19,7 @@ dev = [
     "pyyaml>=6.0.3",
     "types-pyyaml>=6.0.12.20261103",
     "pytest-xdist>=3.8",
+    "lizard>=1.26.1",
 ]
 
 [tool.ruff]

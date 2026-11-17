@@ -181,17 +181,24 @@ Replaying the rule (D6) over each repository's last ~120 merged pull requests: h
 
 | Limit | infrastructure (src) | infrastructure (with tests) | troupe (src) | website |
 |---|---|---|---|---|
-| 15 | 5 of 119 | 25 | 34 | 1 of 47 |
-| 20 | 5 | 21 | 24 | 0 |
-| **25** | **5** | 18 | **11** | **0** |
-| 30 | 4 | 15 | 11 | 0 |
-| 40 | 0 | — | 4 | 0 |
+| 15 | 14 of 119 | 33 | 34 | 1 of 47 |
+| 20 | 9 | 24 | 24 | 0 |
+| **25** | **9** | 21 | **11** | **0** |
+| 30 | 8 | 18 | 11 | 0 |
+| 40 | 3 | — | 4 | 0 |
 
-**Proposed: `block_above = 25`, tests excluded.** It blocks about 4% of infrastructure's and 9% of troupe's pull
-requests, each one a function that is genuinely hard to follow (`dependabot_issues.plan` at 38, `projection.plan` at
-36, the scripted runner's `_step` growing 31 → 34 → 37 over three pull requests). Including tests would block 15% of
-infrastructure's, nearly all its workflow tests' `problems` checklists (CCN 36–63), which are long but flat lists of
-conditions; #325's mutation testing judges tests instead. #320's stricter limit would sit lower, around 15.
+In infrastructure, `scripts/guard.py` is the source, so it's measured; in troupe and website it's a delivered copy
+and isn't. (A first pass skipped it here too and undercounted infrastructure: 5 at 25, corrected to 9.) The module's
+own rule, replayed over infrastructure's last 20 merged pull requests at a limit of 10, flagged exactly the functions
+the calibration script did (four, all in #302).
+
+**Proposed: `block_above = 25`, tests excluded.** It blocks about 8% of infrastructure's and 9% of troupe's pull
+requests, each one a function that is genuinely hard to follow: `dependabot_issues.plan` at 38, `projection.plan` at
+36, the scripted runner's `_step` growing 31 → 34 → 37 over three pull requests, and the guard's `gh_decision` growing
+47 → 48 → 49 → 50 over three. That last one shows the rule's cost: once a function is over the limit, each pull
+request that adds a branch to it must split it first. Including tests would block 18% of infrastructure's, nearly all
+its workflow tests' `problems` checklists (CCN 36–63), which are long but flat lists of conditions; #325's mutation
+testing judges tests instead. #320's stricter limit would sit lower, around 15.
 
 ### Dependency audit
 

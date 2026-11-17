@@ -1,0 +1,86 @@
+{
+ "total": {
+  "lines": {
+   "total": 2078,
+   "covered": 926,
+   "skipped": 0,
+   "pct": 44.56
+  },
+  "statements": {
+   "total": 2469,
+   "covered": 1173,
+   "skipped": 0,
+   "pct": 47.5
+  },
+  "functions": {
+   "total": 681,
+   "covered": 271,
+   "skipped": 0,
+   "pct": 39.79
+  },
+  "branches": {
+   "total": 939,
+   "covered": 722,
+   "skipped": 0,
+   "pct": 76.89
+  },
+  "branchesTrue": {
+   "total": 0,
+   "covered": 0,
+   "skipped": 0,
+   "pct": 100
+  }
+ },
+ "/ROOT/scripts/roadmap-lib.mjs": {
+  "lines": {
+   "total": 69,
+   "covered": 69,
+   "skipped": 0,
+   "pct": 100
+  },
+  "functions": {
+   "total": 13,
+   "covered": 13,
+   "skipped": 0,
+   "pct": 100
+  },
+  "statements": {
+   "total": 77,
+   "covered": 77,
+   "skipped": 0,
+   "pct": 100
+  },
+  "branches": {
+   "total": 55,
+   "covered": 54,
+   "skipped": 0,
+   "pct": 98.18
+  }
+ },
+ "/ROOT/src/lib/site-path.ts": {
+  "lines": {
+   "total": 3,
+   "covered": 3,
+   "skipped": 0,
+   "pct": 100
+  },
+  "functions": {
+   "total": 1,
+   "covered": 1,
+   "skipped": 0,
+   "pct": 100
+  },
+  "statements": {
+   "total": 4,
+   "covered": 4,
+   "skipped": 0,
+   "pct": 100
+  },
+  "branches": {
+   "total": 2,
+   "covered": 2,
+   "skipped": 0,
+   "pct": 100
+  }
+ }
+}
