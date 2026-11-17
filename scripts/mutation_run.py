@@ -151,6 +151,13 @@ def run_mutmut(
 ) -> dict[str, mr.Module]:
     """One unit's modules, with paths as in the checkout. `names` limits it to those globs."""
     workdir = mutmut_workdir(checkout, unit)
+    if (workdir / "setup.cfg").exists():
+        if workdir == checkout:
+            (checkout / "src").unlink()
+        raise RunError(
+            f"{workdir / 'setup.cfg'} exists, and mutmut reads its configuration from there: "
+            "this run writes its own, so it won't overwrite one the repository holds"
+        )
     plugin = workdir / f"{PLUGIN_COPY}.py"
     try:
         shutil.copy2(CHILDREN_PLUGIN, plugin)
