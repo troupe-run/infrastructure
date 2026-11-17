@@ -2,6 +2,7 @@
 against it (spec: mutation-testing; lint-mutation design D3)."""
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -246,3 +247,23 @@ def test_a_package_init_is_named_by_its_package() -> None:
         mr.module_name("packages/troupe/src/troupe/store/__init__.py", "packages/troupe/src")
         == "troupe.store"
     )
+
+
+def test_a_real_mutmut_run_reads_back_with_every_survivor_on_its_source_line(
+    tmp_path: Path,
+) -> None:
+    fixture = Path(__file__).parent / "fixtures" / "mutation" / "mutmut-3.8.1"
+    shutil.copytree(fixture / "mutants", tmp_path / "mutants")
+    (tmp_path / "src").mkdir()
+    source = (fixture / "src" / "mutation_settings.py.fixture").read_text(encoding="utf-8")
+    (tmp_path / "src" / "mutation_settings.py").write_text(source, encoding="utf-8")
+    shows = json.loads((fixture / "show.json").read_text(encoding="utf-8"))
+    modules = mr.from_mutmut(tmp_path, "src", shows.__getitem__)
+    settings = modules["mutation_settings"]
+    assert (settings.killed, settings.survived, settings.counted) == (323, 58, 381)
+    assert settings.score == 84.8
+    lines = source.splitlines()
+    for survivor in settings.survivors:
+        removed = survivor.change.splitlines()[0]
+        assert removed.startswith("-"), survivor.name
+        assert lines[survivor.line - 1].strip() == removed[1:].strip(), survivor.name

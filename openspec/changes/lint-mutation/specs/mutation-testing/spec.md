@@ -165,22 +165,22 @@ as having no baselines.
 
 ### Requirement: New survivors are attributed to the pull request that added them
 The weekly run SHALL call a surviving mutant new when the line it mutates was last changed by a commit that isn't in the
-previous weekly run's tested commit for that repository. The module's issue SHALL list new survivors first, with the
-commit and the merged pull request that contains it, and that pull request SHALL get one comment naming the survivors
-it added. With no previous run to compare with, no survivor SHALL be called new.
+previous weekly run's tested commit for that repository. The module's issue SHALL list new survivors first, each naming
+the commit and the merged pull request that contains it, so GitHub cross-references the issue on that pull request.
+With no previous run to compare with, no survivor SHALL be called new.
 
 #### Scenario: A pull request adds an untested branch
 - **WHEN** a pull request merged since the last weekly run adds a line whose mutant survives
-- **THEN** the module's issue lists that survivor under new survivors with the pull request, and the pull request gets
-  a comment naming it
+- **THEN** the module's issue lists that survivor under new survivors, naming the pull request, and the pull request's
+  timeline shows the issue mentioning it
 
 #### Scenario: An old survivor
 - **WHEN** a survivor's line was last changed before the previous weekly run's tested commit
-- **THEN** it's listed with the other survivors, and no pull request is commented on for it
+- **THEN** it's listed with the other survivors, with no pull request named
 
 #### Scenario: The first run
 - **WHEN** no previous weekly run's report is available
-- **THEN** no survivor is called new and no pull request is commented on
+- **THEN** no survivor is called new
 
 ### Requirement: Each ready pull request's changed code is mutation tested, as a report
 On every pull request that's ready for review in troupe, website and infrastructure, a workflow delivered from
@@ -219,8 +219,8 @@ be a required check, and SHALL conclude success when it finds survivors. Only it
 
 ### Requirement: The job that runs a pull request's code holds no write token
 In the pull request workflow, the job that runs the pull request's code under mutation SHALL have a read-only token,
-and SHALL hand on only a report. The job that comments SHALL check out nothing and SHALL read the report as data
-against a closed schema.
+and SHALL hand on only a report. The job that comments SHALL check out only the pull request's base commit, never its
+head, and SHALL read the report as data against a closed schema.
 
 #### Scenario: A malformed pull request report
 - **WHEN** the comment job reads a report with a field the schema doesn't name

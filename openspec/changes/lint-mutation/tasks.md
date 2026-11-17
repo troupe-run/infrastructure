@@ -63,12 +63,12 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 
 ## 5. P: pull request mutation report (design D9)
 
-- [ ] 5.1 `scripts/mutation_pr.py`: changed lines from `git diff --unified=0`, the enclosing Python functions as mutmut
+- [x] 5.1 `scripts/mutation_pr.py`: changed lines from `git diff --unified=0`, the enclosing Python functions as mutmut
       globs, Stryker `--mutate <file>:<range>` for TypeScript and JavaScript, survivors filtered to changed lines, step
       timings, the report; tests first over a scratch repository and the captured tool output
-- [ ] 5.2 The comment: found by its marker, edited in place, closed schema on the report, "nothing to mutate" when no
+- [x] 5.2 The comment: found by its marker, edited in place, closed schema on the report, "nothing to mutate" when no
       target changed. Tests first
-- [ ] 5.3 `.github/workflows/mutation-pr.yml`: ready pull requests only, `mutate` with a read-only token and the
+- [x] 5.3 `.github/workflows/mutation-pr.yml`: ready pull requests only, `mutate` with a read-only token and the
       budget, `comment` with `pull-requests: write` and no checkout, never required, success on survivors. Tests: no
       write permission in `mutate`, no checkout in `comment`, the timeout follows `pr_budget_minutes`
 - [ ] 5.4 Deliver `mutation-pr.yml`, `mutation_pr.py` and `mutation.json` beside the guard's files
@@ -83,12 +83,12 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 - [ ] 6.2 The App's declaration in `oob/app-installations.json`, the `mutation-issues` environment (main only, no
       bypass) and `TEST_QUALITY_APP_CLIENT_ID` in `tofu/`, with the main-only environment test covering it. Verify the
       check fails when the environment's branch policy is removed. Send the owner the App's creation steps
-- [ ] 6.3 `.github/workflows/mutation.yml`: weekly schedule and dispatch (`repository`, `dry-run`), the `mutate`
+- [x] 6.3 `.github/workflows/mutation.yml`: weekly schedule and dispatch (`repository`, `dry-run`), the `mutate`
       matrix with no secret on Python 3.15 and full history, the previous run's reports downloaded, the `issues` job in
       `mutation-issues`, the `board` job as `schedules.yml`, one concurrency group. Tests: no `pull_request`/
       `merge_group` trigger, the token's permissions equal the App's declaration, the job timeout equals the budget
       plus 30, the board job's URL check
-- [ ] 6.4 `scripts/watched-schedules.json` gains `mutation.yml` (8 days). Verify the schedule watch's tests pass
+- [x] 6.4 `scripts/watched-schedules.json` gains `mutation.yml` (8 days). Verify the schedule watch's tests pass
 - [ ] 6.5 The oob README gains the App's creation and key-setting steps; the development workflow doc describes the
       weekly report, the ratchet and P's comment
 

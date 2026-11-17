@@ -80,5 +80,13 @@
       "pull_requests": "write"
     },
     "repository_selection": "selected"
+  },
+  {
+    "app_slug": "troupe-run-test-quality",
+    "permissions": {
+      "issues": "write",
+      "metadata": "read"
+    },
+    "repository_selection": "selected"
   }
 ]

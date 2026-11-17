@@ -233,32 +233,27 @@ def test_new_survivors_come_first_with_their_pull_request() -> None:
     assert "added in #412" in p.actions[0].body
 
 
-def test_a_pull_request_that_added_survivors_gets_one_comment() -> None:
-    calls: list[list[str]] = []
+def test_new_survivors_are_looked_up_with_the_read_token_and_no_pull_request_is_written(
+    tmp_path: Path,
+) -> None:
+    r = mr.Report("troupe", SHA, None, {"troupe.a": module(killed=5, survived=5, new=1)})
+    (tmp_path / "report-troupe.json").write_text(mr.dump_report(r), encoding="utf-8")
+    for name in ("infrastructure", "website"):
+        (tmp_path / f"skipped-{name}").touch()
+    reads: list[list[str]] = []
 
-    def gh(args: list[str]) -> mi.GhResult:
-        calls.append(args)
-        return mi.GhResult(0, "{}", "")
+    def read_gh(args: list[str]) -> mi.GhResult:
+        reads.append(args)
+        return mi.GhResult(
+            0, json.dumps([{"number": 412, "merged_at": "2026-11-16T10:00:00Z"}]), ""
+        )
 
-    r = report(**{"troupe.a": module(killed=5, survived=3, new=1)})
-    done = mi.comment_on_pulls(gh, "troupe", r, {"b" * 40: 412}, {}, dry=False)
-    assert done == ["#412"]
-    assert len(calls) == 1
-    assert calls[0][1] == "repos/troupe-run/troupe/issues/412/comments"
-
-
-def test_old_survivors_and_a_dry_run_comment_on_no_pull_request() -> None:
-    calls: list[list[str]] = []
-
-    def gh(args: list[str]) -> mi.GhResult:
-        calls.append(args)
-        return mi.GhResult(0, "{}", "")
-
-    old = report(**{"troupe.a": module(killed=5, survived=3)})
-    assert mi.comment_on_pulls(gh, "troupe", old, {"b" * 40: 412}, {}, dry=False) == []
-    new = report(**{"troupe.a": module(killed=5, survived=3, new=1)})
-    assert mi.comment_on_pulls(gh, "troupe", new, {"b" * 40: 412}, {}, dry=True) == ["#412"]
-    assert calls == []
+    app = FakeGitHub()
+    assert mi.main([str(tmp_path)], actions_env(tmp_path), app, read_gh) == 0
+    assert reads == [["api", f"repos/troupe-run/troupe/commits/{'b' * 40}/pulls"]]
+    [opened] = app.writes
+    assert opened[1] == "repos/troupe-run/troupe/issues"
+    assert any("added in #412" in arg for arg in opened)
 
 
 # The whole run
@@ -383,3 +378,11 @@ def test_a_commit_is_attributed_to_its_merged_pull_request_only() -> None:
         return mi.GhResult(0, json.dumps(answers[commit]), "")
 
     assert mi.pulls_for(gh, "troupe", {"b" * 40, "c" * 40}) == {"b" * 40: 412}
+
+
+def test_an_issue_says_mutmut_cant_see_code_tests_run_in_a_subprocess() -> None:
+    p = plan(report(**{"troupe.a": module(killed=10, survived=4, no_tests=6)}))
+    assert (
+        "6 reached by no test in the test process (mutmut doesn't see code a test runs"
+        in p.actions[0].body
+    )

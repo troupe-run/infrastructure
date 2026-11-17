@@ -245,7 +245,8 @@ def module_name(path: str, source: str) -> str:
 
 
 def function_start(tree: ast.Module, mangled: str) -> int | None:
-    """The first line (its first decorator's, if any) of mutmut's `x_f` or `xǁCǁm`."""
+    """The first line (its first decorator's, if any) of mutmut's `x_f`, or of `x<sep>C<sep>m`
+    for a method, <sep> being U+01C1."""
     if mangled.startswith("x_"):
         wanted, scope = mangled[2:], tree.body
     else:

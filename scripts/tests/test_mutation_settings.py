@@ -162,3 +162,30 @@ def test_a_quality_gates_file_without_a_mutation_table_has_no_baselines() -> Non
 def test_a_quality_gates_file_that_isnt_toml_fails_naming_it() -> None:
     with pytest.raises(ms.SettingsError, match=r"quality-gates\.toml isn't TOML"):
         ms.read_mutation_table("[mutation\n", "quality-gates.toml")
+
+
+def with_deselect(entry: object) -> str:
+    changed = declared()
+    changed["repositories"]["infrastructure"]["units"][0]["deselect"] = [entry]
+    return text(changed)
+
+
+def test_a_deselected_test_carries_its_reason() -> None:
+    entry = {"test": "scripts/tests/test_a.py::test_b", "why": "it pretends to be Windows"}
+    settings = ms.load_settings(with_deselect(entry))
+    unit = settings.repositories["infrastructure"].units[0]
+    assert unit.deselect == (("scripts/tests/test_a.py::test_b", "it pretends to be Windows"),)
+
+
+@pytest.mark.parametrize(
+    ("entry", "named"),
+    [
+        ({"test": "scripts/tests/test_a.py::test_b"}, "why"),
+        ({"test": "tests/test_a.py::test_b", "why": "x"}, "node id under scripts/tests"),
+        ({"test": "scripts/tests/test_a.py", "why": "x"}, "node id"),
+        ({"test": "scripts/tests/test_a.py::t", "why": ""}, "why"),
+    ],
+)
+def test_a_deselection_without_a_reason_or_a_node_id_fails(entry: object, named: str) -> None:
+    with pytest.raises(ms.SettingsError, match=named):
+        ms.load_settings(with_deselect(entry))
