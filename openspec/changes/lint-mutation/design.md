@@ -273,6 +273,10 @@ they're deselected in `scripts/mutation.json`, each with its reason. Infrastruct
 `scripts/` holds 18,967 mutants in all, which the weekly budget (240 minutes) has to cover; the first scheduled run
 shows whether it does, and a module not finished isn't judged.
 
+**Measured locally, troupe** (2026-11-18, `main` at b88683b8): `troupe-identity-local` as a unit, from its own
+directory, with no other setting: 115 mutants in 40 seconds, 92 killed and 23 survived (80%), every survivor on its
+source line.
+
 ### D10. A raised baseline reaches main by an ordinary pull request (owner, 2026-11-17: option C)
 
 The weekly run names the baselines it would raise in its summary and in each module's issue, and a person or agent

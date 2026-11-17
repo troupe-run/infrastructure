@@ -290,3 +290,14 @@ def test_a_whole_run_with_unrun_mutants_isnt_finished(
         SETTINGS.repositories["infrastructure"], tmp_path, SETTINGS, None, MetaRecorder(0)
     )
     assert not modules["calc"].finished
+
+
+def test_a_unit_with_its_own_setup_cfg_is_refused_not_overwritten(tmp_path: Path) -> None:
+    (tmp_path / "packages" / "troupe" / "src").mkdir(parents=True)
+    (tmp_path / "packages" / "troupe" / "setup.cfg").write_text("[metadata]\n", encoding="utf-8")
+    unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
+    with pytest.raises(run.RunError, match="won't overwrite"):
+        run.run_mutmut(tmp_path, unit, [], 0.0, Recorder())
+    assert (tmp_path / "packages" / "troupe" / "setup.cfg").read_text(
+        encoding="utf-8"
+    ) == "[metadata]\n"
