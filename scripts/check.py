@@ -1,6 +1,6 @@
 """Run every quality gate, in order, stopping at the first failure.
 
-Usage: uv run scripts/check.py [--scope NAME ...]
+Usage: uv run scripts/check.py [--scope NAME ...] [--base REV]
 
 The tests run in TEST_WORKERS parallel worker processes (pytest-xdist), or one per CPU where
 there are fewer (check-time design D1).
@@ -8,6 +8,10 @@ there are fewer (check-time design D1).
 With --scope, every gate still runs, but the tests narrow to those marked with any of the scopes
 declared in scripts/check-paths.toml. The guard passes scopes when a commit stages only paths
 they cover (spec: development-workflow; commit-check-paths design D8).
+
+Every run measures the complexity of the functions the work adds or edits since --base, or since
+where it left origin/main (spec: quality-gates). Coverage and the dependency audit run only on CI's
+coverage leg, which sets QUALITY_GATES_LEG=true; never locally (owner, 2026-11-18).
 
 The same script runs locally and in CI, so the two can't diverge (design D8). It needs no
 secret: `tofu validate` reads neither state nor variable values. Every repo the org builds in
@@ -19,8 +23,9 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -62,16 +67,68 @@ def requested_scopes(names: Sequence[str], declaration: guard.CheckPaths | None)
     return tuple(sorted(set(names)))
 
 
-def gates(scopes: tuple[str, ...] = ()) -> list[tuple[str, list[str]]]:
+LEG = "QUALITY_GATES_LEG"
+"""Set to `true` by CI's coverage leg, under GitHub Actions only, to run coverage and the audit
+(quality-gates design D5)."""
+
+QUALITY_GATES = str(ROOT / "scripts" / "quality_gates.py")
+
+
+def on_leg(env: Mapping[str, str]) -> bool:
+    """Whether this run is CI's coverage leg. Set anywhere else, or to anything but `true`, the
+    variable stops the check: it is not a way to measure coverage locally."""
+    value = env.get(LEG, "")
+    if value == "":
+        return False
+    if value != "true":
+        sys.exit(
+            f"check: {LEG}={value!r} isn't valid. Fix: unset it; CI's coverage leg sets it to true."
+        )
+    if env.get("GITHUB_ACTIONS") != "true":
+        sys.exit(
+            f"check: {LEG} is set, but this isn't GitHub Actions. Coverage and the dependency "
+            f"audit run on CI's coverage leg only (quality-gates design D5). Fix: unset {LEG}."
+        )
+    return True
+
+
+def coverage_report() -> Path:
+    """Where the coverage leg's report goes: the runner's temporary directory."""
+    return (
+        Path(os.environ.get("RUNNER_TEMP", tempfile.gettempdir())) / "quality-gates-coverage.json"
+    )
+
+
+def gates(
+    scopes: tuple[str, ...] = (), base: str | None = None, leg: bool = False
+) -> list[tuple[str, list[str]]]:
     tofu = tool("tofu", path=None)
     pytest = [tool("pytest"), "-n", str(worker_count())]
     if scopes:
         pytest += ["-m", guard.marker_expression(scopes)]
-    return [
+    measure = leg and not scopes
+    if measure:
+        pytest += ["--cov", "--cov-report=", f"--cov-report=json:{coverage_report()}"]
+    on_base = ["--base", base] if base else []
+    steps = [
         ("ruff lint", [tool("ruff"), "check", "."]),
         ("ruff format", [tool("ruff"), "format", "--check", "."]),
         ("mypy --strict", [tool("mypy")]),
+        ("complexity", [sys.executable, QUALITY_GATES, "complexity", *on_base]),
         ("tests", pytest),
+    ]
+    if measure:
+        report = str(coverage_report())
+        steps.append(
+            ("coverage", [sys.executable, QUALITY_GATES, "coverage", "--coveragepy", report])
+        )
+    elif leg:
+        note = "print('coverage not measured: the tests were scoped')"
+        steps.append(("coverage", [sys.executable, "-c", note]))
+    if leg:
+        steps.append(("audit", [sys.executable, QUALITY_GATES, "audit", *on_base]))
+    return [
+        *steps,
         ("tofu fmt", [tofu, "fmt", "-check", "-recursive", "tofu"]),
         ("tofu init", [tofu, "-chdir=tofu", "init", "-backend=false", "-input=false"]),
         ("tofu validate", [tofu, "-chdir=tofu", "validate"]),
@@ -117,7 +174,9 @@ def run_gates(steps: list[tuple[str, list[str]]], cwd: Path, scopes: tuple[str, 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--scope", action="append", default=[], help="a declared scope")
-    names = parser.parse_args(argv).scope
+    parser.add_argument("--base", help="the commit the complexity and audit gates compare with")
+    args = parser.parse_args(argv)
+    names = args.scope
     scopes: tuple[str, ...] = ()
     if names:
         text = guard.read_working_tree(ROOT)(guard.CHECK_PATHS)
@@ -129,7 +188,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     activated = activate_git_hooks(ROOT)
     if activated is not None:
         print(f"check: {activated}", flush=True)
-    return run_gates(gates(scopes), ROOT, scopes)
+    return run_gates(gates(scopes, args.base, on_leg(os.environ)), ROOT, scopes)
 
 
 if __name__ == "__main__":

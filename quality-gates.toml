@@ -1,0 +1,27 @@
+# The merge gates' thresholds for this repository (spec: quality-gates). scripts/quality_gates.py reads it strictly:
+# an unknown key or a wrong type fails the check. It isn't delivered: troupe and website keep their own.
+# Defaults approved by the owner on 2026-11-18 (openspec/changes/quality-gates/design.md, "Owner's decisions").
+version = 1
+
+# Branch coverage, measured on CI's `check` job only (Linux, Python 3.15). A package can't measure below its baseline
+# by more than the tolerance, and a package with no baseline must meet the floor. Raise a baseline by hand when the
+# check says it could be raised.
+[coverage]
+floor = 80.0
+tolerance = 0.5
+
+[coverage.packages.scripts]
+paths = ["scripts"]
+baseline = 91.5
+
+# Cyclomatic complexity (lizard) of each function a change adds or edits: above the limit, it may not be new or more
+# complex than before. guard.py is measured here, where it's the source.
+[complexity]
+block_above = 25
+languages = ["python"]
+exclude = ["**/tests/**"]
+
+# A pull request that changes the lock file fails on an advisory of these severities that has a fix.
+[audit]
+lock_files = ["uv.lock"]
+block = ["high", "critical"]

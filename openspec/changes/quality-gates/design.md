@@ -99,14 +99,18 @@ every merge, and #321 named a baseline taken when the gate lands.
 | coverage | no | one leg, full check only |
 | audit | no | the same leg, when a lock file changed |
 
-`check.py` takes `--coverage`, `--audit` and `--base REV`. CI's coverage leg passes all three. A local check runs
-only the complexity gate, so a commit's check gets no slower to speak of and needs no network. Coverage under
-sys.monitoring on 3.15 costs little (measured below), but a scoped run's coverage would be partial, so a scoped check
-says "coverage not measured: the tests were scoped" and passes that gate; every change to a Python source runs the
-full check (run-checks-by-path design D3), so code changes are always measured.
+`check.py` takes `--base REV` for the diff gates. Coverage and the audit have no flag: the owner chose that coverage
+is never measured locally, not even on request (2026-11-18). `check.py` runs them only when the CI leg sets
+`QUALITY_GATES_LEG=true` and GitHub Actions is running it (`GITHUB_ACTIONS=true`); the variable set anywhere else
+fails the check, naming it, so it can't become a local switch. A local check runs only the complexity gate, so a
+commit's check gets no slower to speak of and needs no network. A scoped run's coverage would be partial, so on the
+leg a scoped check says "coverage not measured: the tests were scoped" and passes that gate; every change to a Python
+source runs the full check (run-checks-by-path design D3), so code changes are always measured.
 
-Here, CI's `check` job moves from Python 3.12 to 3.15 and becomes the coverage leg; the guard's legs drop their
-`exclude` of Linux 3.12, so 3.12 is still tested on Linux. In troupe, the Linux 3.15 leg gets `gates: true` in the
+Here, CI's `check` job moves from Python 3.12 to 3.15 and becomes the coverage leg; the guard's legs swap their
+`exclude` from Linux 3.12 to Linux 3.15 (the check job runs the guard's tests there), so 3.12 is still tested on
+Linux and the leg count stays 11. The job's limit goes from 10 to 15 minutes for coverage and the audit; a local
+run of the leg took 130 s for the tests under coverage and 24 s for the audit. In troupe, the Linux 3.15 leg gets `gates: true` in the
 matrix. In website, the one `test` job is the leg.
 
 ### D6. The complexity rule
@@ -163,7 +167,25 @@ then reports.
 Worker 2's #323 (linting) and #325 (mutation testing) change the same `check.py` files; whichever merges second
 rebases.
 
-## Calibration (proposed defaults, for the owner's approval)
+## Owner's decisions
+
+Owner, 2026-11-18, through the orchestrator, on the six items sent with the calibration below:
+
+1. **D1 approved:** one stdlib-only `scripts/quality_gates.py`, delivered to troupe and website with the guard's files;
+   a per-repository `quality-gates.toml`, never delivered.
+2. **Complexity:** block new or worsened functions over CCN 25, tests, delivered and generated code excluded, on the
+   corrected calibration (infrastructure 9 of 119). #320 uses about 15.
+3. **Coverage:** an 80% floor for a new package; no package below its baseline, with a 0.5-point tolerance until the
+   same commit has been measured twice on CI; baselines are the CI leg's measurement rounded down to 0.1, raised by
+   hand. troupe's runner subprocess gap and website's `.astro` gap are handled in their own changes.
+4. **Where:** complexity in the local commit check; coverage and the audit on one CI leg only, and no local coverage
+   at all, not even an opt-in flag (D5 as amended).
+5. **Audit as proposed:** high and critical advisories with a fix block a lock-file change; unknown severity blocks; a
+   network failure fails; severity from OSV.
+6. **Weekly report as proposed**, one "Dependency advisories" issue per repository, and troupe gets its `board`
+   environment here.
+
+## Calibration (the defaults the owner approved)
 
 Measured 2026-11-17 on each repository's `origin/main`.
 

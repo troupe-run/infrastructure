@@ -236,3 +236,46 @@ def test_a_push_the_queue_did_not_pass_runs_the_full_check_and_every_leg() -> No
     }
     assert evaluate(condition(jobs["check"]), answered)
     assert evaluate(condition(jobs["guard-tests"]), answered)
+
+
+# The coverage leg (spec: ci-apply, "One CI leg runs the coverage and audit gates"; quality-gates
+# design D5)
+
+
+def check_step(workflow: dict[str, Any]) -> dict[str, Any]:
+    steps = workflow["jobs"]["check"]["steps"]
+    return next(s for s in steps if str(s.get("name", "")).startswith("Check ("))
+
+
+def test_the_check_job_is_the_coverage_leg_on_linux_with_python_3_15() -> None:
+    job = ci()["jobs"]["check"]
+    assert job["runs-on"] == "ubuntu-latest"
+    setup = next(s for s in job["steps"] if "setup-uv" in str(s.get("uses", "")))
+    assert setup["with"]["python-version"] == "3.15"
+    assert check_step(ci())["env"]["QUALITY_GATES_LEG"] == "true"
+
+
+def test_the_leg_fetches_history_and_passes_each_events_base() -> None:
+    job = ci()["jobs"]["check"]
+    checkout = next(s for s in job["steps"] if "checkout" in str(s.get("uses", "")))
+    assert checkout["with"]["fetch-depth"] == 0
+    script = check_step(ci())["run"]
+    assert "pull_request) BASE=$(git rev-parse HEAD^1)" in script
+    assert 'merge_group) BASE="$MERGE_GROUP_BASE"' in script
+    assert 'uv run scripts/check.py $CHECK_ARGS --base "$BASE"' in script
+    env = check_step(ci())["env"]
+    assert env["MERGE_GROUP_BASE"] == "${{ github.event.merge_group.base_sha }}"
+    assert env["BEFORE"] == "${{ github.event.before }}"
+
+
+def test_the_guard_legs_still_test_linux_on_python_3_12() -> None:
+    matrix = ci()["jobs"]["guard-tests"]["strategy"]["matrix"]
+    legs = {
+        (os, python)
+        for os in matrix["os"]
+        for python in matrix["python"]
+        if {"os": os, "python": python} not in matrix.get("exclude", [])
+    }
+    assert ("ubuntu-latest", "3.12") in legs
+    assert ("ubuntu-latest", "3.15") not in legs  # the check job runs the guard's tests there
+    assert len(legs) == 11

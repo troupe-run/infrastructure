@@ -111,12 +111,18 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.scope != 'none' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The full check under coverage, and the audit when uv.lock changed (quality-gates design D5).
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The base, for the complexity and audit gates' diff.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          python-version: "3.12"
+          # The coverage leg: Linux with Python 3.15 (spec: quality-gates; owner, #321). The guard's
+          # legs below test Linux on 3.12.
+          python-version: "3.15"
           enable-cache: true
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
@@ -129,13 +135,26 @@ jobs:
           # `--scope <name>` words, or nothing for the full check. Scope names are [a-z][a-z0-9_]*,
           # so they split on spaces safely.
           CHECK_ARGS: ${{ needs.changes.outputs['check-args'] }}
-        run: uv run scripts/check.py $CHECK_ARGS
+          # Coverage and the dependency audit run here and nowhere else (quality-gates design D5).
+          QUALITY_GATES_LEG: "true"
+          EVENT: ${{ github.event_name }}
+          MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # What the work is judged against: a pull request's merge commit's first parent (main),
+          # a merge group's base, or what main was before a push.
+          case "$EVENT" in
+            pull_request) BASE=$(git rev-parse HEAD^1) ;;
+            merge_group) BASE="$MERGE_GROUP_BASE" ;;
+            *) BASE="$BEFORE" ;;
+          esac
+          uv run scripts/check.py $CHECK_ARGS --base "$BASE"
 
   guard-tests:
     # The guard's hooks run on contributors' machines, so its tests run on every OS and Python
     # version troupe supports: 3.12 to 3.15 since troupe-run/troupe#110 (development-workflow
-    # design D10, python-3-14-3-15). The check job above covers Linux on 3.12. Not required
-    # themselves: `guard tests` below reports for them.
+    # design D10, python-3-14-3-15). The check job above covers Linux on 3.15, the coverage leg
+    # (quality-gates design D5). Not required themselves: `guard tests` below reports for them.
     name: guard tests (${{ matrix.os }}, Python ${{ matrix.python }})
     needs: changes
     if: >-
@@ -150,7 +169,7 @@ jobs:
         python: ["3.12", "3.13", "3.14", "3.15"]
         exclude:
           - os: ubuntu-latest
-            python: "3.12"
+            python: "3.15"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3

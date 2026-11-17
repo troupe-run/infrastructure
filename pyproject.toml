@@ -20,6 +20,9 @@ dev = [
     "types-pyyaml>=6.0.12.20261103",
     "pytest-xdist>=3.8",
     "lizard>=1.26.1",
+    "coverage>=7.17.3",
+    "pytest-cov>=7.1.0",
+    "pip-audit>=2.10.1",
 ]
 
 [tool.ruff]
@@ -52,3 +55,11 @@ pythonpath = ["scripts"]
 # guard_pytest checks each test's markers against what it reads (scripts/check-paths.toml).
 addopts = ["-ra", "--strict-markers", "--strict-config", "-p", "guard_pytest"]
 xfail_strict = true
+
+# How CI's coverage leg measures (spec: quality-gates; quality-gates design D3). Its thresholds are in
+# quality-gates.toml. patch = subprocess measures the scripts the tests run as processes.
+[tool.coverage.run]
+branch = true
+patch = ["subprocess"]
+source = ["scripts"]
+omit = ["scripts/tests/*"]
