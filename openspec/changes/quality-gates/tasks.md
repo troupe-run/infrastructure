@@ -68,7 +68,7 @@ complex than at the base.
 
 ## 6. Weekly report (design D8)
 
-- [ ] 6.1 Tests first for `quality_gates.py report`: opens one issue when there are advisories, updates the open one,
+- [x] 6.1 Tests first for `quality_gates.py report`: opens one issue when there are advisories, updates the open one,
       closes it when clear, never opens a second (a fake `gh`). Verify they fail, then implement, then pass
 - [ ] 6.2 Add `.github/workflows/dependency-report.yml` with its board job, and troupe's `board` environment and
       variable in `tofu/board.tf`. Verify workflow tests pass and the plan shows the troupe environment
@@ -77,10 +77,14 @@ complex than at the base.
 
 - [ ] 7.1 Add `scripts/quality_gates.py` to `tofu/guard_delivery.tf`. Verify the plan delivers it to troupe and
       website and nothing else changes
-- [ ] 7.2 Document the gates in `docs/development-workflow.md` (what each blocks, where its thresholds live, how to
+- [x] 7.2 Document the gates in `docs/development-workflow.md` (what each blocks, where its thresholds live, how to
       raise a baseline). Verify the docs tests pass
 
 ## Workflow follow-up
 
 - troupe's and website's `quality-gates` changes, after the delivery is applied (design D9).
+- Once their `dependency-report.yml` files are on main, add them to `scripts/watched-schedules.json` here (a
+  workflow that doesn't exist yet would read as stopped).
+- After the apply that creates troupe's `board` environment, the owner sets `BOARD_APP_PRIVATE_KEY` there
+  (`oob/README.md`).
 - The after-merge comment on #322 and #324, and the board cards.

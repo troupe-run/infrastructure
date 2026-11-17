@@ -40,6 +40,7 @@ MAIN_ONLY = {
     ("repo_website", "github-pages"): False,
     ("repo_website", "board"): False,
     ("repo_infrastructure", "board"): False,
+    ("repo_troupe", "board"): False,
     ("repo_troupe", "docs"): False,
     ("repo_infrastructure", "docs"): False,
     ("repo_infrastructure", "dependabot-issues"): False,
@@ -435,10 +436,27 @@ def test_infrastructure_s_board_open_to_an_admin_bypass_is_named() -> None:
     texts = real_texts()
     text = texts["board.tf"]
     start = text.index(BOARD_INFRASTRUCTURE)
-    texts["board.tf"] = text[:start] + edit(
-        text[start:], "can_admins_bypass   = false", "can_admins_bypass   = true"
+    end = text.index("\n}\n", start)
+    texts["board.tf"] = (
+        text[:start]
+        + edit(text[start:end], "can_admins_bypass   = false", "can_admins_bypass   = true")
+        + text[end:]
     )
     assert problems(texts) == ["board on repo_infrastructure: can_admins_bypass isn't false"]
+
+
+BOARD_TROUPE = 'resource "github_repository_environment" "board_troupe" {'
+BOARD_TROUPE_POLICY = (
+    'resource "github_repository_environment_deployment_policy" "board_troupe_main_only" {'
+)
+
+
+def test_a_deleted_troupe_board_declaration_is_named() -> None:
+    texts = real_texts()
+    texts["board.tf"] = delete_block(
+        delete_block(texts["board.tf"], BOARD_TROUPE), BOARD_TROUPE_POLICY
+    )
+    assert problems(texts) == ["board on repo_troupe: not declared"]
 
 
 DISPATCH_TROUPE = 'resource "github_repository_environment" "dependabot_dispatch_troupe" {'

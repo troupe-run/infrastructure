@@ -377,6 +377,33 @@ by hand, and its comment in `scripts/check-paths.toml` should say so.
 The rule itself is `guard.tag_violations`, which takes plain data: a test's id, its tags and the files it read.
 Another runner, such as vitest, follows the same contract with its own adapter that collects that data.
 
+## The merge gates
+
+Besides its linters and tests, every governed repository's check runs three gates, decided in #321 and specified in
+the `quality-gates` spec. Their measures are `scripts/quality_gates.py`, delivered from here with the guard's files,
+so troupe, website and this repository measure alike. Their thresholds are each repository's own, in
+`quality-gates.toml` at its root, which isn't delivered and is read strictly: a misspelt key or a missing file fails
+the check rather than switching a gate off.
+
+| Gate | What fails | Where it runs |
+|---|---|---|
+| complexity | a function the change adds or edits whose cyclomatic complexity (lizard) is above `[complexity] block_above` and is new or higher than before | every check, local and CI |
+| coverage | a package whose branch coverage is below its `baseline` by more than `tolerance`, or below `floor` with no baseline; a source file in no package | CI's coverage leg only |
+| audit | a changed lock file with an advisory whose severity is in `[audit] block` (or unknown) and that has a fix | CI's coverage leg only |
+
+- **Complexity** judges the work against where it left `origin/main` locally (staged, unstaged and new files
+  included), or the base CI names. Existing complex functions can be edited, but not made more complex: split them
+  first. Tests, delivered files and generated code are excluded in each repository's config.
+- **Coverage is never measured locally**, not even on request (owner, 2026-11-18). CI's coverage leg sets
+  `QUALITY_GATES_LEG=true`, and `check.py` refuses that variable outside GitHub Actions. Here the leg is the `check`
+  job, on Linux with Python 3.15. It prints every package's measurement against its baseline. When a package has
+  risen, the check says so; raise its `baseline` by hand in a pull request. A baseline never moves by itself, and
+  lowering one shows in the diff.
+- **The audit** runs only when a lock file changed. Severity comes from OSV (pip-audit doesn't give it) or npm. A
+  network failure fails the leg rather than passing it. Everything else, any severity, with or without a fix, goes in
+  the weekly "Dependency advisories" issue (`.github/workflows/dependency-report.yml`), which is opened, updated and
+  closed by itself, and put on the board.
+
 ## What the guard grants
 
 The Claude Code hook can also answer "allow", so a command runs without a prompt or auto mode's check

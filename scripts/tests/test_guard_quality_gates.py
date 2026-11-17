@@ -1,4 +1,7 @@
-"""The quality gates' measures (spec: quality-gates; quality-gates design D2-D7).
+"""The quality gates' measures (spec: quality-gates; quality-gates design D2-D8).
+
+Named test_guard_*: scripts/quality_gates.py is delivered with the guard and runs in troupe's check
+on every OS, so the guard's legs run these tests on each OS and Python too.
 
 Tool output is real: pip-audit, OSV, npm audit, coverage.py and Vitest reports were captured on
 2026-11-17 (fixtures/quality-gates). lizard runs for real on scratch git repositories.
@@ -6,6 +9,7 @@ Tool output is real: pip-audit, OSV, npm audit, coverage.py and Vitest reports w
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import urllib.error
@@ -17,7 +21,7 @@ import pytest
 import quality_gates as qg
 
 FIXTURES = Path(__file__).parent / "fixtures" / "quality-gates"
-LIZARD = str(Path(sys.executable).parent / "lizard")
+LIZARD = shutil.which("lizard", path=str(Path(sys.executable).parent)) or "lizard"
 
 CONFIG = """\
 version = 1
@@ -504,3 +508,123 @@ def test_an_unreachable_osv_is_an_error(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(urllib.request, "urlopen", refuse)
     with pytest.raises(qg.GateError, match="couldn't read GHSA-x from OSV"):
         qg.osv_severity("GHSA-x")
+
+
+# --- Weekly report -------------------------------------------------------------------------------
+
+
+class FakeIssues:
+    """One repository's issues, in memory."""
+
+    def __init__(self, open_number: int | None = None) -> None:
+        self.open_number = open_number
+        self.calls: list[tuple[str, ...]] = []
+
+    def find_open(self) -> int | None:
+        return self.open_number
+
+    def create(self, body: str) -> str:
+        self.calls.append(("create", body))
+        self.open_number = 7
+        return "https://github.com/troupe-run/infrastructure/issues/7"
+
+    def edit(self, number: int, body: str) -> None:
+        self.calls.append(("edit", str(number), body))
+
+    def close(self, number: int, comment: str) -> None:
+        self.calls.append(("close", str(number), comment))
+        self.open_number = None
+
+
+HIGH = qg.Advisory("requests", "2.19.0", "GHSA-x84v-xcm2-53pg", "high", "2.20.0")
+MODERATE = qg.Advisory("glob", "9.0.0 - 14.0.1", "npm audit", "moderate", None)
+
+
+def test_advisories_with_no_open_issue_open_one_and_return_its_url() -> None:
+    issues = FakeIssues()
+    url = qg.upkeep([HIGH, MODERATE], AUDIT, issues, ["uv.lock"])
+    assert url == "https://github.com/troupe-run/infrastructure/issues/7"
+    assert [call[0] for call in issues.calls] == ["create"]
+    body = issues.calls[0][1]
+    assert "| requests | 2.19.0 | GHSA-x84v-xcm2-53pg | high | 2.20.0 | yes |" in body
+    assert "| glob | 9.0.0 - 14.0.1 | npm audit | moderate | no fix yet |  |" in body
+
+
+def test_advisories_with_an_open_issue_update_it_and_open_no_other() -> None:
+    issues = FakeIssues(open_number=3)
+    assert qg.upkeep([MODERATE], AUDIT, issues, ["uv.lock"]) is None
+    assert [call[:2] for call in issues.calls] == [("edit", "3")]
+
+
+def test_no_advisories_close_the_open_issue() -> None:
+    issues = FakeIssues(open_number=3)
+    assert qg.upkeep([], AUDIT, issues, ["uv.lock"]) is None
+    assert issues.calls == [("close", "3", "The weekly dependency audit found no advisories.")]
+
+
+def test_no_advisories_and_no_issue_do_nothing() -> None:
+    issues = FakeIssues()
+    assert qg.upkeep([], AUDIT, issues, ["uv.lock"]) is None
+    assert issues.calls == []
+
+
+FAKE_GH = """\
+import json, pathlib, sys
+log = pathlib.Path(sys.argv[0]).with_suffix(".log")
+args = sys.argv[1:]
+with log.open("a") as out:
+    stdin = "" if sys.stdin.isatty() else sys.stdin.read()
+    out.write(json.dumps({"args": args, "stdin": stdin}) + "\\n")
+if args[:2] == ["issue", "list"]:
+    print(json.dumps([
+        {"number": 12, "title": "Dependency advisories in website"},
+        {"number": 9, "title": "Dependency advisories"},
+    ]))
+elif args[:2] == ["issue", "create"]:
+    print("https://github.com/troupe-run/infrastructure/issues/40")
+"""
+
+
+def fake_gh(tmp_path: Path) -> tuple[str, Path]:
+    script = tmp_path / "gh.py"
+    script.write_text(FAKE_GH, encoding="utf-8")
+    wrapper = tmp_path / "gh"
+    wrapper.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', encoding="utf-8")
+    wrapper.chmod(0o755)
+    return str(wrapper), script.with_suffix(".log")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the fake gh is a shell script")
+def test_gh_issues_finds_its_issue_by_exact_title_and_label(tmp_path: Path) -> None:
+    gh, log = fake_gh(tmp_path)
+    issues = qg.GhIssues(gh, "troupe-run/infrastructure")
+    assert issues.find_open() == 9
+    issues.edit(9, "the body")
+    issues.close(9, "clear")
+    calls = [json.loads(line) for line in log.read_text().splitlines()]
+    assert calls[0]["args"][:7] == [
+        "issue", "list", "--state", "open", "--label", "dependencies", "--search",
+    ]  # fmt: skip
+    assert calls[0]["args"][-2:] == ["-R", "troupe-run/infrastructure"]
+    assert calls[1]["args"] == [
+        "issue", "edit", "9", "--body-file", "-", "-R", "troupe-run/infrastructure",
+    ]  # fmt: skip
+    assert calls[1]["stdin"] == "the body"
+    assert calls[2]["args"][:4] == ["issue", "close", "9", "--comment"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the fake gh is a shell script")
+def test_gh_issues_creates_with_title_label_and_body(tmp_path: Path) -> None:
+    gh, log = fake_gh(tmp_path)
+    url = qg.GhIssues(gh, "troupe-run/infrastructure").create("the body")
+    assert url == "https://github.com/troupe-run/infrastructure/issues/40"
+    call = json.loads(log.read_text().splitlines()[0])
+    assert call["args"][:6] == [
+        "issue", "create", "--title", "Dependency advisories", "--label", "dependencies",
+    ]  # fmt: skip
+    assert call["stdin"] == "the body"
+
+
+def test_a_failing_gh_is_an_error() -> None:
+    with pytest.raises(qg.GateError, match="gh issue list failed"):
+        qg.GhIssues("false", "troupe-run/infrastructure").find_open()

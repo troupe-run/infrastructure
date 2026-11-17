@@ -1,4 +1,5 @@
-# The files every governed repository runs from here: the guard's, Claude's review workflow (spec:
+# The files every governed repository runs from here: the guard's, the quality gates' measures
+# (spec: quality-gates), Claude's review workflow (spec:
 # pr-review; claude-pr-review design D6), and the dispatcher that starts dependabot-issues (spec:
 # dependency-updates; dependabot-issues-on-events design D2). Their source is this repository
 # (spec: guard-delivery, design D2), and the App commits them straight to main.
@@ -12,6 +13,9 @@ locals {
     "scripts/guard.py",
     # The pytest adapter for the guard's tag check (commit-check-paths design D9).
     "scripts/guard_pytest.py",
+    # The merge gates' measures, so every repository measures alike (spec: quality-gates;
+    # quality-gates design D1). Each repository's thresholds stay in its own quality-gates.toml.
+    "scripts/quality_gates.py",
     ".githooks/pre-commit",
     ".githooks/commit-msg",
     ".githooks/pre-push",

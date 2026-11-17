@@ -1,9 +1,11 @@
+# Source: troupe-run/infrastructure. Change it there; copies in other repositories are delivered.
 """The quality gates every governed repository's check runs (spec: quality-gates; its design).
 
 Usage:
     quality_gates.py complexity [--base REV] [--lizard PATH]
     quality_gates.py coverage (--coveragepy REPORT.json | --vitest coverage-summary.json)
     quality_gates.py audit [--base REV] [--pip-audit PATH] [--uv PATH] [--npm PATH]
+    quality_gates.py report --repository OWNER/NAME [--github-output PATH] [--gh PATH] ...
 
 Each gate reads its thresholds from quality-gates.toml at the repository's root (design D2),
 strictly: an unknown key, a wrong type or a missing file is an error, never a skipped gate.
@@ -32,6 +34,7 @@ import urllib.request
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Protocol
 
 CONFIG_NAME = "quality-gates.toml"
 
@@ -270,10 +273,29 @@ def excluded(path: str, patterns: Sequence[str]) -> bool:
 # --- Git ------------------------------------------------------------------------------------------
 
 
+def _process(
+    command: Sequence[str], cwd: Path, body: str | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run a tool, capturing its UTF-8 output. With no body, its stdin is empty rather than the
+    caller's. A tool that can't be started is the gate unable to judge, not a crash."""
+    try:
+        return subprocess.run(
+            list(command),
+            cwd=cwd,
+            input=body,
+            stdin=subprocess.DEVNULL if body is None else None,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError as error:
+        raise GateError(f"couldn't run {command[0]}: {error}.") from error
+
+
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args], cwd=root, capture_output=True, text=True, encoding="utf-8", check=False
-    )
+    return _process(["git", *args], root)
 
 
 def resolve_base(root: Path, base: str | None) -> str:
@@ -361,14 +383,7 @@ def lizard_functions(lizard: str, tree: Path, paths: Sequence[str]) -> list[Func
     """Every function lizard finds in `paths` under `tree`."""
     if not paths:
         return []
-    result = subprocess.run(
-        [lizard, "--csv", *paths],
-        cwd=tree,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        check=False,
-    )
+    result = _process([lizard, "--csv", *paths], tree)
     if result.returncode != 0:
         raise GateError(f"lizard failed (exit {result.returncode}): {result.stderr.strip()}")
     functions = []
@@ -383,14 +398,12 @@ def _base_copies(root: Path, base: str, paths: Sequence[str], into: Path) -> lis
     """Write each path's content at `base` under `into`; the paths that existed there."""
     present = []
     for path in paths:
-        shown = subprocess.run(
-            ["git", "show", f"{base}:{path}"], cwd=root, capture_output=True, check=False
-        )
+        shown = _git(root, "show", f"{base}:{path}")
         if shown.returncode != 0:
             continue  # new since the base
         target = into / path
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(shown.stdout)
+        target.write_text(shown.stdout, encoding="utf-8")
         present.append(path)
     return present
 
@@ -662,9 +675,7 @@ def blocking(advisories: Iterable[Advisory], config: AuditConfig) -> list[Adviso
 
 def _run_json(command: Sequence[str], root: Path, what: str) -> dict[str, object]:
     """Run a tool that prints JSON (exit 1 can mean "found something"), and parse it."""
-    result = subprocess.run(
-        list(command), cwd=root, capture_output=True, text=True, encoding="utf-8", check=False
-    )
+    result = _process(command, root)
     try:
         data = json.loads(result.stdout)
     except json.JSONDecodeError:
@@ -682,10 +693,10 @@ def audit_uv_lock(
     """Every advisory for what uv.lock pins, every group and workspace member included."""
     with tempfile.TemporaryDirectory() as scratch:
         requirements = Path(scratch) / "requirements.txt"
-        exported = subprocess.run(
+        exported = _process(
             [uv, "export", "--frozen", "--all-groups", "--all-packages", "--no-emit-workspace",
              "--no-hashes", "--no-header", "--quiet", "--output-file", str(requirements)],
-            cwd=root, capture_output=True, text=True, encoding="utf-8", check=False,
+            root,
         )  # fmt: skip
         if exported.returncode != 0:
             raise GateError(f"uv export failed: {exported.stderr.strip()}")
@@ -701,6 +712,103 @@ def audit_package_lock(root: Path, npm: str) -> list[Advisory]:
     return npm_audit_advisories(
         _run_json([npm, "audit", "--package-lock-only", "--json"], root, "npm audit")
     )
+
+
+# --- Weekly report (design D8) --------------------------------------------------------------------
+
+REPORT_TITLE = "Dependency advisories"
+REPORT_LABEL = "dependencies"
+
+
+class IssueTracker(Protocol):
+    """The one report issue: found among open issues by title and label."""
+
+    def find_open(self) -> int | None: ...
+    def create(self, body: str) -> str: ...
+    def edit(self, number: int, body: str) -> None: ...
+    def close(self, number: int, comment: str) -> None: ...
+
+
+def report_body(
+    advisories: Sequence[Advisory], config: AuditConfig, lock_files: Sequence[str]
+) -> str:
+    """The issue's body: every advisory, marking those that would block a pull request."""
+    failing = blocking(advisories, config)
+    rows = [
+        f"| {a.package} | {a.version} | {a.id} | {a.severity} | {a.fixed_in or 'no fix yet'} | "
+        f"{'yes' if a in failing else ''} |"
+        for a in sorted(advisories, key=lambda a: (a.package, a.id))
+    ]
+    return "\n".join(
+        [
+            f"The weekly dependency audit found {len(advisories)} advisories in "
+            f"{', '.join(f'`{lock}`' for lock in lock_files)} on `main` "
+            "(spec: quality-gates). This issue is kept up to date by "
+            "`.github/workflows/dependency-report.yml`: its list is replaced each week, and it's "
+            "closed when the audit finds none.",
+            "",
+            "A pull request that changes a lock file fails on the advisories marked *blocks*.",
+            "",
+            "| Package | Version | Advisory | Severity | Fixed in | Blocks |",
+            "|---|---|---|---|---|---|",
+            *rows,
+        ]
+    )
+
+
+def upkeep(
+    advisories: Sequence[Advisory],
+    config: AuditConfig,
+    issues: IssueTracker,
+    lock_files: Sequence[str],
+) -> str | None:
+    """Open, update or close the one report issue. Returns its URL when it was opened."""
+    number = issues.find_open()
+    if not advisories:
+        if number is not None:
+            issues.close(number, "The weekly dependency audit found no advisories.")
+        return None
+    body = report_body(advisories, config, lock_files)
+    if number is None:
+        return issues.create(body)
+    issues.edit(number, body)
+    return None
+
+
+class GhIssues:
+    """The report issue through the gh CLI, with the token the workflow gives it."""
+
+    def __init__(self, gh: str, repository: str) -> None:
+        self.gh = gh
+        self.repository = repository
+
+    def _run(self, *args: str, body: str | None = None) -> str:
+        result = _process([self.gh, *args, "-R", self.repository], Path.cwd(), body)
+        if result.returncode != 0:
+            raise GateError(f"gh {args[0]} {args[1]} failed: {result.stderr.strip()}")
+        return result.stdout
+
+    def find_open(self) -> int | None:
+        listed = json.loads(
+            self._run(
+                "issue", "list", "--state", "open", "--label", REPORT_LABEL,
+                "--search", f'in:title "{REPORT_TITLE}"', "--json", "number,title",
+            )
+        )  # fmt: skip
+        matches = sorted(i["number"] for i in listed if i["title"] == REPORT_TITLE)
+        return matches[0] if matches else None
+
+    def create(self, body: str) -> str:
+        return self._run(
+            "issue", "create", "--title", REPORT_TITLE, "--label", REPORT_LABEL,
+            "--body-file", "-", body=body,
+        ).strip()  # fmt: skip
+
+    def edit(self, number: int, body: str) -> None:
+        self._run("issue", "edit", str(number), "--body-file", "-", body=body)
+
+    def close(self, number: int, comment: str) -> None:
+        self._run("issue", "close", str(number), "--comment", comment)
 
 
 # --- Command line ---------------------------------------------------------------------------------
@@ -747,19 +855,24 @@ def _coverage(args: argparse.Namespace, root: Path, config: Config) -> int:
     return 1 if result.problems else 0
 
 
+def _audit_locks(args: argparse.Namespace, root: Path, locks: Sequence[str]) -> list[Advisory]:
+    found: list[Advisory] = []
+    for lock in locks:
+        if Path(lock).name == "uv.lock":
+            where = root / Path(lock).parent
+            found += audit_uv_lock(where, _tool("uv", args.uv), _tool("pip-audit", args.pip_audit))
+        else:
+            found += audit_package_lock(root / Path(lock).parent, _tool("npm", args.npm))
+    return found
+
+
 def _audit(args: argparse.Namespace, root: Path, config: Config) -> int:
     base = resolve_base(root, args.base)
     changed = changed_lock_files(root, base, config.audit.lock_files)
     if not changed:
         print("audit: no lock file changed, so nothing to audit")
         return 0
-    found: list[Advisory] = []
-    for lock in changed:
-        if Path(lock).name == "uv.lock":
-            where = root / Path(lock).parent
-            found += audit_uv_lock(where, _tool("uv", args.uv), _tool("pip-audit", args.pip_audit))
-        else:
-            found += audit_package_lock(root / Path(lock).parent, _tool("npm", args.npm))
+    found = _audit_locks(args, root, changed)
     failing = blocking(found, config.audit)
     for advisory in found:
         mark = "FAIL" if advisory in failing else "note"
@@ -768,6 +881,20 @@ def _audit(args: argparse.Namespace, root: Path, config: Config) -> int:
         print("audit: update each package above to its fixed version, or pin a fixed version.")
         return 1
     print(f"audit: {', '.join(changed)}: no {'/'.join(config.audit.block)} advisory with a fix")
+    return 0
+
+
+def _report(args: argparse.Namespace, root: Path, config: Config) -> int:
+    for lock in config.audit.lock_files:
+        if not (root / lock).exists():
+            raise GateError(f"{CONFIG_NAME} names {lock}, which doesn't exist.")
+    found = _audit_locks(args, root, config.audit.lock_files)
+    issues = GhIssues(_tool("gh", args.gh), args.repository)
+    opened = upkeep(found, config.audit, issues, config.audit.lock_files)
+    print(f"report: {len(found)} advisories in {', '.join(config.audit.lock_files)}")
+    if opened is not None and args.github_output:
+        with Path(args.github_output).open("a", encoding="utf-8") as output:
+            output.write(f"issue-url={opened}\n")
     return 0
 
 
@@ -786,9 +913,18 @@ def main(argv: Sequence[str] | None = None, root: Path | None = None) -> int:
     audit.add_argument("--uv")
     audit.add_argument("--pip-audit")
     audit.add_argument("--npm")
+    report = gates.add_parser("report")
+    report.add_argument("--repository", required=True, help="owner/name, where the issue lives")
+    report.add_argument("--github-output", help="where to write issue-url= when an issue opens")
+    report.add_argument("--gh")
+    report.add_argument("--uv")
+    report.add_argument("--pip-audit")
+    report.add_argument("--npm")
     args = parser.parse_args(argv)
     root = root or Path.cwd()
-    run = {"complexity": _complexity, "coverage": _coverage, "audit": _audit}[args.gate]
+    run = {"complexity": _complexity, "coverage": _coverage, "audit": _audit, "report": _report}[
+        args.gate
+    ]
     try:
         return run(args, root, read_config(root))
     except GateError as error:
