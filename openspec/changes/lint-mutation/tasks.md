@@ -57,9 +57,10 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 
 - [x] 4.1 Blame each survivor's line at the tested commit and mark it new when its commit isn't an ancestor of the
       previous run's tested commit; tests first, over a scratch git repository built in the test
-- [x] 4.2 The issues job finds each new survivor's merged pull request (`commits/<sha>/pulls`), lists new survivors
-      first in the issue, and comments once on the pull request; tests first, with GitHub faked. Verify the first run
-      (no previous report) calls nothing new
+- [x] 4.2 The issues job finds each new survivor's merged pull request (`commits/<sha>/pulls`, with the run's own
+      read-only token), and lists new survivors first in the issue, naming the pull request so GitHub cross-references
+      it (option B; whether the run also comments on the pull request is pending the owner, design D8); tests first,
+      with GitHub faked. Verify the first run (no previous report) calls nothing new
 
 ## 5. P: pull request mutation report (design D9)
 
@@ -80,9 +81,12 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 
 - [ ] 6.1 `test-quality` in `tofu/labels/kinds.json`. Verify the plan shows it created in each managed repository and
       nothing else changing
-- [ ] 6.2 The App's declaration in `oob/app-installations.json`, the `mutation-issues` environment (main only, no
-      bypass) and `TEST_QUALITY_APP_CLIENT_ID` in `tofu/`, with the main-only environment test covering it. Verify the
-      check fails when the environment's branch policy is removed. Send the owner the App's creation steps
+- [x] 6.2 The App's declaration in `oob/app-installations.json`, the `mutation-issues` environment (main only, no
+      bypass) in `tofu/test_quality.tf`, with the main-only environment test covering it. Verified: removing the
+      environment's branch policy fails the test, naming `mutation-issues` and its policies. The App's creation steps
+      are in `oob/README.md` and went to the owner
+- [ ] 6.2b `TEST_QUALITY_APP_CLIENT_ID` in `tofu/test_quality.tf`, once the owner has created the App and sent its client
+      ID (open on purpose until then: the pull request isn't marked ready before it)
 - [x] 6.3 `.github/workflows/mutation.yml`: weekly schedule and dispatch (`repository`, `dry-run`), the `mutate`
       matrix with no secret on Python 3.15 and full history, the previous run's reports downloaded, the `issues` job in
       `mutation-issues`, the `board` job as `schedules.yml`, one concurrency group. Tests: no `pull_request`/

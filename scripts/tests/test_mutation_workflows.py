@@ -3,6 +3,7 @@ block a merge, and keep their budgets and token in step with their declarations 
 mutation-testing, mutation-issue-credentials; lint-mutation design D3, D4, D9)."""
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -163,3 +164,112 @@ def test_the_pull_request_report_and_what_it_runs_are_delivered() -> None:
     assert needed <= delivered, needed - delivered
     # The weekly run, its issue upkeep and the App's credential stay here.
     assert not {".github/workflows/mutation.yml", "scripts/mutation_issues.py"} & delivered
+
+
+# The steps' own scripts, run with gh faked on the PATH (bash, jq and unzip as on the runner)
+
+
+def step_script(path: Path, job: str, name: str) -> str:
+    [step] = [s for s in load(path)["jobs"][job]["steps"] if s.get("name") == name]
+    return str(step["run"])
+
+
+def fake_gh(tmp_path: Path, script: str) -> dict[str, str]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    gh = bin_dir / "gh"
+    gh.write_text("#!/bin/sh\n" + script, encoding="utf-8")
+    gh.chmod(0o755)
+    # This interpreter's directory before the system's, so python3 is 3.12+ as on the runner.
+    python = Path(sys.executable).parent
+    return {"PATH": f"{bin_dir}:{python}:/usr/bin:/bin:/opt/homebrew/bin", "HOME": str(tmp_path)}
+
+
+def test_a_previous_run_that_skipped_the_repository_calls_nothing_new_and_doesnt_fail(
+    tmp_path: Path,
+) -> None:
+    import subprocess
+    import zipfile
+
+    with zipfile.ZipFile(tmp_path / "artifact.zip", "w") as archive:
+        archive.writestr("skipped-troupe", "")
+    env = fake_gh(
+        tmp_path,
+        'case "$*" in\n'
+        '  "run list"*) echo 41;;\n'
+        '  *"/runs/41/artifacts"*) echo 7;;\n'
+        f'  *"/artifacts/7/zip"*) cat "{tmp_path}/artifact.zip";;\n'
+        "esac\n",
+    )
+    out = tmp_path / "github-output"
+    out.touch()
+    env |= {
+        "GH_TOKEN": "x",
+        "REPOSITORY": "troupe",
+        "GITHUB_REPOSITORY": "troupe-run/infrastructure",
+        "RUNNER_TEMP": str(tmp_path),
+        "GITHUB_OUTPUT": str(out),
+    }
+    script = step_script(WEEKLY, "mutate", "The previous run's tested commit")
+    done = subprocess.run(
+        ["bash", "-c", script], env=env, capture_output=True, text=True, check=False
+    )
+    assert done.returncode == 0, done.stderr
+    assert "didn't mutate troupe: nothing is called new" in done.stdout
+    assert out.read_text(encoding="utf-8") == ""
+
+
+def run_comment_step(tmp_path: Path, nothing: bool, existing: str) -> list[str]:
+    import subprocess
+
+    calls = tmp_path / "calls"
+    env = fake_gh(
+        tmp_path,
+        f'echo "$*" >> "{calls}"\ncase "$*" in *"--paginate"*) printf "{existing}";; esac\n',
+    )
+    (tmp_path / "out").mkdir()
+    fields = {
+        "version": 1,
+        "repository": "troupe",
+        "nothing": nothing,
+        "finished": True,
+        "mutants": 0,
+        "caught": 0,
+        "survivors": [],
+        "timings": {"total": 1.0},
+    }
+    (tmp_path / "out" / "pr-report.json").write_text(json.dumps(fields), encoding="utf-8")
+    (tmp_path / "scripts").symlink_to(REPO / "scripts")
+    env |= {
+        "GH_TOKEN": "x",
+        "NUMBER": "5",
+        "GITHUB_REPOSITORY": "troupe-run/troupe",
+        "RUNNER_TEMP": str(tmp_path),
+    }
+    script = step_script(PR, "comment", "Keep one comment on the pull request")
+    done = subprocess.run(
+        ["bash", "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True, check=False
+    )
+    assert done.returncode == 0, done.stderr
+    return calls.read_text(encoding="utf-8").splitlines() if calls.exists() else []
+
+
+def test_a_pull_request_with_nothing_to_mutate_and_no_comment_gets_none(tmp_path: Path) -> None:
+    calls = run_comment_step(tmp_path, nothing=True, existing="")
+    assert [call for call in calls if "--paginate" not in call] == []
+
+
+def test_a_pull_request_with_an_earlier_comment_has_it_edited_even_when_nothing_was_mutated(
+    tmp_path: Path,
+) -> None:
+    calls = run_comment_step(tmp_path, nothing=True, existing="99")
+    assert [call.split()[:4] for call in calls if "--paginate" not in call] == [
+        ["api", "-X", "PATCH", "repos/troupe-run/troupe/issues/comments/99"]
+    ]
+
+
+def test_a_pull_request_with_mutants_gets_a_new_comment(tmp_path: Path) -> None:
+    calls = run_comment_step(tmp_path, nothing=False, existing="")
+    assert [call.split()[:2] for call in calls if "--paginate" not in call] == [
+        ["api", "repos/troupe-run/troupe/issues/5/comments"]
+    ]
