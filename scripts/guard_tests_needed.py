@@ -36,6 +36,10 @@ DEPENDS_ON = (
     ".github/workflows/claude-review.yml",
     # The same, for the dispatcher that starts dependabot-issues (spec: dependency-updates).
     ".github/workflows/dependabot-dispatch.yml",
+    # The merge gates' measures, delivered too and run in troupe's check on every OS (spec:
+    # quality-gates), and the real tool output its tests read.
+    "scripts/quality_gates.py",
+    "scripts/tests/fixtures/quality-gates/",
     # Its tests, what they share, and what they run with.
     "scripts/tests/test_guard_",
     "scripts/tests/conftest.py",

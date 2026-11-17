@@ -162,7 +162,8 @@ export OP_ACCOUNT=l-a-u.1password.com
 # gh runs only once op has read the key, so a failed read can't set an empty secret.
 key=$(op read -n "op://troupe.run/troupe-run-board/private key") &&
   printf '%s' "$key" | gh secret set BOARD_APP_PRIVATE_KEY --env board -R troupe-run/website &&
-  printf '%s' "$key" | gh secret set BOARD_APP_PRIVATE_KEY --env board -R troupe-run/infrastructure
+  printf '%s' "$key" | gh secret set BOARD_APP_PRIVATE_KEY --env board -R troupe-run/infrastructure &&
+  printf '%s' "$key" | gh secret set BOARD_APP_PRIVATE_KEY --env board -R troupe-run/troupe
 unset key
 ```
 
@@ -171,6 +172,7 @@ Check each by name, never by value:
 ```sh
 gh api repos/troupe-run/website/environments/board/secrets --jq '.secrets[].name'
 gh api repos/troupe-run/infrastructure/environments/board/secrets --jq '.secrets[].name'
+gh api repos/troupe-run/troupe/environments/board/secrets --jq '.secrets[].name'
 ```
 
 **Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run both

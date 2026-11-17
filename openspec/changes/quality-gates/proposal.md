@@ -45,6 +45,8 @@ and Claude's review.
 ### Modified Capabilities
 
 - `guard-delivery`: the delivered files include the gate module, so troupe and website run the same measures.
+- `board-credentials`: troupe gets a `board` environment and `BOARD_APP_CLIENT_ID`, for its weekly report's board
+  job.
 - `ci-apply`: this repository's `check` job runs on Python 3.15 and runs the leg-only gates; Linux 3.12 is covered by
   the guard's legs instead.
 
