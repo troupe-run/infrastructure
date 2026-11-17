@@ -42,6 +42,8 @@ import mutation_settings as ms
 
 ORG = "troupe-run"
 APP = "troupe-run-test-quality[bot]"
+CREATOR = APP.replace("[", "%5B").replace("]", "%5D")
+"""The App's login in a query string, its brackets encoded as dependabot_issues.py does."""
 LABEL = "test-quality"
 ISSUE_TYPE = "Task"
 SETTINGS = Path(__file__).resolve().parent / "mutation.json"
@@ -109,14 +111,20 @@ def title(judgement: Judgement, settings: ms.Settings) -> str:
     return f"Mutation score {judgement.score:g}% in {judgement.module} ({why})"
 
 
+def code(text: str) -> str:
+    """Text for inside a code span: a report's strings come from a run of other code, so a
+    backtick can't end the span and let the rest render as Markdown."""
+    return text.replace("`", "'")
+
+
 def survivor_line(survivor: mr.Survivor, pulls: Mapping[str, int]) -> str:
-    where = f"`{survivor.path}:{survivor.line}`"
+    where = f"`{code(survivor.path)}:{survivor.line}`"
     added = ""
     if survivor.new and survivor.commit:
         pull = pulls.get(survivor.commit)
         added = f", added in #{pull}" if pull else f", added in {survivor.commit[:12]}"
-    change = survivor.change.replace("`", "'").replace("\n", " / ")
-    return f"- {where} `{survivor.name}`{added}: `{change}`"
+    change = code(survivor.change.replace("\n", " / "))
+    return f"- {where} `{code(survivor.name)}`{added}: `{change}`"
 
 
 def body(
@@ -319,7 +327,7 @@ def list_issues(gh: Gh, repository: str) -> list[Issue]:
             "api",
             "--paginate",
             "--slurp",
-            f"repos/{ORG}/{repository}/issues?state=open&labels={LABEL}&creator={APP}&per_page=100",
+            f"repos/{ORG}/{repository}/issues?state=open&labels={LABEL}&creator={CREATOR}&per_page=100",
         ],
     )
     pages = found if isinstance(found, list) else []

@@ -179,3 +179,43 @@ def test_a_repository_the_settings_dont_list_fails_naming_it(
         == 2
     )
     assert "'.github'" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("path", "glob", "matches"),
+    [
+        ("src/index.ts", "src/**/*.ts", True),  # **/ is zero directories too, as Stryker reads it
+        ("src/lib/site-path.ts", "src/**/*.ts", True),
+        ("src/lib/deep/a.ts", "src/**/*.ts", True),
+        ("scripts/check.mjs", "scripts/**/*.mjs", True),
+        ("src/lib/a.tsx", "src/**/*.ts", False),
+        ("tests/unit/a.ts", "src/**/*.ts", False),
+        ("src/lib/a.ts", "src/*.ts", False),  # * stays within one directory
+    ],
+)
+def test_globs_match_as_stryker_reads_them(path: str, glob: str, matches: bool) -> None:
+    assert pr.glob_match(path, glob) is matches
+
+
+def test_a_change_to_a_file_directly_under_a_globbed_directory_is_mutated() -> None:
+    changed = {"scripts/check.mjs": {4}, "src/route-middleware.ts": {2}}
+    [target] = pr.plan(SETTINGS.repositories["website"], changed, lambda path: "")
+    assert target.globs == ("scripts/check.mjs:4-4", "src/route-middleware.ts:2-2")
+
+
+def test_a_backtick_in_a_reports_strings_cant_end_the_code_span() -> None:
+    fields = report_fields(
+        survivors=[
+            {
+                "name": "m`@owner`",
+                "path": "a`[x](https://example.invalid)`.py",
+                "line": 7,
+                "change": "-a\n+b`",
+                "commit": None,
+                "new": False,
+            }
+        ]
+    )
+    text = pr.comment(pr.load_pr_report(json.dumps(fields)))
+    line = next(line for line in text.splitlines() if line.startswith("- `a"))
+    assert line.count("`") == 6, line

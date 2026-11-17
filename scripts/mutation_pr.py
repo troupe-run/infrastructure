@@ -16,7 +16,6 @@ Standard library only, Python 3.12+: delivered with the guard's files (design D9
 
 import argparse
 import ast
-import fnmatch
 import json
 import os
 import re
@@ -80,6 +79,30 @@ def mutmut_functions(source: str, lines: set[int]) -> set[str]:
     return found
 
 
+def glob_regex(glob: str) -> re.Pattern[str]:
+    """A path glob as Stryker reads it: `**/` is zero or more directories, `*` and `?` stay
+    within one. fnmatch's `*` crosses `/`, and its `**/` needs at least one directory, so
+    `src/index.ts` wouldn't match `src/**/*.ts`."""
+    pattern = ""
+    index = 0
+    while index < len(glob):
+        if glob.startswith("**/", index):
+            pattern, index = pattern + "(?:.*/)?", index + 3
+        elif glob.startswith("**", index):
+            pattern, index = pattern + ".*", index + 2
+        elif glob[index] == "*":
+            pattern, index = pattern + "[^/]*", index + 1
+        elif glob[index] == "?":
+            pattern, index = pattern + "[^/]", index + 1
+        else:
+            pattern, index = pattern + re.escape(glob[index]), index + 1
+    return re.compile(pattern)
+
+
+def glob_match(path: str, glob: str) -> bool:
+    return glob_regex(glob).fullmatch(path) is not None
+
+
 @dataclass(frozen=True)
 class Target:
     """What to mutate for one mutmut unit, or for Stryker."""
@@ -124,7 +147,7 @@ def plan(
         globs = set()
         lines = {}
         for path, changed_here in sorted(changed.items()):
-            if any(fnmatch.fnmatch(path, glob) for glob in repository.mutate):
+            if any(glob_match(path, glob) for glob in repository.mutate):
                 globs.update(f"{path}:{start}-{end}" for start, end in ranges(changed_here))
                 lines[path] = sorted(changed_here)
         if globs:
@@ -144,6 +167,12 @@ def on_changed_lines(
         for survivor in module.survivors
         if survivor.line in set(lines.get(survivor.path, ()))
     ]
+
+
+def code(text: str) -> str:
+    """Text for inside a code span: the report comes from the job that ran the pull request's own
+    code, so a backtick can't end the span and let the rest render as Markdown."""
+    return text.replace("`", "'")
 
 
 def comment(report: Mapping[str, object]) -> str:
@@ -167,9 +196,10 @@ def comment(report: Mapping[str, object]) -> str:
             for survivor in survivors[:SHOWN]:
                 if not isinstance(survivor, dict):
                     raise ms.SettingsError("a survivor in the report isn't an object")
-                change = str(survivor["change"]).replace("`", "'").replace("\n", " / ")
+                change = code(str(survivor["change"]).replace("\n", " / "))
                 lines.append(
-                    f"- `{survivor['path']}:{survivor['line']}` `{survivor['name']}`: `{change}`"
+                    f"- `{code(str(survivor['path']))}:{survivor['line']}` "
+                    f"`{code(str(survivor['name']))}`: `{change}`"
                 )
             if len(survivors) > SHOWN:
                 lines.append(f"- and {len(survivors) - SHOWN} more, in the run's summary")

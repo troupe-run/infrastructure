@@ -386,3 +386,22 @@ def test_an_issue_says_mutmut_cant_see_code_tests_run_in_a_subprocess() -> None:
         "6 reached by no test in the test process (mutmut doesn't see code a test runs"
         in p.actions[0].body
     )
+
+
+def test_the_apps_issues_are_listed_with_its_login_encoded_in_the_query() -> None:
+    asked: list[list[str]] = []
+
+    def gh(args: list[str]) -> mi.GhResult:
+        asked.append(args)
+        return mi.GhResult(0, "[[]]", "")
+
+    mi.list_issues(gh, "troupe")
+    [query] = [arg for arg in asked[0] if arg.startswith("repos/")]
+    assert "creator=troupe-run-test-quality%5Bbot%5D&" in query
+    assert "[" not in query
+
+
+def test_a_backtick_in_a_survivor_cant_end_the_code_span_in_an_issue() -> None:
+    survivor = mr.Survivor("m`@owner`", "a`b`.py", 3, "-x`\n+y")
+    line = mi.survivor_line(survivor, {})
+    assert line.count("`") == 6, line
