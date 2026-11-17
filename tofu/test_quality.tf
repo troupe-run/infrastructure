@@ -25,3 +25,16 @@ resource "github_repository_environment_deployment_policy" "mutation_issues_main
   environment    = github_repository_environment.mutation_issues.environment
   branch_pattern = "main"
 }
+
+locals {
+  # Not a secret: it names the App, and minting a token also needs the key. App ID 5807252,
+  # installation 183091782 (created by the owner, 2026-11-18).
+  test_quality_app_client_id = "Iv23li3zWmqsrcvJgHLu"
+}
+
+# The infrastructure App writes it with "Variables: write", which it already has on infrastructure.
+resource "github_actions_variable" "test_quality_app_client_id" {
+  repository    = module.repo_infrastructure.name
+  variable_name = "TEST_QUALITY_APP_CLIENT_ID"
+  value         = local.test_quality_app_client_id
+}

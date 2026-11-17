@@ -189,3 +189,189 @@ def test_a_deselected_test_carries_its_reason() -> None:
 def test_a_deselection_without_a_reason_or_a_node_id_fails(entry: object, named: str) -> None:
     with pytest.raises(ms.SettingsError, match=named):
         ms.load_settings(with_deselect(entry))
+
+
+SHA_40 = "a" * 40
+
+
+# Every refusal, word for word (lint-mutation 6b: the pull request report's survivors)
+
+KEYS = (
+    "['budget_minutes', 'max_new_issues', 'min_mutants', 'pr_budget_minutes', 'repositories', "
+    "'threshold', 'tolerance', 'tools']"
+)
+
+
+def changed(path: list[str | int], value: object) -> str:
+    settings = declared()
+    target: Any = settings
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+    return text(settings)
+
+
+@pytest.mark.parametrize(
+    ("source", "message"),
+    [
+        ("[]", "the settings isn't an object"),
+        (changed(["tools"], []), "tools isn't an object"),
+        (changed(["tools", "mutmut"], ""), "tools.mutmut is ''; it must be a non-empty string"),
+        (changed(["repositories"], {}), "repositories must be a non-empty object"),
+        (changed(["repositories"], []), "repositories must be a non-empty object"),
+        (changed(["threshold"], 101), "threshold is 101; it must be a number from 0 to 100"),
+        (changed(["threshold"], True), "threshold is True; it must be a number from 0 to 100"),
+        (changed(["tolerance"], -1), "tolerance is -1; it must be a number from 0 to 100"),
+        (
+            changed(["min_mutants"], 0),
+            "min_mutants is 0; it must be a whole number from 1 to 10000",
+        ),
+        (
+            changed(["min_mutants"], 1.5),
+            "min_mutants is 1.5; it must be a whole number from 1 to 10000",
+        ),
+        (
+            changed(["budget_minutes"], 331),
+            "budget_minutes is 331; it must be a whole number from 1 to 330",
+        ),
+        (
+            changed(["pr_budget_minutes"], 331),
+            "pr_budget_minutes is 331; it must be a whole number from 1 to 330",
+        ),
+        (
+            changed(["max_new_issues"], 101),
+            "max_new_issues is 101; it must be a whole number from 0 to 100",
+        ),
+        (changed(["repositories", "troupe"], []), "repositories.troupe isn't an object"),
+        (
+            changed(["repositories", "troupe", "tool"], "pitest"),
+            "repositories.troupe.tool is 'pitest'; it must be one of ['mutmut', 'stryker']",
+        ),
+        (
+            changed(["repositories", "troupe", "mutate"], ["x"]),
+            "repositories.troupe has the key 'mutate', which isn't one of ['tool', 'units']",
+        ),
+        (
+            changed(["repositories", "troupe", "units"], []),
+            "repositories.troupe.units must be a non-empty list",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0], "x"),
+            "repositories.troupe.units[0] isn't an object",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "name"], ""),
+            "repositories.troupe.units[0].name is ''; it must be a non-empty string",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "source"], ""),
+            "repositories.troupe.units[0].source is ''; it must be a non-empty string",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "tests"], ""),
+            "repositories.troupe.units[0].tests is ''; it must be a non-empty string",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "also_copy"], "x"),
+            "repositories.troupe.units[0].also_copy must be a list of paths",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "also_copy"], [""]),
+            "repositories.troupe.units[0].also_copy is ''; it must be a non-empty string",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "deselect"], "x"),
+            "repositories.troupe.units[0].deselect must be a list of {test, why}",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "deselect"], [1]),
+            "repositories.troupe.units[0].deselect[0] isn't an object",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "deselect"], [{"test": "", "why": "w"}]),
+            "repositories.troupe.units[0].deselect[0].test is ''; it must be a non-empty string",
+        ),
+        (
+            changed(["repositories", "website", "units"], []),
+            "repositories.website has the key 'units', "
+            "which isn't one of ['mutate', 'tests', 'tool']",
+        ),
+        (
+            changed(["repositories", "website", "mutate"], []),
+            "repositories.website.mutate must be a non-empty list of globs",
+        ),
+        (
+            changed(["repositories", "website", "mutate"], [""]),
+            "repositories.website.mutate is ''; it must be a non-empty string",
+        ),
+        (
+            changed(["repositories", "website", "tests"], ""),
+            "repositories.website.tests is ''; it must be a non-empty string",
+        ),
+    ],
+)
+def test_each_refusal_names_the_setting_its_value_and_whats_valid(
+    source: str, message: str
+) -> None:
+    with pytest.raises(ms.SettingsError) as raised:
+        ms.load_settings(source)
+    assert str(raised.value) == message
+
+
+def test_an_unknown_top_level_key_lists_every_valid_one() -> None:
+    with pytest.raises(ms.SettingsError) as raised:
+        ms.load_settings(changed(["extra"], 1))
+    assert str(raised.value) == f"the settings has the key 'extra', which isn't one of {KEYS}"
+
+
+def test_the_declared_repositories_load_as_written() -> None:
+    settings = ms.load_settings(DECLARED.read_text(encoding="utf-8"))
+    raw = declared()
+    assert settings.tools == raw["tools"]
+    for name, repository in settings.repositories.items():
+        assert repository.name == name
+    website = settings.repositories["website"]
+    assert (website.mutate, website.tests) == (
+        tuple(raw["repositories"]["website"]["mutate"]),
+        "tests/unit",
+    )
+    for unit, written in zip(
+        settings.repositories["troupe"].units, raw["repositories"]["troupe"]["units"], strict=True
+    ):
+        assert (unit.name, unit.source, unit.tests) == (
+            written["name"],
+            written["source"],
+            written["tests"],
+        )
+    infrastructure = settings.repositories["infrastructure"].units[0]
+    assert [test for test, _ in infrastructure.deselect] == [
+        entry["test"] for entry in raw["repositories"]["infrastructure"]["units"][0]["deselect"]
+    ]
+
+
+@pytest.mark.parametrize(
+    ("table", "message"),
+    [
+        ({"baselines": []}, "quality-gates.toml [mutation] baselines isn't a table"),
+        (
+            {"baselines": {"m": {"score": 101, "mutants": 1, "judged_at": SHA_40}}},
+            "quality-gates.toml [mutation.baselines.'m'] score is 101; "
+            "it must be a number from 0 to 100",
+        ),
+        (
+            {"baselines": {"m": {"score": 50, "mutants": 0, "judged_at": SHA_40}}},
+            "quality-gates.toml [mutation.baselines.'m'] mutants is 0; "
+            "it must be a whole number from 1 to 1000000",
+        ),
+    ],
+)
+def test_each_baseline_refusal_word_for_word(table: dict[str, Any], message: str) -> None:
+    with pytest.raises(ms.SettingsError) as raised:
+        ms.load_baselines(table, "quality-gates.toml")
+    assert str(raised.value) == message
+
+
+def test_a_mutation_value_that_isnt_a_table_is_refused_naming_the_file() -> None:
+    with pytest.raises(ms.SettingsError) as raised:
+        ms.read_mutation_table("mutation = 1\n", "quality-gates.toml")
+    assert str(raised.value) == "quality-gates.toml's mutation isn't a table"

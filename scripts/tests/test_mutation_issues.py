@@ -429,3 +429,354 @@ def test_an_issue_opened_before_a_later_write_fails_still_goes_to_the_board(tmp_
     assert json.loads(out.removeprefix("issue-urls=")) == [
         "https://github.com/troupe-run/x/issues/9"
     ]
+
+
+# What each write sends GitHub (lint-mutation 6b: the pull request report's survivors)
+
+
+def recorded_apply(plan_: mi.Plan) -> tuple[list[list[str]], list[str]]:
+    calls: list[list[str]] = []
+
+    def gh(args: list[str]) -> mi.GhResult:
+        calls.append(args)
+        return mi.GhResult(
+            0, json.dumps({"html_url": "https://github.com/troupe-run/troupe/issues/9"}), ""
+        )
+
+    opened: list[str] = []
+    mi.apply(gh, "troupe", plan_, opened)
+    return calls, opened
+
+
+def test_opening_an_issue_sends_its_title_body_label_and_type() -> None:
+    plan_ = mi.Plan(actions=[mi.Action("open", "troupe.a", None, "T", "B")])
+    calls, opened = recorded_apply(plan_)
+    assert calls == [
+        [
+            "api",
+            "repos/troupe-run/troupe/issues",
+            "-f",
+            "title=T",
+            "-f",
+            "body=B",
+            "-f",
+            "labels[]=test-quality",
+            "-f",
+            "type=Task",
+        ]
+    ]
+    assert opened == ["https://github.com/troupe-run/troupe/issues/9"]
+
+
+def test_updating_an_issue_patches_its_title_and_body() -> None:
+    plan_ = mi.Plan(
+        actions=[mi.Action("update", "troupe.a", issue("troupe.a", number=7), "T", "B")]
+    )
+    calls, opened = recorded_apply(plan_)
+    assert calls == [
+        ["api", "-X", "PATCH", "repos/troupe-run/troupe/issues/7", "-f", "title=T", "-f", "body=B"]
+    ]
+    assert opened == []
+
+
+def test_commenting_on_an_issue_posts_the_comment() -> None:
+    plan_ = mi.Plan(
+        actions=[mi.Action("comment", "troupe.a", issue("troupe.a", number=7), comment="C")]
+    )
+    calls, _ = recorded_apply(plan_)
+    assert calls == [["api", "repos/troupe-run/troupe/issues/7/comments", "-f", "body=C"]]
+
+
+def test_closing_an_issue_comments_then_closes_it_as_completed() -> None:
+    plan_ = mi.Plan(
+        actions=[mi.Action("close", "troupe.a", issue("troupe.a", number=7), comment="C")]
+    )
+    calls, _ = recorded_apply(plan_)
+    assert calls == [
+        ["api", "repos/troupe-run/troupe/issues/7/comments", "-f", "body=C"],
+        [
+            "api",
+            "-X",
+            "PATCH",
+            "repos/troupe-run/troupe/issues/7",
+            "-f",
+            "state=closed",
+            "-f",
+            "state_reason=completed",
+        ],
+    ]
+
+
+@pytest.mark.parametrize("kind", ["update", "comment", "close"])
+def test_an_action_on_an_existing_issue_without_one_writes_nothing(kind: str) -> None:
+    calls, _ = recorded_apply(mi.Plan(actions=[mi.Action(kind, "troupe.a", None, "T", "B", "C")]))
+    assert calls == []
+
+
+def test_a_refused_write_names_the_command_and_githubs_reason() -> None:
+    def gh(args: list[str]) -> mi.GhResult:
+        return mi.GhResult(1, "", "  HTTP 403: Resource not accessible by integration \n")
+
+    with pytest.raises(mi.GitHubError) as raised:
+        mi.gh_json(gh, ["api", "repos/troupe-run/troupe/issues", "-f", "title=T"])
+    assert str(raised.value) == (
+        "gh api repos/troupe-run/troupe/issues -f failed: "
+        "HTTP 403: Resource not accessible by integration"
+    )
+
+
+def test_an_empty_answer_reads_as_nothing() -> None:
+    assert mi.gh_json(lambda args: mi.GhResult(0, "", ""), ["api", "x"]) is None
+
+
+# Judging at the edges
+
+
+def judged(killed: int, survived: int, baseline_score: float | None = None) -> mi.Judgement:
+    base = None if baseline_score is None else baseline(baseline_score)
+    return mi.judge("m", module(killed=killed, survived=survived), base, SETTINGS)
+
+
+def test_a_score_exactly_at_the_threshold_isnt_under() -> None:
+    j = judged(6, 4)  # 60%
+    assert (j.score, j.counted, j.under_threshold, j.under) == (60.0, 10, False, False)
+
+
+def test_a_score_exactly_at_its_baseline_hasnt_fallen_and_raises_nothing() -> None:
+    j = judged(7, 3, baseline_score=70.0)
+    assert (j.below_baseline, j.raise_to, j.baseline) == (False, None, 70.0)
+
+
+def test_a_score_just_over_its_baseline_raises_it() -> None:
+    assert judged(71, 29, baseline_score=70.0).raise_to == 71.0
+
+
+def test_an_unjudged_module_raises_nothing_and_isnt_under() -> None:
+    j = mi.judge("m", module(killed=1, survived=8), None, SETTINGS)
+    assert (j.judged, j.under_threshold, j.below_baseline, j.raise_to, j.under) == (
+        False,
+        False,
+        False,
+        None,
+        False,
+    )
+
+
+# Listing and reading the App's issues
+
+
+def test_the_listing_asks_for_every_page_of_open_test_quality_issues() -> None:
+    asked: list[list[str]] = []
+
+    def gh(args: list[str]) -> mi.GhResult:
+        asked.append(args)
+        return mi.GhResult(0, "[[]]", "")
+
+    mi.list_issues(gh, "troupe")
+    assert asked == [
+        [
+            "api",
+            "--paginate",
+            "--slurp",
+            "repos/troupe-run/troupe/issues?state=open&labels=test-quality"
+            "&creator=troupe-run-test-quality%5Bbot%5D&per_page=100",
+        ]
+    ]
+
+
+@pytest.mark.parametrize("answer", ["{}", "[{}]", '[["x"]]', '[[{"user": {"login": "someone"}}]]'])
+def test_a_listing_of_another_shape_finds_no_issue(answer: str) -> None:
+    assert mi.list_issues(lambda args: mi.GhResult(0, answer, ""), "troupe") == []
+
+
+def test_an_issue_with_no_number_or_body_isnt_read() -> None:
+    marker = mi.marker("troupe", "troupe.a")
+    assert mi.read_issue({"body": marker}, "troupe") is None
+    assert mi.read_issue({"number": 3}, "troupe") is None
+    assert mi.read_issue({"number": 3, "body": "text\n" + marker}, "troupe") is None
+
+
+def test_an_issue_without_html_url_falls_back_to_its_api_url() -> None:
+    read = mi.read_issue(
+        {"number": 3, "body": mi.marker("troupe", "a"), "url": "api-url"}, "troupe"
+    )
+    assert read == mi.Issue(3, "api-url", "a", None, None)
+
+
+# The issue's text
+
+
+def test_a_survivor_names_its_commit_when_no_pull_request_is_known() -> None:
+    new = mr.Survivor("m.f__mutmut_1", "a.py", 4, "-a\n+b", "c" * 40, True)
+    assert (
+        mi.survivor_line(new, {}) == f"- `a.py:4` `m.f__mutmut_1`, added in {'c' * 12}: `-a / +b`"
+    )
+    old = mr.Survivor("m.f__mutmut_1", "a.py", 4, "-a\n+b", "c" * 40, False)
+    assert mi.survivor_line(old, {"c" * 40: 5}) == "- `a.py:4` `m.f__mutmut_1`: `-a / +b`"
+
+
+def test_was_shows_a_number_or_a_question_mark() -> None:
+    assert (mi.was(None), mi.was(50.0), mi.was(12)) == ("?", "50", "12")
+
+
+def issue_body(m: mr.Module, tool: str = "mutmut", baseline_score: float | None = None) -> str:
+    j = mi.judge(
+        "troupe.a", m, None if baseline_score is None else baseline(baseline_score), SETTINGS
+    )
+    return mi.body("troupe", j, m, SETTINGS, RUN, tool, {})
+
+
+def test_the_body_says_what_was_measured_and_how_to_close_it() -> None:
+    text = issue_body(module(killed=10, survived=5, no_tests=5))
+    assert text.split("\n")[:3] == [
+        mi.marker("troupe", "troupe.a"),
+        "<!-- mutation-testing-state: score=50 survived=5 -->",
+        "",
+    ]
+    assert (
+        f"`troupe.a` scored **50%** in the weekly mutation run ([run]({RUN})): 10 caught of 20 "
+        "(10 killed, 0 timed out, 0 crashed), 5 survived, 5 reached by no test in the test process"
+    ) in text
+    assert f"Settings: [scripts/mutation.json]({mi.SETTINGS_URL})." in text
+    assert "\n### Surviving mutants\n\n- `src/m.py:1`" in text
+    assert text.endswith(
+        "A test that fails for a mutant kills it. Close this by raising the score: the weekly run "
+        "closes it when the module is back at or over its threshold and baseline.\n"
+    )
+
+
+def test_a_module_with_every_mutant_reached_says_nothing_about_subprocesses() -> None:
+    text = issue_body(module(killed=10, survived=10))
+    assert "10 survived, 0 reached by no test." in text
+
+
+def test_a_stryker_module_points_at_its_html_report_for_the_rest() -> None:
+    text = issue_body(module(killed=5, survived=40), tool="stryker")
+    assert "- and 10 more: the Stryker HTML report in the run's artifacts lists them all" in text
+    assert "in the test process" not in issue_body(
+        module(killed=5, survived=4, no_tests=6), tool="stryker"
+    )
+
+
+def test_new_survivors_leave_room_for_the_rest_within_thirty() -> None:
+    m = module(killed=5, survived=3, new=1)
+    old = tuple(mr.Survivor(f"m.g__mutmut_{n}", "src/m.py", 50 + n, "-a\n+b") for n in range(40))
+    mixed = mr.Module(5, 43, 0, 0, 0, 0, True, m.survivors + old)
+    text = issue_body(mixed)
+    assert text.count("m.f__mutmut_") == 3
+    assert text.count("m.g__mutmut_") == 27
+    assert "- and 13 more:" in text
+
+
+# The summary and the run's outputs
+
+
+def test_the_summary_lays_out_the_table_the_actions_and_the_baselines() -> None:
+    r = report(
+        **{
+            "troupe.a": module(killed=16, survived=9),
+            "troupe.b": module(killed=10, survived=10),
+            "troupe.c": module(killed=1, survived=1),
+        }
+    )
+    p = mi.plan_repository(r, {}, (issue("troupe.b", number=4),), SETTINGS, RUN, "mutmut", {})
+    p.deferred.append("troupe.z")
+    text = mi.summary("troupe", r, p, SETTINGS, dry=False)
+    assert text.split("\n")[:5] == [
+        f"## troupe at {SHA[:12]}",
+        "",
+        "| Module | Score | Mutants | Judged |",
+        "|---|---|---|---|",
+        "| `troupe.a` | 64% | 25 | yes |",
+    ]
+    assert "| `troupe.c` | 50% | 2 | no |" in text
+    assert "- update `troupe.b` (#4)" in text
+    cap = SETTINGS.max_new_issues
+    assert (
+        f"- under, but past the cap of {cap} new issues: `troupe.z` (raised by a later run)" in text
+    )
+    # troupe.b has no baseline yet, so its first judged score is one to record too (design D7).
+    raises = (
+        "Baselines to raise in this repository's `quality-gates.toml`, by pull request:\n\n"
+        "```toml\n"
+        f'[mutation.baselines."troupe.a"]\nscore = 64\nmutants = 25\njudged_at = "{SHA}"\n\n'
+        f'[mutation.baselines."troupe.b"]\nscore = 50\nmutants = 20\njudged_at = "{SHA}"\n\n```\n'
+    )
+    assert text.endswith(raises)
+
+
+def test_a_run_writes_its_summary_and_names_what_it_couldnt_handle(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    write_reports(tmp_path, skip="troupe")
+    env = actions_env(tmp_path) | {"GITHUB_STEP_SUMMARY": str(tmp_path / "summary")}
+    assert mi.main([str(tmp_path)], env, FakeGitHub()) == 1
+    summary_text = (tmp_path / "summary").read_text(encoding="utf-8")
+    assert summary_text == capsys.readouterr().out.removesuffix("\n")
+    assert "## infrastructure at" in summary_text
+    assert "## website at" in summary_text
+    assert summary_text.endswith(
+        "\n**Not handled:** troupe: no report (its job failed or timed out)\n"
+    )
+
+
+def test_a_run_links_its_issues_to_this_run(tmp_path: Path) -> None:
+    write_reports(tmp_path)
+    gh = FakeGitHub()
+    env = actions_env(tmp_path) | {
+        "GITHUB_SERVER_URL": "https://github.example",
+        "GITHUB_REPOSITORY": "troupe-run/infrastructure",
+        "GITHUB_RUN_ID": "77",
+    }
+    mi.main([str(tmp_path)], env, gh)
+    bodies = [arg for write in gh.writes for arg in write if arg.startswith("body=")]
+    assert all(
+        "([run](https://github.example/troupe-run/infrastructure/actions/runs/77))" in b
+        for b in bodies
+    )
+
+
+def test_unreadable_settings_stop_the_run_before_anything(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    bad = tmp_path / "mutation.json"
+    bad.write_text("{", encoding="utf-8")
+    monkeypatch.setattr(mi, "SETTINGS", bad)
+    assert mi.main([str(tmp_path)], {}, FakeGitHub()) == 2
+    assert capsys.readouterr().err.startswith(
+        "mutation_issues: mutation.json: the settings aren't JSON"
+    )
+
+
+def test_a_repositorys_read_token_reads_its_pull_requests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    made: list[str] = []
+
+    def reading(token: str) -> mi.Gh:
+        made.append(token)
+        return lambda args: mi.GhResult(0, "[]", "")
+
+    monkeypatch.setattr(mi, "reading_gh", reading)
+    write_reports(tmp_path)
+    mi.main([str(tmp_path)], actions_env(tmp_path) | {"READ_TOKEN": "t"}, FakeGitHub())
+    assert made == ["t"]
+
+
+def test_a_baseline_file_is_read_for_its_own_repository(tmp_path: Path) -> None:
+    write_reports(tmp_path)
+    # infrastructure.a at 50% with a 40% baseline: under 60%, but not below its baseline.
+    (tmp_path / "quality-gates-infrastructure.toml").write_text(
+        '[mutation.baselines."infrastructure.a"]\nscore = 40.0\nmutants = 20\njudged_at = "'
+        + "e" * 40
+        + '"\n',
+        encoding="utf-8",
+    )
+    gh = FakeGitHub()
+    assert mi.main([str(tmp_path)], actions_env(tmp_path), gh) == 0
+    titles = sorted(arg for write in gh.writes for arg in write if arg.startswith("title="))
+    assert titles == [
+        "title=Mutation score 50% in infrastructure.a (under 60%)",
+        "title=Mutation score 50% in troupe.a (under 60%)",
+        "title=Mutation score 50% in website.a (under 60%)",
+    ]

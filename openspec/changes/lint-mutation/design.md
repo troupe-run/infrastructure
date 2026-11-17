@@ -225,12 +225,11 @@ commit, and the `issues` job asks GitHub which merged pull request contains it (
 - the module's issue lists new survivors first, under "New since the last run", each with its commit and pull request;
 - naming the pull request in the issue ("added in #412") makes GitHub show the issue on that pull request's timeline.
 
-**Pending the owner (2026-11-18):** whether the run also comments on the pull request (option A). A GitHub App token
-reaches only what its permissions name, so commenting needs "Pull requests: read and write" on the test-quality App,
-which could then also edit or close pull requests (never push or merge). Built provisionally as option B, the
-cross-reference only, which keeps the App issues-only (orchestrator, 2026-11-18). Choosing A later adds the App
-permission, its token input and the comment; nothing else changes. Which pull request a commit came from is read with
-the run's own read-only token (`READ_TOKEN`), since the App's issues-only token can't read pull requests.
+**Decided (owner, 2026-11-18): option B.** The run doesn't comment on the pull request: the issue names it ("added in
+#412"), and GitHub shows the issue on that pull request's timeline. The App stays issues-only. Option A, a comment
+from the App, would have needed "Pull requests: read and write", with which it could also edit or close pull requests.
+Which pull request a commit came from is read with the run's own read-only token (`READ_TOKEN`), since the App's
+issues-only token can't read pull requests.
 
 With no previous run (the first, or one older than 90 days), nothing is called new. Cost: one blame per survivor,
 seconds.
