@@ -320,25 +320,30 @@ def resolve_base(root: Path, base: str | None) -> str:
 HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", re.MULTILINE)
 
 
-def changed_lines(root: Path, base: str) -> dict[str, set[int]]:
+Lines = frozenset[int] | None
+"""A changed file's new or edited line numbers, or None when the whole file is new to git."""
+
+
+def changed_lines(root: Path, base: str) -> dict[str, Lines]:
     """Each file the work changes since `base` (staged, unstaged and untracked), with its new or
-    edited line numbers. Deleted files aren't listed: nothing in them can be measured."""
+    edited line numbers. Deleted files aren't listed: nothing in them can be measured. No file is
+    opened here: an untracked file is new throughout, so its lines are None, not counted."""
     diff = _git(root, "diff", "-U0", "--no-renames", "--no-ext-diff", "--no-color", base, "--")
     if diff.returncode != 0:
         raise GateError(f"git diff from {base} failed: {diff.stderr.strip()}")
-    changed: dict[str, set[int]] = {}
+    changed: dict[str, Lines] = {}
     for section in re.split(r"^diff --git ", diff.stdout, flags=re.MULTILINE)[1:]:
         target = re.search(r"^\+\+\+ b/(.+)$", section, re.MULTILINE)
         if target is None:
             continue  # deleted, or binary
-        lines = changed.setdefault(target.group(1), set())
+        lines: set[int] = set()
         for start, length in HUNK.findall(section):
             count = int(length) if length else 1
             lines.update(range(int(start), int(start) + count))
+        changed[target.group(1)] = frozenset(lines)
     untracked = _git(root, "ls-files", "--others", "--exclude-standard", "-z")
     for path in filter(None, untracked.stdout.split("\0")):
-        text = (root / path).read_text(encoding="utf-8", errors="replace")
-        changed[path] = set(range(1, text.count("\n") + 2))
+        changed[path] = None
     return changed
 
 
@@ -430,7 +435,8 @@ def complexity_problems(
         # complex than at the base, so this also keeps the rule's answer the same; #320 counts the
         # changed functions themselves.
         span = set(range(function.start, function.end + 1))
-        if function.complexity <= config.block_above or not span & changes[function.path]:
+        lines = changes[function.path]
+        if function.complexity <= config.block_above or (lines is not None and not span & lines):
             continue
         old = before.get((function.path, function.long_name))
         if old is None or function.complexity > old:
