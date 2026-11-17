@@ -78,6 +78,10 @@
             {
               "test": "scripts/tests/test_needs_guard_tests.py::test_every_guard_test_and_its_fixtures_need_them",
               "why": "It matches the guard tests' paths under scripts/, which mutmut's copy has under src/ (trial, 2026-11-18)."
+            },
+            {
+              "test": "scripts/tests/test_guard_review_threads.py::test_the_guard_s_delivered_python_is_ascii_only",
+              "why": "It reads guard.py's text, which in mutmut's copy is the mutated source, whose mutant names aren't ASCII (trial, 2026-11-18)."
             }
           ]
         }

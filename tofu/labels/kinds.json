@@ -3,5 +3,10 @@
     "name": "speed",
     "color": "FBCA04",
     "description": "Making something faster: the product, its tests, or its checks"
+  },
+  {
+    "name": "test-quality",
+    "color": "BFD4F2",
+    "description": "Tests that wouldn't notice a change: raised by the weekly mutation run"
   }
 ]
