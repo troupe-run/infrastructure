@@ -1,6 +1,7 @@
 """scripts/check.py stops at the first failing gate and returns its exit code."""
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -325,3 +326,21 @@ def test_rules_without_a_version_line_stop_the_check_saying_so(
     assert (
         str(stopped.value) == "check: .tflint.hcl has no `# tflint v<version>` line. Fix: add it."
     )
+
+
+# Only tflint may be missing locally (owner, 2026-11-18): every other tool stays an error.
+
+
+def test_a_missing_tofu_stops_the_check_even_locally(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(shutil, "which", lambda name, path=None: None)
+    with pytest.raises(SystemExit) as stopped:
+        check.gates((), {"PATH": "", "GITHUB_ACTIONS": "false"})
+    assert str(stopped.value) == (
+        "check: tofu is not installed in the PATH. Fix: install OpenTofu (brew install opentofu)."
+    )
+
+
+def test_a_missing_python_tool_stops_the_check_saying_to_sync(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as stopped:
+        check.tool("ruff", path=str(tmp_path))
+    assert str(stopped.value) == f"check: ruff is not installed in {check.BIN}. Fix: run `uv sync`."
