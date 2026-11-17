@@ -231,3 +231,64 @@ def test_a_malformed_leg_value_stops_the_check() -> None:
     with pytest.raises(SystemExit) as refused:
         check.on_leg({check.LEG: "yes", "GITHUB_ACTIONS": "true"})
     assert "QUALITY_GATES_LEG='yes' isn't valid" in str(refused.value.code)
+
+
+# tflint (lint-mutation design D1, D2)
+
+
+def fake_path(tmp_path: Path, *names: str) -> str:
+    """A PATH for tflint's lookup holding only executables with these names."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        exe = tmp_path / name
+        exe.write_text("#!/bin/sh\nexit 0\n")
+        exe.chmod(0o755)
+    return str(tmp_path)
+
+
+def test_tflint_runs_after_tofu_validate_over_tofu_with_the_root_rules(tmp_path: Path) -> None:
+    env = {"PATH": fake_path(tmp_path, "tflint")}
+    steps = check.gates((), env=env)
+    labels = [label for label, _ in steps]
+    assert labels.index("tflint") == labels.index("tofu validate") + 1
+    command = dict(steps)["tflint"]
+    assert command[0] == str(tmp_path / "tflint")
+    assert command[1:] == ["--chdir=tofu", "--recursive", f"--config={check.ROOT / '.tflint.hcl'}"]
+
+
+def test_a_scoped_check_still_runs_tflint(tmp_path: Path) -> None:
+    env = {"PATH": fake_path(tmp_path, "tflint")}
+    assert "tflint" in dict(check.gates(("dns",), env=env))
+
+
+def test_a_missing_tflint_in_github_actions_fails_naming_it(tmp_path: Path) -> None:
+    env = {"PATH": fake_path(tmp_path), "GITHUB_ACTIONS": "true"}
+    with pytest.raises(SystemExit) as stopped:
+        check.gates((), env=env)
+    assert "tflint" in str(stopped.value)
+    assert "PATH" in str(stopped.value)
+
+
+def test_a_missing_tflint_locally_skips_only_that_gate_and_says_how_to_install_it(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with_it = check.gates((), env={"PATH": fake_path(tmp_path / "a", "tflint")})
+    without = check.gates((), env={"PATH": fake_path(tmp_path / "b"), "GITHUB_ACTIONS": "false"})
+    assert [label for label, _ in without] == [label for label, _ in with_it if label != "tflint"]
+    out = capsys.readouterr().out
+    assert "tflint gate is skipped" in out
+    assert f"go install github.com/terraform-linters/tflint@{check.tflint_version()}" in out
+
+
+def test_the_tflint_version_is_read_from_the_rules_file() -> None:
+    assert check.tflint_version().startswith("v")
+    assert check.tflint_version() in (check.ROOT / ".tflint.hcl").read_text()
+
+
+def test_an_installed_tflint_that_fails_fails_the_check(tmp_path: Path) -> None:
+    failing = tmp_path / "tflint"
+    finding = "tofu/x.tf:1:1: Warning: unused variable (terraform_unused_declarations)"
+    failing.write_text(f"#!/bin/sh\necho '{finding}'\nexit 2\n")
+    failing.chmod(0o755)
+    gate = dict(check.gates((), env={"PATH": str(tmp_path), "GITHUB_ACTIONS": "false"}))["tflint"]
+    assert check.run_gates([("tflint", gate)], tmp_path) == 2

@@ -53,12 +53,23 @@ is fixed in `tofu/` before the gate lands.
 *Alternatives:* run `tflint` only in CI (rejected: #321 says blocking locally too, and the check is the same script in
 both places, ci-apply design D8); `tofu fmt` alone (rejected by #321).
 
-### D2. Developers install `tflint` themselves; the check says how
+### D2. CI installs `tflint`; a local check without it says so and goes on (owner, 2026-11-17)
 
-Like `tofu`, `tflint` isn't a Python package, so `uv sync` can't bring it. Homebrew no longer carries it here. The
-check's fix names `go install github.com/terraform-linters/tflint@<version>`, which builds the pinned release from
-source with the Go toolchain already used on the owner's machine, and the README's setup lists it. **Owner to
-confirm** (sent with D4 and D6): the route, or another one (the release binary, or a container).
+The owner chose CI first: no local install for now, and the draft pull request's CI leg is `tflint`'s first trial on
+this configuration. So the gate is blocking where `tflint` must be present, and absent only where the owner said it
+may be:
+
+- **In GitHub Actions** (`GITHUB_ACTIONS=true`), a missing `tflint` fails the check, naming it. CI installs it, so a
+  missing one there is a broken workflow, never a skip.
+- **Locally**, a missing `tflint` prints `check: tflint isn't installed, so the tflint gate is skipped here; CI runs
+  it` with the install command, and the other gates run. Absent is the only state that skips: a `tflint` that is
+  installed and fails, or can't read `.tflint.hcl`, fails the check like any gate.
+
+When the owner later installs it locally, nothing changes in the check: it's found and runs. The install command the
+notice names is `go install github.com/terraform-linters/tflint@<version>`, the version from `.tflint.hcl`.
+
+*Alternative:* fail locally when it's missing (rejected for now: every commit on every machine without `tflint` would
+fail, against the owner's choice).
 
 ### D3. One workflow in infrastructure runs all three repositories
 
@@ -95,7 +106,7 @@ confirm** (sent with D4 and D6): the route, or another one (the release binary, 
 - **It stays in the schedule watch.** `scripts/watched-schedules.json` gains `mutation.yml` with `max_age_days: 8`,
   so a paused schedule is reported like website's weekly link check.
 
-### D4. The issues are filed by a credential that can write all three repositories (owner's decision)
+### D4. The issues are filed by a new, narrow App (owner, 2026-11-17: option A)
 
 `GITHUB_TOKEN` can only write infrastructure's issues, and the issues belong in the module's own repository. Options:
 
@@ -106,7 +117,7 @@ confirm** (sent with D4 and D6): the route, or another one (the release binary, 
 | C | The `troupe-run-infrastructure` App | Already installed with issues write | Its key also holds administration, contents and workflows write; today it's only in `plan-main` and the reviewed `apply`. An unattended weekly job beside it widens what a mistake can reach |
 | D | `GITHUB_TOKEN`, all issues in infrastructure | No credential at all | The issue isn't where the code is, so troupe's work tracking misses it |
 
-**Recommendation: A.** It's the least a leaked key can do, and it follows the pattern the org already uses. Issues
+**Chosen: A** (owner, 2026-11-17). It's the least a leaked key can do, and it follows the pattern the org already uses. Issues
 opened by an App start no workflow trouble: no repository runs anything on `issues` events from it.
 
 ### D5. One issue per module, found by a marker, updated in place
@@ -114,12 +125,12 @@ opened by an App start no workflow trouble: no repository runs anything on `issu
 - **Identity of a module:** `<repository>:<module>`, where a module is a Python dotted module (`troupe.store.events`)
   or a website source path (`src/lib/site-path.ts`). The issue body starts with
   `<!-- mutation-testing: <repository>:<module> -->`, and the script finds its issue by listing the repository's
-  issues labelled `test-quality` and reading that line, open or closed in the last 90 days. Only issues the
+  issues labelled `test-quality` and reading that line, open ones only. Only issues the
   credential's App opened are read as its own (the login is checked), so a person's issue quoting the marker isn't
   edited.
-- **Under the threshold, no open issue:** open one, type Task, label `test-quality`, title
-  `Mutation score <score>% in <module> (under <threshold>%)`. If the closed one is recent (90 days), reopen that
-  instead, so the history stays together. The URL goes to the `board` job.
+- **Under the threshold or its baseline (D7), no open issue:** open one, type Task, label `test-quality`, title
+  `Mutation score <score>% in <module> (under <threshold>% | below its <baseline>% baseline)`. The URL goes to the
+  `board` job. No reopening (D7).
 - **Under the threshold, open issue:** rewrite its body with this run's numbers and survivors, and add a comment only
   when the score or the number of survivors changed, so a quiet week makes no noise.
 - **At or over the threshold, open issue:** comment with the new score and close it as completed.
@@ -134,7 +145,7 @@ opened by an App start no workflow trouble: no repository runs anything on `issu
   others are handled, like `dependabot_issues.py`. Outside GitHub Actions, or with `dry-run`, it only prints what it
   would do.
 
-### D6. Proposed thresholds and budget (for the owner's approval)
+### D6. Proposed thresholds and budget (with the owner)
 
 All in `scripts/mutation.json`, read by both scripts; the workflow's job timeout is derived from the budget by a test.
 
@@ -145,7 +156,6 @@ All in `scripts/mutation.json`, read by both scripts; the workflow's job timeout
 | `min_mutants` per module | **10** | A module with a handful of mutants swings 20 points on one survivor |
 | `budget_minutes` per repository | **240** | Weekly, well inside GitHub's 6-hour job limit; job timeout = budget + 30 for setup and the report |
 | `max_new_issues` per repository per run | **5** | 15 a week at most across the org; existing issues are always updated |
-| `reopen_window_days` | **90** | Reopens a recent issue instead of opening another |
 | Schedule | weekly, Sunday 03:23 UTC | #321: weekly; off the hour |
 | Tools | mutmut 3.8.1; Stryker 10.1.1 with its vitest runner | Current releases; pinned, moved by pull request |
 
@@ -153,10 +163,66 @@ All in `scripts/mutation.json`, read by both scripts; the workflow's job timeout
 the owner sees how many issues 60% would open before any is filed, and the threshold can move in the same pull
 request that turns filing on. This repository's own scripts are trialled small locally (one module) before that.
 
+### D7. A ratchet: each module's baseline only moves up (owner, 2026-11-17; how, proposed)
+
+The owner made the score a ratchet and dropped the 90-day reopen rule: (1) each module keeps a recorded baseline,
+its score must not fall below it, and the baseline only moves up; (2) new or changed code must not push the score
+down. How, as proposed for the owner's approval:
+
+**(1) The baseline.**
+
+- **When a module is judged** (≥ `min_mutants` mutants, finished within the budget), its baseline becomes
+  max(baseline, score). A module with no baseline gets its first judged score.
+- **Its issue is open** while score < 60% (the starting `threshold`, for code that has never reached it) or
+  score < baseline − `tolerance` (default 0). So a module first measured at 40% has an issue for being under 60%, and
+  if it then falls to 35% the issue says it fell below its 40% baseline. When both conditions clear, the issue gets a
+  comment and closes. If it opens again later, a new issue is raised: no reopen window.
+- **Where the baselines live: one record issue in infrastructure**, "Mutation testing baselines", opened by the
+  test-quality App and labelled `test-quality`, holding the baselines as a JSON block under a marker. Each run reads
+  it, raises what moved up, and writes it back. GitHub keeps every edit, so each raise is visible, and the owner can
+  lower one deliberately (for example after deleting well-tested code) by editing it. A record that won't parse, or
+  that someone else's account last edited into a shape the schema doesn't allow, fails the run naming the field: it's
+  never reset to empty.
+  *Why not a file in the repository:* committing it needs contents write, which would widen the App from issues-only,
+  or a pull request every week. *Why not an Actions variable:* that needs the `troupe-run-infrastructure` App's
+  variables permission (D4, option C's problem).
+- **The dry run** reports the baselines it would record and every drop, and writes nothing.
+
+**(2) New code can't push the score down: two ways, and what each costs.**
+
+- **W. Weekly attribution (recommended to build now, in this change).** For each surviving mutant, the weekly run
+  reads `git blame` for its line. If the line changed since the commit the previous run judged (recorded with the
+  baselines), the survivor is new: the module's issue lists it under "new since the last run" with its commit and pull
+  request, and the run comments on that merged pull request naming the survivors it added. Cost: no extra mutation
+  runs, only blame on the survivors' lines, seconds. Limit: it's after the merge, up to a week later, and it reports
+  rather than blocks.
+- **P. A diff-scoped run on each pull request (recommended as a separate Feature, report first).** On a ready pull
+  request that changes Python or TypeScript source, mutate only the functions (mutmut `run "<module>.<function>*"`) or
+  lines (Stryker `--mutate <file>:<lines>`) it changes, and fail on any surviving mutant there unless the line carries
+  the tool's own exemption with a reason (`# pragma: no mutate`, `// Stryker disable next-line ...: <reason>`).
+  Estimated cost per pull request, on one Linux runner (to be measured on real pull requests before anything blocks):
+
+  | Repository | Today's check | mutmut's test-mapping pass (one traced serial run) | Changed functions' mutants (~5-20 functions × 10-20) | Total |
+  |---|---|---|---|---|
+  | infrastructure | ~1 min (4 workers) | ~5-8 min | ~2-5 min | **~10-15 min** |
+  | troupe | ~4-5 min (Linux leg) | ~15-25 min | ~3-10 min | **~20-35 min** |
+  | website | ~2.5 min (whole test job) | Stryker's per-test coverage run, ~1-2 min | ~2-5 min | **~5-10 min** |
+
+  Blocking would add that to every source-changing pull request's path to merge, which is what #321 kept off the
+  blocking path; reporting (a check that's not required, with its survivors in the run's summary) costs the same
+  runner time but no waiting. It needs a workflow in each repository, so it's a change to troupe and website too.
+  **Recommendation:** raise P as its own Feature, run it as a report on the next ~10 source pull requests per
+  repository to measure the real cost and the false alarms (equivalent mutants), then the owner decides whether it
+  blocks. W ships now and covers the gap meanwhile.
+
+**What the ratchet changes in D6:** `reopen_window_days` goes; `tolerance` (default 0 percentage points) is added. The
+rest stays: 60% `threshold` for modules with no baseline, `min_mutants` 10, `budget_minutes` 240, `max_new_issues` 5,
+weekly Sunday 03:23 UTC, the first run dry.
+
 ## Risks / Trade-offs
 
 - **`tflint` can't parse OpenTofu-only syntax** (the `encryption` block) → trialled in CI on the draft pull request
-  first; a file it can't read is excluded in `.tflint.hcl` with the reason, and if it can't read the configuration at
+  first (D2); a file it can't read is excluded in `.tflint.hcl` with the reason, and if it can't read the configuration at
   all, that goes back to the owner rather than a silent skip.
 - **mutmut or libcst has no Python 3.15 build yet** → trialled before the workflow lands; if not, the owner decides
   between 3.14 for this job and waiting.
@@ -171,8 +237,7 @@ request that turns filing on. This repository's own scripts are trialled small l
 
 ## Migration Plan
 
-1. Land `tflint` with `tofu/` brought into line; the check fails for anyone without `tflint` until they install it
-   (README and the check's own fix say how).
+1. Land `tflint` with `tofu/` brought into line; CI runs it, and a local check without it says so (D2).
 2. The owner creates the App (D4) and sets its key; the plan adds the environment, variable and label.
 3. Merge the workflow; dispatch it with `dry-run`; the owner confirms or moves the threshold.
 4. The weekly schedule files issues from then on.

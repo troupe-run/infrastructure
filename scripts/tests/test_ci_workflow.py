@@ -279,3 +279,25 @@ def test_the_guard_legs_still_test_linux_on_python_3_12() -> None:
     assert ("ubuntu-latest", "3.12") in legs
     assert ("ubuntu-latest", "3.15") not in legs  # the check job runs the guard's tests there
     assert len(legs) == 11
+
+
+# tflint (lint-mutation design D1, D2)
+
+
+def test_the_check_job_installs_the_tflint_version_the_rules_name() -> None:
+    import check
+
+    steps = ci()["jobs"]["check"]["steps"]
+    setup = [
+        step
+        for step in steps
+        if str(step.get("uses", "")).startswith("terraform-linters/setup-tflint@")
+    ]
+    assert len(setup) == 1, "the check job installs tflint once"
+    installed = setup[0]["with"]["tflint_version"]
+    declared = check.tflint_version()
+    assert installed == declared, (
+        f"ci.yml installs tflint {installed}; .tflint.hcl names {declared}"
+    )
+    names = [step.get("name") for step in steps]
+    assert steps.index(setup[0]) < names.index("Check (the same script as local runs)")

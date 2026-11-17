@@ -49,8 +49,7 @@ changed paths: nothing, those scopes, or the full check. Every non-test gate run
 ### Requirement: The check lints the OpenTofu configuration
 The check SHALL run `tflint` over the OpenTofu configuration, with its rules declared in one file in this repository,
 locally and in CI's `check` job, and SHALL fail when it reports a finding. A rule turned off, or a finding accepted,
-SHALL be recorded in that file with its reason. The check SHALL find `tflint` on the PATH, and SHALL fail naming how
-to install it when it isn't there. CI SHALL install the version the rules file names.
+SHALL be recorded in that file with its reason.
 
 #### Scenario: A finding fails the check
 - **WHEN** a change adds a variable to `tofu/` that nothing uses
@@ -60,9 +59,21 @@ to install it when it isn't there. CI SHALL install the version the rules file n
 - **WHEN** the check runs on `main` after this change
 - **THEN** `tflint` reports no finding
 
-#### Scenario: tflint isn't installed
-- **WHEN** the check runs on a machine with no `tflint` on the PATH
-- **THEN** it fails before any gate runs, naming `tflint` and the command that installs it
+### Requirement: CI always runs tflint; a local check may go without it
+CI SHALL install the `tflint` version the rules file names, and the check in GitHub Actions SHALL fail when `tflint` is
+missing. A local check without `tflint` SHALL say the gate is skipped and how to install it, and run the other gates.
+
+#### Scenario: tflint isn't installed in CI
+- **WHEN** the check runs in GitHub Actions with no `tflint` on the PATH
+- **THEN** it fails before any gate runs, naming `tflint`
+
+#### Scenario: tflint isn't installed locally
+- **WHEN** the check runs outside GitHub Actions with no `tflint` on the PATH
+- **THEN** it prints that the `tflint` gate is skipped and the command that installs it, and runs every other gate
+
+#### Scenario: An installed tflint that fails
+- **WHEN** `tflint` is installed locally and reports a finding
+- **THEN** the check fails at the `tflint` gate, as in CI
 
 #### Scenario: CI's version drifts from the declared one
 - **WHEN** the version CI installs and the version the rules file names differ

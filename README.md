@@ -45,12 +45,14 @@ that closes the issue. Specs live in `openspec/specs/`.
 You need:
 - [uv](https://docs.astral.sh/uv/);
 - OpenTofu 1.8 or later (`brew install opentofu`);
+- optionally, TFLint at the version `.tflint.hcl` names (`go install github.com/terraform-linters/tflint@v0.66.0`).
+  CI always runs it; without it, a local check says the `tflint` gate is skipped and runs the rest;
 - the 1Password CLI (`op`), signed in to the account named in `scripts/tofu.py`;
 - `gh`, logged in with read access to the org.
 
 ```
 uv sync
-uv run scripts/check.py          # ruff, mypy --strict, pytest, tofu fmt and validate; needs no secret
+uv run scripts/check.py          # ruff, mypy --strict, pytest, tofu fmt and validate, tflint; needs no secret
 ```
 
 The first run of the check turns the git hooks on (`core.hooksPath = .githooks`), and says so. From then on, each

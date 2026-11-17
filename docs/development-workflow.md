@@ -258,6 +258,10 @@ minutes on macOS, nearly all of it the tests, which run in 4 worker processes (`
 one-time dependency and provider download. Whatever runs is announced before it starts, its output streams as it runs,
 and it's stopped and the commit refused after 10 minutes (`CHECK_TIMEOUT_SECONDS` in `scripts/guard.py`).
 
+Here the check's gates are ruff, `ruff format --check`, `mypy --strict`, the tests, `tofu fmt -check`, `tofu
+validate` and `tflint` (rules in `.tflint.hcl`). CI always runs `tflint`; a local check on a machine without it says
+the gate is skipped and how to install it, and runs the rest (lint-mutation design D2).
+
 A repository can say that some paths need less than the full check, in `scripts/check-paths.toml`. The file is the
 repository's own and isn't delivered, because what its tests read is its own knowledge:
 

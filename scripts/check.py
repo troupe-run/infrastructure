@@ -20,6 +20,7 @@ has a scripts/check.py; the development-workflow guard runs it before every comm
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -52,6 +53,41 @@ def tool(name: str, path: str | None = str(BIN)) -> str:
         fix = "run `uv sync`" if path else "install OpenTofu (brew install opentofu)"
         sys.exit(f"check: {name} is not installed in {where}. Fix: {fix}.")
     return found
+
+
+TFLINT_RULES = ROOT / ".tflint.hcl"
+
+
+def tflint_version() -> str:
+    """The tflint version CI installs, from the `# tflint v<version>` line in .tflint.hcl."""
+    found = re.search(r"^# tflint (v\d+\.\d+\.\d+)$", TFLINT_RULES.read_text(), re.MULTILINE)
+    if found is None:
+        sys.exit(f"check: {TFLINT_RULES.name} has no `# tflint v<version>` line. Fix: add it.")
+    return found.group(1)
+
+
+def tflint_gate(env: Mapping[str, str]) -> list[tuple[str, list[str]]]:
+    """The tflint gate, or none on a machine without tflint outside GitHub Actions (design D2).
+
+    CI installs tflint, so a missing one there is a broken workflow and fails. Locally the owner
+    chose CI first (2026-11-17): absent is the one state that skips, and it says so. An installed
+    tflint that fails fails the check like any gate.
+    """
+    found = shutil.which("tflint", path=env.get("PATH"))
+    if found is None:
+        if env.get("GITHUB_ACTIONS") == "true":
+            sys.exit(
+                "check: tflint is not on the PATH. Fix: install it in the workflow "
+                "(terraform-linters/setup-tflint, the version in .tflint.hcl)."
+            )
+        install = f"go install github.com/terraform-linters/tflint@{tflint_version()}"
+        print(
+            f"check: tflint isn't installed, so the tflint gate is skipped here; CI runs it. "
+            f"To run it locally: {install}",
+            flush=True,
+        )
+        return []
+    return [("tflint", [found, "--chdir=tofu", "--recursive", f"--config={TFLINT_RULES}"])]
 
 
 def requested_scopes(names: Sequence[str], declaration: guard.CheckPaths | None) -> tuple[str, ...]:
@@ -100,7 +136,10 @@ def coverage_report() -> Path:
 
 
 def gates(
-    scopes: tuple[str, ...] = (), base: str | None = None, leg: bool = False
+    scopes: tuple[str, ...] = (),
+    base: str | None = None,
+    leg: bool = False,
+    env: Mapping[str, str] = os.environ,
 ) -> list[tuple[str, list[str]]]:
     tofu = tool("tofu", path=None)
     pytest = [tool("pytest"), "-n", str(worker_count())]
@@ -132,6 +171,7 @@ def gates(
         ("tofu fmt", [tofu, "fmt", "-check", "-recursive", "tofu"]),
         ("tofu init", [tofu, "-chdir=tofu", "init", "-backend=false", "-input=false"]),
         ("tofu validate", [tofu, "-chdir=tofu", "validate"]),
+        *tflint_gate(env),
     ]
 
 
