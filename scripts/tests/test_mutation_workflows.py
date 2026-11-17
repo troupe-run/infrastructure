@@ -143,3 +143,23 @@ def test_neither_workflow_is_a_required_check() -> None:
         job.get("name", key) for path in (WEEKLY, PR) for key, job in load(path)["jobs"].items()
     }
     assert not contexts & names, contexts & names
+
+
+def test_the_pull_request_report_and_what_it_runs_are_delivered() -> None:
+    import tofu_text
+
+    delivered = set(
+        tofu_text.guard_files((REPO / "tofu" / "guard_delivery.tf").read_text(encoding="utf-8"))
+    )
+    needed = {
+        ".github/workflows/mutation-pr.yml",
+        "scripts/mutation.json",
+        "scripts/mutation_children.py",
+        "scripts/mutation_pr.py",
+        "scripts/mutation_report.py",
+        "scripts/mutation_run.py",
+        "scripts/mutation_settings.py",
+    }
+    assert needed <= delivered, needed - delivered
+    # The weekly run, its issue upkeep and the App's credential stay here.
+    assert not {".github/workflows/mutation.yml", "scripts/mutation_issues.py"} & delivered

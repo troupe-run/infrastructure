@@ -40,6 +40,14 @@ DEPENDS_ON = (
     # quality-gates), and the real tool output its tests read.
     "scripts/quality_gates.py",
     "scripts/tests/fixtures/quality-gates/",
+    # The same, for the pull request mutation report and what it runs (spec: mutation-testing).
+    ".github/workflows/mutation-pr.yml",
+    "scripts/mutation.json",
+    "scripts/mutation_children.py",
+    "scripts/mutation_pr.py",
+    "scripts/mutation_report.py",
+    "scripts/mutation_run.py",
+    "scripts/mutation_settings.py",
     # Its tests, what they share, and what they run with.
     "scripts/tests/test_guard_",
     "scripts/tests/conftest.py",
