@@ -5,7 +5,6 @@ output they're read back from is in fixtures/mutation/ (test_mutation_report.py)
 import json
 import os
 import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -737,16 +736,23 @@ def test_mutmut_already_on_the_path_isnt_added_twice() -> None:
     assert env == {"MUTANT_UNDER_TEST": "m.x__mutmut_1", "PYTHONPATH": "/site"}
 
 
-def test_the_plugin_sets_childrens_environments_once_loaded(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_loading_the_plugin_patches_how_children_start(monkeypatch: pytest.MonkeyPatch) -> None:
     import mutation_children as children
 
     monkeypatch.setattr(subprocess.Popen, "__init__", subprocess.Popen.__init__)
-    monkeypatch.setattr(children, "mutmut_path", lambda: "/site")
-    monkeypatch.setenv("MUTANT_UNDER_TEST", "stats")
-    monkeypatch.delenv("PYTHONPATH", raising=False)
     children.pytest_configure(object())
-    probe = "import os; print(os.environ['MUTANT_UNDER_TEST'], os.environ['PYTHONPATH'])"
-    done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, check=True)
-    assert done.stdout.split() == ["none.none", "/site"]
+    assert subprocess.Popen.__init__ is children._popen_init
+
+
+def test_a_child_starts_with_the_adjusted_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    import mutation_children as children
+
+    started: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        children, "_original_init", lambda self, *args, **kwargs: started.append(kwargs)
+    )
+    monkeypatch.setattr(children, "mutmut_path", lambda: "/site")
+    children._popen_init(object(), ["x"], env={"MUTANT_UNDER_TEST": "stats"}, cwd="/w")  # type: ignore[arg-type]
+    assert started == [
+        {"env": {"MUTANT_UNDER_TEST": "none.none", "PYTHONPATH": "/site"}, "cwd": "/w"}
+    ]
