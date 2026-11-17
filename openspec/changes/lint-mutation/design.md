@@ -277,6 +277,13 @@ shows whether it does, and a module not finished isn't judged.
 directory, with no other setting: 115 mutants in 40 seconds, 92 killed and 23 survived (80%), every survivor on its
 source line.
 
+**Measured locally, website** (2026-11-18, `main` at bc78d22): Stryker 10.1.1 over `src/lib/*.ts`, 298 mutants in 31
+seconds (`docs-nav.ts` 56.7%, `copy.ts`'s 9 mutants reached by no test); a pull-request-style range over
+`site-section.ts` in 16 seconds. Three things it needed, in `mutation_run.py`: Stryker installed into the checkout
+(`npm install --no-save`), since from npx's own cache it can't find the project's typescript and vitest; `--inPlace`,
+since its sandbox copy fails on the repository's symlinked skills; and one test runner, since the roadmap tests fetch
+into a shared git cache and parallel runners collide on its lock.
+
 ### D10. A raised baseline reaches main by an ordinary pull request (owner, 2026-11-17: option C)
 
 The weekly run names the baselines it would raise in its summary and in each module's issue, and a person or agent

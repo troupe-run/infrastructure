@@ -256,6 +256,44 @@ def from_stryker(report: Mapping[str, object]) -> dict[str, mr.Module]:
     return modules
 
 
+def stryker_commands(mutate: Sequence[str], version: str) -> list[list[str]]:
+    """Install Stryker into the checkout, then run it (design D3; trial, 2026-11-18).
+
+    - Installed into the project (`--no-save`: package.json and the lockfile are left alone), since
+      Stryker run from npx's own cache can't find the project's typescript or vitest.
+    - `--inPlace`: the checkout is throwaway, and Stryker's sandbox copy fails on the repository's
+      symlinked skills.
+    - One test runner: website's roadmap tests fetch into a shared git cache, and parallel
+      runners collide on its lock.
+    """
+    return [
+        [
+            "npm",
+            "install",
+            "--no-save",
+            "--no-audit",
+            "--no-fund",
+            f"@stryker-mutator/core@{version}",
+            f"@stryker-mutator/vitest-runner@{version}",
+        ],
+        [
+            "npx",
+            "--no-install",
+            "stryker",
+            "run",
+            "--inPlace",
+            "--testRunner",
+            "vitest",
+            "--reporters",
+            "json,html",
+            "--concurrency",
+            "1",
+            "--mutate",
+            ",".join(mutate),
+        ],
+    ]
+
+
 def run_stryker(
     checkout: Path,
     repository: ms.Repository,
@@ -266,25 +304,11 @@ def run_stryker(
 ) -> dict[str, mr.Module]:
     out = checkout / "reports" / "mutation" / "mutation.json"
     out.unlink(missing_ok=True)
-    command = [
-        "npx",
-        "--yes",
-        "-p",
-        f"@stryker-mutator/core@{version}",
-        "-p",
-        f"@stryker-mutator/vitest-runner@{version}",
-        "stryker",
-        "run",
-        "--testRunner",
-        "vitest",
-        "--reporters",
-        "json,html",
-        "--concurrency",
-        str(CHILDREN),
-        "--mutate",
-        ",".join(mutate or repository.mutate),
-    ]
-    code = run(command, checkout, deadline - time.monotonic())
+    install, stryker = stryker_commands(mutate or repository.mutate, version)
+    installed = run(install, checkout, deadline - time.monotonic())
+    if installed != 0:
+        raise RunError(f"installing Stryker {version} failed (exit {installed})")
+    code = run(stryker, checkout, deadline - time.monotonic())
     if not out.exists():
         raise RunError(f"Stryker wrote no report (exit {code})")
     modules = from_stryker(json.loads(out.read_text(encoding="utf-8")))

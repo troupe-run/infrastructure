@@ -34,7 +34,7 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 - [x] 2.2 The `[mutation]` table of `quality-gates.toml`: read through #322's `read_config(path).mutation` (or a
       `tomllib` stand-in under the same name until it's on main), validated as a closed schema; a malformed table fails
       naming the file, module and key. Tests first
-- [ ] 2.3 `scripts/mutation_report.py`: mutmut's results (per package) and Stryker's JSON report into the one report
+- [x] 2.3 `scripts/mutation_report.py`: mutmut's results (per package) and Stryker's JSON report into the one report
       shape (per module: counts, score, survivors with location and change; finished or not). Tests first, from real
       output captured in a small local trial (one infrastructure module under mutmut, one website file under Stryker),
       saved as fixtures
@@ -73,7 +73,7 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
       write permission in `mutate`, no checkout in `comment`, the timeout follows `pr_budget_minutes`
 - [ ] 5.4 Deliver `mutation-pr.yml`, `mutation_pr.py` and `mutation.json` beside the guard's files
       (`tofu/guard_delivery.tf`); verify the delivery tests and the plan list them for troupe and website
-- [ ] 5.5 Trial P small locally on one changed function in this repository, under the load rule, and record its
+- [x] 5.5 Trial P small locally on one changed function in this repository, under the load rule, and record its
       step timings in the design
 
 ## 6. Credential, label and weekly workflow (design D3, D4)
@@ -94,7 +94,7 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 
 ## 7. Verification
 
-- [ ] 7.1 The full check passes (`uv run scripts/check.py`), under the load rule
+- [x] 7.1 The full check passes (`uv run scripts/check.py`), under the load rule
 - [ ] 7.2 The draft pull request's CI runs `tflint` and passes; the plan shows only the label, environment, variable,
       policy and the delivered files
 - [ ] 7.3 After merge and the owner's apply: dispatch `mutation.yml` with `dry-run`, read its summary, and send the

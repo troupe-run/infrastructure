@@ -301,3 +301,27 @@ def test_a_unit_with_its_own_setup_cfg_is_refused_not_overwritten(tmp_path: Path
     assert (tmp_path / "packages" / "troupe" / "setup.cfg").read_text(
         encoding="utf-8"
     ) == "[metadata]\n"
+
+
+def test_stryker_is_installed_into_the_checkout_then_run_in_place_with_one_runner() -> None:
+    install, stryker = run.stryker_commands(["src/lib/a.ts:3-5", "src/lib/b.ts:9-9"], "10.1.1")
+    assert install[:3] == ["npm", "install", "--no-save"]
+    assert "@stryker-mutator/core@10.1.1" in install
+    assert "@stryker-mutator/vitest-runner@10.1.1" in install
+    assert stryker[:4] == ["npx", "--no-install", "stryker", "run"]
+    assert "--inPlace" in stryker
+    assert stryker[stryker.index("--concurrency") + 1] == "1"
+    assert stryker[-2:] == ["--mutate", "src/lib/a.ts:3-5,src/lib/b.ts:9-9"]
+
+
+def test_a_real_stryker_report_reads_back_with_every_survivor_on_its_source_line() -> None:
+    fixture = Path(__file__).parent / "fixtures" / "mutation" / "stryker-10.1.1" / "mutation.json"
+    report = json.loads(fixture.read_text(encoding="utf-8"))
+    modules = run.from_stryker(report)
+    nav = modules["src/lib/docs-nav.ts"]
+    assert (nav.killed, nav.survived, nav.counted, nav.score) == (51, 39, 90, 56.7)
+    assert modules["src/lib/copy.ts"].no_tests == 9
+    for path, module in modules.items():
+        lines = report["files"][path]["source"].splitlines()
+        for survivor in module.survivors:
+            assert survivor.change.splitlines()[0] == "-" + lines[survivor.line - 1], survivor.name
