@@ -36,6 +36,10 @@ paths = ["tofu/labels/**"]
 [scopes.dependabot]
 paths = ["tofu/dependabot.json", "tofu/dependabot/**"]
 
+# Mutation testing's settings (spec: mutation-testing; lint-mutation design D3, D6).
+[scopes.mutation]
+paths = ["scripts/mutation.json"]
+
 # The workflows the schedule watch reads (spec: schedule-watch).
 [scopes.schedules]
 paths = ["scripts/watched-schedules.json"]
