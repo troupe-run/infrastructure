@@ -276,3 +276,116 @@ def test_mutmut_files_under_the_tests_are_skipped(tmp_path: Path) -> None:
     fixture.write_text(json.dumps({"exit_code_by_key": {}}), encoding="utf-8")
     modules = mr.from_mutmut(root, "src", DIFFS.__getitem__, skip=("src/tests/",))
     assert list(modules) == ["pkg.calc"]
+
+
+# Every refusal, word for word, and the reading edges (lint-mutation 6b)
+
+
+@pytest.mark.parametrize(
+    ("source", "message"),
+    [
+        ("[]", "troupe's report: it isn't an object"),
+        (
+            report({}).replace('"modules": {}', '"modules": []'),
+            "troupe's report: its modules isn't an object",
+        ),
+        (report({}, commit=None), "troupe's report: commit is None; it must be a full commit SHA"),
+        (
+            report({}, previous_commit="x"),
+            "troupe's report: previous_commit is 'x'; it must be a full commit SHA",
+        ),
+        (report({"m": "x"}), "troupe's report: modules.m isn't an object"),
+        (
+            report({"m": module(killed=-1)}),
+            "troupe's report: modules.m.killed is -1; it must be a whole number from 0 to 10000000",
+        ),
+        (
+            report({"m": module(finished="yes")}),
+            "troupe's report: modules.m.finished is 'yes'; it must be true or false",
+        ),
+        (
+            report({"m": module(survivors={})}),
+            "troupe's report: modules.m.survivors must be a list",
+        ),
+        (
+            report({"m": module(survived=1, survivors=[survivor(name="")])}),
+            "troupe's report: modules.m.survivors[0].name is ''; it must be a non-empty string",
+        ),
+        (
+            report({"m": module(survived=1, survivors=[survivor(path="")])}),
+            "troupe's report: modules.m.survivors[0].path is ''; it must be a non-empty string",
+        ),
+        (
+            report({"m": module(survived=1, survivors=[survivor(line=0)])}),
+            "troupe's report: modules.m.survivors[0].line is 0; "
+            "it must be a whole number from 1 to 10000000",
+        ),
+        (
+            report({"m": module(survived=1, survivors=[survivor(change="")])}),
+            "troupe's report: modules.m.survivors[0].change is ''; it must be a non-empty string",
+        ),
+        (
+            report({"m": module(survived=1, survivors=[survivor(commit="x")])}),
+            "troupe's report: modules.m.survivors[0].commit is 'x'; it must be a full commit SHA",
+        ),
+    ],
+)
+def test_each_report_refusal_word_for_word(source: str, message: str) -> None:
+    with pytest.raises(mr.ReportError) as raised:
+        mr.load_report(source, "troupe")
+    assert str(raised.value) == message
+
+
+def test_a_dumped_report_is_indented_and_sorted_by_module() -> None:
+    loaded = mr.load_report(report({"b": module(), "a": module()}), "troupe")
+    text = mr.dump_report(loaded)
+    assert text.startswith('{\n  "version": 1,\n  "repository": "troupe",')
+    assert text.index('"a": {') < text.index('"b": {')
+
+
+def test_a_failed_blame_names_the_line_the_commit_and_gits_reason(tmp_path: Path) -> None:
+    repo, _, new = scratch(tmp_path)
+    with pytest.raises(mr.ReportError) as raised:
+        mr.last_changed(repo, new, "m.py", 9)
+    assert str(raised.value).startswith(f"git blame of m.py:9 at {new[:12]} failed: fatal: ")
+
+
+def test_a_mutants_line_counts_from_the_hunks_start() -> None:
+    diff = "--- a\n+++ a\n@@ -3,4 +3,4 @@\n x\n y\n-old\n+new\n z"
+    assert mr.mutated_line(diff, 10) == (14, "-old\n+new")
+
+
+def test_lines_before_the_first_hunk_are_never_read_as_the_change() -> None:
+    assert mr.mutated_line("-not a change\n+nor this\n@@ -1 +1 @@\n-a\n+b", 5) == (5, "-a\n+b")
+
+
+def test_an_unreadable_diff_still_gives_the_survivor_a_change(tmp_path: Path) -> None:
+    root = mutmut_tree(tmp_path, {"pkg.calc.x_add__mutmut_1": 0})
+    [survivor] = mr.from_mutmut(root, "src", lambda name: "")["pkg.calc"].survivors
+    assert (survivor.line, survivor.change) == (4, "pkg.calc.x_add__mutmut_1")
+
+
+def test_a_mutant_named_unlike_mutmuts_falls_back_to_the_files_first_line(tmp_path: Path) -> None:
+    root = mutmut_tree(tmp_path, {"pkg.calc.oddname": 0})
+    [survivor] = mr.from_mutmut(root, "src", lambda name: "@@ -1 +1 @@\n-a\n+b")[
+        "pkg.calc"
+    ].survivors
+    assert survivor.line == 1
+
+
+def test_a_meta_file_without_its_source_is_skipped_not_fatal(tmp_path: Path) -> None:
+    root = mutmut_tree(tmp_path, {"pkg.calc.x_add__mutmut_1": 1})
+    orphan = root / "mutants" / "src" / "pkg" / "gone.py.meta"
+    orphan.write_text(json.dumps({"exit_code_by_key": {}}), encoding="utf-8")
+    later = root / "mutants" / "src" / "pkg" / "later.py.meta"
+    later.write_text(
+        json.dumps({"exit_code_by_key": {"pkg.later.x_f__mutmut_1": 1}}), encoding="utf-8"
+    )
+    (root / "src" / "pkg" / "later.py").write_text("def f():\n    return 1\n", encoding="utf-8")
+    assert sorted(mr.from_mutmut(root, "src", DIFFS.__getitem__)) == ["pkg.calc", "pkg.later"]
+
+
+def test_an_unrun_mutant_leaves_the_rest_of_the_file_counted(tmp_path: Path) -> None:
+    root = mutmut_tree(tmp_path, {"pkg.calc.x_add__mutmut_1": None, "pkg.calc.x_add__mutmut_2": 1})
+    calc = mr.from_mutmut(root, "src", DIFFS.__getitem__)["pkg.calc"]
+    assert (calc.finished, calc.killed) == (False, 1)

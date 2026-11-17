@@ -278,6 +278,8 @@ def mutated_line(diff: str, start: int) -> tuple[int, str]:
             added.append(line)
         elif not removed:
             offset += 1
+    if not seen:  # no hunk to count from: the function's own first line is the nearest known
+        return start, ""
     change = "\n".join([*removed, *added])
     return start + offset - 1, change
 

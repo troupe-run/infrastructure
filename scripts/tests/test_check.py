@@ -292,3 +292,36 @@ def test_an_installed_tflint_that_fails_fails_the_check(tmp_path: Path) -> None:
     failing.chmod(0o755)
     gate = dict(check.gates((), env={"PATH": str(tmp_path), "GITHUB_ACTIONS": "false"}))["tflint"]
     assert check.run_gates([("tflint", gate)], tmp_path) == 2
+
+
+def test_a_missing_tflint_in_github_actions_says_how_ci_installs_it(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as stopped:
+        check.gates((), {"PATH": fake_path(tmp_path), "GITHUB_ACTIONS": "true"})
+    assert str(stopped.value) == (
+        "check: tflint is not on the PATH. Fix: install it in the workflow "
+        "(terraform-linters/setup-tflint, the version in .tflint.hcl)."
+    )
+
+
+def test_the_local_skip_notice_word_for_word(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    check.gates((), {"PATH": fake_path(tmp_path)})
+    assert capsys.readouterr().out == (
+        "check: tflint isn't installed, so the tflint gate is skipped here; CI runs it. "
+        "To run it locally: go install "
+        f"github.com/terraform-linters/tflint@{check.tflint_version()}\n"
+    )
+
+
+def test_rules_without_a_version_line_stop_the_check_saying_so(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rules = tmp_path / ".tflint.hcl"
+    rules.write_text('plugin "terraform" {}\n', encoding="utf-8")
+    monkeypatch.setattr(check, "TFLINT_RULES", rules)
+    with pytest.raises(SystemExit) as stopped:
+        check.tflint_version()
+    assert (
+        str(stopped.value) == "check: .tflint.hcl has no `# tflint v<version>` line. Fix: add it."
+    )

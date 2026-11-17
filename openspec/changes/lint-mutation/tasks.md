@@ -64,7 +64,7 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
       previous run's tested commit; tests first, over a scratch git repository built in the test
 - [x] 4.2 The issues job finds each new survivor's merged pull request (`commits/<sha>/pulls`, with the run's own
       read-only token), and lists new survivors first in the issue, naming the pull request so GitHub cross-references
-      it (option B; whether the run also comments on the pull request is pending the owner, design D8); tests first,
+      it (option B, decided by the owner on 2026-11-18, design D8); tests first,
       with GitHub faked. Verify the first run (no previous report) calls nothing new
 
 ## 5. P: pull request mutation report (design D9)
@@ -90,8 +90,10 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
       bypass) in `tofu/test_quality.tf`, with the main-only environment test covering it. Verified: removing the
       environment's branch policy fails the test, naming `mutation-issues` and its policies. The App's creation steps
       are in `oob/README.md` and went to the owner
-- [ ] 6.2b `TEST_QUALITY_APP_CLIENT_ID` in `tofu/test_quality.tf`, once the owner has created the App and sent its client
-      ID (open on purpose until then: the pull request isn't marked ready before it)
+- [x] 6.2b `TEST_QUALITY_APP_CLIENT_ID` in `tofu/test_quality.tf`. Done: the owner created the App (App ID 5807252,
+      installation 183091782, 2026-11-18). Its installation's permissions read from the org's installations are exactly
+      the declared ones (issues write, metadata read, selected repositories); its repository list isn't readable with
+      the owner's token, so it's checked by hand on the installation's page
 - [x] 6.3 `.github/workflows/mutation.yml`: weekly schedule and dispatch (`repository`, `dry-run`), the `mutate`
       matrix with no secret on Python 3.15 and full history, the previous run's reports downloaded, the `issues` job in
       `mutation-issues`, the `board` job as `schedules.yml`, one concurrency group. Tests: no `pull_request`/
@@ -100,6 +102,15 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 - [x] 6.4 `scripts/watched-schedules.json` gains `mutation.yml` (8 days). Verify the schedule watch's tests pass
 - [x] 6.5 The oob README gains the App's creation and key-setting steps; the development workflow doc describes the
       weekly report, the ratchet and P's comment
+
+## 6b. This change's own test quality (owner, 2026-11-18)
+
+- [ ] 6b.1 Measure each of this change's new modules (the mutation scripts, and `check.py`'s changed functions) with
+      the pull request report's own run, locally: the "before" scores
+- [ ] 6b.2 Add tests that kill the surviving mutants, or exempt an equivalent mutant on its line with the reason,
+      until every judged module (at least 10 mutants) reaches the 60% weekly threshold
+- [ ] 6b.3 Re-run the pull request report on the pushed result, and record each module's before and after scores in
+      the design
 
 ## 7. Verification
 

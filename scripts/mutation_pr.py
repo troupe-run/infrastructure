@@ -302,7 +302,17 @@ def pr_report(
     }
 
 
-def main(argv: Sequence[str] | None = None, env: Mapping[str, str] = os.environ) -> int:
+def run_mutation(command: list[str]) -> int:
+    """Run mutation_run.py, its output streaming to the job's log."""
+    return subprocess.run(command, check=False).returncode
+
+
+def main(
+    argv: Sequence[str] | None = None,
+    env: Mapping[str, str] = os.environ,
+    root: Path = ROOT,
+    mutate: Callable[[list[str]], int] = run_mutation,
+) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run")
@@ -324,9 +334,9 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] = os.environ)
                 f"GITHUB_REPOSITORY names {name!r}, which mutation.json doesn't list"
             )
         started = time.monotonic()
-        changed = changed_lines(git_diff(ROOT, args.base, args.head))
+        changed = changed_lines(git_diff(root, args.base, args.head))
         targets = plan(
-            settings.repositories[name], changed, lambda p: (ROOT / p).read_text(encoding="utf-8")
+            settings.repositories[name], changed, lambda p: (root / p).read_text(encoding="utf-8")
         )
         timings = {"plan": time.monotonic() - started}
         report = None
@@ -334,18 +344,18 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] = os.environ)
             out = args.out.with_suffix(".mutants.json")
             command = [
                 sys.executable,
-                str(ROOT / "scripts" / "mutation_run.py"),
+                str(root / "scripts" / "mutation_run.py"),
                 name,
-                str(ROOT),
+                str(root),
                 str(out),
                 "--only",
                 json.dumps(only_argument(targets)),
             ]
             begun = time.monotonic()
-            done = subprocess.run(command, check=False)
+            code = mutate(command)
             timings["mutation"] = time.monotonic() - begun
-            if done.returncode != 0:
-                raise ms.SettingsError(f"mutation_run.py failed (exit {done.returncode})")
+            if code != 0:
+                raise ms.SettingsError(f"mutation_run.py failed (exit {code})")
             report = mr.load_report(out.read_text(encoding="utf-8"), name)
         timings["total"] = time.monotonic() - started
         fields = pr_report(name, targets, report, timings)
