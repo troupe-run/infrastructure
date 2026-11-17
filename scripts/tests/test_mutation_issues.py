@@ -405,3 +405,27 @@ def test_a_backtick_in_a_survivor_cant_end_the_code_span_in_an_issue() -> None:
     survivor = mr.Survivor("m`@owner`", "a`b`.py", 3, "-x`\n+y")
     line = mi.survivor_line(survivor, {})
     assert line.count("`") == 6, line
+
+
+def test_an_issue_opened_before_a_later_write_fails_still_goes_to_the_board(tmp_path: Path) -> None:
+    modules = {
+        "troupe.a": module(killed=10, survived=10),
+        "troupe.b": module(killed=10, survived=10),
+    }
+    (tmp_path / "report-troupe.json").write_text(
+        mr.dump_report(mr.Report("troupe", SHA, None, modules)), encoding="utf-8"
+    )
+    for name in ("infrastructure", "website"):
+        (tmp_path / f"skipped-{name}").touch()
+
+    class FailsSecondWrite(FakeGitHub):
+        def __call__(self, args: list[str]) -> mi.GhResult:
+            if ("-f" in args or "-X" in args) and len(self.writes) == 1:
+                return mi.GhResult(1, "", "API rate limit exceeded")
+            return super().__call__(args)
+
+    assert mi.main([str(tmp_path)], actions_env(tmp_path), FailsSecondWrite()) == 1
+    out = (tmp_path / "out").read_text(encoding="utf-8")
+    assert json.loads(out.removeprefix("issue-urls=")) == [
+        "https://github.com/troupe-run/x/issues/9"
+    ]

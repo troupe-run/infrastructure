@@ -356,9 +356,9 @@ def pulls_for(gh: Gh, repository: str, commits: set[str]) -> dict[str, int]:
     return pulls
 
 
-def apply(gh: Gh, repository: str, plan: Plan) -> list[str]:
-    """Make the plan's writes; returns the URLs of the issues it opened."""
-    opened = []
+def apply(gh: Gh, repository: str, plan: Plan, opened: list[str]) -> None:
+    """Make the plan's writes, adding each issue's URL to `opened` as soon as it's opened, so an
+    issue opened before a later write fails still reaches the board (spec: mutation-testing)."""
     base = f"repos/{ORG}/{repository}/issues"
     for action in plan.actions:
         if action.kind == "open":
@@ -416,7 +416,6 @@ def apply(gh: Gh, repository: str, plan: Plan) -> list[str]:
                     "state_reason=completed",
                 ],
             )
-    return opened
 
 
 # The run
@@ -470,8 +469,10 @@ def handle(
     gh: Gh,
     run_url: str,
     dry: bool,
+    opened: list[str],
     read_gh: Gh | None = None,
-) -> tuple[list[str], str]:
+) -> str:
+    """One repository's issues; the URLs of those it opens are added to `opened` as it goes."""
     report = mr.load_report(
         (directory / f"report-{repository}.json").read_text(encoding="utf-8"), repository
     )
@@ -487,8 +488,9 @@ def handle(
     pulls = pulls_for(reader, repository, commits) if commits else {}
     tool = settings.repositories[repository].tool
     plan = plan_repository(report, baselines, issues, settings, run_url, tool, pulls)
-    opened = [] if dry else apply(gh, repository, plan)
-    return opened, summary(repository, report, plan, settings, dry)
+    if not dry:
+        apply(gh, repository, plan, opened)
+    return summary(repository, report, plan, settings, dry)
 
 
 def reading_gh(token: str) -> Gh:
@@ -529,7 +531,9 @@ def main(
     )
     if read_gh is None and env.get("READ_TOKEN"):
         read_gh = reading_gh(env["READ_TOKEN"])
-    failed, opened, text = [], [], []
+    failed: list[str] = []
+    opened: list[str] = []
+    text: list[str] = []
     for repository in sorted(settings.repositories):
         if not (args.reports / f"report-{repository}.json").exists():
             if (args.reports / f"skipped-{repository}").exists():
@@ -537,11 +541,10 @@ def main(
             failed.append(f"{repository}: no report (its job failed or timed out)")
             continue
         try:
-            urls, part = handle(repository, args.reports, settings, gh, run_url, dry, read_gh)
+            part = handle(repository, args.reports, settings, gh, run_url, dry, opened, read_gh)
         except (mr.ReportError, ms.SettingsError, GitHubError) as error:
             failed.append(f"{repository}: {error}")
             continue
-        opened += urls
         text.append(part)
     report = "\n".join(text) + "".join(f"\n**Not handled:** {problem}\n" for problem in failed)
     print(report)

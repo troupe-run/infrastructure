@@ -2,9 +2,9 @@
 
 ### Requirement: Mutation testing runs weekly from infrastructure
 A workflow in troupe-run/infrastructure SHALL run mutation testing weekly, and on demand, over troupe's and
-infrastructure's Python and website's TypeScript, each at its `main`, on Linux with Python 3.15. It SHALL NOT run on
-pull requests or merge groups, and SHALL NOT be a required check, so it never blocks a merge. The workflow SHALL be
-one of the scheduled workflows the schedule watch declares.
+infrastructure's Python and website's TypeScript, each at its `main`, on Linux with Python 3.15. This weekly workflow
+SHALL NOT run on pull requests or merge groups. No mutation testing SHALL be a required check, so none blocks a merge.
+The weekly workflow SHALL be one of the scheduled workflows the schedule watch declares.
 
 #### Scenario: The weekly run
 - **WHEN** the weekly schedule fires
@@ -12,7 +12,8 @@ one of the scheduled workflows the schedule watch declares.
 
 #### Scenario: A pull request
 - **WHEN** a pull request is opened, or enters the merge queue, in any repository
-- **THEN** no mutation testing runs, and no required check waits for it
+- **THEN** the weekly workflow doesn't run, and no required check waits for any mutation testing (a ready pull request
+  gets the report of its own changes instead)
 
 #### Scenario: One repository on demand
 - **WHEN** the owner dispatches the workflow naming one repository

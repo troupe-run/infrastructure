@@ -70,8 +70,8 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 - [x] 5.2 The comment: found by its marker, edited in place, closed schema on the report, "nothing to mutate" when no
       target changed. Tests first
 - [x] 5.3 `.github/workflows/mutation-pr.yml`: ready pull requests only, `mutate` with a read-only token and the
-      budget, `comment` with `pull-requests: write` and no checkout, never required, success on survivors. Tests: no
-      write permission in `mutate`, no checkout in `comment`, the timeout follows `pr_budget_minutes`
+      budget, `comment` with `pull-requests: write` checking out only the base commit, never required, success on survivors. Tests: no
+      write permission in `mutate`, only the base commit checked out in `comment`, the timeout follows `pr_budget_minutes`
 - [ ] 5.4 Deliver `mutation-pr.yml`, `mutation_pr.py` and `mutation.json` beside the guard's files
       (`tofu/guard_delivery.tf`); verify the delivery tests and the plan list them for troupe and website
 - [x] 5.5 Trial P small locally on one changed function in this repository, under the load rule, and record its
