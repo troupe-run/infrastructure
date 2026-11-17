@@ -33,9 +33,9 @@ against a closed schema, and SHALL treat a missing or malformed report as an err
 - **THEN** the other repositories' issues are handled, that repository's are left alone, and the run fails naming it
 
 ### Requirement: Mutation testing's settings are declared once
-The score threshold, the time budget per repository, the fewest mutants a module needs to be judged, the most new
-issues one run may open per repository, the window in which a closed issue is reopened, the tool versions, and what
-each repository mutates and tests SHALL be declared in one file in infrastructure. Every job SHALL read them from
+The score threshold, the ratchet's tolerance, the time budgets, the fewest mutants a module needs to be judged, the
+most new issues one run may open per repository, the tool versions, and what each repository mutates and tests SHALL
+be declared in one file in infrastructure. Every job SHALL read them from
 there. An unknown or malformed setting SHALL fail the check.
 
 #### Scenario: The threshold moves
@@ -68,8 +68,9 @@ at least the declared fewest mutants and the run finished all of its mutants wit
 - **THEN** that module is listed in the summary as not finished and isn't judged, and the modules that finished are
   judged as usual
 
-### Requirement: Each module under the threshold has exactly one issue
-For each module judged under the threshold, the run SHALL keep exactly one open issue in the module's repository,
+### Requirement: Each module under the threshold or its baseline has exactly one issue
+For each module judged under the threshold or below its baseline, the run SHALL keep exactly one open issue in the
+module's repository,
 labelled `test-quality`. The run SHALL recognise its own issue by a marker naming the repository and module, in an
 issue its credential opened, and SHALL never open a second one for the same module.
 
@@ -83,12 +84,12 @@ issue its credential opened, and SHALL never open a second one for the same modu
   a comment is added only if the score or the number of survivors changed
 
 #### Scenario: A module recovers
-- **WHEN** a module with an open issue scores at or over the threshold
+- **WHEN** a module with an open issue scores at or over both the threshold and its baseline
 - **THEN** the issue gets a comment with the new score and is closed as completed
 
-#### Scenario: A module falls back under soon after
-- **WHEN** a module scores under the threshold and its issue was closed within the declared reopen window
-- **THEN** that issue is reopened and updated rather than a new one opened
+#### Scenario: A module falls again after its issue closed
+- **WHEN** a module whose issue was closed falls under the threshold or its baseline again
+- **THEN** a new issue is opened; the closed one stays closed
 
 #### Scenario: A person's issue quotes the marker
 - **WHEN** an issue opened by a person contains a module's marker
@@ -108,7 +109,7 @@ surviving mutants, each with its location and change: the first 30, then how man
   that lists them all
 
 ### Requirement: A run opens a bounded number of new issues
-A run SHALL open, or reopen, at most the declared number of issues per repository. Modules beyond that SHALL be named
+A run SHALL open at most the declared number of issues per repository. Modules beyond that SHALL be named
 in the run's summary and handled by a later run. Open issues SHALL always be updated or closed.
 
 #### Scenario: More modules than the cap
@@ -117,7 +118,7 @@ in the run's summary and handled by a later run. Open issues SHALL always be upd
   under
 
 ### Requirement: New issues go on the roadmap board
-Every issue the run opens or reopens SHALL be added to the troupe roadmap board, by the board's own credential, in a
+Every issue the run opens SHALL be added to the troupe roadmap board, by the board's own credential, in a
 job that only adds issues whose URL is an issue in troupe, infrastructure or website.
 
 #### Scenario: A new issue
@@ -135,3 +136,92 @@ SHALL report every module's score and what it would open, update, reopen or clos
 #### Scenario: The calibration run
 - **WHEN** the owner dispatches the workflow as a dry run
 - **THEN** the run's summary lists each module's score and the issues it would open, and no issue changes
+
+### Requirement: A module's baseline only moves up
+Each repository's committed quality-gates file SHALL hold, in its mutation table, each judged module's baseline score.
+A module SHALL count as having fallen when its score is below its baseline by more than the declared tolerance. A run
+SHALL report every baseline it would raise, to max(baseline, score), in its summary and the module's issue, and SHALL
+NOT write or lower one: a baseline changes only through an ordinary pull request.
+
+#### Scenario: A module falls below its baseline
+- **WHEN** a module with a 72.0% baseline scores 70.5%, above the 60% threshold, with a tolerance of 0
+- **THEN** its issue is opened or updated, saying it fell below its 72.0% baseline
+
+#### Scenario: A module improves
+- **WHEN** a module with a 72.0% baseline scores 75.0%
+- **THEN** the run reports the baseline it would raise to 75.0%, and no issue is opened
+
+#### Scenario: A module with no baseline
+- **WHEN** a module with no recorded baseline is judged at 64.0%
+- **THEN** no issue is opened, and the run reports 64.0% as the baseline to record
+
+### Requirement: A malformed mutation table is an error
+A malformed mutation table SHALL fail the run for that repository, naming the file and the key, and SHALL NOT be read
+as having no baselines.
+
+#### Scenario: A malformed baseline
+- **WHEN** a repository's mutation table gives a module a score of "high"
+- **THEN** that repository's issues are left alone, and the run fails naming the file, the module and the key
+
+### Requirement: New survivors are attributed to the pull request that added them
+The weekly run SHALL call a surviving mutant new when the line it mutates was last changed by a commit that isn't in the
+previous weekly run's tested commit for that repository. The module's issue SHALL list new survivors first, with the
+commit and the merged pull request that contains it, and that pull request SHALL get one comment naming the survivors
+it added. With no previous run to compare with, no survivor SHALL be called new.
+
+#### Scenario: A pull request adds an untested branch
+- **WHEN** a pull request merged since the last weekly run adds a line whose mutant survives
+- **THEN** the module's issue lists that survivor under new survivors with the pull request, and the pull request gets
+  a comment naming it
+
+#### Scenario: An old survivor
+- **WHEN** a survivor's line was last changed before the previous weekly run's tested commit
+- **THEN** it's listed with the other survivors, and no pull request is commented on for it
+
+#### Scenario: The first run
+- **WHEN** no previous weekly run's report is available
+- **THEN** no survivor is called new and no pull request is commented on
+
+### Requirement: Each ready pull request's changed code is mutation tested, as a report
+On every pull request that's ready for review in troupe, website and infrastructure, a workflow delivered from
+infrastructure SHALL mutate the code the pull request changed and report the surviving mutants on changed lines, in one
+comment on the pull request, edited in place on later pushes, and in the run's summary, with its runtime. It SHALL NOT
+be a required check, and SHALL conclude success when it finds survivors. Only its own failure to run SHALL fail it.
+
+#### Scenario: A pull request leaves a changed line untested
+- **WHEN** a ready pull request changes a function, and a mutant on a changed line survives
+- **THEN** the pull request's mutation comment lists it with its location and change, the job succeeds, and the merge
+  isn't held
+
+#### Scenario: An exempted line
+- **WHEN** a changed line carries the tool's exemption with a reason
+- **THEN** no mutant on it is reported
+
+#### Scenario: Unchanged code isn't reported
+- **WHEN** a mutant survives on a line the pull request didn't change
+- **THEN** it isn't in the comment
+
+#### Scenario: Another push
+- **WHEN** the pull request is pushed to again
+- **THEN** the same comment is edited with the new result, and no second comment appears
+
+#### Scenario: A draft
+- **WHEN** a draft pull request is opened or pushed to
+- **THEN** no mutation runs
+
+#### Scenario: No source changed
+- **WHEN** a ready pull request changes no file the repository's targets mutate
+- **THEN** nothing is mutated, and the comment, if one exists, says so
+
+#### Scenario: The runtime is recorded
+- **WHEN** the run finishes, or stops at its budget
+- **THEN** its comment and its report give the time of each step and of the whole job
+
+### Requirement: The job that runs a pull request's code holds no write token
+In the pull request workflow, the job that runs the pull request's code under mutation SHALL have a read-only token,
+and SHALL hand on only a report. The job that comments SHALL check out nothing and SHALL read the report as data
+against a closed schema.
+
+#### Scenario: A malformed pull request report
+- **WHEN** the comment job reads a report with a field the schema doesn't name
+- **THEN** it writes no comment and fails, naming the field
