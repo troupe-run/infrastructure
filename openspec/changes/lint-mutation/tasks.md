@@ -50,7 +50,7 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
       in `specs/mutation-testing` on issues, the cap and the baseline
 - [x] 3.2 Verify a malformed or missing report, or mutation table, fails the run naming the repository, after the
       others are handled
-- [ ] 3.3 Verify a dry run against the real repositories (local, read-only, with the trial reports) prints what it
+- [x] 3.3 Verify a dry run against the real repositories (local, read-only, with the trial reports) prints what it
       would do and writes nothing
 
 ## 4. W: attribution of new survivors (design D8)
@@ -89,7 +89,7 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
       `merge_group` trigger, the token's permissions equal the App's declaration, the job timeout equals the budget
       plus 30, the board job's URL check
 - [x] 6.4 `scripts/watched-schedules.json` gains `mutation.yml` (8 days). Verify the schedule watch's tests pass
-- [ ] 6.5 The oob README gains the App's creation and key-setting steps; the development workflow doc describes the
+- [x] 6.5 The oob README gains the App's creation and key-setting steps; the development workflow doc describes the
       weekly report, the ratchet and P's comment
 
 ## 7. Verification

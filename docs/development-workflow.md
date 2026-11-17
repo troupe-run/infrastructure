@@ -599,6 +599,38 @@ Only Dependabot can write to its branches, you included. To bring one up to date
 `@dependabot rebase`; GitHub's "Update branch" is refused by the ruleset. An open pull request is judged by the guard
 on its own branch, so it picks up a change to these rules only once Dependabot rebases it.
 
+## Mutation testing
+
+Mutation testing changes the code in small ways (a `+` to a `-`, a `<` to a `<=`) and runs the tests: a change no
+test notices is a surviving mutant, which says a test is missing (spec: mutation-testing; #325). It reports and
+never blocks a merge. Every number it judges by is in `scripts/mutation.json`.
+
+**Weekly** (`.github/workflows/mutation.yml`, Sunday 03:23 UTC, on Linux with Python 3.15), troupe, infrastructure
+and website are mutated at their `main` (mutmut for Python, Stryker for website's TypeScript). A module's score is
+the mutants caught as a percentage of those caught, survived or reached by no test. A module is judged when it has at
+least 10 mutants and all of them ran within the budget, and is **under** when its score is below 60% or below its
+recorded baseline. Each under module has one issue in its repository, labelled `test-quality`, on the board, listing
+its surviving mutants: opened (at most 5 new ones a run), updated in place, and closed when the module is back over
+both. A survivor on a line changed since the last run names the pull request that added it, which GitHub shows on
+that pull request.
+
+**Baselines only move up.** Each repository's `quality-gates.toml` holds, under `[mutation.baselines."<module>"]`,
+the score a module may not fall below. The run never writes it: its summary, and each module's issue, give the
+`[mutation.baselines]` entries to raise, and a person or agent raises them in an ordinary pull request (#326 tracks
+doing that automatically). Lowering one, for example after deleting well-tested code, is an ordinary pull request
+too. A dispatch can name one repository, or be a dry run that writes nothing and lists every score.
+
+**On each ready pull request** (`.github/workflows/mutation-pr.yml`, delivered to troupe and website), the functions
+or lines it changed are mutated, and one comment, edited on each push, lists the mutants that survive on changed
+lines, with the run's time. It's a report: it's not a required check, and it succeeds when it finds survivors. To
+answer a survivor, add a test that fails for it, or exempt the line with the tool's own comment and a reason
+(`# pragma: no mutate`, `// Stryker disable next-line <mutator>: <reason>`). In infrastructure it takes about 25-30
+minutes, most of it mutmut's pass over the whole suite.
+
+**mutmut's limits here.** It can't see code a test runs in a subprocess, which is how most of the guard's tests work,
+so a function reached only that way counts as reached by no test, and the issue says so. A few tests can't run under
+its hooks at all; they're listed in `scripts/mutation.json` under `deselect`, each with its reason.
+
 ## Known gaps
 
 GitHub enforces rules that apply to everyone, or that protect a secret, such as an App's key. It doesn't try to tell

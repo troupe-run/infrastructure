@@ -1,7 +1,8 @@
 # The files every governed repository runs from here: the guard's, the quality gates' measures
-# (spec: quality-gates), Claude's review workflow (spec:
-# pr-review; claude-pr-review design D6), and the dispatcher that starts dependabot-issues (spec:
-# dependency-updates; dependabot-issues-on-events design D2). Their source is this repository
+# (spec: quality-gates), Claude's review workflow (spec: pr-review; claude-pr-review design D6),
+# the dispatcher that starts dependabot-issues (spec: dependency-updates; dependabot-issues-on-events
+# design D2), and the pull request mutation report (spec: mutation-testing; lint-mutation design
+# D9). Their source is this repository
 # (spec: guard-delivery, design D2), and the App commits them straight to main.
 
 locals {
@@ -26,6 +27,15 @@ locals {
     # Starts infrastructure's dependabot-issues when Dependabot acts there (spec:
     # dependency-updates; dependabot-issues-on-events design D2).
     ".github/workflows/dependabot-dispatch.yml",
+    # Mutation testing of each ready pull request's changes, as a report that never blocks (spec:
+    # mutation-testing; lint-mutation design D9), with the scripts and settings it runs.
+    ".github/workflows/mutation-pr.yml",
+    "scripts/mutation.json",
+    "scripts/mutation_children.py",
+    "scripts/mutation_pr.py",
+    "scripts/mutation_report.py",
+    "scripts/mutation_run.py",
+    "scripts/mutation_settings.py",
   ])
 
   # The list a receiving repository holds (spec: guard-delivery). Generated from guard_files, so it
