@@ -273,3 +273,24 @@ def test_a_pull_request_with_mutants_gets_a_new_comment(tmp_path: Path) -> None:
     assert [call.split()[:2] for call in calls if "--paginate" not in call] == [
         ["api", "repos/troupe-run/troupe/issues/5/comments"]
     ]
+
+
+def test_every_tflint_and_tofu_install_matches_ci() -> None:
+    import check
+
+    ci = load(REPO / ".github" / "workflows" / "ci.yml")
+    [ci_tofu] = [
+        s
+        for s in ci["jobs"]["check"]["steps"]
+        if str(s.get("uses", "")).startswith("opentofu/setup-opentofu@")
+    ]
+    for path, job in ((WEEKLY, "mutate"), (PR, "mutate")):
+        steps = load(path)["jobs"][job]["steps"]
+        tflint = [
+            s for s in steps if str(s.get("uses", "")).startswith("terraform-linters/setup-tflint@")
+        ]
+        tofu = [s for s in steps if str(s.get("uses", "")).startswith("opentofu/setup-opentofu@")]
+        assert [s["with"]["tflint_version"] for s in tflint] == [check.tflint_version()], path.name
+        assert [s["with"]["tofu_version"] for s in tofu] == [ci_tofu["with"]["tofu_version"]], (
+            path.name
+        )
