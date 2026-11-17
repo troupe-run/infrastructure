@@ -128,6 +128,12 @@ jobs:
         with:
           tofu_version: 1.13.1
           tofu_wrapper: false
+      # The check's tflint gate (spec: ci-apply; lint-mutation design D1, D2). The version is the
+      # one .tflint.hcl names; a test holds the two together.
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: v0.66.0
+          tflint_wrapper: false
       - name: Install
         run: uv sync --locked
       - name: Check (the same script as local runs)

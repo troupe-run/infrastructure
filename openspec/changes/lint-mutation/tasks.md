@@ -5,23 +5,25 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 
 ## 0. Owner decisions (design D2, D4, D6)
 
-- [ ] 0.1 The owner confirms how developers install `tflint` (D2), and installs it on this machine
-- [ ] 0.2 The owner chooses the credential that files the issues (D4); if not option A, revise
-      `specs/mutation-issue-credentials` and these tasks before section 4
+- [x] 0.1 The owner confirms how developers install `tflint` (D2). Done: CI first, no local install for now (owner,
+      2026-11-17); design D2 and the ci-apply delta record the local skip
+- [x] 0.2 The owner chooses the credential that files the issues (D4). Done: option A, a new
+      `troupe-run-test-quality` App (owner, 2026-11-17)
 - [ ] 0.3 The owner approves, or changes, the thresholds and budget in D6
 
 ## 1. `tflint` in the check (design D1, D2)
 
-- [ ] 1.1 Write the tests first in `scripts/tests/test_check.py`: `gates()` lists a `tflint` gate after `tofu validate`
-      with `--chdir=tofu --recursive` and the root `.tflint.hcl`; a missing `tflint` exits naming it and the install
-      command; a scoped check still runs it. Verify they fail on the base code
-- [ ] 1.2 Add the gate to `scripts/check.py` and `.tflint.hcl` (bundled `terraform` ruleset, `recommended` preset, the
+- [x] 1.1 Write the tests first in `scripts/tests/test_check.py`: `gates()` lists a `tflint` gate after `tofu validate`
+      with `--chdir=tofu --recursive` and the root `.tflint.hcl`; a missing `tflint` fails under `GITHUB_ACTIONS=true`
+      naming it, and locally prints the skip notice with the install command and drops only that gate; a scoped check
+      still runs it. Verify they fail on the base code
+- [x] 1.2 Add the gate to `scripts/check.py` and `.tflint.hcl` (bundled `terraform` ruleset, `recommended` preset, the
       version in a comment). Verify 1.1's tests pass
-- [ ] 1.3 Run `tflint` over `tofu/`; fix each finding in `tofu/`, or record it in `.tflint.hcl` with its reason. Verify
+- [ ] 1.3 Run `tflint` over `tofu/` (first in the draft pull request's CI, D2); fix each finding in `tofu/`, or record it in `.tflint.hcl` with its reason. Verify
       `tflint` exits 0 and `tofu validate` still passes, and that a deliberately unused variable fails the gate
-- [ ] 1.4 Install `tflint` in CI's `check` job (`terraform-linters/setup-tflint`, version from `.tflint.hcl`), with a
+- [x] 1.4 Install `tflint` in CI's `check` job (`terraform-linters/setup-tflint`, version from `.tflint.hcl`), with a
       test that fails when the workflow's version and `.tflint.hcl`'s differ. Verify the test fails on a mismatch
-- [ ] 1.5 README's setup and `docs/development-workflow.md`'s list of gates name `tflint` and how to install it
+- [x] 1.5 README's setup and `docs/development-workflow.md`'s list of gates name `tflint` and how to install it
 
 ## 2. Settings and reports (design D3, D5, D6)
 
