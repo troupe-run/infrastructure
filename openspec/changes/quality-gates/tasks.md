@@ -5,7 +5,7 @@ and run one at a time.
 
 ## 0. Owner approval
 
-- [ ] 0.1 Send design's Calibration (proposed defaults) and D1 (a delivered module) to the owner through the
+- [x] 0.1 Send design's Calibration (proposed defaults) and D1 (a delivered module) to the owner through the
       orchestrator, and record the answer in design.md. Verify: the answer is quoted in design.md with its date
 
 Tasks 1–4 were built while the owner's answer on design's Calibration was pending (orchestrator, 2026-11-17: build the
@@ -53,14 +53,17 @@ complex than at the base.
 
 ## 5. This repository's adoption (design D5)
 
-- [ ] 5.1 Add coverage, pytest-cov, lizard and pip-audit to the dev group (`uv add --dev`, then check the lock diff by
+- [x] 5.1 Add coverage, pytest-cov, lizard and pip-audit to the dev group (`uv add --dev`, then check the lock diff by
       package: only these and their dependencies). Verify `uv sync --locked` passes
-- [ ] 5.2 Wire `scripts/check.py`: the complexity gate always; `--coverage` and `--audit` and `--base`; a scoped check
-      says coverage wasn't measured. Tests in `scripts/tests/test_check.py`. Verify they pass, and a local full check
-      stays within a few seconds of today's
+- [x] 5.2 Wire `scripts/check.py`: the complexity gate always (`--base` optional); coverage and audit only when
+      `QUALITY_GATES_LEG=true` under `GITHUB_ACTIONS=true` (the variable anywhere else fails, naming it; no flag, owner
+      2026-11-18); a scoped check on the leg says coverage wasn't measured. Tests in `scripts/tests/test_check.py`.
+      Verify they pass, and a local full check stays within a few seconds of today's. Done: the complexity gate
+      takes 0.5 s; a simulated leg run (GITHUB_ACTIONS and the variable set) ran every gate, tests 130 s under
+      coverage, audit 24 s
 - [ ] 5.3 Write `quality-gates.toml` with the approved defaults and the `scripts` baseline. Verify the full check
       with `--coverage --audit --base origin/main` passes here
-- [ ] 5.4 CI: `check` on Python 3.15 with the base fetched and the flags passed; the guard's legs gain Linux 3.12.
+- [x] 5.4 CI: `check` on Python 3.15 with the base fetched and the flags passed; the guard's legs gain Linux 3.12.
       Update `scripts/tests/` workflow tests to match. Verify they pass
 
 ## 6. Weekly report (design D8)
