@@ -442,3 +442,13 @@ def test_a_changed_test_file_or_non_python_file_is_never_mutated() -> None:
     changed = {"scripts/tests/test_a.py": {1}, "scripts/a.txt": {1}, "scripts/b.py": {2}}
     targets = pr.plan(repository, changed, lambda path: "def f():\n    return 1\n")
     assert targets == [pr.Target("scripts", ("b.x_f__mutmut_*",), {"scripts/b.py": [2]})]
+
+
+def test_a_timing_for_an_unknown_step_is_refused_so_no_key_reaches_the_comment() -> None:
+    fields = report_fields(timings={"[x](https://example.invalid) @owner": 1.0})
+    with pytest.raises(ms.SettingsError) as raised:
+        pr.load_pr_report(json.dumps(fields))
+    assert str(raised.value) == (
+        "the pull request report's timings name '[x](https://example.invalid) @owner', "
+        "not one of ['mutation', 'plan', 'total']"
+    )

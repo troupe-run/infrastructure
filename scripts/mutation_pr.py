@@ -221,6 +221,9 @@ def comment(report: Mapping[str, object]) -> str:
     return "\n".join(lines) + "\n"
 
 
+STEPS = {"plan", "mutation", "total"}
+"""The steps a pull request report times."""
+
 PR_REPORT_KEYS = {
     "version",
     "repository",
@@ -253,6 +256,12 @@ def load_pr_report(source: str) -> dict[str, object]:
         isinstance(value, int | float) and not isinstance(value, bool) for value in timings.values()
     ):
         raise ms.SettingsError("the pull request report's timings aren't seconds by step")
+    for step in sorted(set(timings) - STEPS):
+        # The report comes from the run of the pull request's own code: only known steps reach
+        # the comment, so no key can carry Markdown into it.
+        raise ms.SettingsError(
+            f"the pull request report's timings name {step!r}, not one of {sorted(STEPS)}"
+        )
     return fields
 
 
