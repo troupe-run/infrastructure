@@ -100,6 +100,11 @@ jobs:
           [[ -n "$artifact" ]] || { echo "Run $run kept no report for $REPOSITORY: nothing is called new."; exit 0; }
           gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact/zip" > "$RUNNER_TEMP/previous.zip"
           unzip -o -q "$RUNNER_TEMP/previous.zip" -d "$RUNNER_TEMP/previous"
+          # A dispatch that named another repository kept only a skipped marker for this one.
+          if [[ ! -f "$RUNNER_TEMP/previous/report-$REPOSITORY.json" ]]; then
+            echo "Run $run didn't mutate $REPOSITORY: nothing is called new."
+            exit 0
+          fi
           commit=$(jq -r '.commit' "$RUNNER_TEMP/previous/report-$REPOSITORY.json")
           if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
             printf '::error::the previous report for %s names no commit: %q\n' "$REPOSITORY" "$commit"

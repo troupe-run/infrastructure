@@ -103,6 +103,9 @@ jobs:
             --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n1)
           if [[ -n "$existing" ]]; then
             gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -F "body=@$RUNNER_TEMP/comment.md" > /dev/null
+          elif [[ "$(jq -r '.nothing' out/pr-report.json)" == true ]]; then
+            # Nothing was mutated and nothing was said before: no comment (spec: "No source changed").
+            echo "No file this repository mutation tests changed: no comment."
           else
             gh api "repos/$GITHUB_REPOSITORY/issues/$NUMBER/comments" -F "body=@$RUNNER_TEMP/comment.md" > /dev/null
           fi
