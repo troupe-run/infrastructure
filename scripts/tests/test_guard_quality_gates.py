@@ -248,6 +248,26 @@ def test_staged_and_unstaged_edits_are_both_judged(repo: Path) -> None:
     assert sorted(p.function.name for p in problems) == ["staged", "unstaged"]
 
 
+def test_untracked_files_count_as_wholly_changed_and_are_never_opened(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A gate reads no file it doesn't measure, such as an untracked file under openspec/."""
+    base = commit(repo, {"a.py": "x = 1\n"})
+    (repo / "a.py").write_text("x = 2\n", encoding="utf-8")
+    (repo / "openspec" / "changes" / "x").mkdir(parents=True)
+    (repo / "openspec" / "changes" / "x" / "design.md").write_text("# x\n", encoding="utf-8")
+
+    def refuse(*_args: object, **_kwargs: object) -> str:
+        raise AssertionError("changed_lines opened a file")
+
+    monkeypatch.setattr(Path, "read_text", refuse)
+    monkeypatch.setattr(Path, "read_bytes", refuse)
+    assert qg.changed_lines(repo, base) == {
+        "a.py": frozenset({1}),
+        "openspec/changes/x/design.md": None,
+    }
+
+
 def test_committed_work_since_the_base_is_judged(repo: Path) -> None:
     base = commit(repo, {"a.py": "x = 1\n"})
     commit(repo, {"a.py": branches(6)})
