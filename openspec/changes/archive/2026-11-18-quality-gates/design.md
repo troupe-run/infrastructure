@@ -268,7 +268,9 @@ Findings that shape the troupe and website changes, not this one:
 - **Floor for a new package: 80%.** Below every core package and most plugins today, above the three runners whose
   processes go unmeasured; a new package written with its tests meets it.
 - **Tolerance: 0.5 points**, until the same commit has been measured twice on a CI leg; then the smallest value that
-  covers the difference, rounded up to 0.1, recorded here.
+  covers the difference, rounded up to 0.1, recorded here. **Here: 0.1.** Two runs of the `check` job on 00a4557
+  (run 44185676354, attempts 1 and 2) both measured `scripts` at 91.0%, so the difference is below the 0.1 the report
+  shows; the baseline is 91.0. troupe and website settle theirs the same way.
 - **Baselines: each package's measurement on its CI leg when the gate lands, rounded down to 0.1.**
 
 ### Time
