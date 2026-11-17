@@ -61,8 +61,10 @@ complex than at the base.
       Verify they pass, and a local full check stays within a few seconds of today's. Done: the complexity gate
       takes 0.5 s; a simulated leg run (GITHUB_ACTIONS and the variable set) ran every gate, tests 130 s under
       coverage, audit 24 s
-- [ ] 5.3 Write `quality-gates.toml` with the approved defaults and the `scripts` baseline. Verify the full check
-      with `--coverage --audit --base origin/main` passes here
+- [ ] 5.3 Write `quality-gates.toml` with the approved defaults and the `scripts` baseline. The baseline is CI's:
+      coverage and the audit run only on the `check` job (`QUALITY_GATES_LEG=true` under GitHub Actions; 5.2, design
+      D5), so the verification is that job's run on this pull request. Set `baseline` to its measurement rounded down
+      to 0.1, run the job again on the same commit to settle the tolerance (design D4), and cite both runs
 - [x] 5.4 CI: `check` on Python 3.15 with the base fetched and the flags passed; the guard's legs gain Linux 3.12.
       Update `scripts/tests/` workflow tests to match. Verify they pass
 
