@@ -37,11 +37,11 @@ See proposal.md for why. What shapes the approach:
 
 ## Decisions
 
-### D1. `tflint` is a gate after `tofu validate`, found on the PATH like `tofu`
+### D1. `tflint` is a gate after `tofu validate`
 
-`check.py` gains `("tflint", [tflint, "--chdir=tofu", "--recursive", "--config", <root>/.tflint.hcl])` after `tofu
-validate`. It's found with `tool("tflint", path=None)`, whose fix names the install route (D2). CI's `check` job
-installs it with `terraform-linters/setup-tflint`, at the version `.tflint.hcl`'s comment and the workflow both name,
+`check.py`'s `tflint_gate` adds `("tflint", [tflint, "--chdir=tofu", "--recursive", "--config=<root>/.tflint.hcl"])`
+after `tofu validate`, finding `tflint` on the PATH. Where it isn't there, D2's rule applies. CI's `check` job
+installs it with `terraform-linters/setup-tflint`, at the version `.tflint.hcl`'s `# tflint v<version>` line names,
 and a test holds the two together. It's a non-test gate, so it runs in scoped checks too, as `tofu fmt` does.
 
 `.tflint.hcl` enables the bundled `terraform` ruleset's `recommended` preset. No provider plugin: the
@@ -97,9 +97,11 @@ fail, against the owner's choice).
 - **mutmut per package.** troupe's tests live beside each package, so the troupe leg runs mutmut once per package
   under `packages/`, each with its own `source_paths` and tests. The leg writes the run's `setup.cfg` `[mutmut]`
   section into its throwaway checkout from `scripts/mutation.json`; nothing is committed to troupe.
-- **Stryker from the settings' pinned versions.** The website leg runs `npm ci`, then
-  `npx -p @stryker-mutator/core@<v> -p @stryker-mutator/vitest-runner@<v> stryker run` with a config written from
-  the settings: mutate `src/**/*.ts` and `scripts/**/*.mjs`, run `tests/unit`, JSON reporter.
+- **Stryker from the settings' pinned version.** The website leg runs `npm ci`, then `mutation_run.py` installs
+  `@stryker-mutator/core` and its vitest runner at that version into the throwaway checkout (`npm install --no-save`)
+  and runs `npx --no-install stryker run --inPlace --testRunner vitest --concurrency 1 --mutate <globs or ranges>`,
+  with no config file: the settings' globs (`src/**/*.ts`, `scripts/**/*.mjs`), or a pull request's changed ranges.
+  Why each of those, from the trial, is under "Measured locally, website" below.
 - **What a trial of mutmut 3.8.1 on Python 3.15 taught** (2026-11-17, on this repository's `scripts/`), and how
   `scripts/mutation_run.py` answers each:
   - mutmut names a module by its path from where it runs, stripping only `src/`, and infrastructure's tests import
