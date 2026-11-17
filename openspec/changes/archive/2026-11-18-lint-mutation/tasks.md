@@ -77,15 +77,19 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 - [x] 5.3 `.github/workflows/mutation-pr.yml`: ready pull requests only, `mutate` with a read-only token and the
       budget, `comment` with `pull-requests: write` checking out only the base commit, never required, success on survivors. Tests: no
       write permission in `mutate`, only the base commit checked out in `comment`, the timeout follows `pr_budget_minutes`
-- [ ] 5.4 Deliver `mutation-pr.yml`, `mutation_pr.py` and `mutation.json` beside the guard's files
-      (`tofu/guard_delivery.tf`); verify the delivery tests and the plan list them for troupe and website
+- [x] 5.4 Deliver `mutation-pr.yml`, `mutation_pr.py` and `mutation.json` beside the guard's files
+      (`tofu/guard_delivery.tf`); verify the delivery tests and the plan list them for troupe and website. Verified: the plan for a269b54 (run 44197215871)
+      creates the seven delivered files in troupe and in website, and updates their `guard-delivery.json` and
+      `dependabot.yml`
 - [x] 5.5 Trial P small locally on one changed function in this repository, under the load rule, and record its
       step timings in the design
 
 ## 6. Credential, label and weekly workflow (design D3, D4)
 
-- [ ] 6.1 `test-quality` in `tofu/labels/kinds.json`. Verify the plan shows it created in each managed repository and
-      nothing else changing
+- [x] 6.1 `test-quality` in `tofu/labels/kinds.json`. Verify the plan shows it created in each managed repository and
+      nothing else changing. Verified: the plan for a269b54 (run 44197215871)
+      adds `test-quality` to troupe's, `.github`'s, infrastructure's and website's label sets, and changes no other
+      label
 - [x] 6.2 The App's declaration in `oob/app-installations.json`, the `mutation-issues` environment (main only, no
       bypass) in `tofu/test_quality.tf`, with the main-only environment test covering it. Verified: removing the
       environment's branch policy fails the test, naming `mutation-issues` and its policies. The App's creation steps
@@ -110,18 +114,24 @@ under 40, and run one at a time. Mutation trials stay small locally (one module)
 - [x] 6b.2 Add tests that kill the surviving mutants, or exempt an equivalent mutant on its line with the reason,
       until every judged module (at least 10 mutants) reaches the 60% weekly threshold. Done: every
       module is over 60% after (design D11), with no exemption needed
-- [ ] 6b.3 Re-run the pull request report on the pushed result, and record each module's before and after scores in
-      the design
+- [x] 6b.3 Re-run the pull request report on the pushed result, and record each module's before and after scores in
+      the design. Done: P's re-run in CI at a269b54
+      (mutation-pr run 44197215930): 3,309 mutants in the changed functions, 2,929 caught (88.5%), 256
+      survivors on changed lines (852 at ab692ae), 32.2 minutes. The per-module scores are in design D11
 
 ## 7. Verification
 
 - [x] 7.1 The full check passes (`uv run scripts/check.py`), under the load rule
-- [ ] 7.2 The draft pull request's CI runs `tflint` and passes; the plan shows only the label, environment, variable,
-      policy and the delivered files
-- [ ] 7.3 After merge and the owner's apply: dispatch `mutation.yml` with `dry-run`, read its summary, and send the
-      scores and the baselines to record to the owner
+- [x] 7.2 The draft pull request's CI runs `tflint` and passes; the plan shows only the label, environment, variable,
+      policy and the delivered files. Verified: CI's `check` passed `tflint` (runs
+      44134274617 and later); the plan for a269b54 is 17 to add, 8 to change, 0 to destroy, all of them these
+
 
 ## Workflow follow-up
+
+- After merge and the owner's apply: the owner sets `TEST_QUALITY_APP_PRIVATE_KEY` (oob/README.md), then dispatch
+  `mutation.yml` with `dry-run`, read its summary, and send the scores and the baselines to record to the owner (was
+  task 7.3, which can only run after the merge).
 
 - website's ESLint, Prettier and `tsc --noEmit` (the other half of #323) go in a website change on its own branch.
 - After merge, comment on #323 and #325 with the PR and the archived change, and check their cards say Done.
