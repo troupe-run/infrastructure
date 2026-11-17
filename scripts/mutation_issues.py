@@ -11,8 +11,10 @@ more than the tolerance (the ratchet, design D7). An under module keeps exactly 
 issue in its repository, labelled `test-quality`, found by the marker on its first line in an issue
 the test-quality App opened: opened if there's none (at most `max_new_issues` a run), rewritten if
 there is, with a comment when the score or the number of survivors changed. A module no longer under
-gets a comment and its issue closed. A merged pull request that added new survivors (design D8) gets
-one comment naming them.
+gets a comment and its issue closed. A survivor new since the last run (design D8) names the merged
+pull request that added it, "added in #n", which GitHub cross-references on that pull request: the
+test-quality App writes issues only. Which pull request a commit came from is read with READ_TOKEN
+(the workflow's own, read-only), since an issues-only token can't read pull requests.
 
 The run never writes a baseline: its summary, and each module's issue, name the baselines it would
 raise, for a person or agent to raise by pull request (design D10).
@@ -46,6 +48,11 @@ SETTINGS = Path(__file__).resolve().parent / "mutation.json"
 SETTINGS_URL = "https://github.com/troupe-run/infrastructure/blob/main/scripts/mutation.json"
 SHOWN = 30
 """How many survivors an issue lists before saying how many more there are."""
+NO_TESTS_NOTE = {
+    "mutmut": " in the test process (mutmut doesn't see code a test runs in a subprocess, so a "
+    "function tested only that way counts here)",
+    "stryker": "",
+}
 MARKER = re.compile(r"<!-- mutation-testing: (?P<repository>[\w.-]+):(?P<module>\S+) -->")
 STATE = re.compile(
     r"<!-- mutation-testing-state: score=(?P<score>[\d.]+) survived=(?P<survived>\d+) -->"
@@ -130,7 +137,9 @@ def body(
         f"`{judgement.module}` scored **{judgement.score:g}%** in the weekly mutation run "
         f"([run]({run_url})): {module.caught} caught of {module.counted} "
         f"({module.killed} killed, {module.timeout} timed out, {module.crashed} crashed), "
-        f"{module.survived} survived, {module.no_tests} not covered by any test.",
+        f"{module.survived} survived, {module.no_tests} reached by no test"
+        + (NO_TESTS_NOTE[tool] if module.no_tests else "")
+        + ".",
         "",
     ]
     if judgement.below_baseline:
@@ -402,40 +411,6 @@ def apply(gh: Gh, repository: str, plan: Plan) -> list[str]:
     return opened
 
 
-def comment_on_pulls(
-    gh: Gh,
-    repository: str,
-    report: mr.Report,
-    pulls: Mapping[str, int],
-    issues: Mapping[str, str],
-    dry: bool,
-) -> list[str]:
-    """One comment on each merged pull request that added survivors since the last run (D8)."""
-    by_pull: dict[int, list[tuple[str, mr.Survivor]]] = {}
-    for name, module in sorted(report.modules.items()):
-        for survivor in module.survivors:
-            if survivor.new and survivor.commit and survivor.commit in pulls:
-                by_pull.setdefault(pulls[survivor.commit], []).append((name, survivor))
-    done = []
-    for pull, found in sorted(by_pull.items()):
-        lines = [
-            "The weekly mutation run found surviving mutants on lines this pull request added or "
-            "changed: no test fails when they're changed.",
-            "",
-        ]
-        for name, survivor in found:
-            where = f" ({issues[name]})" if name in issues else ""
-            lines.append(survivor_line(survivor, {}) + where)
-        text = "\n".join(lines) + "\n"
-        done.append(f"#{pull}")
-        if not dry:
-            gh_json(
-                gh,
-                ["api", f"repos/{ORG}/{repository}/issues/{pull}/comments", "-f", f"body={text}"],
-            )
-    return done
-
-
 # The run
 
 
@@ -481,7 +456,13 @@ def summary(
 
 
 def handle(
-    repository: str, directory: Path, settings: ms.Settings, gh: Gh, run_url: str, dry: bool
+    repository: str,
+    directory: Path,
+    settings: ms.Settings,
+    gh: Gh,
+    run_url: str,
+    dry: bool,
+    read_gh: Gh | None = None,
 ) -> tuple[list[str], str]:
     report = mr.load_report(
         (directory / f"report-{repository}.json").read_text(encoding="utf-8"), repository
@@ -494,17 +475,35 @@ def handle(
     baselines = ms.load_baselines(table, path)
     issues = list_issues(gh, repository)
     commits = {s.commit for m in report.modules.values() for s in m.survivors if s.new and s.commit}
-    pulls = pulls_for(gh, repository, commits) if commits else {}
+    reader = read_gh or gh
+    pulls = pulls_for(reader, repository, commits) if commits else {}
     tool = settings.repositories[repository].tool
     plan = plan_repository(report, baselines, issues, settings, run_url, tool, pulls)
     opened = [] if dry else apply(gh, repository, plan)
-    urls = {issue.module: issue.url for issue in issues}
-    comment_on_pulls(gh, repository, report, pulls, urls, dry)
     return opened, summary(repository, report, plan, settings, dry)
 
 
+def reading_gh(token: str) -> Gh:
+    """gh with another token, for the reads the App's issues-only token can't make."""
+
+    def gh(args: list[str]) -> GhResult:
+        done = subprocess.run(
+            ["gh", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+            env={**os.environ, "GH_TOKEN": token},
+        )
+        return GhResult(done.returncode, done.stdout, done.stderr)
+
+    return gh
+
+
 def main(
-    argv: Sequence[str] | None = None, env: Mapping[str, str] = os.environ, gh: Gh = run_gh
+    argv: Sequence[str] | None = None,
+    env: Mapping[str, str] = os.environ,
+    gh: Gh = run_gh,
+    read_gh: Gh | None = None,
 ) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument("reports", type=Path)
@@ -520,6 +519,8 @@ def main(
         f"{env.get('GITHUB_SERVER_URL', 'https://github.com')}/{env.get('GITHUB_REPOSITORY', '')}"
         f"/actions/runs/{env.get('GITHUB_RUN_ID', '')}"
     )
+    if read_gh is None and env.get("READ_TOKEN"):
+        read_gh = reading_gh(env["READ_TOKEN"])
     failed, opened, text = [], [], []
     for repository in sorted(settings.repositories):
         if not (args.reports / f"report-{repository}.json").exists():
@@ -528,7 +529,7 @@ def main(
             failed.append(f"{repository}: no report (its job failed or timed out)")
             continue
         try:
-            urls, part = handle(repository, args.reports, settings, gh, run_url, dry)
+            urls, part = handle(repository, args.reports, settings, gh, run_url, dry, read_gh)
         except (mr.ReportError, ms.SettingsError, GitHubError) as error:
             failed.append(f"{repository}: {error}")
             continue

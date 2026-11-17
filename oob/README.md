@@ -227,6 +227,47 @@ gh api repos/troupe-run/infrastructure/environments/docs/secrets --jq '.secrets[
 commands above again, for every repository they name. Then delete the old key in the App's settings. A run between the two steps still works, because
 both keys are valid until the old one is deleted.
 
+## The test-quality App (set up by hand)
+
+`.github/workflows/mutation.yml` keeps one `test-quality` issue per module whose mutation score is under its threshold
+or below its baseline, in troupe, website and infrastructure (spec: mutation-testing, mutation-issue-credentials,
+#325). `GITHUB_TOKEN` can't write the other repositories, so the run writes with the `troupe-run-test-quality` App's
+token, which can write issues and nothing else. GitHub has no API for creating an App, and OpenTofu never holds a
+secret, so these steps are the owner's. `tofu/test_quality.tf` declares the `mutation-issues` environment on
+infrastructure. The board card is added with the board App's token, in the `board` environment.
+
+**Creating it.** In the org's settings, under GitHub Apps, create a new App:
+- name `troupe-run-test-quality`, installable only on this account, webhook off. The script trusts only issues by
+  `troupe-run-test-quality[bot]`, so a different name means changing `APP` in `scripts/mutation_issues.py` too;
+- repository permission "Issues: read and write", and nothing else: no organisation or account permissions. GitHub
+  adds "Metadata: read". Setting an issue's type needs nothing more. The workflow's token asks for each permission by
+  name, and `scripts/check.py` holds it to `app-installations.json`, so a permission added here needs the workflow
+  too (#238);
+- install it with "Only select repositories" and select `troupe`, `infrastructure` and `website`.
+
+Its installation is checked by `oob.py` against `app-installations.json`. Its client ID goes in
+`tofu/test_quality.tf`.
+
+**Its key.** Generate a private key in the App's settings. Store it in 1Password as an SSH Key item named
+`troupe-run-test-quality` in vault `troupe.run`, by importing the downloaded `.pem`, then delete the file. Once the
+`mutation-issues` environment exists on infrastructure (after the apply that creates it), set the secret. Nothing is
+printed:
+
+```sh
+export OP_ACCOUNT=l-a-u.1password.com
+# gh runs only once op has read the key, and only if it's PKCS#1 or PKCS#8 (create-github-app-token refuses OpenSSH).
+key=$(op read -n "op://troupe.run/troupe-run-test-quality/private key") &&
+  case "$key" in "-----BEGIN RSA PRIVATE KEY-----"*|"-----BEGIN PRIVATE KEY-----"*) ;; *) false ;; esac &&
+  printf '%s' "$key" | gh secret set TEST_QUALITY_APP_PRIVATE_KEY --env mutation-issues -R troupe-run/infrastructure
+unset key
+```
+
+Check it by name, never by value:
+
+```sh
+gh api repos/troupe-run/infrastructure/environments/mutation-issues/secrets --jq '.secrets[].name'
+```
+
 ## The Dependabot issues App (set up by hand)
 
 `.github/workflows/dependabot-issues.yml` gives every Dependabot pull request in troupe, website and infrastructure its

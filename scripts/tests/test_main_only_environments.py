@@ -27,6 +27,7 @@ TF_FILES = (
     REPO / "tofu" / "docs.tf",
     REPO / "tofu" / "dependabot_issues.tf",
     REPO / "tofu" / "dependabot_dispatch.tf",
+    REPO / "tofu" / "test_quality.tf",
 )
 
 
@@ -46,6 +47,7 @@ MAIN_ONLY = {
     ("repo_infrastructure", "dependabot-issues"): False,
     ("repo_troupe", "dependabot-dispatch"): False,
     ("repo_website", "dependabot-dispatch"): False,
+    ("repo_infrastructure", "mutation-issues"): False,
 }
 
 

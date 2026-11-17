@@ -100,6 +100,25 @@ fail, against the owner's choice).
 - **Stryker from the settings' pinned versions.** The website leg runs `npm ci`, then
   `npx -p @stryker-mutator/core@<v> -p @stryker-mutator/vitest-runner@<v> stryker run` with a config written from
   the settings: mutate `src/**/*.ts` and `scripts/**/*.mjs`, run `tests/unit`, JSON reporter.
+- **What a trial of mutmut 3.8.1 on Python 3.15 taught** (2026-11-17, on this repository's `scripts/`), and how
+  `scripts/mutation_run.py` answers each:
+  - mutmut names a module by its path from where it runs, stripping only `src/`, and infrastructure's tests import
+    `mutation_settings`, not `scripts.mutation_settings`. So mutmut runs where `src` is the unit's source: a troupe
+    package's own directory, and infrastructure's checkout root with `src` linked to `scripts`. A survivor's path is
+    mapped back to the unit's real source.
+  - The tests run in mutmut's copy (`mutants/`) and find the repository's files from their own place, so every other
+    top-level entry is copied in beside the source (a hand-kept list missed `.tflint.hcl`). The tests themselves are
+    run, never mutated.
+  - The repository's pytest `addopts` load the guard's tag-check plugin, which looks for files from the repository's
+    root; a mutation run clears them (`-o addopts=-ra`).
+  - Tests that run a script in a subprocess (the guard's) crashed mutmut's stats pass, and a git hook running a
+    mutated copy under another Python couldn't import mutmut. A pytest plugin loaded only in mutation runs
+    (`scripts/mutation_children.py`) gives each child a no-mutant value during stats and the mutant's name during a
+    mutant's run, with mutmut on `PYTHONPATH`. **Limit:** mutmut's stats don't see what a child process runs, so a
+    function reached only through a subprocess counts as not covered by any test.
+  - A mutmut run that fails is an error naming the unit, never a report of empty modules.
+  - `mutation_settings.py` alone, with only its own tests selected: 381 mutants in 21 s (323 killed, 58 survived,
+    84.8%); every survivor's computed line matched the source.
 - **Results to one report.** `scripts/mutation_report.py` turns mutmut's per-mutant results or Stryker's
   `mutation.json` into one shape: per module, the counts, the score, and each surviving mutant's name, line and diff
   (from `mutmut show` or Stryker's replacement), plus whether the run finished within the budget.
@@ -202,8 +221,14 @@ was last changed by a commit that isn't an ancestor of the previously judged com
 commit, and the `issues` job asks GitHub which merged pull request contains it (`commits/<sha>/pulls`). Then:
 
 - the module's issue lists new survivors first, under "New since the last run", each with its commit and pull request;
-- the merged pull request gets one comment naming the survivors it added, the module's score and the issue. A comment
-  on a pull request is an issue comment, which the test-quality App's issues permission covers.
+- naming the pull request in the issue ("added in #412") makes GitHub show the issue on that pull request's timeline.
+
+**Pending the owner (2026-11-18):** whether the run also comments on the pull request (option A). A GitHub App token
+reaches only what its permissions name, so commenting needs "Pull requests: read and write" on the test-quality App,
+which could then also edit or close pull requests (never push or merge). Built provisionally as option B, the
+cross-reference only, which keeps the App issues-only (orchestrator, 2026-11-18). Choosing A later adds the App
+permission, its token input and the comment; nothing else changes. Which pull request a commit came from is read with
+the run's own read-only token (`READ_TOKEN`), since the App's issues-only token can't read pull requests.
 
 With no previous run (the first, or one older than 90 days), nothing is called new. Cost: one blame per survivor,
 seconds.
@@ -219,7 +244,7 @@ the owner can decide later whether it should block.
   `scripts/mutation.json` (the settings, read for the repository's own targets) join `guard_files` in
   `tofu/guard_delivery.tf`, so troupe and website run the same files, delivered after an approved plan.
 - **Two jobs, so the job that runs the pull request's code holds nothing.** `mutate` checks out the pull request with
-  its base, has a read-only token, and writes a report artifact. `comment` checks out nothing, reads the report as data
+  its base, has a read-only token, and writes a report artifact. `comment` checks out only the base commit (for the script that reads the report), reads the report as data
   against a closed schema, and writes one comment on the pull request, found by a marker and edited in place on later
   pushes (GITHUB_TOKEN, `pull-requests: write`).
 - **What is mutated.** `git diff --unified=0 <base>...<head>` gives the changed lines of files in the repository's

@@ -33,6 +33,8 @@ class Unit:
     name: str
     source: str
     tests: str
+    also_copy: tuple[str, ...] = ()  # what the tests read beside the source, copied in with it
+    deselect: tuple[tuple[str, str], ...] = ()  # (test node id, why mutmut's hooks can't run it)
 
 
 @dataclass(frozen=True)
@@ -120,9 +122,36 @@ def load_repository(name: str, value: object) -> Repository:
         loaded = []
         for index, unit in enumerate(units):
             at = f"{where}.units[{index}]"
-            fields = closed(unit, {"name", "source", "tests"}, at)
+            fields = closed(
+                unit,
+                {"name", "source", "tests", "also_copy", "deselect"},
+                at,
+                required={"name", "source", "tests"},
+            )
+            also_copy = fields.get("also_copy", [])
+            if not isinstance(also_copy, list):
+                raise SettingsError(f"{at}.also_copy must be a list of paths")
+            deselect = fields.get("deselect", [])
+            if not isinstance(deselect, list):
+                raise SettingsError(f"{at}.deselect must be a list of {{test, why}}")
+            skipped = []
+            for number, entry in enumerate(deselect):
+                item = closed(entry, {"test", "why"}, f"{at}.deselect[{number}]")
+                test = text(item["test"], f"{at}.deselect[{number}].test")
+                if not test.startswith(fields["tests"].rstrip("/") + "/") or "::" not in test:
+                    raise SettingsError(
+                        f"{at}.deselect[{number}].test is {test!r}; it must be a test node id "
+                        f"under {fields['tests']}, such as {fields['tests']}/test_x.py::test_y"
+                    )
+                skipped.append((test, text(item["why"], f"{at}.deselect[{number}].why")))
             loaded.append(
-                Unit(*(text(fields[key], f"{at}.{key}") for key in ("name", "source", "tests")))
+                Unit(
+                    name=text(fields["name"], f"{at}.name"),
+                    source=text(fields["source"], f"{at}.source"),
+                    tests=text(fields["tests"], f"{at}.tests"),
+                    also_copy=tuple(text(path, f"{at}.also_copy") for path in also_copy),
+                    deselect=tuple(skipped),
+                )
             )
         return Repository(name, tool, units=tuple(loaded))
     closed(raw, {"tool", "mutate", "tests"}, where)

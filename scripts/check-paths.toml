@@ -59,6 +59,7 @@ paths = [
   "tofu/providers.tf",
   "tofu/release.tf",
   "tofu/repositories.tf",
+  "tofu/test_quality.tf",
   "tofu/versions.tf",
   "tofu/modules/**",
   "tofu/required-checks.json",

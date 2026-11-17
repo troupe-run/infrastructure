@@ -1,0 +1,245 @@
+name: mutation
+
+# Weekly mutation testing of troupe, infrastructure and website, which keeps one test-quality issue
+# per module under its threshold or baseline (spec: mutation-testing; #325; lint-mutation design
+# D3-D8). It runs on no pull request and is no required check, so it never blocks a merge.
+#
+#   mutate   no secret; contents and actions read   checks out a repository's main, runs mutmut or
+#                                                   Stryker within the budget (scripts/mutation.json),
+#                                                   and hands on its report, the repository's
+#                                                   quality-gates.toml, and nothing else
+#   issues   env mutation-issues (main only)        reads the reports as data and keeps the issues,
+#                                                   with the troupe-run-test-quality App's token
+#   board    env board (main only)                  adds each issue it opened to the troupe roadmap
+#                                                   board, with the board App's token
+#
+# A dispatch can name one repository, and can be a dry run: every module's score and what it would
+# open, update or close go to the run's summary, and nothing is written (design D6's calibration).
+on:
+  # Sunday 03:23 UTC, off the hour. The schedule watch reports it if GitHub stops running it
+  # (scripts/watched-schedules.json).
+  schedule:
+    - cron: "23 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "One repository to mutate, or all"
+        type: choice
+        options: [all, troupe, infrastructure, website]
+        default: all
+      dry-run:
+        description: "Report every score and what would change, and write nothing"
+        type: boolean
+        default: false
+
+permissions: {}
+
+# Two runs at once could each open an issue for the same module.
+concurrency:
+  group: mutation
+  cancel-in-progress: false
+
+jobs:
+  mutate:
+    name: mutate ${{ matrix.repository }}
+    runs-on: ubuntu-latest
+    # budget_minutes (scripts/mutation.json) plus 30 for setup and the report; a test holds the two
+    # together.
+    timeout-minutes: 270
+    permissions:
+      contents: read
+      actions: read # the previous run's report, for attributing new survivors (design D8)
+    strategy:
+      fail-fast: false
+      matrix:
+        repository: [troupe, infrastructure, website]
+    steps:
+      - name: Skip a repository the dispatch didn't name
+        id: skip
+        env:
+          NAMED: ${{ inputs.repository || 'all' }}
+          REPOSITORY: ${{ matrix.repository }}
+        run: |
+          mkdir -p out
+          if [[ "$NAMED" != all && "$NAMED" != "$REPOSITORY" ]]; then
+            touch "out/skipped-$REPOSITORY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      # This repository's main: the scripts and their settings.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.skip.outputs.skip != 'true'
+        with:
+          path: infra
+      # The repository under test, at its main, with its history for git blame (design D8).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.skip.outputs.skip != 'true'
+        with:
+          repository: troupe-run/${{ matrix.repository }}
+          ref: main
+          path: target
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        if: steps.skip.outputs.skip != 'true'
+        with:
+          python-version: "3.15"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.skip.outputs.skip != 'true' && matrix.repository == 'website'
+        with:
+          node-version-file: target/.nvmrc
+      - name: The previous run's tested commit
+        id: previous
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ matrix.repository }}
+        run: |
+          set -euo pipefail
+          run=$(gh run list -R "$GITHUB_REPOSITORY" -w mutation.yml -s success -L 1 --json databaseId --jq '.[0].databaseId // empty')
+          [[ -n "$run" ]] || { echo "No previous successful run: nothing is called new."; exit 0; }
+          artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts" --jq ".artifacts[] | select(.name == \"report-$REPOSITORY\" and .expired == false) | .id" | head -n1)
+          [[ -n "$artifact" ]] || { echo "Run $run kept no report for $REPOSITORY: nothing is called new."; exit 0; }
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact/zip" > "$RUNNER_TEMP/previous.zip"
+          unzip -o -q "$RUNNER_TEMP/previous.zip" -d "$RUNNER_TEMP/previous"
+          commit=$(jq -r '.commit' "$RUNNER_TEMP/previous/report-$REPOSITORY.json")
+          if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+            printf '::error::the previous report for %s names no commit: %q\n' "$REPOSITORY" "$commit"
+            exit 1
+          fi
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Install the repository and the tool
+        if: steps.skip.outputs.skip != 'true'
+        working-directory: target
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+        run: |
+          set -euo pipefail
+          mutmut=$(jq -r '.tools.mutmut' ../infra/scripts/mutation.json)
+          if [[ "$REPOSITORY" == website ]]; then
+            npm ci
+          else
+            uv sync --locked
+            uv pip install "mutmut==$mutmut"
+          fi
+      - name: Mutate
+        if: steps.skip.outputs.skip != 'true'
+        working-directory: target
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+          PREVIOUS: ${{ steps.previous.outputs.commit }}
+        run: |
+          set -euo pipefail
+          args=("$REPOSITORY" . "../out/report-$REPOSITORY.json")
+          [[ -z "$PREVIOUS" ]] || args+=(--previous "$PREVIOUS")
+          if [[ "$REPOSITORY" == website ]]; then
+            python3 ../infra/scripts/mutation_run.py "${args[@]}"
+          else
+            uv run --no-sync python ../infra/scripts/mutation_run.py "${args[@]}"
+          fi
+          if [[ -f quality-gates.toml ]]; then
+            cp quality-gates.toml "../out/quality-gates-$REPOSITORY.toml"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: report-${{ matrix.repository }}
+          path: out/
+          if-no-files-found: ignore
+          retention-days: 90
+      # Stryker's own report, for the survivors past the 30 an issue lists.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() && matrix.repository == 'website' && steps.skip.outputs.skip != 'true' }}
+        with:
+          name: stryker-html
+          path: target/reports/mutation/
+          if-no-files-found: ignore
+
+  issues:
+    name: keep the issues
+    # A repository whose job failed has no report, which the script reports by name after handling
+    # the others, so this runs on any outcome but cancelled.
+    needs: mutate
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Limited to main, and holds only the troupe-run-test-quality App's key
+    # (spec: mutation-issue-credentials).
+    environment:
+      name: mutation-issues
+      deployment: false
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      issue-urls: ${{ steps.issues.outputs.issue-urls }}
+    steps:
+      # This repository's main only: no repository's code under test is checked out here.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: report-*
+          path: reports
+          merge-multiple: true
+      # Only the permissions the App is declared with in oob/app-installations.json; a test holds
+      # the two together (#238).
+      - name: Mint the troupe-run-test-quality App's token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.TEST_QUALITY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.TEST_QUALITY_APP_PRIVATE_KEY }}
+          owner: troupe-run
+          permission-issues: write
+      - name: Keep the issues
+        id: issues
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # This run's own token, read-only: which pull request a survivor's commit came from. The
+          # App's token is issues-only, and can't read pull requests (design D8).
+          READ_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
+        run: uv run --no-project scripts/mutation_issues.py reports $DRY_RUN
+
+  board:
+    name: put the issues on the board
+    needs: issues
+    if: ${{ !cancelled() && needs.issues.outputs.issue-urls != '' && needs.issues.outputs.issue-urls != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: board
+      deployment: false
+    permissions: {}
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: token
+        with:
+          client-id: ${{ vars.BOARD_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BOARD_APP_PRIVATE_KEY }}
+          owner: troupe-run
+          permission-organization-projects: write
+      - name: Add each issue to the troupe roadmap board
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          ISSUE_URLS: ${{ needs.issues.outputs.issue-urls }}
+        run: |
+          set -euo pipefail
+          # What issues hands over is checked before it's used: a JSON list of issue URLs in the
+          # repositories it serves.
+          if ! jq -e 'type == "array" and all(.[]; type == "string")' <<<"$ISSUE_URLS" >/dev/null; then
+            printf '::error::issue-urls from the issues job is not a JSON list of strings: %q\n' "$ISSUE_URLS"
+            exit 1
+          fi
+          mapfile -t urls < <(jq -r '.[]' <<<"$ISSUE_URLS")
+          for ISSUE_URL in "${urls[@]}"; do
+            if [[ ! "$ISSUE_URL" =~ ^https://github\.com/troupe-run/(troupe|website|infrastructure)/issues/[0-9]+$ ]]; then
+              printf '::error::issue-urls holds something that is not an issue it serves: %q\n' "$ISSUE_URL"
+              exit 1
+            fi
+          done
+          for ISSUE_URL in "${urls[@]}"; do
+            gh project item-add 1 --owner troupe-run --url "$ISSUE_URL"
+            echo "Added $ISSUE_URL"
+          done
