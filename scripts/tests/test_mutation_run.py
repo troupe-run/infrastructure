@@ -648,6 +648,9 @@ def scratch_checkout(tmp_path: Path) -> tuple[Path, str]:
         "def add(a, b):\n    return a + b\n", encoding="utf-8"
     )
     git(repo, "init", "-q", "-b", "main")
+    # The committer too, not only the author: a fresh runner has no git identity of its own.
+    git(repo, "config", "user.email", "test@example.invalid")
+    git(repo, "config", "user.name", "Test")
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "c", "--author=Test <test@example.invalid>")
     return repo, git(repo, "rev-parse", "HEAD").stdout.strip()
