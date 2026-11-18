@@ -122,9 +122,10 @@ def own_addopts(checkout: Path) -> str:
     return shlex.join(kept)
 
 
-def link_checkout_entries(checkout: Path, unit: ms.Unit) -> list[Path]:
+def link_checkout_entries(checkout: Path, unit: ms.Unit, made: list[Path]) -> None:
     """For a package's unit, link each top-level entry of the checkout into the source's top
-    directory (troupe's packages/), and return the links.
+    directory (troupe's packages/), adding each link to `made` as it's made, so a failure partway
+    still leaves every one for the caller to remove.
 
     A test that finds the repository's root by counting directories up from its own file counts
     one too many from inside mutmut's copy (<package>/mutants/tests), and lands there; with the
@@ -132,14 +133,12 @@ def link_checkout_entries(checkout: Path, unit: ms.Unit) -> list[Path]:
     .git isn't linked: git would take that directory for a repository of its own.
     """
     into = checkout / Path(unit.source).parts[0]
-    made = []
     for entry in sorted(checkout.iterdir()):
         link = into / entry.name
         if entry.name == ".git" or link.exists() or link.is_symlink():
             continue
         link.symlink_to(Path("..") / entry.name, target_is_directory=entry.is_dir())
         made.append(link)
-    return made
 
 
 def mutmut_config(workdir: Path, checkout: Path, unit: ms.Unit) -> str:
@@ -236,7 +235,7 @@ def run_mutmut(
     links: list[Path] = []
     try:
         if workdir != checkout:
-            links = link_checkout_entries(checkout, unit)
+            link_checkout_entries(checkout, unit, links)
         shutil.copy2(CHILDREN_PLUGIN, plugin)
         (workdir / "setup.cfg").write_text(mutmut_config(workdir, checkout, unit), encoding="utf-8")
         shutil.rmtree(workdir / "mutants", ignore_errors=True)

@@ -30,6 +30,11 @@ workflow delivered from infrastructure SHALL mutate the code the pull request ch
 comment on the pull request, edited in place on later pushes, and in the run's summary, with its runtime. It SHALL NOT
 be a required check, and SHALL conclude success when it finds survivors. Only its own failure to run SHALL fail it.
 
+#### Scenario: A repository the list doesn't name
+- **WHEN** a ready pull request in infrastructure, which holds the report's workflow as its source but isn't on the
+  list, is tested
+- **THEN** the report mutates nothing and runs no tests, says the repository isn't on the list, and doesn't fail
+
 #### Scenario: A branch made before a delivery
 - **WHEN** a ready pull request's branch was made before infrastructure delivered the report's scripts to its
   repository

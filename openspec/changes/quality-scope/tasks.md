@@ -27,6 +27,10 @@ time.
       reported by #322's worker). Tests: the workflow's checkout and range; a scratch repository where main gains a
       delivered file after the branch point
 
+- [x] 2.4 `mutation-pr.yml` runs `mutate` only where the list names the repository (a `listed` job reading
+      `scripts/mutation.json` at the merge), so infrastructure's own pull requests mutate nothing rather than fail.
+      Tests: the gate for a listed and an unlisted repository (from the review of #334)
+
 ## 3. Delivery follows the list (design D3)
 
 - [x] 3.1 `tofu/guard_delivery.tf`: the seven report files go only to guard targets the list names; each target's

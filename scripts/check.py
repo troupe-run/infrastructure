@@ -146,7 +146,10 @@ def gates(
     """The check's steps. `coverage` says whether this repository measures coverage; left unset,
     its quality-gates.toml says, by declaring [coverage] or not (#332). Only CI's leg asks."""
     if coverage is None and leg:
-        coverage = quality_gates.read_config(ROOT).coverage is not None
+        try:
+            coverage = quality_gates.read_config(ROOT).coverage is not None
+        except quality_gates.GateError as error:
+            sys.exit(f"check: {error}")
     tofu = tool("tofu", path=None)
     pytest = [tool("pytest"), "-n", str(worker_count())]
     if scopes:

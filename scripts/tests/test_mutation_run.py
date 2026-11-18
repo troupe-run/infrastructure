@@ -548,6 +548,48 @@ def test_addopts_as_one_string_is_split_as_pytest_splits_it(tmp_path: Path) -> N
     assert "\n    addopts=-ra -k 'a or b'\n" in config
 
 
+def test_the_joined_plugin_form_is_left_out_too(tmp_path: Path) -> None:
+    unit = package_checkout(tmp_path)
+    write_addopts(tmp_path, '["-ra", "-pguard_pytest", "-pgitrepo"]')
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+    assert "\n    addopts=-ra -pgitrepo\n" in config
+
+
+def test_no_addopts_gives_ra(tmp_path: Path) -> None:
+    unit = package_checkout(tmp_path)
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+    assert "\n    addopts=-ra\n" in config
+
+
+def test_a_pyproject_that_isnt_toml_is_refused_naming_it(tmp_path: Path) -> None:
+    unit = package_checkout(tmp_path)
+    (tmp_path / "pyproject.toml").write_text("[tool.pytest\n", encoding="utf-8")
+    with pytest.raises(run.RunError, match=r"pyproject.toml isn't valid TOML"):
+        run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+
+
+def test_links_made_before_a_failed_link_are_removed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    unit = package_checkout(tmp_path)
+    real = Path.symlink_to
+    made: list[Path] = []
+
+    def second_fails(self: Path, target: Path | str, target_is_directory: bool = False) -> None:
+        if made:
+            raise OSError("no room for a link")
+        real(self, target, target_is_directory)
+        made.append(self)
+
+    monkeypatch.setattr(Path, "symlink_to", second_fails)
+    monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
+    with pytest.raises(OSError, match="no room for a link"):
+        run.run_mutmut(tmp_path, unit, [], 1e12, Recorder())
+    assert made
+    assert not any(link.is_symlink() for link in made)
+    assert sorted(p.name for p in (tmp_path / "packages").iterdir()) == ["other", "troupe"]
+
+
 def test_addopts_of_another_type_is_refused_naming_it(tmp_path: Path) -> None:
     unit = package_checkout(tmp_path)
     write_addopts(tmp_path, "3")
