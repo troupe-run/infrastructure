@@ -31,13 +31,14 @@ time.
 
 - [x] 3.1 `tofu/guard_delivery.tf`: the seven report files go only to guard targets the list names; each target's
       `guard-delivery.json` lists what it receives. Tests: troupe receives them, website doesn't, quality_gates.py
-      still goes to both
+      still goes to both, evaluated by OpenTofu from the real locals block (`test_delivery_targets.py`, after the
+      review's finding that a string match on the .tf checked nothing)
 - [x] 3.2 `scripts/dependabot_config.py`: each repository's delivered workflows, not the union; regenerate
       `tofu/dependabot/`. Verify website's no longer names `mutation-pr.yml`
 
 ## 4. troupe's mutation runs (design D5)
 
-- [ ] 4.1 Tests first in `test_mutation_run.py`: a package unit links the checkout's missing top-level entries into the
+- [x] 4.1 Tests first in `test_mutation_run.py`: a package unit links the checkout's missing top-level entries into the
       package's parent, and `packages/packages`, and removes them after, failed runs too; the repository's own
       `addopts` reach mutmut without `--strict-markers` and `-p guard_pytest`. Then change `scripts/mutation_run.py`
 - [x] 4.2 Verify on a scratch clone of troupe, under the load rule: the `troupe` package's stats pass completes with
