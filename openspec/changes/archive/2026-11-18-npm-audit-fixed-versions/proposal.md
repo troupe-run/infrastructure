@@ -13,7 +13,8 @@ the gate on an advisory nobody can fix (#330).
 
 - For `package-lock.json`, the audit reads npm's root advisories (the GitHub advisories in each vulnerability's
   `via`), once each, and judges each by its patched versions in OSV, as the `uv.lock` path does with pip-audit's fixed
-  versions. npm's `fixAvailable` is no longer read.
+  versions. npm's `fixAvailable` counts only when OSV has no record of the advisory, and then only when it names the
+  vulnerable package itself (owner, 2026-11-18, design D4).
 - Severity stays npm's (GitHub's advisory severity); an unknown one still blocks. OSV unreachable still fails the gate.
 - The weekly report lists the same root advisories, each once, instead of every package that depends on one.
 
@@ -25,8 +26,9 @@ None.
 
 ### Modified Capabilities
 
-- `quality-gates`: "A changed lock file can't bring in a fixable high-severity advisory" says what counts as a fix:
-  a patched version of the vulnerable package, never a change to another one.
+- `quality-gates`: a new requirement, "Only the vulnerable package's own patched release is a fix", says what counts
+  as a fix: a patched version of the vulnerable package, never a change to another one, from the advisory's record,
+  or from npm's own fix when that record can't be had and it names the package.
 
 ## Impact
 

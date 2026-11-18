@@ -12,6 +12,14 @@
       reports picomatch as not blocking. Done: 77 tests pass; live on website's lock, 4 root advisories, picomatch
       "high, no fix yet", none blocking
 
+## 2. A record OSV lacks (design D4; owner, 2026-11-18)
+
+- [x] 2.1 `_npm_own_fix`: with no OSV record, npm's `fixAvailable` counts only when it names the vulnerable package.
+      Tests in `scripts/tests/test_guard_quality_gates.py`:
+      `test_without_an_osv_record_npms_fix_counts_when_it_names_the_package_itself`,
+      `test_without_an_osv_record_npms_fix_doesnt_count_when_it_names_a_dependent` and
+      `test_an_osv_record_wins_over_npms_fix`. Verify each fails when its rule is broken. Done: all three caught
+
 ## Workflow follow-up
 
 - The plan the owner approves delivers the new `scripts/quality_gates.py` to troupe and website and changes nothing

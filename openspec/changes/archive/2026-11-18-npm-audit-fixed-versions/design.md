@@ -15,7 +15,9 @@ or `{name, version, isSemVerMajor}` naming whatever package npm would move, in e
 The audit collects the advisory objects from every `via`, once each by `source`. For each, it reads the GitHub
 advisory id from `url` and asks OSV for its record, as it already does for severity on the `uv.lock` path, and takes
 the lowest `fixed` event among the record's npm ranges for that package as the fixed version. No `fixed` event means
-no fix. A record OSV doesn't have (404) means no known fix, and the advisory still appears in the report.
+no fix. For a record OSV doesn't have (404), or an advisory npm doesn't link by GitHub advisory id, D4 (added after
+the review) falls back to npm's own fix when it names the vulnerable package itself; otherwise there's no known fix,
+and the advisory still appears in the report.
 
 *Rejected:* reading `fixAvailable` and ignoring semver-major or downgrade plans. npm doesn't say which direction a
 plan moves, and a semver-minor move of a dependent can still be a downgrade. The advisory's own data is what the spec
