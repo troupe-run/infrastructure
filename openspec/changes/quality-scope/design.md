@@ -53,6 +53,10 @@ what it receives, and `scripts/dependabot_config.py` leaves out the delivered wo
 become per-repository. Removing website from the list deletes its copies through the App, as any delivered file is
 removed. `quality_gates.py` is delivered everywhere still: complexity and the audit run everywhere.
 
+infrastructure holds `mutation-pr.yml` as its source, so it runs here too. A first job, `listed`, reads
+`scripts/mutation.json` at the merge and lets `mutate` run only when the list names the repository; otherwise it says
+so, and the report mutates nothing and doesn't fail (from the review of #334).
+
 ### D4. `[coverage]` is optional (agreed with #322's worker)
 
 `parse_config` reads `[coverage]` only when it's there; `Config.coverage` is `CoverageConfig | None`. The `coverage`

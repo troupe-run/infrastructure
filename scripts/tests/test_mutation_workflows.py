@@ -176,7 +176,10 @@ def test_the_job_that_runs_the_pull_requests_code_holds_no_write_token() -> None
     assert mutate["permissions"] == {"contents": "read"}
     assert "environment" not in mutate
     assert "secrets." not in json.dumps(mutate)
-    assert mutate["if"] == "${{ !github.event.pull_request.draft }}"
+    assert mutate["needs"] == "listed"
+    assert mutate["if"] == (
+        "${{ !github.event.pull_request.draft && needs.listed.outputs.listed == 'true' }}"
+    )
     assert mutate["timeout-minutes"] == SETTINGS.pr_budget_minutes + 30
 
 
@@ -229,6 +232,44 @@ def test_the_merges_first_parent_gives_only_the_pull_requests_lines(tmp_path: Pa
         "a.py",
         "scripts/mutation.json",
     ]
+
+
+def run_listed(tmp_path: Path, repository: str) -> tuple[subprocess.CompletedProcess[str], str]:
+    """The gate step, over this repository's scripts/mutation.json."""
+    out = tmp_path / "github-output"
+    out.touch()
+    env = dict(os.environ) | {"GITHUB_REPOSITORY": repository, "GITHUB_OUTPUT": str(out)}
+    script = str(load(PR)["jobs"]["listed"]["steps"][-1]["run"])
+    done = subprocess.run(
+        ["bash", "-c", script], cwd=REPO, env=env, capture_output=True, text=True, check=False
+    )
+    return done, out.read_text(encoding="utf-8")
+
+
+def test_a_listed_repositorys_pull_request_is_mutated(tmp_path: Path) -> None:
+    done, output = run_listed(tmp_path, "troupe-run/troupe")
+    assert done.returncode == 0, done.stderr
+    assert output == "listed=true\n"
+
+
+def test_an_unlisted_repositorys_pull_request_runs_nothing_and_says_why(tmp_path: Path) -> None:
+    """infrastructure holds the workflow as its source but isn't on the list (#332): its own pull
+    requests mutate nothing, rather than fail."""
+    done, output = run_listed(tmp_path, "troupe-run/infrastructure")
+    assert done.returncode == 0, done.stderr
+    assert output == "listed=false\n"
+    assert "infrastructure isn't in scripts/mutation.json's repositories" in done.stdout
+
+
+def test_the_gate_reads_the_list_from_the_merge_only() -> None:
+    listed = load(PR)["jobs"]["listed"]
+    assert listed["permissions"] == {"contents": "read"}
+    [checkout] = steps_using(listed, "actions/checkout")
+    assert checkout["with"] == {
+        "ref": "${{ github.sha }}",
+        "sparse-checkout": "scripts/mutation.json",
+        "sparse-checkout-cone-mode": False,
+    }
 
 
 def test_the_comment_job_checks_out_the_base_commit_only() -> None:

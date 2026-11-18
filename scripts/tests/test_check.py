@@ -248,6 +248,18 @@ def test_this_repository_measures_coverage_only_if_the_list_names_it() -> None:
     )
 
 
+def test_a_bad_gate_config_on_the_leg_stops_the_check_with_its_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def refuse(root: object) -> None:
+        raise quality_gates.GateError("quality-gates.toml: `version` must be 1, not 2.")
+
+    monkeypatch.setattr(quality_gates, "read_config", refuse)
+    with pytest.raises(SystemExit) as refused:
+        check.gates(leg=True)
+    assert refused.value.code == "check: quality-gates.toml: `version` must be 1, not 2."
+
+
 def test_the_leg_is_off_unless_its_variable_is_set() -> None:
     assert check.on_leg({}) is False
     assert check.on_leg({"GITHUB_ACTIONS": "true"}) is False
