@@ -490,24 +490,75 @@ def test_an_advisory_with_no_known_severity_blocks() -> None:
     assert len(qg.blocking(advisories, AUDIT)) == 5
 
 
-def test_npm_audit_reads_severity_and_fix() -> None:
-    advisories = qg.npm_audit_advisories(fixture("npm-audit-lodash-minimist.json"))
-    assert [(a.package, a.severity, a.fixed_in) for a in advisories] == [
-        ("lodash", "critical", "lodash@4.18.1"),
-        ("minimist", "critical", "minimist@1.2.8"),
-    ]
-    assert len(qg.blocking(advisories, AUDIT)) == 2
+def osv_records(advisory_id: str) -> dict[str, object] | None:
+    """The OSV records captured on 2026-11-17 and 18, as OSV would answer, or None for a 404."""
+    path = FIXTURES / f"osv-{advisory_id}.json"
+    if not path.exists():
+        return None
+    record: dict[str, object] = json.loads(path.read_text(encoding="utf-8"))
+    return record
 
 
-def test_websites_moderate_advisories_dont_block() -> None:
-    advisories = qg.npm_audit_advisories(fixture("npm-audit-website.json"))
-    assert {a.severity for a in advisories} == {"moderate"}
+WEBSITE = "npm-audit-website-2026-11-18.json"
+"""website's lock on 2026-11-18: picomatch's high advisory has no patched version, and npm marks it
+fixable by downgrading astro from 7.4.7 to 5.3.0 (#330)."""
+
+
+def test_npms_downgrade_of_a_dependent_isnt_a_fix() -> None:
+    """Spec: quality-gates, "npm offers a downgrade of a dependent as the fix" (#330)."""
+    advisories = qg.npm_audit_advisories(fixture(WEBSITE), osv_records)
+    picomatch = next(a for a in advisories if a.package == "picomatch")
+    assert (picomatch.id, picomatch.severity, picomatch.fixed_in) == (
+        "GHSA-fc5q-39xc-vjpf",
+        "high",
+        None,
+    )
     assert qg.blocking(advisories, AUDIT) == []
+
+
+def test_each_root_advisory_is_listed_once_with_osvs_fixed_version() -> None:
+    advisories = qg.npm_audit_advisories(fixture(WEBSITE), osv_records)
+    # npm lists 30 vulnerable packages; four advisories are their roots.
+    assert sorted((a.package, a.id, a.severity, a.fixed_in) for a in advisories) == [
+        ("glob", "GHSA-3g3m-2fjr-6pw4", "moderate", "14.0.2"),
+        ("minimatch", "GHSA-g3hv-75wg-m249", "moderate", "11.0.1"),
+        ("picomatch", "GHSA-fc5q-39xc-vjpf", "high", None),
+        ("postcss-selector-parser", "GHSA-rj75-hqrm-r3gf", "moderate", "6.1.5"),
+    ]
+
+
+def test_an_advisory_its_own_package_fixes_blocks() -> None:
+    advisories = qg.npm_audit_advisories(fixture("npm-audit-lodash-minimist.json"), osv_records)
+    failing = qg.blocking(advisories, AUDIT)
+    assert {a.package for a in failing} == {"lodash", "minimist"}
+    assert all(a.fixed_in is not None for a in failing)
+
+
+def test_an_advisory_osv_doesnt_know_has_no_known_fix() -> None:
+    advisories = qg.npm_audit_advisories(fixture(WEBSITE), lambda _: None)
+    assert {a.fixed_in for a in advisories} == {None}
+    assert qg.blocking(advisories, AUDIT) == []
+
+
+def test_osvs_fixed_version_is_the_lowest_for_that_package() -> None:
+    record = osv_records("GHSA-rj75-hqrm-r3gf")
+    assert record is not None
+    assert qg.osv_fixed_version(record, "postcss-selector-parser") == "6.1.5"
+    assert qg.osv_fixed_version(record, "some-other-package") is None
+
+
+def test_an_unreachable_osv_fails_the_npm_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(*_args: object, **_kwargs: object) -> object:
+        raise urllib.error.URLError("no network")
+
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    with pytest.raises(qg.GateError, match="couldn't read GHSA-"):
+        qg.npm_audit_advisories(fixture(WEBSITE), qg.osv_record)
 
 
 def test_an_npm_error_is_an_error() -> None:
     with pytest.raises(qg.GateError, match="npm audit failed"):
-        qg.npm_audit_advisories({"error": {"code": "ENOLOCK"}})
+        qg.npm_audit_advisories({"error": {"code": "ENOLOCK"}}, osv_records)
 
 
 def test_only_a_changed_lock_file_is_audited(repo: Path) -> None:
