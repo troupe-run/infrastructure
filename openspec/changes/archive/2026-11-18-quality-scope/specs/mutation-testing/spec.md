@@ -2,8 +2,7 @@
 
 ### Requirement: Mutation testing runs weekly from infrastructure
 A workflow in troupe-run/infrastructure SHALL run mutation testing weekly, and on demand, over each repository the list
-names (spec: mutation-testing, "The repositories that get coverage and mutation testing are named in one place"), each
-at its `main`, on Linux with Python 3.15. This weekly workflow SHALL NOT run on pull requests or merge groups. No
+names (the requirement on naming them in one place), each at its `main`, on Linux with Python 3.15. This weekly workflow SHALL NOT run on pull requests or merge groups. No
 mutation testing SHALL be a required check, so none blocks a merge. The weekly workflow SHALL be one of the scheduled
 workflows the schedule watch declares.
 

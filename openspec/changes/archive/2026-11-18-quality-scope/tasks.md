@@ -55,8 +55,10 @@ time.
 
 - [x] 5.1 `docs/development-workflow.md` ("Mutation testing", and the coverage gate's section) and README: where the
       list lives, that it covers coverage and mutation testing, and how to add a repository
-- [ ] 5.2 The full check passes; the pull request's plan shows website's report files deleted, troupe's updated, and
-      nothing else
+- [x] 5.2 The full check passes; the pull request's plan shows website's report files deleted, troupe's updated, and
+      nothing else. Plan for 9ab59ae (#334): 0 to add, 9 to change, 7 to destroy; the 7 are website's report files,
+      the changes are website's list, Dependabot config and quality_gates.py and troupe's four changed files, plus
+      claude-review.yml in both from main's unapplied Dependabot bump (7120828), which isn't this change's
 
 ## Workflow follow-up
 
