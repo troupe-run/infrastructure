@@ -12,7 +12,7 @@
       reports picomatch as not blocking. Done: 77 tests pass; live on website's lock, 4 root advisories, picomatch
       "high, no fix yet", none blocking
 
-## 2. Delivery
+## Workflow follow-up
 
-- [ ] 2.1 The plan delivers the new `scripts/quality_gates.py` to troupe and website and changes nothing else. Verify
-      with the pull request's plan run
+- The plan the owner approves delivers the new `scripts/quality_gates.py` to troupe and website and changes nothing
+  else. Read it before queueing (it needs the owner's approval, so it isn't a tracked task).
