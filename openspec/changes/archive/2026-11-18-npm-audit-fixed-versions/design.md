@@ -30,3 +30,13 @@ npm gives it, since the lock may pin several versions of one package.
 
 The weekly issue lists root advisories, so picomatch appears once instead of with each of the 20 packages that depend
 on it.
+
+### D4. A record OSV lacks (owner, 2026-11-18)
+
+Claude's review of #331 asked what happens when OSV has no record of an npm advisory, or npm's link isn't a GitHub
+advisory id: D1 made that "no known fix", so a critical advisory with a real patched release could pass while OSV lags
+GitHub. The owner chose (c) of three: then npm's own `fixAvailable` counts, but only when it names the vulnerable
+package itself, never a dependent (#330's bug). An OSV record, when there is one, always wins. Rejected: (a) keep
+"no fix", which leaves the window open; (b) fail the gate as for an unreachable OSV, which blocks lock changes on
+advisories nobody can fix until OSV catches up.
+

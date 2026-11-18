@@ -540,6 +540,38 @@ def test_an_advisory_osv_doesnt_know_has_no_known_fix() -> None:
     assert qg.blocking(advisories, AUDIT) == []
 
 
+def with_picomatch_fix(fix: object) -> dict[str, object]:
+    """website's real report, with npm's fix for picomatch set to `fix`."""
+    report = fixture(WEBSITE)
+    vulnerabilities = report["vulnerabilities"]
+    assert isinstance(vulnerabilities, dict)
+    vulnerabilities["picomatch"] = {**vulnerabilities["picomatch"], "fixAvailable": fix}
+    return report
+
+
+def test_without_an_osv_record_npms_fix_counts_when_it_names_the_package_itself() -> None:
+    """Spec: quality-gates, "OSV has no record, and npm's fix names the vulnerable package" (owner,
+    2026-11-18, #331's review)."""
+    fix = {"name": "picomatch", "version": "4.0.8", "isSemVerMajor": False}
+    advisories = qg.npm_audit_advisories(with_picomatch_fix(fix), lambda _: None)
+    picomatch = next(a for a in advisories if a.package == "picomatch")
+    assert picomatch.fixed_in == "4.0.8"
+    assert qg.blocking(advisories, AUDIT) == [picomatch]
+
+
+def test_without_an_osv_record_npms_fix_doesnt_count_when_it_names_a_dependent() -> None:
+    # The real report: npm's fix for picomatch names astro@5.3.0, a downgrade of a dependent.
+    advisories = qg.npm_audit_advisories(fixture(WEBSITE), lambda _: None)
+    assert next(a for a in advisories if a.package == "picomatch").fixed_in is None
+    assert qg.blocking(advisories, AUDIT) == []
+
+
+def test_an_osv_record_wins_over_npms_fix() -> None:
+    fix = {"name": "picomatch", "version": "4.0.8", "isSemVerMajor": False}
+    advisories = qg.npm_audit_advisories(with_picomatch_fix(fix), osv_records)
+    assert next(a for a in advisories if a.package == "picomatch").fixed_in is None
+
+
 def test_osvs_fixed_version_is_the_lowest_for_that_package() -> None:
     record = osv_records("GHSA-rj75-hqrm-r3gf")
     assert record is not None
