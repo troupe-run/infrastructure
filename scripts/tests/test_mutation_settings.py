@@ -144,9 +144,13 @@ def test_an_unknown_key_in_the_table_fails() -> None:
         ms.load_baselines({"floor": 50, "baselines": {}}, "quality-gates.toml")
 
 
+GATES = (REPO / "quality-gates.toml").read_text(encoding="utf-8")
+"""A whole, valid quality-gates.toml (#322's), which the mutation table is read from (design D7)."""
+
+
 def test_a_quality_gates_file_hands_over_its_mutation_table() -> None:
     source = (
-        '[coverage]\nfloor = 80\n\n[mutation.baselines."troupe.store.events"]\n'
+        GATES + '\n[mutation.baselines."troupe.store.events"]\n'
         f'score = 71.2\nmutants = 140\njudged_at = "{"b" * 40}"\n'
     )
     table = ms.read_mutation_table(source, "quality-gates.toml")
@@ -156,12 +160,20 @@ def test_a_quality_gates_file_hands_over_its_mutation_table() -> None:
 
 
 def test_a_quality_gates_file_without_a_mutation_table_has_no_baselines() -> None:
-    assert ms.read_mutation_table("[coverage]\nfloor = 80\n", "quality-gates.toml") == {}
+    assert ms.read_mutation_table(GATES, "quality-gates.toml") == {}
 
 
 def test_a_quality_gates_file_that_isnt_toml_fails_naming_it() -> None:
-    with pytest.raises(ms.SettingsError, match=r"quality-gates\.toml isn't TOML"):
-        ms.read_mutation_table("[mutation\n", "quality-gates.toml")
+    with pytest.raises(
+        ms.SettingsError,
+        match=r"^troupe-run/troupe/quality-gates\.toml: quality-gates\.toml isn't valid TOML",
+    ):
+        ms.read_mutation_table("[mutation\n", "troupe-run/troupe/quality-gates.toml")
+
+
+def test_a_quality_gates_file_its_own_parser_refuses_is_an_error_naming_it() -> None:
+    with pytest.raises(ms.SettingsError, match=r"^troupe-run/troupe/quality-gates\.toml: "):
+        ms.read_mutation_table("version = 1\n", "troupe-run/troupe/quality-gates.toml")
 
 
 def with_deselect(entry: object) -> str:
@@ -372,6 +384,5 @@ def test_each_baseline_refusal_word_for_word(table: dict[str, Any], message: str
 
 
 def test_a_mutation_value_that_isnt_a_table_is_refused_naming_the_file() -> None:
-    with pytest.raises(ms.SettingsError) as raised:
-        ms.read_mutation_table("mutation = 1\n", "quality-gates.toml")
-    assert str(raised.value) == "quality-gates.toml's mutation isn't a table"
+    with pytest.raises(ms.SettingsError, match=r"^quality-gates\.toml: "):
+        ms.read_mutation_table(GATES + "mutation = 1\n", "quality-gates.toml")

@@ -297,7 +297,7 @@ def test_an_installed_tflint_that_fails_fails_the_check(tmp_path: Path) -> None:
 
 def test_a_missing_tflint_in_github_actions_says_how_ci_installs_it(tmp_path: Path) -> None:
     with pytest.raises(SystemExit) as stopped:
-        check.gates((), {"PATH": fake_path(tmp_path), "GITHUB_ACTIONS": "true"})
+        check.gates((), env={"PATH": fake_path(tmp_path), "GITHUB_ACTIONS": "true"})
     assert str(stopped.value) == (
         "check: tflint is not on the PATH. Fix: install it in the workflow "
         "(terraform-linters/setup-tflint, the version in .tflint.hcl)."
@@ -307,7 +307,7 @@ def test_a_missing_tflint_in_github_actions_says_how_ci_installs_it(tmp_path: Pa
 def test_the_local_skip_notice_word_for_word(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    check.gates((), {"PATH": fake_path(tmp_path)})
+    check.gates((), env={"PATH": fake_path(tmp_path)})
     assert capsys.readouterr().out == (
         "check: tflint isn't installed, so the tflint gate is skipped here; CI runs it. "
         "To run it locally: go install "
@@ -334,7 +334,7 @@ def test_rules_without_a_version_line_stop_the_check_saying_so(
 def test_a_missing_tofu_stops_the_check_even_locally(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(shutil, "which", lambda name, path=None: None)
     with pytest.raises(SystemExit) as stopped:
-        check.gates((), {"PATH": "", "GITHUB_ACTIONS": "false"})
+        check.gates((), env={"PATH": "", "GITHUB_ACTIONS": "false"})
     assert str(stopped.value) == (
         "check: tofu is not installed in the PATH. Fix: install OpenTofu (brew install opentofu)."
     )
