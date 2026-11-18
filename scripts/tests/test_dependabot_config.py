@@ -253,6 +253,7 @@ def test_troupes_github_actions_labels_are_dependencies_and_github_actions() -> 
 @pytest.mark.dependabot
 @pytest.mark.labels
 @pytest.mark.tofu
+@pytest.mark.mutation
 def test_every_label_in_the_real_configurations_is_declared_for_that_repository() -> None:
     labels = json.loads(dependabot_config.LABELS.read_text(encoding="utf-8"))
     for name, content in dependabot_config.generated().items():
@@ -267,6 +268,7 @@ def test_every_label_in_the_real_configurations_is_declared_for_that_repository(
 @pytest.mark.dependabot
 @pytest.mark.labels
 @pytest.mark.tofu
+@pytest.mark.mutation
 def test_no_real_configuration_moves_dependabots_branches_out_of_the_reserved_name() -> None:
     # The ruleset reserves Dependabot's default dependabot/ prefix and / separator
     # (dependabot-exemption design D2), so no entry may change either.
@@ -294,6 +296,28 @@ def test_infrastructure_leaves_out_nothing() -> None:
 def test_only_the_github_actions_entry_leaves_anything_out() -> None:
     assert "exclude-paths" not in updates("troupe")["uv"]
     assert "exclude-paths" not in updates("website")["npm"]
+
+
+def test_the_mutation_report_is_left_out_only_where_the_list_delivers_it() -> None:
+    """mutation-pr.yml goes only to the repositories scripts/mutation.json lists (#332)."""
+    configs = dependabot_config.configs(
+        POLICY, LABELS, GUARD_FILES, TARGETS, [".github/workflows/mutation-pr.yml"], ["troupe"]
+    )
+    excluded = {
+        repo: configs[repo]["updates"][0]["exclude-paths"] for repo in ("troupe", "website")
+    }
+    assert ".github/workflows/mutation-pr.yml" in excluded["troupe"]
+    assert ".github/workflows/mutation-pr.yml" not in excluded["website"]
+
+
+@pytest.mark.dependabot
+@pytest.mark.labels
+@pytest.mark.mutation
+@pytest.mark.tofu
+def test_the_real_configurations_leave_out_the_report_only_in_troupe() -> None:
+    generated = dependabot_config.generated()
+    assert ".github/workflows/mutation-pr.yml" in generated["troupe.yml"]
+    assert "mutation-pr.yml" not in generated["website.yml"]
 
 
 def test_a_newly_delivered_workflow_is_left_out_too() -> None:
@@ -327,6 +351,7 @@ def test_the_time_is_quoted_so_no_reader_takes_it_for_a_number() -> None:
 @pytest.mark.dependabot
 @pytest.mark.labels
 @pytest.mark.tofu
+@pytest.mark.mutation
 def test_the_generated_files_are_up_to_date() -> None:
     assert dependabot_config.stale(dependabot_config.OUT, dependabot_config.generated()) == []
 
@@ -380,6 +405,7 @@ def test_the_guard_targets_delivered_list_names_the_dependabot_config() -> None:
 @pytest.mark.dependabot
 @pytest.mark.labels
 @pytest.mark.tofu
+@pytest.mark.mutation
 def test_every_guard_target_has_a_generated_file() -> None:
     targets = tofu_text.guard_targets(
         tofu_text.GUARD_DELIVERY_TF.read_text(encoding="utf-8"),

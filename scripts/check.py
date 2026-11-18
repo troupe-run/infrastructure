@@ -33,6 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BIN = Path(sys.executable).parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import guard  # noqa: E402  (scripts/guard.py reads the declaration and activates the hooks)
+import quality_gates  # noqa: E402  (whether this repository declares [coverage])
 
 TEST_WORKERS = 4
 """How many processes the tests run in, at most. Small, not `auto`: the machine is shared, and the
@@ -140,12 +141,17 @@ def gates(
     base: str | None = None,
     leg: bool = False,
     env: Mapping[str, str] = os.environ,
+    coverage: bool | None = None,
 ) -> list[tuple[str, list[str]]]:
+    """The check's steps. `coverage` says whether this repository measures coverage; left unset,
+    its quality-gates.toml says, by declaring [coverage] or not (#332). Only CI's leg asks."""
+    if coverage is None and leg:
+        coverage = quality_gates.read_config(ROOT).coverage is not None
     tofu = tool("tofu", path=None)
     pytest = [tool("pytest"), "-n", str(worker_count())]
     if scopes:
         pytest += ["-m", guard.marker_expression(scopes)]
-    measure = leg and not scopes
+    measure = leg and coverage and not scopes
     if measure:
         pytest += ["--cov", "--cov-report=", f"--cov-report=json:{coverage_report()}"]
     on_base = ["--base", base] if base else []
@@ -162,7 +168,8 @@ def gates(
             ("coverage", [sys.executable, QUALITY_GATES, "coverage", "--coveragepy", report])
         )
     elif leg:
-        note = "print('coverage not measured: the tests were scoped')"
+        why = ": the tests were scoped" if coverage else " in this repository (no [coverage])"
+        note = f"print('coverage not measured{why}')"
         steps.append(("coverage", [sys.executable, "-c", note]))
     if leg:
         steps.append(("audit", [sys.executable, QUALITY_GATES, "audit", *on_base]))

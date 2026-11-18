@@ -13,10 +13,13 @@ import mutation_settings as ms
 pytestmark = pytest.mark.mutation
 
 DECLARED = REPO / "scripts" / "mutation.json"
+# The settings as they were with three repositories and both tools: the refusals are tested on
+# them, so every tool's keys stay covered while the real list names troupe alone (#332).
+THREE = REPO / "scripts" / "tests" / "fixtures" / "mutation" / "settings-three.json"
 
 
 def declared() -> dict[str, Any]:
-    loaded = json.loads(DECLARED.read_text(encoding="utf-8"))
+    loaded = json.loads(THREE.read_text(encoding="utf-8"))
     assert isinstance(loaded, dict)
     return loaded
 
@@ -29,11 +32,12 @@ def test_the_declared_settings_load_with_the_owners_values() -> None:
     assert settings.budget_minutes == 240
     assert settings.pr_budget_minutes == 45
     assert settings.max_new_issues == 5
-    assert set(settings.repositories) == {"troupe", "infrastructure", "website"}
+    # The one list of repositories that get coverage and mutation testing (#332, owner 2026-11-18).
+    assert set(settings.repositories) == {"troupe"}
 
 
-def test_each_repository_names_its_tool_and_what_it_mutates() -> None:
-    settings = ms.load_settings(DECLARED.read_text(encoding="utf-8"))
+def test_the_fixtures_three_repositories_name_their_tools_and_what_they_mutate() -> None:
+    settings = ms.load_settings(THREE.read_text(encoding="utf-8"))
     assert settings.repositories["website"].tool == "stryker"
     for name in ("troupe", "infrastructure"):
         repository = settings.repositories[name]
@@ -336,8 +340,8 @@ def test_an_unknown_top_level_key_lists_every_valid_one() -> None:
     assert str(raised.value) == f"the settings has the key 'extra', which isn't one of {KEYS}"
 
 
-def test_the_declared_repositories_load_as_written() -> None:
-    settings = ms.load_settings(DECLARED.read_text(encoding="utf-8"))
+def test_the_fixtures_repositories_load_as_written() -> None:
+    settings = ms.load_settings(THREE.read_text(encoding="utf-8"))
     raw = declared()
     assert settings.tools == raw["tools"]
     for name, repository in settings.repositories.items():

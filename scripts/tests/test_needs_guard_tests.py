@@ -16,8 +16,8 @@ GUARD_DELIVERY_TF = REPO / "tofu" / "guard_delivery.tf"
 
 
 def delivered_files(text: str) -> list[str]:
-    """The `guard_files` list in guard_delivery.tf's text."""
-    return tofu_text.guard_files(text)
+    """Every file guard_delivery.tf delivers to any repository."""
+    return tofu_text.delivered_files(text)
 
 
 def uncovered(files: list[str]) -> list[str]:
@@ -87,8 +87,14 @@ def test_every_file_the_guard_delivers_needs_them() -> None:
 
 
 def test_a_delivered_file_missing_from_the_list_is_named() -> None:
-    text = 'guard_files = toset([\n  "scripts/guard.py",\n  "scripts/guard_hooks.toml",\n])'
-    assert uncovered(delivered_files(text)) == ["scripts/guard_hooks.toml"]
+    text = (
+        'guard_files = toset([\n  "scripts/guard.py",\n  "scripts/guard_hooks.toml",\n])\n'
+        'mutation_report_files = toset([\n  "scripts/mutation_new.py",\n])\n'
+    )
+    assert uncovered(delivered_files(text)) == [
+        "scripts/guard_hooks.toml",
+        "scripts/mutation_new.py",
+    ]
 
 
 def test_the_script_prints_a_github_output_line() -> None:

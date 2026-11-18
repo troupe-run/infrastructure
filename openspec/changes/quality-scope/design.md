@@ -84,6 +84,15 @@ In `mutation_run.py`, for a unit whose source is a package's `src` (mutmut runs 
     can't build the package from mutmut's copy.
 - troupe's other packages are mutated as before. If their runs show more such tests, they're deselected the same way.
 
+### D7. The pull request report tests the merge, not the branch
+
+`mutation-pr.yml`'s mutate job checked out `pull_request.head.sha`. On troupe#444, branched before the report's
+delivery, `scripts/mutation.json` wasn't there, so the run failed before mutating anything. It now checks out
+`github.sha`, the merge with the base, which is what the pull request would merge, and diffs it against the merge's
+first parent, so only the pull request's changes are mutated, at their lines in the merge. `pull_request.base.sha` isn't
+used for the range: if GitHub recomputed the merge on a newer base, the range from an older base would take in main's
+own changes.
+
 ### D6. website's Stryker failure isn't fixed here
 
 website is off the list, so its weekly job and report go. The Stryker code stays, tested against its fixture, for a

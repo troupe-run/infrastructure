@@ -14,7 +14,18 @@ import mutation_settings as ms
 pytestmark = pytest.mark.mutation
 
 SHA = "a" * 40
-SETTINGS = ms.load_settings(mi.SETTINGS.read_text(encoding="utf-8"))
+# The settings as they were with three repositories and both tools (#332 cut the real list to
+# troupe), so every tool's code stays tested.
+SETTINGS_THREE = Path(__file__).parent / "fixtures" / "mutation" / "settings-three.json"
+SETTINGS = ms.load_settings(SETTINGS_THREE.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(autouse=True)
+def three_repositories(monkeypatch: pytest.MonkeyPatch) -> None:
+    """main() reads the settings from mi.SETTINGS: give it the same three repositories."""
+    monkeypatch.setattr(mi, "SETTINGS", SETTINGS_THREE)
+
+
 GATES = (Path(mi.__file__).resolve().parent.parent / "quality-gates.toml").read_text(
     encoding="utf-8"
 )

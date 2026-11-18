@@ -1,8 +1,9 @@
 # The files every governed repository runs from here: the guard's, the quality gates' measures
 # (spec: quality-gates), Claude's review workflow (spec: pr-review; claude-pr-review design D6),
 # the dispatcher that starts dependabot-issues (spec: dependency-updates; dependabot-issues-on-events
-# design D2), and the pull request mutation report (spec: mutation-testing; lint-mutation design
-# D9). Their source is this repository
+# design D2), and, to the repositories scripts/mutation.json lists, the pull request mutation report
+# (spec: mutation-testing; lint-mutation design D9; quality-scope design D3). Their source is this
+# repository
 # (spec: guard-delivery, design D2), and the App commits them straight to main.
 
 locals {
@@ -27,8 +28,14 @@ locals {
     # Starts infrastructure's dependabot-issues when Dependabot acts there (spec:
     # dependency-updates; dependabot-issues-on-events design D2).
     ".github/workflows/dependabot-dispatch.yml",
-    # Mutation testing of each ready pull request's changes, as a report that never blocks (spec:
-    # mutation-testing; lint-mutation design D9), with the scripts and settings it runs.
+  ])
+
+  # Mutation testing of each ready pull request's changes, as a report that never blocks (spec:
+  # mutation-testing; lint-mutation design D9), with the scripts and settings it runs. Delivered
+  # only to the targets scripts/mutation.json's `repositories` names: the one list of repositories
+  # that get coverage and mutation testing (#332; quality-scope design D3). Taking one off the list
+  # deletes these files there.
+  mutation_report_files = toset([
     ".github/workflows/mutation-pr.yml",
     "scripts/mutation.json",
     "scripts/mutation_children.py",
@@ -38,25 +45,47 @@ locals {
     "scripts/mutation_settings.py",
   ])
 
-  # The list a receiving repository holds (spec: guard-delivery). Generated from guard_files, so it
-  # can't disagree with what is delivered; its presence is what turns on the delivered-file rule.
-  # It names the Dependabot configuration delivered beside the guard too (dependabot.tf; spec:
-  # dependency-updates), so the rule covers that file as well.
-  guard_list_path = ".github/guard-delivery.json"
-  guard_list = "${jsonencode({
-    source = "troupe-run/infrastructure"
-    files  = sort(concat(tolist(local.guard_files), [local.guard_list_path, local.dependabot_path]))
-  })}\n"
+  mutation_listed = toset(keys(jsondecode(file("${path.module}/../scripts/mutation.json")).repositories))
 
-  guard_contents = merge(
-    { for source in local.guard_files : source => file("${path.module}/../${source}") },
-    { (local.guard_list_path) = local.guard_list },
-  )
-
-  guard_deliveries = {
-    for pair in setproduct(local.guard_targets, keys(local.guard_contents)) :
-    "${pair[0]}:${pair[1]}" => { repository = pair[0], file = pair[1] }
+  # What each target receives, apart from its list.
+  guard_target_files = {
+    for repository in local.guard_targets : repository => setunion(
+      local.guard_files,
+      contains(local.mutation_listed, repository) ? local.mutation_report_files : toset([]),
+    )
   }
+
+  # The list a receiving repository holds (spec: guard-delivery). Generated from what it receives,
+  # so it can't disagree with what is delivered; its presence is what turns on the delivered-file
+  # rule. It names the Dependabot configuration delivered beside the guard too (dependabot.tf;
+  # spec: dependency-updates), so the rule covers that file as well.
+  guard_list_path = ".github/guard-delivery.json"
+  guard_lists = {
+    for repository, files in local.guard_target_files : repository => "${jsonencode({
+      source = "troupe-run/infrastructure"
+      files  = sort(concat(tolist(files), [local.guard_list_path, local.dependabot_path]))
+    })}\n"
+  }
+
+  guard_sources = {
+    for source in setunion(local.guard_files, local.mutation_report_files) :
+    source => file("${path.module}/../${source}")
+  }
+
+  guard_deliveries = merge(
+    {
+      for pair in flatten([
+        for repository, files in local.guard_target_files : [
+          for source in files : { repository = repository, file = source }
+        ]
+      ]) : "${pair.repository}:${pair.file}" => merge(pair, { content = local.guard_sources[pair.file] })
+    },
+    {
+      for repository, list in local.guard_lists : "${repository}:${local.guard_list_path}" => {
+        repository = repository, file = local.guard_list_path, content = list
+      }
+    },
+  )
 }
 
 resource "github_repository_file" "guard" {
@@ -67,7 +96,7 @@ resource "github_repository_file" "guard" {
   repository          = each.value.repository
   branch              = "main"
   file                = each.value.file
-  content             = sensitive(local.guard_contents[each.value.file])
+  content             = sensitive(each.value.content)
   overwrite_on_create = false
 
   # After each receiving repository's ruleset, which lets the App push (design D5). Without
@@ -84,5 +113,5 @@ resource "github_repository_file" "guard" {
 
   # Changes exactly when the content does, so a delivery never reuses an earlier message
   # (design D3).
-  commit_message = "chore(guard): deliver ${each.value.file} ${substr(sha256(local.guard_contents[each.value.file]), 0, 12)} from troupe-run/infrastructure"
+  commit_message = "chore(guard): deliver ${each.value.file} ${substr(sha256(each.value.content), 0, 12)} from troupe-run/infrastructure"
 }

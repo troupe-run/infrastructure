@@ -30,7 +30,7 @@ def paths_opentofu_reads() -> set[str]:
             literal = argument.split("${", 1)[0]
             if literal.startswith("../"):
                 read.add(literal.removeprefix("../") or ".")
-    read |= set(tofu_text.guard_files((TOFU / "guard_delivery.tf").read_text(encoding="utf-8")))
+    read |= set(tofu_text.delivered_files((TOFU / "guard_delivery.tf").read_text(encoding="utf-8")))
     read |= {
         str(path.relative_to(REPO)) for path in (REPO / "org-profile").rglob("*") if path.is_file()
     }

@@ -3,6 +3,8 @@ block a merge, and keep their budgets and token in step with their declarations 
 mutation-testing, mutation-issue-credentials; lint-mutation design D3, D4, D9)."""
 
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -18,6 +20,7 @@ from test_dependabot_issues_workflow import (
     token_problems,
 )
 
+import mutation_pr as pr
 import mutation_settings as ms
 
 pytestmark = [pytest.mark.mutation, pytest.mark.oob, pytest.mark.tofu, pytest.mark.schedules]
@@ -57,9 +60,56 @@ def test_the_mutate_job_holds_no_secret_and_has_the_budget() -> None:
     assert "secrets." not in json.dumps(mutate)
     timeout, budget = mutate["timeout-minutes"], SETTINGS.budget_minutes
     assert timeout == budget + 30, f"mutate's timeout is {timeout}; budget_minutes is {budget}"
-    assert mutate["strategy"]["matrix"]["repository"] == sorted(
-        SETTINGS.repositories, key=["troupe", "infrastructure", "website"].index
+    assert mutate["needs"] == "targets"
+    assert mutate["strategy"]["matrix"]["repository"] == (
+        "${{ fromJSON(needs.targets.outputs.repositories) }}"
     )
+
+
+def run_targets(tmp_path: Path, named: str) -> tuple[subprocess.CompletedProcess[str], str]:
+    """The targets step, over this repository's scripts/mutation.json."""
+    out = tmp_path / "github-output"
+    out.touch()
+    env = dict(os.environ) | {"NAMED": named, "GITHUB_OUTPUT": str(out)}
+    script = step_script(WEEKLY, "targets", "The repositories the list names")
+    done = subprocess.run(
+        ["bash", "-c", script], cwd=REPO, env=env, capture_output=True, text=True, check=False
+    )
+    return done, out.read_text(encoding="utf-8")
+
+
+def test_the_weekly_runs_repositories_are_the_lists(tmp_path: Path) -> None:
+    """One list names the repositories that get mutation testing (#332): the jobs follow it."""
+    done, output = run_targets(tmp_path, "all")
+    assert done.returncode == 0, done.stderr
+    assert (
+        output == f"repositories={json.dumps(list(SETTINGS.repositories), separators=(',', ':'))}\n"
+    )
+
+
+def test_a_dispatch_naming_a_listed_repository_runs(tmp_path: Path) -> None:
+    done, output = run_targets(tmp_path, "troupe")
+    assert done.returncode == 0, done.stderr
+    assert output.startswith("repositories=")
+
+
+def test_a_dispatch_naming_a_repository_the_list_doesnt_fails_naming_the_list(
+    tmp_path: Path,
+) -> None:
+    done, output = run_targets(tmp_path, "website")
+    assert done.returncode == 1
+    assert "website isn't in scripts/mutation.json's repositories" in done.stdout
+    assert '["troupe"]' in done.stdout
+    assert output == ""
+
+
+def test_the_dispatch_names_its_repository_as_text_not_a_fixed_choice() -> None:
+    inputs = load(WEEKLY)[True]["workflow_dispatch"]["inputs"]
+    assert inputs["repository"] == {
+        "description": "One repository scripts/mutation.json lists, or all",
+        "type": "string",
+        "default": "all",
+    }
 
 
 def test_the_issues_job_checks_out_only_this_repository_and_asks_for_the_apps_permissions() -> None:
@@ -130,6 +180,57 @@ def test_the_job_that_runs_the_pull_requests_code_holds_no_write_token() -> None
     assert mutate["timeout-minutes"] == SETTINGS.pr_budget_minutes + 30
 
 
+def mutate_step(name: str) -> dict[str, Any]:
+    [step] = [s for s in load(PR)["jobs"]["mutate"]["steps"] if s.get("name") == name]
+    found: dict[str, Any] = step
+    return found
+
+
+def test_the_mutate_job_tests_the_merge_with_the_base_not_the_branch_alone() -> None:
+    """A branch made before a delivery lacks scripts/mutation.json and the scripts; the merge with
+    the base has them, as the pull request's merge would (troupe#444's run; #332)."""
+    [checkout] = steps_using(load(PR)["jobs"]["mutate"], "actions/checkout")
+    assert checkout["with"] == {"ref": "${{ github.sha }}", "fetch-depth": 0}
+    mutate = mutate_step("Mutate what changed")
+    assert mutate["env"] == {"MERGE": "${{ github.sha }}"}
+    assert 'BASE=$(git rev-parse "$MERGE^1")' in mutate["run"]
+    assert "pull_request.head.sha" not in json.dumps(load(PR)["jobs"]["mutate"])
+
+
+def git(cwd: Path, *args: str) -> str:
+    identity = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+                "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}  # fmt: skip
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")} | identity
+    done = subprocess.run(["git", *args], cwd=cwd, env=env, capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+    return done.stdout.strip()
+
+
+def test_the_merges_first_parent_gives_only_the_pull_requests_lines(tmp_path: Path) -> None:
+    """Diffing the merge against its first parent, as the job does, reports only what the pull
+    request changed, while the checkout holds what main delivered after the branch was made."""
+    git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "a.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
+    git(tmp_path, "add", ".")
+    git(tmp_path, "commit", "-q", "-m", "base")
+    git(tmp_path, "switch", "-q", "-c", "branch")
+    (tmp_path / "a.py").write_text("x = 1\ny = 3\n", encoding="utf-8")
+    git(tmp_path, "commit", "-q", "-am", "the pull request")
+    git(tmp_path, "switch", "-q", "main")
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "mutation.json").write_text("{}\n", encoding="utf-8")
+    git(tmp_path, "add", ".")
+    git(tmp_path, "commit", "-q", "-m", "a delivery after the branch was made")
+    git(tmp_path, "merge", "-q", "--no-ff", "-m", "merge", "branch")
+    merge = git(tmp_path, "rev-parse", "HEAD")
+    base = git(tmp_path, "rev-parse", f"{merge}^1")
+    assert pr.changed_lines(pr.git_diff(tmp_path, base, merge)) == {"a.py": {2}}
+    assert git(tmp_path, "ls-tree", "--name-only", "-r", merge).splitlines() == [
+        "a.py",
+        "scripts/mutation.json",
+    ]
+
+
 def test_the_comment_job_checks_out_the_base_commit_only() -> None:
     comment = load(PR)["jobs"]["comment"]
     assert comment["permissions"] == {"contents": "read", "pull-requests": "write"}
@@ -150,7 +251,9 @@ def test_the_pull_request_report_and_what_it_runs_are_delivered() -> None:
     import tofu_text
 
     delivered = set(
-        tofu_text.guard_files((REPO / "tofu" / "guard_delivery.tf").read_text(encoding="utf-8"))
+        tofu_text.mutation_report_files(
+            (REPO / "tofu" / "guard_delivery.tf").read_text(encoding="utf-8")
+        )
     )
     needed = {
         ".github/workflows/mutation-pr.yml",
@@ -164,6 +267,16 @@ def test_the_pull_request_report_and_what_it_runs_are_delivered() -> None:
     assert needed <= delivered, needed - delivered
     # The weekly run, its issue upkeep and the App's credential stay here.
     assert not {".github/workflows/mutation.yml", "scripts/mutation_issues.py"} & delivered
+    # Only to the targets the one list names (#332): the delivery reads it, and nothing else.
+    tf = (REPO / "tofu" / "guard_delivery.tf").read_text(encoding="utf-8")
+    assert (
+        'mutation_listed = toset(keys(jsondecode(file("${path.module}/../scripts/mutation.json"))'
+        ".repositories))" in tf
+    )
+    assert (
+        "contains(local.mutation_listed, repository) ? local.mutation_report_files : toset([])"
+        in tf
+    )
 
 
 # The steps' own scripts, run with gh faked on the PATH (bash, jq and unzip as on the runner)
