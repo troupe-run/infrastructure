@@ -10,6 +10,13 @@ from conftest import Repo, git
 import check
 
 
+@pytest.fixture(autouse=True)
+def not_on_the_leg(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CI's check job sets QUALITY_GATES_LEG, which makes the check read the scratch repository's
+    quality-gates.toml; these tests are about git hooks, not the leg (#332)."""
+    monkeypatch.delenv(check.LEG, raising=False)
+
+
 def hooks_path(repo: Repo) -> str:
     return git(repo.path, "config", "--get", "core.hooksPath", check=False).stdout.strip()
 
