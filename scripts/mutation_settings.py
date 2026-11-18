@@ -12,7 +12,6 @@ Standard library only, Python 3.12+: it's delivered with the pull request report
 
 import json
 import re
-import tomllib
 from dataclasses import dataclass
 from typing import Any
 
@@ -215,14 +214,13 @@ def load_baselines(table: dict[str, Any], path: str) -> dict[str, Baseline]:
 def read_mutation_table(source: str, path: str) -> dict[str, Any]:
     """The [mutation] table of a repository's quality-gates.toml, untouched, or {} without one.
 
-    A stand-in for #322's `read_config(path).mutation` until that's on main (design D7): the same
-    contract, so the swap is one line. The table is validated by load_baselines.
+    The file is read by quality_gates.py's own strict parser (#322), which hands this table over
+    as it is; load_baselines validates it. Anything that parser refuses is an error naming the file.
     """
+    import quality_gates
+
     try:
-        loaded = tomllib.loads(source)
-    except tomllib.TOMLDecodeError as error:
-        raise SettingsError(f"{path} isn't TOML: {error}") from None
-    table = loaded.get("mutation", {})
-    if not isinstance(table, dict):
-        raise SettingsError(f"{path}'s mutation isn't a table")
-    return table
+        config = quality_gates.parse_config(source)
+    except quality_gates.GateError as error:
+        raise SettingsError(f"{path}: {error}") from None
+    return dict(config.mutation)

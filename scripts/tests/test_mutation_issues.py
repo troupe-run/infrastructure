@@ -15,6 +15,10 @@ pytestmark = pytest.mark.mutation
 
 SHA = "a" * 40
 SETTINGS = ms.load_settings(mi.SETTINGS.read_text(encoding="utf-8"))
+GATES = (Path(mi.__file__).resolve().parent.parent / "quality-gates.toml").read_text(
+    encoding="utf-8"
+)
+"""A whole, valid quality-gates.toml (#322's), which a repository's baselines are read from."""
 RUN = "https://github.com/troupe-run/infrastructure/actions/runs/1"
 
 
@@ -331,7 +335,8 @@ def test_a_malformed_mutation_table_fails_that_repository(
 ) -> None:
     write_reports(tmp_path)
     (tmp_path / "quality-gates-troupe.toml").write_text(
-        '[mutation.baselines."troupe.a"]\nscore = "high"\nmutants = 1\njudged_at = "'
+        GATES
+        + '\n[mutation.baselines."troupe.a"]\nscore = "high"\nmutants = 1\njudged_at = "'
         + "e" * 40
         + '"\n',
         encoding="utf-8",
@@ -767,7 +772,8 @@ def test_a_baseline_file_is_read_for_its_own_repository(tmp_path: Path) -> None:
     write_reports(tmp_path)
     # infrastructure.a at 50% with a 40% baseline: under 60%, but not below its baseline.
     (tmp_path / "quality-gates-infrastructure.toml").write_text(
-        '[mutation.baselines."infrastructure.a"]\nscore = 40.0\nmutants = 20\njudged_at = "'
+        GATES
+        + '\n[mutation.baselines."infrastructure.a"]\nscore = 40.0\nmutants = 20\njudged_at = "'
         + "e" * 40
         + '"\n',
         encoding="utf-8",
