@@ -671,14 +671,24 @@ def pip_audit_advisories(report: Mapping[str, object], severity: SeverityLookup)
     return list(advisories.values())
 
 
+def _npm_own_fix(entry: object, package: str) -> str | None:
+    """npm's fix for an advisory OSV has no record of, only when it names the vulnerable package
+    itself: a dependent's move, such as a downgrade, isn't a fix (owner, 2026-11-18; #330)."""
+    fix = entry.get("fixAvailable") if isinstance(entry, dict) else None
+    if isinstance(fix, dict) and fix.get("name") == package and isinstance(fix.get("version"), str):
+        return str(fix["version"])
+    return None
+
+
 def npm_audit_advisories(
     report: Mapping[str, object], record: RecordLookup = osv_record
 ) -> list[Advisory]:
     """Each root advisory in `npm audit --json`, once, with npm's severity and OSV's fixed version.
 
     npm lists every package that depends on a vulnerable one too; the advisories themselves are
-    the objects in each entry's `via`. npm's `fixAvailable` isn't read: it can be a downgrade of a
-    dependent (#330)."""
+    the objects in each entry's `via`. Each one's fix is OSV's; npm's `fixAvailable` is read only
+    when OSV has no record, and only when it names the vulnerable package itself, since it can be a
+    downgrade of a dependent (#330)."""
     if "error" in report:
         raise GateError(f"npm audit failed: {report['error']}")
     vulnerabilities = report.get("vulnerabilities")
@@ -694,6 +704,10 @@ def npm_audit_advisories(
         package = str(via.get("name"))
         advisory_id = str(via.get("url", "")).rstrip("/").rsplit("/", 1)[-1] or "npm advisory"
         found = record(advisory_id) if advisory_id.startswith("GHSA-") else None
+        if found is not None:
+            fixed_in = osv_fixed_version(found, package)
+        else:
+            fixed_in = _npm_own_fix(vulnerabilities.get(package), package)
         severity = via.get("severity")
         advisories.append(
             Advisory(
@@ -701,7 +715,7 @@ def npm_audit_advisories(
                 str(via.get("range", "?")),
                 advisory_id,
                 severity if isinstance(severity, str) and severity in SEVERITIES else "unknown",
-                osv_fixed_version(found, package) if found else None,
+                fixed_in,
             )
         )
     return advisories
