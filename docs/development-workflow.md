@@ -392,17 +392,21 @@ the check rather than switching a gate off.
 | Gate | What fails | Where it runs |
 |---|---|---|
 | complexity | a function the change adds or edits whose cyclomatic complexity (lizard) is above `[complexity] block_above` and is new or higher than before | every check, local and CI |
-| coverage | a package whose branch coverage is below its `baseline` by more than `tolerance`, or below `floor` with no baseline; a source file in no package | CI's coverage leg only |
+| coverage | a package whose branch coverage is below its `baseline` by more than `tolerance`, or below `floor` with no baseline; a source file in no package | CI's coverage leg only, in the repositories that get coverage and mutation testing |
 | audit | a changed lock file with an advisory whose severity is in `[audit] block` (or unknown) and that has a fix | CI's coverage leg only |
 
 - **Complexity** judges the work against where it left `origin/main` locally (staged, unstaged and new files
   included), or the base CI names. Existing complex functions can be edited, but not made more complex: split them
   first. Tests, delivered files and generated code are excluded in each repository's config.
+- **Coverage applies only to the repositories that get mutation testing too**: those `scripts/mutation.json`'s
+  `repositories` names (owner, 2026-11-18, #332; see "Mutation testing" below). Only they declare `[coverage]`;
+  the rest leave it out, and their coverage leg says coverage isn't measured there. Today that's troupe alone, so this
+  repository has no `[coverage]`, and a test fails if its table and the list disagree.
 - **Coverage is never measured locally**, not even on request (owner, 2026-11-18). CI's coverage leg sets
   `QUALITY_GATES_LEG=true`, and `check.py` refuses that variable outside GitHub Actions. Here the leg is the `check`
-  job, on Linux with Python 3.15. It prints every package's measurement against its baseline. When a package has
-  risen, the check says so; raise its `baseline` by hand in a pull request. A baseline never moves by itself, and
-  lowering one shows in the diff.
+  job, on Linux with Python 3.15, which runs the audit. Where coverage is measured, the leg prints every package's
+  measurement against its baseline. When a package has risen, the check says so; raise its `baseline` by hand in a
+  pull request. A baseline never moves by itself, and lowering one shows in the diff.
 - **The audit** runs only when a lock file changed. Severity comes from OSV (pip-audit doesn't give it) or npm. A
   network failure fails the leg rather than passing it. Everything else, any severity, with or without a fix, goes in
   the weekly "Dependency advisories" issue (`.github/workflows/dependency-report.yml`), which is opened, updated and
@@ -605,8 +609,16 @@ Mutation testing changes the code in small ways (a `+` to a `-`, a `<` to a `<=`
 test notices is a surviving mutant, which says a test is missing (spec: mutation-testing; #325). It reports and
 never blocks a merge. Every number it judges by is in `scripts/mutation.json`.
 
-**Weekly** (`.github/workflows/mutation.yml`, Sunday 03:23 UTC, on Linux with Python 3.15), troupe, infrastructure
-and website are mutated at their `main` (mutmut for Python, Stryker for website's TypeScript). A module's score is
+**Which repositories.** `scripts/mutation.json`'s `repositories` is the one list of repositories that get coverage
+and mutation testing: the weekly run, the pull request report and the coverage gate (owner, 2026-11-18, #332).
+Today it names troupe alone. website and infrastructure keep complexity, the audit and linting. To add a repository,
+in one pull request here: add its entry to `repositories` (what to mutate, with mutmut or Stryker), and, for
+infrastructure itself, a `[coverage]` table in `quality-gates.toml`; another repository declares its own
+`[coverage]` in its own pull request. Once applied, the weekly run mutates it, and if it receives the guard's files,
+the pull request report is delivered to it. Taking one off the list deletes its delivered copies.
+
+**Weekly** (`.github/workflows/mutation.yml`, Sunday 03:23 UTC, on Linux with Python 3.15), each listed repository is
+mutated at its `main` (mutmut for Python, Stryker for TypeScript). A module's score is
 the mutants caught as a percentage of those caught, survived or reached by no test. A module is judged when it has at
 least 10 mutants and all of them ran within the budget, and is **under** when its score is below 60% or below its
 recorded baseline. Each under module has one issue in its repository, labelled `test-quality`, on the board, listing
@@ -618,18 +630,21 @@ that pull request.
 the score a module may not fall below. The run never writes it: its summary, and each module's issue, give the
 `[mutation.baselines]` entries to raise, and a person or agent raises them in an ordinary pull request (#326 tracks
 doing that automatically). Lowering one, for example after deleting well-tested code, is an ordinary pull request
-too. A dispatch can name one repository, or be a dry run that writes nothing and lists every score.
+too. A dispatch can name one listed repository, or be a dry run that writes nothing and lists every score.
 
-**On each ready pull request** (`.github/workflows/mutation-pr.yml`, delivered to troupe and website), the functions
-or lines it changed are mutated, and one comment, edited on each push, lists the mutants that survive on changed
+**On each ready pull request** (`.github/workflows/mutation-pr.yml`, delivered to the listed repositories), the
+functions or lines it changed are mutated, on its merge with its base, and one comment, edited on each push, lists the mutants that survive on changed
 lines, with the run's time. It's a report: it's not a required check, and it succeeds when it finds survivors. To
 answer a survivor, add a test that fails for it, or exempt the line with the tool's own comment and a reason
-(`# pragma: no mutate`, `// Stryker disable next-line <mutator>: <reason>`). In infrastructure it takes about 25-30
-minutes, most of it mutmut's pass over the whole suite.
+(`# pragma: no mutate`, `// Stryker disable next-line <mutator>: <reason>`). Most of its time is mutmut's pass over
+the whole suite.
 
-**mutmut's limits here.** It can't see code a test runs in a subprocess, which is how most of the guard's tests work,
-so a function reached only that way counts as reached by no test, and the issue says so. A few tests can't run under
-its hooks at all; they're listed in `scripts/mutation.json` under `deselect`, each with its reason.
+**mutmut's limits here.** It can't see code a test runs in a subprocess, so a function reached only that way counts
+as reached by no test, and the issue says so. A few tests can't run under its hooks at all; they're listed in
+`scripts/mutation.json` under `deselect`, each with its reason. A run keeps the repository's own pytest `addopts`
+except `--strict-markers` and the guard's tag plugin, which can't find their declarations from mutmut's copy. For a
+package's unit, the checkout's top-level entries are linked into its parent directory during the run, so a test that
+finds the repository's root by counting directories finds it from inside the copy too.
 
 ## Known gaps
 

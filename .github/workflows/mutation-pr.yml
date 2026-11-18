@@ -34,9 +34,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      # The merge with the base, as the pull request would merge: a branch made before a delivery
+      # lacks scripts/mutation.json and the scripts this job runs, which its merge has (#332).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
@@ -68,10 +70,13 @@ jobs:
           fi
       - name: Mutate what changed
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
+          MERGE: ${{ github.sha }}
+        # Against the merge's first parent, the base it merged onto, so only the pull request's own
+        # changes are mutated, at their lines in the merge.
         run: |
           set -euo pipefail
+          BASE=$(git rev-parse "$MERGE^1")
+          HEAD=$MERGE
           mkdir -p out
           if [[ -f package-lock.json ]]; then
             python3 scripts/mutation_pr.py run "$BASE" "$HEAD" out/pr-report.json

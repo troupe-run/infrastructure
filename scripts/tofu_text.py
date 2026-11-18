@@ -17,15 +17,30 @@ class ShapeError(Exception):
     """The configuration's text isn't the shape a reader expects."""
 
 
-def guard_files(text: str) -> list[str]:
-    """The `guard_files` list in guard_delivery.tf's text, in its order."""
-    found = re.search(r"guard_files = toset\(\[(.*?)\]\)", text, re.S)
+def _file_list(text: str, name: str) -> list[str]:
+    found = re.search(rf"\b{name} = toset\(\[(.*?)\]\)", text, re.S)
     if found is None:
-        raise ShapeError("guard_files isn't toset([...]) in tofu/guard_delivery.tf")
+        raise ShapeError(f"{name} isn't toset([...]) in tofu/guard_delivery.tf")
     files = re.findall(r'"([^"]+)"', found.group(1))
     if not files:
-        raise ShapeError("guard_files lists no file in tofu/guard_delivery.tf")
+        raise ShapeError(f"{name} lists no file in tofu/guard_delivery.tf")
     return files
+
+
+def guard_files(text: str) -> list[str]:
+    """The `guard_files` list in guard_delivery.tf's text, in its order: what every target gets."""
+    return _file_list(text, "guard_files")
+
+
+def mutation_report_files(text: str) -> list[str]:
+    """The `mutation_report_files` list: delivered only to the targets scripts/mutation.json
+    lists (#332)."""
+    return _file_list(text, "mutation_report_files")
+
+
+def delivered_files(text: str) -> list[str]:
+    """Every file guard_delivery.tf delivers to any repository."""
+    return guard_files(text) + mutation_report_files(text)
 
 
 def module_names(repositories_tf: str) -> dict[str, str]:

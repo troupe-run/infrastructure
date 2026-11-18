@@ -98,6 +98,7 @@ def branches(count: int, name: str = "f") -> str:
 
 def test_a_valid_config_parses_every_table() -> None:
     config = qg.parse_config(CONFIG + '\n[mutation]\nlast_judged = "abc"\n')
+    assert config.coverage is not None
     assert config.coverage.floor == 80.0
     assert config.coverage.tolerance == 0.5
     assert [(p.name, p.paths, p.baseline) for p in config.coverage.packages] == [
@@ -111,6 +112,24 @@ def test_a_valid_config_parses_every_table() -> None:
 
 def test_mutation_is_empty_when_absent() -> None:
     assert qg.parse_config(CONFIG).mutation == {}
+
+
+def without_coverage(config: str) -> str:
+    """The config with its [coverage] tables removed, as a repository that measures none has it."""
+    start = config.index("[coverage]")
+    return config[:start] + config[config.index("[complexity]") :]
+
+
+def test_coverage_is_optional_and_none_when_absent() -> None:
+    """Coverage applies only to the repositories infrastructure's list names (#332)."""
+    config = qg.parse_config(without_coverage(CONFIG))
+    assert config.coverage is None
+    assert config.complexity.block_above == 5
+
+
+def test_a_malformed_coverage_table_is_still_refused() -> None:
+    with pytest.raises(qg.GateError, match=r"`coverage\.floor` is required"):
+        qg.parse_config(CONFIG.replace("floor = 80.0\n", "", 1))
 
 
 @pytest.mark.parametrize(
@@ -164,7 +183,9 @@ def test_a_missing_config_is_an_error_not_a_skipped_gate(tmp_path: Path) -> None
 
 def test_overlap_is_by_whole_path_segments() -> None:
     config = CONFIG.replace('paths = ["plugins/plugin"]', 'paths = ["packages/core/src2"]')
-    assert len(qg.parse_config(config).coverage.packages) == 2
+    coverage = qg.parse_config(config).coverage
+    assert coverage is not None
+    assert len(coverage.packages) == 2
 
 
 @pytest.mark.parametrize(
@@ -312,7 +333,13 @@ def test_a_bad_config_stops_the_gate_with_exit_2(
 # --- Coverage -------------------------------------------------------------------------------------
 
 
-COVERAGE = qg.parse_config(CONFIG).coverage
+def _coverage_config() -> qg.CoverageConfig:
+    coverage = qg.parse_config(CONFIG).coverage
+    assert coverage is not None
+    return coverage
+
+
+COVERAGE = _coverage_config()
 
 
 def test_coveragepy_counts_statements_and_branches(tmp_path: Path) -> None:
@@ -433,6 +460,18 @@ def test_the_coverage_command_reports_every_package(
     assert capsys.readouterr().out.splitlines() == [
         "coverage: core: 90.0% (baseline 90.0%, +0.0)",
         "coverage: plugin: nothing to measure",
+    ]
+
+
+def test_the_coverage_command_without_coverage_says_so_and_passes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """With no [coverage], the leg reads no report: there's nothing to judge it against."""
+    (tmp_path / "quality-gates.toml").write_text(without_coverage(CONFIG), encoding="utf-8")
+    missing = tmp_path / "never-written.json"
+    assert qg.main(["coverage", "--coveragepy", str(missing)], root=tmp_path) == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "coverage: not measured in this repository (no [coverage] in quality-gates.toml)"
     ]
 
 

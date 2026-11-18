@@ -20,6 +20,23 @@ def test_guard_files_in_another_shape_is_named() -> None:
         tofu_text.guard_files('guard_files = ["scripts/guard.py"]')
 
 
+def test_the_mutation_report_files_are_read_apart_and_delivered_files_are_both() -> None:
+    text = (
+        'guard_files = toset([\n  "scripts/guard.py",\n])\n'
+        'mutation_report_files = toset([\n  ".github/workflows/mutation-pr.yml",\n])\n'
+    )
+    assert tofu_text.mutation_report_files(text) == [".github/workflows/mutation-pr.yml"]
+    assert tofu_text.delivered_files(text) == [
+        "scripts/guard.py",
+        ".github/workflows/mutation-pr.yml",
+    ]
+
+
+def test_mutation_report_files_in_another_shape_is_named() -> None:
+    with pytest.raises(tofu_text.ShapeError, match="mutation_report_files isn't toset"):
+        tofu_text.mutation_report_files('guard_files = toset([\n  "a",\n])')
+
+
 def test_guard_targets_reads_each_module_by_its_repositorys_name() -> None:
     text = "guard_targets = toset([module.repo_troupe.name, module.repo_github.name])"
     assert tofu_text.guard_targets(text, REPOSITORIES) == [".github", "troupe"]

@@ -1,5 +1,6 @@
 """scripts/check.py stops at the first failing gate and returns its exit code."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -9,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import check
+import quality_gates
 
 
 def step(label: str, code: int, marker: Path) -> tuple[str, list[str]]:
@@ -200,7 +202,7 @@ def test_complexity_runs_before_the_tests_and_takes_the_base() -> None:
 
 
 def test_the_leg_measures_coverage_from_the_full_test_run_and_audits() -> None:
-    steps = check.gates(base="abc123", leg=True)
+    steps = check.gates(base="abc123", leg=True, coverage=True)
     report = str(check.coverage_report())
     assert f"--cov-report=json:{report}" in dict(steps)["tests"]
     assert dict(steps)["coverage"][-3:] == ["coverage", "--coveragepy", report]
@@ -209,10 +211,41 @@ def test_the_leg_measures_coverage_from_the_full_test_run_and_audits() -> None:
 
 
 def test_a_scoped_check_on_the_leg_says_coverage_wasnt_measured() -> None:
-    steps = check.gates(("dns",), leg=True)
+    steps = check.gates(("dns",), leg=True, coverage=True)
     assert not any(arg.startswith("--cov") for arg in dict(steps)["tests"])
     assert "coverage not measured: the tests were scoped" in dict(steps)["coverage"][-1]
     assert "audit" in labels(steps)
+
+
+def test_without_coverage_the_leg_audits_and_says_coverage_isnt_measured_here() -> None:
+    """A repository infrastructure's list doesn't name has no [coverage] (#332)."""
+    steps = check.gates(base="abc123", leg=True, coverage=False)
+    assert not any(arg.startswith("--cov") for arg in dict(steps)["tests"])
+    assert "coverage not measured in this repository" in dict(steps)["coverage"][-1]
+    assert dict(steps)["audit"][-3:] == ["audit", "--base", "abc123"]
+
+
+def test_whether_the_leg_measures_coverage_follows_this_repositorys_config() -> None:
+    declared = quality_gates.read_config(check.ROOT).coverage is not None
+    measured = any(arg.startswith("--cov") for arg in dict(check.gates(leg=True))["tests"])
+    assert measured is declared
+
+
+@pytest.mark.mutation
+def test_this_repository_measures_coverage_only_if_the_list_names_it() -> None:
+    """scripts/mutation.json's repositories is the one list for coverage and mutation testing
+    (spec: mutation-testing; #332): infrastructure declares [coverage] only while it's listed."""
+    listed = (
+        "infrastructure"
+        in json.loads((check.ROOT / "scripts" / "mutation.json").read_text(encoding="utf-8"))[
+            "repositories"
+        ]
+    )
+    declared = quality_gates.read_config(check.ROOT).coverage is not None
+    assert declared is listed, (
+        "quality-gates.toml's [coverage] and scripts/mutation.json's repositories disagree: "
+        "declare [coverage] only while the list names infrastructure"
+    )
 
 
 def test_the_leg_is_off_unless_its_variable_is_set() -> None:

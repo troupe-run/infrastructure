@@ -16,7 +16,16 @@ import mutation_settings as ms
 
 pytestmark = pytest.mark.mutation
 
-SETTINGS = ms.load_settings(run.SETTINGS.read_text(encoding="utf-8"))
+# The settings as they were with three repositories and both tools (#332 cut the real list to
+# troupe), so every tool's code stays tested.
+SETTINGS_THREE = Path(__file__).parent / "fixtures" / "mutation" / "settings-three.json"
+SETTINGS = ms.load_settings(SETTINGS_THREE.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(autouse=True)
+def three_repositories(monkeypatch: pytest.MonkeyPatch) -> None:
+    """main() reads the settings from run.SETTINGS: give it the same three repositories."""
+    monkeypatch.setattr(run, "SETTINGS", SETTINGS_THREE)
 
 
 def test_a_package_with_a_src_directory_runs_mutmut_in_the_package(tmp_path: Path) -> None:
@@ -467,6 +476,83 @@ def test_a_run_maps_survivors_back_to_the_real_source_and_cleans_up(
     )
     assert not (tmp_path / "src").exists()
     assert not (tmp_path / "_mutation_children_plugin.py").exists()
+
+
+def package_checkout(tmp_path: Path) -> ms.Unit:
+    """troupe's shape: packages beside plugins/ and scripts/, under a root pyproject.toml."""
+    for name in ("plugins/runner/fixtures", "scripts", ".git", "packages/troupe/src",
+                 "packages/troupe/tests", "packages/other"):  # fmt: skip
+        (tmp_path / name).mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'x'\n", encoding="utf-8")
+    return ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
+
+
+class LinkRecorder(Recorder):
+    """What a test counting one directory too many from inside mutmut's copy finds (#332)."""
+
+    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+        packages = cwd.parent
+        self.seen = {
+            "plugins": (packages / "plugins" / "runner" / "fixtures").is_dir(),
+            "packages": (packages / "packages" / "troupe" / "src").is_dir(),
+            "pyproject": (packages / "pyproject.toml").is_file(),
+            "git": (packages / ".git").exists(),
+            "own": not (packages / "troupe").is_symlink() and not (packages / "other").is_symlink(),
+        }
+        return super().__call__(command, cwd, timeout)
+
+
+@pytest.mark.parametrize("code", [0, 1])
+def test_a_packages_run_finds_the_checkouts_files_from_one_level_up_and_cleans_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, code: int
+) -> None:
+    unit = package_checkout(tmp_path)
+    monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
+    recorder = LinkRecorder(code)
+    if code:
+        with pytest.raises(run.RunError):
+            run.run_mutmut(tmp_path, unit, [], 1e12, recorder)
+    else:
+        fake_show(monkeypatch)
+        run.run_mutmut(tmp_path, unit, [], 1e12, recorder)
+    assert recorder.seen == {
+        "plugins": True, "packages": True, "pyproject": True, "git": False, "own": True,
+    }  # fmt: skip
+    assert sorted(p.name for p in (tmp_path / "packages").iterdir()) == ["other", "troupe"]
+
+
+def write_addopts(tmp_path: Path, addopts: str) -> None:
+    text = f"[tool.pytest.ini_options]\naddopts = {addopts}\n"
+    (tmp_path / "pyproject.toml").write_text(text, encoding="utf-8")
+
+
+def test_a_run_keeps_the_repositorys_pytest_options_but_those_the_copy_cant_honour(
+    tmp_path: Path,
+) -> None:
+    """troupe's own plugins load; strict markers and the guard's tag plugin, which finds its
+    declarations from the repository's root, don't (#332)."""
+    unit = package_checkout(tmp_path)
+    write_addopts(
+        tmp_path,
+        '["-ra", "--strict-markers", "--strict-config", "-p", "protocol_guard", '
+        '"-p", "guard_pytest", "-p", "gitrepo"]',
+    )
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+    assert "\n    addopts=-ra --strict-config -p protocol_guard -p gitrepo\n" in config
+
+
+def test_addopts_as_one_string_is_split_as_pytest_splits_it(tmp_path: Path) -> None:
+    unit = package_checkout(tmp_path)
+    write_addopts(tmp_path, "\"-ra --strict-markers -p guard_pytest -k 'a or b'\"")
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+    assert "\n    addopts=-ra -k 'a or b'\n" in config
+
+
+def test_addopts_of_another_type_is_refused_naming_it(tmp_path: Path) -> None:
+    unit = package_checkout(tmp_path)
+    write_addopts(tmp_path, "3")
+    with pytest.raises(run.RunError, match=r"pyproject.toml's addopts is 3; it must be"):
+        run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
 
 
 def test_a_units_own_setup_cfg_is_refused_word_for_word(tmp_path: Path) -> None:

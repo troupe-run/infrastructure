@@ -30,6 +30,12 @@ workflow delivered from infrastructure SHALL mutate the code the pull request ch
 comment on the pull request, edited in place on later pushes, and in the run's summary, with its runtime. It SHALL NOT
 be a required check, and SHALL conclude success when it finds survivors. Only its own failure to run SHALL fail it.
 
+#### Scenario: A branch made before a delivery
+- **WHEN** a ready pull request's branch was made before infrastructure delivered the report's scripts to its
+  repository
+- **THEN** the report runs on the pull request's merge with its base, which has them, and mutates only the lines the
+  pull request changed
+
 #### Scenario: A pull request leaves a changed line untested
 - **WHEN** a ready pull request changes a function, and a mutant on a changed line survives
 - **THEN** the pull request's mutation comment lists it with its location and change, the job succeeds, and the merge

@@ -12,7 +12,17 @@ import mutation_settings as ms
 
 pytestmark = pytest.mark.mutation
 
-SETTINGS = ms.load_settings(pr.SETTINGS.read_text(encoding="utf-8"))
+# The settings as they were with three repositories and both tools (#332 cut the real list to
+# troupe), so every tool's code stays tested.
+SETTINGS_THREE = Path(__file__).parent / "fixtures" / "mutation" / "settings-three.json"
+SETTINGS = ms.load_settings(SETTINGS_THREE.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(autouse=True)
+def three_repositories(monkeypatch: pytest.MonkeyPatch) -> None:
+    """main() reads the settings from pr.SETTINGS: give it the same three repositories."""
+    monkeypatch.setattr(pr, "SETTINGS", SETTINGS_THREE)
+
 
 DIFF = """\
 diff --git a/scripts/mutation_settings.py b/scripts/mutation_settings.py

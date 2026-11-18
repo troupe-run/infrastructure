@@ -1,9 +1,12 @@
 name: mutation
 
-# Weekly mutation testing of troupe, infrastructure and website, which keeps one test-quality issue
-# per module under its threshold or baseline (spec: mutation-testing; #325; lint-mutation design
-# D3-D8). It runs on no pull request and is no required check, so it never blocks a merge.
+# Weekly mutation testing of the repositories scripts/mutation.json lists (today troupe alone;
+# #332), which keeps one test-quality issue per module under its threshold or baseline (spec:
+# mutation-testing; #325; lint-mutation design D3-D8). It runs on no pull request and is no required
+# check, so it never blocks a merge.
 #
+#   targets  contents read                          reads the list, and checks a dispatch names one
+#                                                   of its repositories
 #   mutate   no secret; contents and actions read   checks out a repository's main, runs mutmut or
 #                                                   Stryker within the budget (scripts/mutation.json),
 #                                                   and hands on its report, the repository's
@@ -23,9 +26,8 @@ on:
   workflow_dispatch:
     inputs:
       repository:
-        description: "One repository to mutate, or all"
-        type: choice
-        options: [all, troupe, infrastructure, website]
+        description: "One repository scripts/mutation.json lists, or all"
+        type: string
         default: all
       dry-run:
         description: "Report every score and what would change, and write nothing"
@@ -40,8 +42,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  targets:
+    name: the repositories to mutate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      repositories: ${{ steps.list.outputs.repositories }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts/mutation.json
+          sparse-checkout-cone-mode: false
+      # The one list of repositories that get coverage and mutation testing (spec: mutation-testing).
+      - name: The repositories the list names
+        id: list
+        env:
+          NAMED: ${{ inputs.repository || 'all' }}
+        run: |
+          set -euo pipefail
+          listed=$(jq -c '.repositories | keys_unsorted' scripts/mutation.json)
+          if [[ "$NAMED" != all ]] && ! jq -e --arg named "$NAMED" 'index($named) != null' <<<"$listed" >/dev/null; then
+            printf "::error::%s isn't in scripts/mutation.json's repositories, which lists %s. Fix: name one of them, or all.\n" "$NAMED" "$listed"
+            exit 1
+          fi
+          echo "repositories=$listed" >> "$GITHUB_OUTPUT"
+
   mutate:
     name: mutate ${{ matrix.repository }}
+    needs: targets
     runs-on: ubuntu-latest
     # budget_minutes (scripts/mutation.json) plus 30 for setup and the report; a test holds the two
     # together.
@@ -52,7 +82,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        repository: [troupe, infrastructure, website]
+        repository: ${{ fromJSON(needs.targets.outputs.repositories) }}
     steps:
       - name: Skip a repository the dispatch didn't name
         id: skip

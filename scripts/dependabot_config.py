@@ -23,6 +23,8 @@ import tofu_text
 REPO = tofu_text.REPO
 POLICY = REPO / "tofu" / "dependabot.json"
 LABELS = REPO / "tofu" / "labels" / "dependabot.json"
+# The one list of repositories that get coverage and mutation testing (#332).
+MUTATION = REPO / "scripts" / "mutation.json"
 OUT = REPO / "tofu" / "dependabot"
 COMMAND = "uv run scripts/dependabot_config.py"
 
@@ -128,9 +130,20 @@ def configs(
     labels: dict[str, Any],
     guard_files: list[str],
     guard_targets: list[str],
+    report_files: list[str] | None = None,
+    report_targets: list[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Each repository with ecosystems mapped to its configuration."""
-    workflows = delivered_workflows(guard_files)
+    """Each repository with ecosystems mapped to its configuration. `report_files` reach only the
+    guard targets in `report_targets`: those scripts/mutation.json lists (#332)."""
+
+    def workflows(repo: str) -> list[str]:
+        if repo not in guard_targets:
+            return []
+        files = list(guard_files)
+        if report_files and repo in (report_targets or []):
+            files += report_files
+        return delivered_workflows(files)
+
     return {
         repo: {
             "version": 2,
@@ -139,7 +152,7 @@ def configs(
                     policy,
                     labels,
                     ecosystem,
-                    workflows if repo in guard_targets else [],
+                    workflows(repo),
                     policy.get("ignore", {}).get(repo, {}).get(ecosystem, []),
                 )
                 for ecosystem in ecosystems
@@ -184,9 +197,11 @@ def generated() -> dict[str, str]:
         guard_delivery_tf, tofu_text.REPOSITORIES_TF.read_text(encoding="utf-8")
     )
     files = tofu_text.guard_files(guard_delivery_tf)
+    report = tofu_text.mutation_report_files(guard_delivery_tf)
+    listed = list(json.loads(MUTATION.read_text(encoding="utf-8"))["repositories"])
     return {
         f"{repo}.yml": render(config)
-        for repo, config in configs(policy, labels, files, targets).items()
+        for repo, config in configs(policy, labels, files, targets, report, listed).items()
     }
 
 
