@@ -195,7 +195,10 @@ def test_the_mutate_job_tests_the_merge_with_the_base_not_the_branch_alone() -> 
     [checkout] = steps_using(load(PR)["jobs"]["mutate"], "actions/checkout")
     assert checkout["with"] == {"ref": "${{ github.sha }}", "fetch-depth": 0}
     mutate = mutate_step("Mutate what changed")
-    assert mutate["env"] == {"MERGE": "${{ github.sha }}"}
+    assert mutate["env"] == {
+        "MERGE": "${{ github.sha }}",
+        "RESOURCES": "${{ github.workspace }}/out/resources-pr.log",
+    }
     assert 'BASE=$(git rev-parse "$MERGE^1")' in mutate["run"]
     assert "pull_request.head.sha" not in json.dumps(load(PR)["jobs"]["mutate"])
 
@@ -270,6 +273,71 @@ def test_the_gate_reads_the_list_from_the_merge_only() -> None:
         "sparse-checkout": "scripts/mutation.json",
         "sparse-checkout-cone-mode": False,
     }
+
+
+BEGIN, END = "# resources: begin", "# resources: end"
+
+
+def sampler_block(path: Path, job: str, step: str) -> str:
+    script = step_script(path, job, step)
+    assert BEGIN in script, f"{path.name}'s {step!r} step doesn't record the runner's resources"
+    return script[script.index(BEGIN) : script.index(END) + len(END)]
+
+
+def test_both_runs_record_the_runners_resources_the_same_way() -> None:
+    """Both mutate jobs carry the one sampler, so a lost runner leaves readings either way
+    (#337; mutation-resources design D1)."""
+    weekly = sampler_block(WEEKLY, "mutate", "Mutate")
+    pr = sampler_block(PR, "mutate", "Mutate what changed")
+    assert weekly == pr
+
+
+def test_the_sampler_logs_and_files_a_reading_a_minute_and_reports_the_lowest(
+    tmp_path: Path,
+) -> None:
+    meminfo = tmp_path / "meminfo"
+    meminfo.write_text(
+        "MemTotal:       16000000 kB\nMemAvailable:    2048000 kB\nSwapFree:        1024000 kB\n",
+        encoding="utf-8",
+    )
+    loadavg = tmp_path / "loadavg"
+    loadavg.write_text("3.50 2.00 1.00 1/200 999\n", encoding="utf-8")
+    summary = tmp_path / "summary.md"
+    readings = tmp_path / "out" / "resources.log"
+    script = "set -euo pipefail\n" + sampler_block(WEEKLY, "mutate", "Mutate") + "\nsleep 2.5\n"
+    env = dict(os.environ) | {
+        "RESOURCES": str(readings),
+        "RESOURCES_MEMINFO": str(meminfo),
+        "RESOURCES_LOADAVG": str(loadavg),
+        "RESOURCES_SECONDS": "1",
+        "GITHUB_STEP_SUMMARY": str(summary),
+    }
+    done = subprocess.run(
+        ["bash", "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True,
+        check=False, timeout=30,
+    )  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    lines = readings.read_text(encoding="utf-8").splitlines()
+    assert len(lines) >= 2
+    fields = dict(field.split("=", 1) for field in lines[0].split()[1:])
+    assert fields["mem_available_mb"] == "2000"
+    assert fields["swap_free_mb"] == "1000"
+    assert fields["load1"] == "3.50"
+    assert int(fields["disk_free_mb"]) > 0
+    assert fields["mutmut_processes"].isdigit()
+    logged = [line for line in done.stdout.splitlines() if line.startswith("resources: ")]
+    assert len(logged) >= len(lines)
+    assert "resources: lowest mem_available_mb=2000 at " in done.stdout
+    assert "lowest free memory: 2000 MB" in summary.read_text(encoding="utf-8")
+
+
+def test_the_pull_request_run_keeps_its_readings_when_it_fails() -> None:
+    [upload] = [
+        s for s in load(PR)["jobs"]["mutate"]["steps"]
+        if s.get("with", {}).get("name") == "resources"
+    ]  # fmt: skip
+    assert upload["if"] == "${{ !cancelled() }}"
+    assert upload["with"]["path"] == "out/resources-pr.log"
 
 
 def test_the_comment_job_checks_out_the_base_commit_only() -> None:

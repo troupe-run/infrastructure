@@ -173,8 +173,43 @@ jobs:
         env:
           REPOSITORY: ${{ matrix.repository }}
           PREVIOUS: ${{ steps.previous.outputs.commit }}
+          RESOURCES: ${{ github.workspace }}/out/resources-${{ matrix.repository }}.log
         run: |
           set -euo pipefail
+          # resources: begin
+          # The runner's memory, swap, disk and load once a minute while mutmut runs, to the log and to a
+          # file uploaded with the report, so a lost runner leaves what it last saw (#337; design D1).
+          mkdir -p "$(dirname "$RESOURCES")"
+          sample_resources() {
+            local meminfo=${RESOURCES_MEMINFO:-/proc/meminfo} loadavg=${RESOURCES_LOADAVG:-/proc/loadavg} line
+            while :; do
+              line="$(date -u +%H:%M:%S)"
+              line+=" mem_available_mb=$(awk '/^MemAvailable:/ {print int($2 / 1024)}' "$meminfo")"
+              line+=" swap_free_mb=$(awk '/^SwapFree:/ {print int($2 / 1024)}' "$meminfo")"
+              line+=" disk_free_mb=$(df -Pm . | awk 'NR == 2 {print $4}')"
+              line+=" load1=$(cut -d' ' -f1 "$loadavg")"
+              # mutmut's children are titled "mutmut: <mutant>": these are the mutants running at once.
+              line+=" mutmut_processes=$( (pgrep -f '^mutmut: ' || true) | wc -l | tr -d ' ')"
+              echo "resources: $line"
+              echo "$line" >> "$RESOURCES"
+              sleep "${RESOURCES_SECONDS:-60}"
+            done
+          }
+          lowest_resources() {
+            kill "$sampler" 2>/dev/null || true
+            wait "$sampler" 2>/dev/null || true
+            local lowest
+            lowest=$(awk '{split($2, f, "="); if (min == "" || f[2] + 0 < min + 0) {min = f[2]; at = $1}}
+              END {if (min != "") print min " at " at}' "$RESOURCES" 2>/dev/null || true)
+            if [[ -n "$lowest" ]]; then
+              echo "resources: lowest mem_available_mb=$lowest"
+              echo "Mutation run: lowest free memory: ${lowest/ at / MB at } UTC" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+            fi
+          }
+          sample_resources &
+          sampler=$!
+          trap lowest_resources EXIT
+          # resources: end
           args=("$REPOSITORY" . "../out/report-$REPOSITORY.json")
           [[ -z "$PREVIOUS" ]] || args+=(--previous "$PREVIOUS")
           if [[ "$REPOSITORY" == website ]]; then

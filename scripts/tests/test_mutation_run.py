@@ -58,7 +58,7 @@ def test_infrastructures_config_mutates_the_linked_source_but_not_its_tests_and_
     (tmp_path / ".tflint.hcl").touch()
     (tmp_path / "src").symlink_to("scripts")
     unit = SETTINGS.repositories["infrastructure"].units[0]
-    config = run.mutmut_config(tmp_path, tmp_path, unit)
+    config = run.mutmut_config(tmp_path, tmp_path, unit, children=2)
     assert "source_paths=src/\n" in config
     assert "pytest_add_cli_args_test_selection=src/tests\n" in config
     assert (
@@ -83,8 +83,9 @@ def test_a_failed_mutmut_run_is_an_error_not_an_empty_report(
 
 
 def test_a_packages_config_selects_its_own_tests(tmp_path: Path) -> None:
+    (tmp_path / "packages" / "troupe").mkdir(parents=True)
     unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
     assert "pytest_add_cli_args_test_selection=tests\n" in config
     assert config.endswith("also_copy=\n    _mutation_children_plugin.py\n")
 
@@ -309,7 +310,7 @@ def test_a_unit_with_its_own_setup_cfg_is_refused_not_overwritten(tmp_path: Path
     (tmp_path / "packages" / "troupe" / "setup.cfg").write_text("[metadata]\n", encoding="utf-8")
     unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
     with pytest.raises(run.RunError, match="won't overwrite"):
-        run.run_mutmut(tmp_path, unit, [], 0.0, Recorder())
+        run.run_mutmut(tmp_path, unit, [], 0.0, Recorder(), children=2)
     assert (tmp_path / "packages" / "troupe" / "setup.cfg").read_text(
         encoding="utf-8"
     ) == "[metadata]\n"
@@ -350,21 +351,60 @@ def test_a_linked_units_whole_config(tmp_path: Path) -> None:
     unit = ms.Unit(
         "scripts", "scripts", "scripts/tests", deselect=(("scripts/tests/test_a.py::test_b", "w"),)
     )
-    assert run.mutmut_config(tmp_path, tmp_path, unit) == (
+    assert run.mutmut_config(tmp_path, tmp_path, unit, children=2) == (
         "[mutmut]\n"
         "source_paths=src/\n"
         "pytest_add_cli_args_test_selection=src/tests\n"
         "pytest_add_cli_args=\n    -o\n    addopts=-ra\n    -p\n    _mutation_children_plugin\n"
         "    --deselect\n    src/tests/test_a.py::test_b\n"
-        f"max_children={run.CHILDREN}\n"
+        "max_children=2\n"
         "do_not_mutate=\n    src/tests/*\n"
         "also_copy=\n    _mutation_children_plugin.py\n    tofu\n"
     )
 
 
+def test_a_packages_unit_copies_its_packages_own_files(tmp_path: Path) -> None:
+    """A plugin's tests read its tools/ and fixtures/ from their own file (#337)."""
+    package = tmp_path / "plugins" / "runner-a"
+    for name in ("src", "tests", "tools", "fixtures", ".venv", "mutants"):
+        (package / name).mkdir(parents=True)
+    for name in ("LICENSE", "setup.cfg", "_mutation_children_plugin.py"):
+        (package / name).touch()
+    unit = ms.Unit("runner-a", "plugins/runner-a/src", "plugins/runner-a/tests")
+    config = run.mutmut_config(package, tmp_path, unit, children=2)
+    assert config.endswith(
+        "also_copy=\n    _mutation_children_plugin.py\n    LICENSE\n    fixtures\n    tools\n"
+    )
+
+
+def test_the_config_runs_as_many_mutants_at_once_as_the_settings_say(tmp_path: Path) -> None:
+    (tmp_path / "packages" / "troupe").mkdir(parents=True)
+    unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=3)
+    assert "\nmax_children=3\n" in config
+
+
+def test_a_run_takes_max_children_from_the_settings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[int] = []
+
+    def fake(checkout: Path, unit: ms.Unit, names: object, deadline: float, run_: object,
+             *, children: int) -> dict[str, object]:  # fmt: skip
+        seen.append(children)
+        return {}
+
+    monkeypatch.setattr(run, "run_mutmut", fake)
+    settings = SETTINGS.__class__(**{**vars(SETTINGS), "max_children": 3})
+    run.collect(SETTINGS.repositories["troupe"], tmp_path, settings, None, Recorder())
+    assert seen
+    assert set(seen) == {3}
+
+
 def test_a_packages_also_copy_is_named_from_its_own_directory(tmp_path: Path) -> None:
+    (tmp_path / "packages" / "troupe").mkdir(parents=True)
     unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests", also_copy=("docs",))
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
     assert config.endswith("also_copy=\n    ../../docs\n    _mutation_children_plugin.py\n")
 
 
@@ -459,7 +499,7 @@ def test_a_run_maps_survivors_back_to_the_real_source_and_cleans_up(
     monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
     shown = fake_show(monkeypatch)
     unit = SETTINGS.repositories["infrastructure"].units[0]
-    modules = run.run_mutmut(tmp_path, unit, [], 1e12, FakeMutmut())
+    modules = run.run_mutmut(tmp_path, unit, [], 1e12, FakeMutmut(), children=2)
     [survivor] = modules["calc"].survivors
     assert (survivor.path, survivor.line, survivor.name) == (
         "scripts/calc.py",
@@ -472,7 +512,7 @@ def test_a_run_maps_survivors_back_to_the_real_source_and_cleans_up(
     )
     assert (tmp_path / "mutants" / "scripts").is_symlink()
     assert (tmp_path / "setup.cfg").read_text(encoding="utf-8") == run.mutmut_config(
-        tmp_path, tmp_path, unit
+        tmp_path, tmp_path, unit, children=2
     )
     assert not (tmp_path / "src").exists()
     assert not (tmp_path / "_mutation_children_plugin.py").exists()
@@ -511,10 +551,10 @@ def test_a_packages_run_finds_the_checkouts_files_from_one_level_up_and_cleans_u
     recorder = LinkRecorder(code)
     if code:
         with pytest.raises(run.RunError):
-            run.run_mutmut(tmp_path, unit, [], 1e12, recorder)
+            run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2)
     else:
         fake_show(monkeypatch)
-        run.run_mutmut(tmp_path, unit, [], 1e12, recorder)
+        run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2)
     assert recorder.seen == {
         "plugins": True, "packages": True, "pyproject": True, "git": False, "own": True,
     }  # fmt: skip
@@ -537,27 +577,27 @@ def test_a_run_keeps_the_repositorys_pytest_options_but_those_the_copy_cant_hono
         '["-ra", "--strict-markers", "--strict-config", "-p", "protocol_guard", '
         '"-p", "guard_pytest", "-p", "gitrepo"]',
     )
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
     assert "\n    addopts=-ra --strict-config -p protocol_guard -p gitrepo\n" in config
 
 
 def test_addopts_as_one_string_is_split_as_pytest_splits_it(tmp_path: Path) -> None:
     unit = package_checkout(tmp_path)
     write_addopts(tmp_path, "\"-ra --strict-markers -p guard_pytest -k 'a or b'\"")
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
     assert "\n    addopts=-ra -k 'a or b'\n" in config
 
 
 def test_the_joined_plugin_form_is_left_out_too(tmp_path: Path) -> None:
     unit = package_checkout(tmp_path)
     write_addopts(tmp_path, '["-ra", "-pguard_pytest", "-pgitrepo"]')
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
     assert "\n    addopts=-ra -pgitrepo\n" in config
 
 
 def test_no_addopts_gives_ra(tmp_path: Path) -> None:
     unit = package_checkout(tmp_path)
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
     assert "\n    addopts=-ra\n" in config
 
 
@@ -565,7 +605,7 @@ def test_a_pyproject_that_isnt_toml_is_refused_naming_it(tmp_path: Path) -> None
     unit = package_checkout(tmp_path)
     (tmp_path / "pyproject.toml").write_text("[tool.pytest\n", encoding="utf-8")
     with pytest.raises(run.RunError, match=r"pyproject.toml isn't valid TOML"):
-        run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+        run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
 
 
 def test_links_made_before_a_failed_link_are_removed(
@@ -584,7 +624,7 @@ def test_links_made_before_a_failed_link_are_removed(
     monkeypatch.setattr(Path, "symlink_to", second_fails)
     monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
     with pytest.raises(OSError, match="no room for a link"):
-        run.run_mutmut(tmp_path, unit, [], 1e12, Recorder())
+        run.run_mutmut(tmp_path, unit, [], 1e12, Recorder(), children=2)
     assert made
     assert not any(link.is_symlink() for link in made)
     assert sorted(p.name for p in (tmp_path / "packages").iterdir()) == ["other", "troupe"]
@@ -594,7 +634,7 @@ def test_addopts_of_another_type_is_refused_naming_it(tmp_path: Path) -> None:
     unit = package_checkout(tmp_path)
     write_addopts(tmp_path, "3")
     with pytest.raises(run.RunError, match=r"pyproject.toml's addopts is 3; it must be"):
-        run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit)
+        run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
 
 
 def test_a_units_own_setup_cfg_is_refused_word_for_word(tmp_path: Path) -> None:
@@ -602,7 +642,12 @@ def test_a_units_own_setup_cfg_is_refused_word_for_word(tmp_path: Path) -> None:
     (tmp_path / "setup.cfg").write_text("[x]\n", encoding="utf-8")
     with pytest.raises(run.RunError) as raised:
         run.run_mutmut(
-            tmp_path, SETTINGS.repositories["infrastructure"].units[0], [], 1e12, Recorder()
+            tmp_path,
+            SETTINGS.repositories["infrastructure"].units[0],
+            [],
+            1e12,
+            Recorder(),
+            children=2,
         )
     assert str(raised.value) == (
         f"{tmp_path / 'setup.cfg'} exists, and mutmut reads its configuration from there: "
