@@ -337,6 +337,22 @@ def test_the_sampler_logs_and_files_a_reading_a_minute_and_reports_the_lowest(
     assert "lowest free memory: 1500 MB at 09:01:00 UTC" in summary.read_text(encoding="utf-8")
 
 
+def test_the_weekly_run_keeps_its_readings_with_its_report_whatever_the_outcome() -> None:
+    """The readings file is inside out/, which the report upload carries on any outcome but
+    cancelled (#337)."""
+    steps = load(WEEKLY)["jobs"]["mutate"]["steps"]
+    [mutate] = [s for s in steps if s.get("name") == "Mutate"]
+    assert mutate["env"]["RESOURCES"] == (
+        "${{ github.workspace }}/out/resources-${{ matrix.repository }}.log"
+    )
+    [upload] = [
+        s for s in steps
+        if s.get("with", {}).get("name") == "report-${{ matrix.repository }}"
+    ]  # fmt: skip
+    assert upload["if"] == "${{ !cancelled() }}"
+    assert upload["with"]["path"] == "out/"
+
+
 def test_the_pull_request_run_keeps_its_readings_when_it_fails() -> None:
     [upload] = [
         s for s in load(PR)["jobs"]["mutate"]["steps"]
