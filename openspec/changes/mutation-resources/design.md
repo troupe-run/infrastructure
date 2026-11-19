@@ -46,7 +46,8 @@ mutation phase's time; the first troupe dry run measures that against the 240-mi
 
 `mutmut_config`, for a unit whose source is a package's `src` (mutmut runs in the package directory), adds the
 package directory's other top-level entries to `also_copy`, except `src`, the tests, `mutants`, `setup.cfg`, the
-plugin copy and `.venv`, the same rule the root unit uses for the checkout. troupe's packages gain their `LICENSE`,
+plugin copy, hidden entries (caches, `.venv`) and build output (`dist`, `build`, `*.egg-info`). `pyproject.toml` is
+copied, as mutmut already copies a package's own. troupe's packages gain their `LICENSE`,
 `README.md` and `CHANGELOG.md` in the copy (harmless); the plugins gain `tools/` and `fixtures/`, which their tests read.
 
 ### D4. The plugins come after a successful dry run of the packages

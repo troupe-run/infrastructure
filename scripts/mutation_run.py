@@ -173,10 +173,16 @@ def mutmut_config(workdir: Path, checkout: Path, unit: ms.Unit, *, children: int
         # A package's tests find its own files (a plugin's tools/ and fixtures/) by counting up
         # from their own file, which inside mutmut's copy is under mutants/: copy them beside the
         # source, as the root unit copies the checkout's (#337; mutation-resources design D3).
-        own = {"src", tests.split("/")[0], ".venv", "mutants", "setup.cfg", "__pycache__",
-               "node_modules", f"{PLUGIN_COPY}.py"}  # fmt: skip
+        # Hidden entries (caches, .venv) and build output aren't the package's files.
+        own = {"src", tests.split("/")[0], "mutants", "setup.cfg", "__pycache__",
+               "node_modules", "dist", "build", f"{PLUGIN_COPY}.py"}  # fmt: skip
         also_copy += sorted(
-            p.name for p in workdir.iterdir() if p.name not in own and p.name not in also_copy
+            p.name
+            for p in workdir.iterdir()
+            if p.name not in own
+            and not p.name.startswith(".")
+            and not p.name.endswith(".egg-info")
+            and p.name not in also_copy
         )
 
     def listed(values: Sequence[str]) -> str:
