@@ -528,8 +528,30 @@ sys.exit(1)
 def test_the_runs_init_waits_for_the_command_rather_than_becoming_it() -> None:
     """The restoring bash stays pid 1 of the namespace, so it reaps orphans (#347, design D1)."""
     block = containment_block(WEEKLY, "Mutate")
-    assert """bash -c 'source "$1"; shift; "$@" & wait "$!"' restore""" in block
+    assert """bash -c 'source "$1"; shift; "$@"; exit $?' restore""" in block
     assert 'exec "$@"' not in block
+
+
+@CONTAINED
+def test_the_command_keeps_its_stdin_and_default_sigint(tmp_path: Path) -> None:
+    """A backgrounded command would get /dev/null and an ignored SIGINT, inherited by every test
+    process (from the review of #360); the init runs it in the foreground instead."""
+    script = tmp_path / "signals.py"
+    script.write_text(
+        "import signal, sys\n"
+        "print('sigint', signal.getsignal(signal.SIGINT) is signal.default_int_handler)\n"
+        "print('stdin', sys.stdin.read().strip())\n",
+        encoding="utf-8",
+    )
+    block = containment_block(WEEKLY, "Mutate")
+    done = subprocess.run(
+        ["bash", "-c", f"set -euo pipefail\n{block}\nrun_contained python3 {script}\n"],
+        cwd=tmp_path, input="piped\n", capture_output=True, text=True, check=False, timeout=120,
+        start_new_session=True,
+    )  # fmt: skip
+    assert done.returncode == 0, (done.returncode, done.stdout, done.stderr)
+    assert "sigint True" in done.stdout
+    assert "stdin piped" in done.stdout
 
 
 @CONTAINED
