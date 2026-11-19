@@ -291,6 +291,11 @@ can't run under the tool at all SHALL be deselected in the settings, with its re
 - **THEN** its tests run with the plugins troupe's pytest options load, without `--strict-markers` and the guard's tag
   plugin, which can't find their declarations from the copy
 
+#### Scenario: A package's tests find a sibling package
+- **WHEN** `troupe-store-text` is mutated and a test points a child process at `packages/troupe/tests`, counting two
+  directories up from its own file
+- **THEN** the child finds troupe's tests, as it does outside the run
+
 ### Requirement: A mutation run records the resources it uses
 While a weekly or pull request mutation run mutates, its job SHALL record the runner's memory, swap, disk and load at
 least once a minute, both in the job's log and in a file uploaded with the run's report, so a run whose runner is lost
