@@ -212,10 +212,12 @@ jobs:
           # resources: end
           args=("$REPOSITORY" . "../out/report-$REPOSITORY.json")
           [[ -z "$PREVIOUS" ]] || args+=(--previous "$PREVIOUS")
+          # In a session of its own: a step shares the runner agent's process group, which a mutant
+          # that kills its own group would otherwise take down (#341).
           if [[ "$REPOSITORY" == website ]]; then
-            python3 ../infra/scripts/mutation_run.py "${args[@]}"
+            setsid --wait python3 ../infra/scripts/mutation_run.py "${args[@]}"
           else
-            uv run --no-sync python ../infra/scripts/mutation_run.py "${args[@]}"
+            setsid --wait uv run --no-sync python ../infra/scripts/mutation_run.py "${args[@]}"
           fi
           if [[ -f quality-gates.toml ]]; then
             cp quality-gates.toml "../out/quality-gates-$REPOSITORY.toml"

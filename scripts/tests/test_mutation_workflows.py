@@ -4,6 +4,7 @@ mutation-testing, mutation-issue-credentials; lint-mutation design D3, D4, D9)."
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -351,6 +352,60 @@ def test_the_weekly_run_keeps_its_readings_with_its_report_whatever_the_outcome(
     ]  # fmt: skip
     assert upload["if"] == "${{ !cancelled() }}"
     assert upload["with"]["path"] == "out/"
+
+
+RUNS = {
+    (WEEKLY, "Mutate"): (
+        'python3 ../infra/scripts/mutation_run.py "${args[@]}"',
+        'uv run --no-sync python ../infra/scripts/mutation_run.py "${args[@]}"',
+    ),
+    (PR, "Mutate what changed"): (
+        'python3 scripts/mutation_pr.py run "$BASE" "$HEAD" out/pr-report.json',
+        'uv run --no-sync python scripts/mutation_pr.py run "$BASE" "$HEAD" out/pr-report.json',
+    ),
+}
+
+
+def test_both_runs_mutate_in_a_session_of_their_own() -> None:
+    """A step shares the runner agent's process group: a mutant's group kill would lose the
+    runner (#341's probe). Each run line is under setsid --wait, after the sampler, which stays in
+    the step's shell (design D2)."""
+    for (path, step), lines in RUNS.items():
+        script = step_script(path, "mutate", step)
+        for line in lines:
+            assert f"setsid --wait {line}" in script, (path.name, line)
+        assert script.index(END) < script.index("setsid --wait"), path.name
+
+
+@pytest.mark.skipif(shutil.which("setsid") is None, reason="setsid is util-linux's: CI runs this")
+def test_a_run_that_kills_its_own_group_fails_the_step_and_spares_its_shell(
+    tmp_path: Path,
+) -> None:
+    """The weekly step itself, with a stand-in run that kills its own process group. The script
+    runs in a fresh session, so even a broken step can't reach this test."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "uv").write_text("#!/bin/sh\nkill -9 0\n", encoding="utf-8")
+    (bin_dir / "uv").chmod(0o755)
+    (tmp_path / "target").mkdir()
+    readings = tmp_path / "out" / "resources-troupe.log"
+    readings.parent.mkdir()
+    readings.write_text("09:00:00 mem_available_mb=1500\n", encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GITHUB_")} | {
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        "REPOSITORY": "troupe",
+        "PREVIOUS": "",
+        "RESOURCES": str(readings),
+        "RESOURCES_SECONDS": "30",
+    }
+    done = subprocess.run(
+        ["bash", "-e", "-c", step_script(WEEKLY, "mutate", "Mutate")],
+        cwd=tmp_path / "target", env=env, capture_output=True, text=True, check=False,
+        timeout=60, start_new_session=True,
+    )  # fmt: skip
+    assert done.returncode == 137, (done.returncode, done.stdout, done.stderr)
+    # The step's own shell lived to run its exit trap: the readings' summary.
+    assert "resources: lowest mem_available_mb=1500 at 09:00:00" in done.stdout
 
 
 def test_the_pull_request_run_keeps_its_readings_when_it_fails() -> None:
