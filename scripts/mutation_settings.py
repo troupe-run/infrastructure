@@ -18,10 +18,10 @@ from typing import Any
 TOOLS = ("mutmut", "stryker")
 SHA = re.compile(r"[0-9a-f]{40}")
 MAX_JOB_MINUTES = 360
-# GitHub's ubuntu-latest runner for a public repository: more mutants at once than CPUs only
-# oversubscribes it (#337).
-RUNNER_CPUS = 4
 """GitHub's limit on one job. A budget leaves 30 minutes of it for setup and the report."""
+RUNNER_CPUS = 4
+"""GitHub's ubuntu-latest runner for a public repository: more mutants at once than CPUs only
+oversubscribes it (#337)."""
 
 
 class SettingsError(Exception):

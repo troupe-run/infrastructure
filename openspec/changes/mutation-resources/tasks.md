@@ -1,7 +1,7 @@
 # Tasks
 
-Built while website#136 waits, with targeted test runs only; the full check and commits wait for the orchestrator's
-slot (2026-11-18). Dry runs are in CI only.
+Built while website#136 waited, with targeted test runs; the full check ran in the orchestrator's slot (2026-11-19),
+and runs in the commit hook of every commit since. Dry runs are in CI only.
 
 ## 1. max_children as a setting (design D2)
 
@@ -28,7 +28,8 @@ slot (2026-11-18). Dry runs are in CI only.
 
 - [x] 4.1 `docs/development-workflow.md`'s "Mutation testing": `max_children`, the readings, what a package's unit
       copies
-- [ ] 4.2 The full check passes (when the orchestrator gives the slot); the pull request's plan updates troupe's four
+- [x] 4.2 The full check passes: it ran in the commit hook of each commit (2026-11-19)
+- [ ] 4.3 The pull request's plan updates troupe's four
       delivered files and nothing else
 
 ## Workflow follow-up

@@ -369,12 +369,14 @@ def test_a_packages_unit_copies_its_packages_own_files(tmp_path: Path) -> None:
     for name in ("src", "tests", "tools", "fixtures", ".venv", "mutants", ".pytest_cache",
                  ".mypy_cache", "dist", "build", "troupe_runner_a.egg-info"):  # fmt: skip
         (package / name).mkdir(parents=True)
-    for name in ("LICENSE", "setup.cfg", "_mutation_children_plugin.py", ".coverage"):
+    for name in ("LICENSE", "pyproject.toml", "uv.lock", "setup.cfg",
+                 "_mutation_children_plugin.py", ".coverage"):  # fmt: skip
         (package / name).touch()
     unit = ms.Unit("runner-a", "plugins/runner-a/src", "plugins/runner-a/tests")
     config = run.mutmut_config(package, tmp_path, unit, children=2)
     assert config.endswith(
-        "also_copy=\n    _mutation_children_plugin.py\n    LICENSE\n    fixtures\n    tools\n"
+        "also_copy=\n    _mutation_children_plugin.py\n    LICENSE\n    fixtures\n"
+        "    pyproject.toml\n    tools\n    uv.lock\n"
     )
 
 
