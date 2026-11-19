@@ -35,4 +35,4 @@ slot (2026-11-18). Dry runs are in CI only.
 
 - After the merge and apply: dispatch `mutation.yml` as a dry run for troupe; report the scores, the runtime against
   the budget, and the lowest free memory.
-- If it fits: a second change adds the six runner plugins as units, then another dry run (design D4).
+- If it fits: #339's change adds the six runner plugins as units, then another dry run (design D4).

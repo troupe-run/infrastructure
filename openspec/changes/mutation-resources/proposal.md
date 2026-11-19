@@ -24,9 +24,9 @@ lines of source) is mutated, and no design says why. It's a gap (#337).
 - **A package's unit copies its package's own files.** As a root unit already copies the checkout's top-level entries,
   a package's unit copies its package directory's (a plugin's `tools/`, for example), so tests that find them from
   their own file still do inside mutmut's copy.
-- **troupe's runner plugins come next**: a second change adds them as six more units once a dry run of troupe's
-  packages, with this change applied, finishes within the budget (design D4). This change's pull request is therefore
-  "Part of #337", not "Closes".
+- **troupe's runner plugins come next**, in #339 (blocked by #337): a second change adds them as six more units once a
+  dry run of troupe's packages, with this change applied, finishes within the budget (design D4). #337 was narrowed to
+  this change so its pull request can close it (owner, 2026-11-19).
 
 ## Capabilities
 
