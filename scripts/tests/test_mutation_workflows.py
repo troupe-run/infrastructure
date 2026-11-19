@@ -580,8 +580,8 @@ def test_the_commands_status_passes_through_the_init(
 
 @CONTAINED
 def test_a_status_above_128_is_reported_as_the_signal_it_means(tmp_path: Path) -> None:
-    # The run is pid 1 of its namespace, which ignores a SIGKILL from inside it: a child dies,
-    # and the run passes its 137 on.
+    # The command (pid 2, under the init bash) kills a child of its own and passes its 137 on,
+    # which the init returns.
     done = run_contained(tmp_path, "run_contained bash -c 'sh -c \"kill -9 \\$\\$\"; exit $?'")
     assert done.returncode == 137, (done.returncode, done.stdout, done.stderr)
     assert "::error::the mutation run was killed by signal 9" in done.stdout
@@ -595,8 +595,8 @@ def test_a_run_that_kills_its_own_group_fails_the_step_and_spares_its_shell(
     runs in a fresh session, so even a broken step can't reach this test."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    # A child kills its group: the run's own top process is pid 1 of its namespace, which ignores a
-    # SIGKILL from inside it, as mutation_run.py does in a real run.
+    # A child kills its group, the run's session: the stand-in run dies with it, and the init bash
+    # (pid 1, which ignores a SIGKILL from inside its namespace) reports the 137.
     (bin_dir / "uv").write_text("#!/bin/sh\nsh -c 'kill -9 0'\nexit $?\n", encoding="utf-8")
     (bin_dir / "uv").chmod(0o755)
     (tmp_path / "target").mkdir()
