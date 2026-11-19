@@ -654,6 +654,12 @@ load and running mutants once a minute, as `resources:` lines in the log and in 
 pull request report's is `resources-pr.log`), uploaded with the report even when the run fails. The run's summary
 gives the lowest free memory seen. If a runner is lost, its last readings in the log say what ran out.
 
+**A mutant can't stop the runner.** A GitHub step shares the runner agent's process group, so a mutant that makes
+troupe's process code kill its own group would kill the runner itself: the job is lost, with no log (#341, proved by
+a probe). So each mutant's tests start a session of their own, through the plugin mutmut loads, and such a mutant
+ends only itself; it's counted as crashed and the run goes on. The whole run is also under `setsid --wait`, so
+nothing it starts can reach the runner.
+
 ## Known gaps
 
 GitHub enforces rules that apply to everyone, or that protect a secret, such as an App's key. It doesn't try to tell

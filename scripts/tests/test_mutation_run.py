@@ -5,6 +5,7 @@ output they're read back from is in fixtures/mutation/ (test_mutation_report.py)
 import json
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -921,6 +922,74 @@ def test_loading_the_plugin_patches_how_children_start(monkeypatch: pytest.Monke
     monkeypatch.setattr(subprocess.Popen, "__init__", subprocess.Popen.__init__)
     children.pytest_configure(object())
     assert subprocess.Popen.__init__ is children._popen_init
+
+
+@pytest.mark.parametrize(
+    ("mutant", "own_session"),
+    [
+        ("troupe.core.x_f__mutmut_3", True),
+        ("stats", False),
+        ("", False),
+        ("fail", False),
+        ("list_all_tests", False),
+        ("none.none", False),
+    ],
+)
+def test_only_a_mutants_test_process_starts_its_own_session(
+    monkeypatch: pytest.MonkeyPatch, mutant: str, own_session: bool
+) -> None:
+    """A mutant that signals its own process group then ends only itself (#341, design D1).
+    mutmut's stats, clean and listing passes run in its own process, which stays where it is."""
+    import mutation_children as children
+
+    calls: list[str] = []
+    monkeypatch.setattr(subprocess.Popen, "__init__", subprocess.Popen.__init__)
+    monkeypatch.setattr(os, "setsid", lambda: calls.append("setsid"))
+    monkeypatch.setenv("MUTANT_UNDER_TEST", mutant)
+    children.pytest_configure(object())
+    assert calls == (["setsid"] if own_session else [])
+
+
+GROUP_KILL = """
+import os, signal, sys
+sys.path.insert(0, sys.argv[1])
+pid = os.fork()
+if pid == 0:
+    if sys.argv[2] == "hook":
+        os.environ["MUTANT_UNDER_TEST"] = "troupe.core.x_f__mutmut_3"
+        import mutation_children
+        mutation_children.pytest_configure(object())
+    os.killpg(0, signal.SIGKILL)  # what a mutant of troupe's _kill_group can do
+    os._exit(0)
+_, status = os.waitpid(pid, 0)
+print("survived", -os.WTERMSIG(status) if os.WIFSIGNALED(status) else os.WEXITSTATUS(status))
+"""
+
+
+def group_kill(hook: str) -> subprocess.CompletedProcess[str]:
+    """The script runs in a fresh session of its own, so a kill the plugin didn't contain ends
+    only that script, never this test process."""
+    return subprocess.run(
+        [sys.executable, "-c", GROUP_KILL, str(Path(run.__file__).parent), hook],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+        start_new_session=True,
+    )
+
+
+@pytest.mark.skipif(not hasattr(os, "setsid"), reason="POSIX sessions only")
+def test_a_mutant_that_kills_its_own_process_group_kills_only_itself() -> None:
+    control = group_kill("none")
+    if control.stdout.strip() == "survived -9":
+        # macOS spares the killer's parent; Linux, where the runner was lost (#341), doesn't.
+        pytest.skip(
+            "this OS doesn't deliver a group kill to the sender's parent: CI's Linux checks it"
+        )
+    assert control.returncode == -9, (control.returncode, control.stdout, control.stderr)
+    done = group_kill("hook")
+    assert done.stdout.strip() == "survived -9", (done.returncode, done.stdout, done.stderr)
 
 
 def test_a_child_starts_with_the_adjusted_environment(monkeypatch: pytest.MonkeyPatch) -> None:
