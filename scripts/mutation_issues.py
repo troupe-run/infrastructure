@@ -421,6 +421,26 @@ def apply(gh: Gh, repository: str, plan: Plan, opened: list[str]) -> None:
 # The run
 
 
+def crashed_section(report: mr.Report) -> list[str]:
+    """Every crashed mutant the report names, for the owner to decide on exclusions (#361). A
+    crash the report names ended only its own test process; one that ended the run never reaches
+    the report: the step says how the run ended instead."""
+    crashes = [c for _, m in sorted(report.modules.items()) for c in m.crashed_mutants]
+    if not crashes:
+        return []
+    lines = [
+        "",
+        "Crashed mutants: each ended only its own test process, and the tool recorded it and went "
+        "on. Excluding any (`# pragma: no mutate`) is the owner's decision.",
+        "",
+    ]
+    for crash in crashes:
+        code = "no exit code" if crash.exit_code is None else f"exit {crash.exit_code}"
+        lines.append(f"- `{crash.name}` at `{crash.path}:{crash.line}` ({code})")
+        lines += [f"    {change}" for change in crash.change.splitlines()]
+    return lines
+
+
 def summary(
     repository: str, report: mr.Report, plan: Plan, settings: ms.Settings, dry: bool
 ) -> str:
@@ -442,6 +462,7 @@ def summary(
             + ", ".join(f"`{name}`" for name in plan.deferred)
             + " (raised by a later run)"
         )
+    lines += crashed_section(report)
     if plan.raises:
         lines += [
             "",

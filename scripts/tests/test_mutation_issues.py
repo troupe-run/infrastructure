@@ -380,6 +380,38 @@ def test_the_summary_names_scores_and_the_baselines_to_raise(tmp_path: Path) -> 
     assert '[mutation.baselines."troupe.a"]\nscore = 64\nmutants = 25' in text
 
 
+def test_the_summary_names_every_crashed_mutant_and_what_it_ended() -> None:
+    """For the owner to decide on exclusions from real data (#361)."""
+    crashes = (
+        mr.Crashed(
+            "troupe.platform.processes.x__kill_group__mutmut_4",
+            "packages/troupe/src/troupe/platform/processes.py",
+            389,
+            "-    os.killpg(pid, signal.SIGKILL)\n+    os.killpg(0, signal.SIGKILL)",
+            -9,
+        ),
+        mr.Crashed("ArithmeticOperator#3", "src/lib/add.ts", 2, "-a + b\n+a - b", None),
+    )
+    m = mr.Module(10, 0, 0, 0, 2, 0, True, (), crashes)
+    r = report(**{"troupe.platform.processes": m})
+    text = mi.summary("troupe", r, plan(r), SETTINGS, dry=True)
+    assert (
+        "Crashed mutants: each ended only its own test process, and the tool recorded it and went "
+        "on. Excluding any (`# pragma: no mutate`) is the owner's decision." in text
+    )
+    assert (
+        "- `troupe.platform.processes.x__kill_group__mutmut_4` at "
+        "`packages/troupe/src/troupe/platform/processes.py:389` (exit -9)" in text
+    )
+    assert "    -    os.killpg(pid, signal.SIGKILL)\n    +    os.killpg(0, signal.SIGKILL)" in text
+    assert "- `ArithmeticOperator#3` at `src/lib/add.ts:2` (no exit code)" in text
+
+
+def test_a_summary_with_no_crashed_mutant_has_no_section_for_them() -> None:
+    r = report(**{"troupe.a": module(killed=10)})
+    assert "Crashed mutants" not in mi.summary("troupe", r, plan(r), SETTINGS, dry=True)
+
+
 def test_a_commit_is_attributed_to_its_merged_pull_request_only() -> None:
     answers = {
         "b" * 40: [
