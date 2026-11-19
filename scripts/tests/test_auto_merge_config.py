@@ -48,11 +48,35 @@ def test_the_committed_config_protects_the_rules_own_files_and_troupes_masking()
     for path in ("auto-merge.toml", "scripts/auto_merge.py", "tofu/main.tf", "oob/README.md",
                  ".github/workflows/auto-merge.yml"):  # fmt: skip
         assert infrastructure.is_protected(path), path
+    for path in (
+        "scripts/dependabot_issues.py",
+        "scripts/tests/test_check.py",
+        "scripts/quality_audit.py",
+        "scripts/mutation.json",
+        "pyproject.toml",
+    ):
+        assert infrastructure.is_protected(path), path
     troupe = config.repositories["troupe"]
     assert troupe.is_protected("packages/troupe/src/troupe/core/masking.py")
     assert troupe.is_protected("packages/troupe-plugin-sdk/src/troupe_plugin_sdk/credential.py")
     assert not troupe.is_protected("packages/troupe/src/troupe/core/runner.py")
     assert not config.repositories["website"].is_protected("src/pages/index.astro")
+
+
+@pytest.mark.auto_merge
+@pytest.mark.parametrize("repository", ["troupe", "infrastructure", "website"])
+def test_what_defines_green_is_protected_everywhere(repository: str) -> None:
+    """Owner, 2026-11-20 (#359's review): a pull request can't make its own check pass."""
+    rules = am.read_config(REPO).repositories[repository]
+    for path in ("scripts/check.py", "scripts/check-paths.toml", "pyproject.toml", "package.json"):
+        assert rules.is_protected(path), path
+
+
+@pytest.mark.auto_merge
+def test_a_packages_own_manifest_isnt_the_root_one() -> None:
+    troupe = am.read_config(REPO).repositories["troupe"]
+    assert not troupe.is_protected("packages/troupe/pyproject.toml")
+    assert not troupe.is_protected("packages/troupe/src/troupe/core/runner.py")
 
 
 def test_a_repositorys_protected_list_adds_to_the_defaults() -> None:

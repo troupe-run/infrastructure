@@ -29,10 +29,19 @@ protected = [
   "quality-gates.toml",
   "release-please-config.json",
   ".release-please-manifest.json",
+  # What defines green: what the required check runs, and the root manifests that configure its tools
+  # (owner, 2026-11-20, #359's review). A root-only pattern: a package's own pyproject.toml isn't
+  # protected, though deleting one is (a component).
+  "scripts/check.py",
+  "scripts/check-paths.toml",
+  "pyproject.toml",
+  "package.json",
 ]
 
 [repositories.infrastructure]
-protected = ["tofu/**", "oob/**", "org-profile/**", "auto-merge.toml", "scripts/auto_merge*.py"]
+# Every script: the check and its tests, what runs unattended with an App's key, and the sources of
+# what's delivered, which as the source this repository has no delivered list for (owner, 2026-11-20).
+protected = ["tofu/**", "oob/**", "org-profile/**", "auto-merge.toml", "scripts/**"]
 
 [repositories.troupe]
 # Credential and masking code, and their tests.
