@@ -545,6 +545,44 @@ class LinkRecorder(Recorder):
         return super().__call__(command, cwd, timeout)
 
 
+class SiblingRecorder(Recorder):
+    """What troupe-store-text's test_processes.py finds from inside mutmut's copy: its child's
+    path is `Path(__file__).resolve().parents[2] / "troupe" / "tests"` (#343)."""
+
+    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+        test_file = cwd / "mutants" / "tests" / "test_processes.py"
+        self.sibling = (test_file.parents[2] / "troupe" / "tests").is_dir()
+        self.root = (test_file.parents[3] / "plugins" / "runner" / "fixtures").is_dir()
+        self.config = (cwd / "setup.cfg").read_text(encoding="utf-8")
+        return super().__call__(command, cwd, timeout)
+
+
+@pytest.mark.parametrize("code", [0, 1])
+def test_a_packages_run_finds_its_sibling_packages_and_cleans_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, code: int
+) -> None:
+    package_checkout(tmp_path)
+    for name in ("packages/troupe-store-text/src", "packages/troupe-store-text/tests"):
+        (tmp_path / name).mkdir(parents=True)
+    unit = ms.Unit(
+        "troupe-store-text", "packages/troupe-store-text/src", "packages/troupe-store-text/tests"
+    )
+    monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
+    recorder = SiblingRecorder(code)
+    if code:
+        with pytest.raises(run.RunError):
+            run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2)
+    else:
+        fake_show(monkeypatch)
+        run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2)
+    assert recorder.sibling, "a test counting up to packages/ didn't find its sibling package"
+    assert recorder.root, "a test counting up to the root no longer finds the checkout's files"
+    also_copy = recorder.config.split("also_copy=", 1)[1].split()
+    assert not {"troupe", "other", "troupe-store-text"} & set(also_copy), also_copy
+    links = [p for p in (tmp_path / "packages").rglob("*") if p.is_symlink()]
+    assert links == [], links
+
+
 @pytest.mark.parametrize("code", [0, 1])
 def test_a_packages_run_finds_the_checkouts_files_from_one_level_up_and_cleans_up(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, code: int
