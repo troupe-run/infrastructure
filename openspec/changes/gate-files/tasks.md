@@ -36,8 +36,8 @@
 
 ## 3. Integration
 
-- [ ] 3.1 Full `uv run scripts/check.py` passes (one heavy run, after the orchestrator says go)
-- [ ] 3.2 Raise the follow-up issues, each on the board with no milestone, and link them from #271: one split issue
+- [x] 3.1 Full `uv run scripts/check.py` passes (one heavy run, after the orchestrator says go)
+- [x] 3.2 Raise the follow-up issues, each on the board with no milestone, and link them from #271: one split issue
   per `[size.allow]` file (8 in infrastructure, 7 in troupe, 1 in website; design D6); troupe and website each add
   `[size]` and drop their delivered-file patterns after the apply; infrastructure makes `[size]` required once both
   have it (D7). Verify each with `gh issue view <n> --json projectItems`
