@@ -3995,19 +3995,47 @@ def test_the_review_result_records_the_head_and_its_coverage(
     assert written == {"head": head, "coverage": recorded[0], "code": recorded[1]}
 
 
-def test_the_review_result_is_what_auto_merge_reads(tmp_path: Path) -> None:
+@pytest.mark.parametrize(("coverage", "counts"), [("complete", True), ("incomplete", False)])
+def test_the_review_result_is_what_auto_merge_reads(
+    tmp_path: Path, coverage: str, counts: bool
+) -> None:
+    """The file the step writes, zipped as the upload would, through auto-merge's own reader and
+    its review condition, so a key renamed on either side fails here (#359's review)."""
+    import base64
+    import io
+    import zipfile
+
     import auto_merge
 
+    sha = "a" * 40
     done = run_step(
         result_step(review()),
         tmp_path,
         tmp_path,
-        {"HEAD": "a" * 40, "COVERAGE": "complete", "CODE": "all"},
+        {"HEAD": sha, "COVERAGE": coverage, "CODE": "all"},
     )
     assert done.returncode == 0, done.stderr
-    written = json.loads(
-        (tmp_path / "workspace" / "review-result.json").read_text(encoding="utf-8")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.write(tmp_path / "workspace" / "review-result.json", "review-result.json")
+    full = "troupe-run/infrastructure"
+    replay = auto_merge.Replay(
+        {
+            f"GET repos/{full}/pulls/1/commits?per_page=100&page=1": [{"sha": sha}],
+            f"GET repos/{full}/actions/workflows/{auto_merge.REVIEW_WORKFLOW}/runs?head_sha={sha}"
+            "&event=pull_request&per_page=100&page=1": {"workflow_runs": [{"id": 5}]},
+            f"GET repos/{full}/actions/runs/5/artifacts": {
+                "artifacts": [{"id": 6, "name": RESULT_UPLOAD["name"]}]
+            },
+            f"RAW repos/{full}/actions/artifacts/6/zip": {
+                "__base64__": base64.b64encode(buffer.getvalue()).decode()
+            },
+            f"GET repos/{full}/commits/{sha}": {"files": [{"filename": "src/x.py"}]},
+        }
     )
-    assert RESULT_UPLOAD["name"] == auto_merge.REVIEW_ARTIFACT
-    assert written["head"] == "a" * 40
-    assert written["coverage"] == "complete"
+    # The review condition reads no setting; these keep the test off auto-merge.toml.
+    rules = auto_merge.Rules(auto_merge.Limits(800, 30, 15, 40), (), (), (), ("python",), ())
+    pr = auto_merge.PullRequest(replay, "infrastructure", 1, rules)
+    pr.data = {"headRefOid": sha}
+    check = auto_merge.review(pr)
+    assert check.ok is counts, check.saw
