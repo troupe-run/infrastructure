@@ -724,6 +724,12 @@ session (`setsid`), back as the runner's user with the step's environment (`setp
 most the run. The step then says "ran out of memory (MemoryMax 12G)", "killed by signal N" or "exited with status N",
 read from the kernel log.
 
+**Crashed mutants are named.** A mutant whose tests die (by a signal, or the tool's runtime error) is counted as caught,
+and the report names it as it names a survivor: its name, path, line, change and the tool's exit code. The weekly run's
+summary lists them all, each having ended only its own test process. A mutant that ended the whole run isn't in the
+report: the step says how the run ended. Excluding a mutant (`# pragma: no mutate`) is the owner's decision, made from
+that list (#361).
+
 **Mutation runs happen only in CI.** Never run them on your own machine: a `kill(-1)` mutant would kill every process
 of your login, and macOS can't contain it. The scripts' tests never run a mutant.
 

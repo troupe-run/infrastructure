@@ -127,6 +127,14 @@ def test_strykers_statuses_become_the_reports_counts() -> None:
     assert add.finished
 
 
+def test_a_stryker_runtime_error_is_named_with_no_exit_code() -> None:
+    """Stryker reports a crash as RuntimeError, without an exit code (#361)."""
+    [crash] = run.from_stryker(stryker_report("RuntimeError"))["src/lib/add.ts"].crashed_mutants
+    assert (crash.path, crash.line, crash.exit_code) == ("src/lib/add.ts", 2, None)
+    assert crash.name == "ArithmeticOperator#0"
+    assert "a - b" in crash.change
+
+
 def test_a_stryker_survivor_shows_its_line_before_and_after() -> None:
     survivor = run.from_stryker(stryker_report("Survived"))["src/lib/add.ts"].survivors[0]
     assert (survivor.path, survivor.line) == ("src/lib/add.ts", 2)
@@ -493,6 +501,35 @@ def fake_show(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     return shown
+
+
+class CrashingMutmut(Recorder):
+    """mutmut, as far as its files: a meta file for calc.py with one crash (SIGKILL)."""
+
+    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+        code = super().__call__(command, cwd, timeout)
+        meta = cwd / "mutants" / "src" / "calc.py.meta"
+        meta.parent.mkdir(parents=True, exist_ok=True)
+        codes = {"calc.x_add__mutmut_1": -9}
+        meta.write_text(json.dumps({"exit_code_by_key": codes}), encoding="utf-8")
+        return code
+
+
+def test_a_run_maps_crashed_mutants_back_to_the_real_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    limited_tree(tmp_path)
+    monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
+    fake_show(monkeypatch)
+    unit = SETTINGS.repositories["infrastructure"].units[0]
+    modules = run.run_mutmut(tmp_path, unit, [], 1e12, CrashingMutmut(), children=2)
+    [crash] = modules["calc"].crashed_mutants
+    assert (crash.path, crash.line, crash.name, crash.exit_code) == (
+        "scripts/calc.py",
+        2,
+        "calc.x_add__mutmut_1",
+        -9,
+    )
 
 
 def test_a_run_maps_survivors_back_to_the_real_source_and_cleans_up(

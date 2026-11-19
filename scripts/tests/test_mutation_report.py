@@ -24,6 +24,7 @@ def module(**overrides: object) -> dict[str, Any]:
         "skipped": 0,
         "finished": True,
         "survivors": [],
+        "crashed_mutants": [],
     }
     fields.update(overrides)
     return fields
@@ -42,9 +43,21 @@ def survivor(**overrides: object) -> dict[str, Any]:
     return fields
 
 
+def crashed(**overrides: object) -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "name": "troupe.platform.processes.x__kill_group__mutmut_4",
+        "path": "packages/troupe/src/troupe/platform/processes.py",
+        "line": 389,
+        "change": "-    os.killpg(pid, signal.SIGKILL)\n+    os.killpg(0, signal.SIGKILL)",
+        "exit_code": -9,
+    }
+    fields.update(overrides)
+    return fields
+
+
 def report(modules: dict[str, Any], **overrides: object) -> str:
     fields: dict[str, Any] = {
-        "version": 1,
+        "version": 2,
         "repository": "troupe",
         "commit": SHA,
         "previous_commit": None,
@@ -66,7 +79,18 @@ def test_a_module_with_an_untested_function_scores_against_it() -> None:
 
 def test_timeouts_and_crashes_count_as_caught_and_skipped_ones_dont_count() -> None:
     loaded = mr.load_report(
-        report({"m": module(killed=6, timeout=2, crashed=2, skipped=30)}), "troupe"
+        report(
+            {
+                "m": module(
+                    killed=6,
+                    timeout=2,
+                    crashed=2,
+                    skipped=30,
+                    crashed_mutants=[crashed(), crashed(name="m.x_g__mutmut_1")],
+                )
+            }
+        ),
+        "troupe",
     )
     assert loaded.modules["m"].score == 100.0
     assert loaded.modules["m"].counted == 10
@@ -74,7 +98,15 @@ def test_timeouts_and_crashes_count_as_caught_and_skipped_ones_dont_count() -> N
 
 def test_a_report_round_trips() -> None:
     source = report(
-        {"m": module(killed=3, survived=1, survivors=[survivor(commit="d" * 40, new=True)])}
+        {
+            "m": module(
+                killed=3,
+                survived=1,
+                survivors=[survivor(commit="d" * 40, new=True)],
+                crashed=2,
+                crashed_mutants=[crashed(), crashed(name="m.x_g__mutmut_1", exit_code=None)],
+            )
+        }
     )
     loaded = mr.load_report(source, "troupe")
     assert mr.load_report(mr.dump_report(loaded), "troupe") == loaded
@@ -90,7 +122,13 @@ def test_a_report_round_trips() -> None:
         (report({"m": module(survived=1, survivors=[survivor(line=0)])}), "line"),
         (report({"m": module(survived=1, survivors=[survivor(new="yes")])}), "new"),
         (report({}, commit="main"), "commit"),
-        (report({}, version=2), "version"),
+        (report({}, version=1), "version"),
+        (report({"m": module(crashed=1)}), "1 crashed"),
+        (
+            report({"m": {k: v for k, v in module().items() if k != "crashed_mutants"}}),
+            "crashed_mutants",
+        ),
+        (report({"m": module(crashed=1, crashed_mutants=[crashed(exit_code="x")])}), "exit_code"),
         (report({}, repository="website"), "website"),
         (report({}, surprise=True), "surprise"),
         ("{", "JSON"),
@@ -192,6 +230,10 @@ def mutmut_tree(tmp_path: Path, codes: dict[str, int | None]) -> Path:
 
 
 DIFFS = {
+    "pkg.calc.x_add__mutmut_6": (
+        "--- src/pkg/calc.py\n+++ src/pkg/calc.py\n@@ -1,2 +1,2 @@\n def add(a, b):\n"
+        "-    return a + b\n+    return a * b"
+    ),
     "pkg.calc.x_add__mutmut_1": (
         "--- src/pkg/calc.py\n+++ src/pkg/calc.py\n@@ -1,2 +1,2 @@\n def add(a, b):\n"
         "-    return a + b\n+    return a - b"
@@ -235,6 +277,15 @@ def test_mutmut_results_become_one_module_with_counts_and_located_survivors(tmp_
         "-    return a + b\n+    return a - b",
     )
     assert size.line == 12  # from the decorator on line 9, `return` is the 4th line
+    # A crash is named as a survivor is, with mutmut's exit code (#361).
+    [crash] = calc.crashed_mutants
+    assert (crash.name, crash.path, crash.line, crash.change, crash.exit_code) == (
+        "pkg.calc.x_add__mutmut_6",
+        "src/pkg/calc.py",
+        5,
+        "-    return a + b\n+    return a * b",
+        -11,
+    )
 
 
 def test_a_mutant_not_yet_run_leaves_its_module_unfinished(tmp_path: Path) -> None:
@@ -279,6 +330,22 @@ def test_mutmut_files_under_the_tests_are_skipped(tmp_path: Path) -> None:
 
 
 # Every refusal, word for word, and the reading edges (lint-mutation 6b)
+
+
+def test_each_crashed_refusal_word_for_word() -> None:
+    """The crashed list is held to its count as survivors are to theirs (#361)."""
+    cases = {
+        report({"m": module(crashed=2, crashed_mutants=[crashed()])}):
+            "troupe's report: modules.m lists 1 crashed mutants but counts 2 crashed",
+        report({"m": module(crashed_mutants={})}):
+            "troupe's report: modules.m.crashed_mutants must be a list",
+        report({}, version=1):
+            "troupe's report: its version is 1; this reads version 2",
+    }  # fmt: skip
+    for source, message in cases.items():
+        with pytest.raises(mr.ReportError) as raised:
+            mr.load_report(source, "troupe")
+        assert str(raised.value) == message
 
 
 @pytest.mark.parametrize(
@@ -339,7 +406,7 @@ def test_each_report_refusal_word_for_word(source: str, message: str) -> None:
 def test_a_dumped_report_is_indented_and_sorted_by_module() -> None:
     loaded = mr.load_report(report({"b": module(), "a": module()}), "troupe")
     text = mr.dump_report(loaded)
-    assert text.startswith('{\n  "version": 1,\n  "repository": "troupe",')
+    assert text.startswith('{\n  "version": 2,\n  "repository": "troupe",')
     assert text.index('"a": {') < text.index('"b": {')
 
 
