@@ -304,6 +304,12 @@ def test_the_sampler_logs_and_files_a_reading_a_minute_and_reports_the_lowest(
     loadavg.write_text("3.50 2.00 1.00 1/200 999\n", encoding="utf-8")
     summary = tmp_path / "summary.md"
     readings = tmp_path / "out" / "resources.log"
+    # Earlier readings on both sides of the live one (2000): only the true minimum, with its own
+    # time, passes, not the first, the last or the largest.
+    readings.parent.mkdir()
+    earlier = ("09:00:00 mem_available_mb=3000", "09:01:00 mem_available_mb=1500",
+               "09:02:00 mem_available_mb=2500")  # fmt: skip
+    readings.write_text("\n".join(earlier) + "\n", encoding="utf-8")
     script = "set -euo pipefail\n" + sampler_block(WEEKLY, "mutate", "Mutate") + "\nsleep 2.5\n"
     env = dict(os.environ) | {
         "RESOURCES": str(readings),
@@ -317,7 +323,7 @@ def test_the_sampler_logs_and_files_a_reading_a_minute_and_reports_the_lowest(
         check=False, timeout=30,
     )  # fmt: skip
     assert done.returncode == 0, done.stderr
-    lines = readings.read_text(encoding="utf-8").splitlines()
+    lines = readings.read_text(encoding="utf-8").splitlines()[3:]
     assert len(lines) >= 2
     fields = dict(field.split("=", 1) for field in lines[0].split()[1:])
     assert fields["mem_available_mb"] == "2000"
@@ -327,8 +333,8 @@ def test_the_sampler_logs_and_files_a_reading_a_minute_and_reports_the_lowest(
     assert fields["mutmut_processes"].isdigit()
     logged = [line for line in done.stdout.splitlines() if line.startswith("resources: ")]
     assert len(logged) >= len(lines)
-    assert "resources: lowest mem_available_mb=2000 at " in done.stdout
-    assert "lowest free memory: 2000 MB" in summary.read_text(encoding="utf-8")
+    assert "resources: lowest mem_available_mb=1500 at 09:01:00" in done.stdout
+    assert "lowest free memory: 1500 MB at 09:01:00 UTC" in summary.read_text(encoding="utf-8")
 
 
 def test_the_pull_request_run_keeps_its_readings_when_it_fails() -> None:
