@@ -645,7 +645,8 @@ as reached by no test, and the issue says so. A few tests can't run under its ho
 except `--strict-markers` and the guard's tag plugin, which can't find their declarations from mutmut's copy. For a
 package's unit, the checkout's top-level entries are linked into its parent directory during the run, so a test that
 finds the repository's root by counting directories finds it from inside the copy too, and the package's own other
-entries (a plugin's `tools/` and `fixtures/`) are copied beside its source.
+entries (a plugin's `tools/` and `fixtures/`; not caches, hidden entries or build output) are copied beside its
+source.
 
 **The runner's resources.** mutmut runs `max_children` mutants at once (`scripts/mutation.json`, 2 since #337: at 4,
 troupe's run lost its hosted runner twice). While a run mutates, its job writes the runner's free memory, swap, disk,
