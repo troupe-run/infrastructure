@@ -17,6 +17,7 @@ from test_guard_push_and_ci import commit_without_hooks, pr_repo, with_remote
 import guard
 
 INFRASTRUCTURE = "troupe-run/infrastructure"
+TROUPE = "troupe-run/troupe"
 GUARD = REPO / ".github" / "workflows" / "guard.yml"
 QUEUE_BRANCH = "gh-readonly-queue/main/pr-7-0123456789abcdef0123456789abcdef01234567"
 
@@ -163,3 +164,42 @@ def test_the_guard_runs_on_every_merge_group_the_queue_asks_checks_of() -> None:
 def test_the_guard_s_pull_request_trigger_is_unchanged() -> None:
     types = ["opened", "edited", "synchronize", "reopened"]
     assert guard_triggers()["pull_request"] == {"types": types}
+
+
+# blocked-by in the queue (#275; auto-merge design D7): the group's pull request is read through
+# its queue ref, and troupe's release pull request stays exempt by its own branch (#359's review).
+
+
+@pytest.mark.usefixtures("passing_openspec")
+@pytest.mark.parametrize(
+    ("head", "status"),
+    [
+        ({"ref": "release-please--branches--main", "repo": {"full_name": TROUPE}}, 0),
+        ({"ref": "fix-the-runner", "repo": {"full_name": TROUPE}}, 1),
+    ],
+)
+def test_a_merge_group_judges_its_pull_request_s_blockers_unless_it_s_the_release(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    head: dict[str, object],
+    status: int,
+) -> None:
+    repo, base = queued(make_repo, tmp_path, "feat: queued work")
+    merge_group_event(tmp_path, monkeypatch, group(base, repo.head()))
+    monkeypatch.setenv("GITHUB_REPOSITORY", TROUPE)
+
+    def read(path: str) -> object:
+        answers: dict[str, object] = {
+            f"repos/{TROUPE}/pulls/7": {"body": "* resolve #12 flake", "head": head},
+            f"repos/{TROUPE}/issues/12/dependencies/blocked_by?per_page=100&page=1": [
+                {"number": 11, "state": "open",
+                 "repository_url": f"https://api.github.com/repos/{TROUPE}"}
+            ],
+        }  # fmt: skip
+        return answers[path]
+
+    assert guard.run_ci_entry(repo.path, None, None, None, read_github=read) == status
+    blocked = "guard: blocked-by: troupe-run/troupe#12 is blocked by troupe-run/troupe#11"
+    assert (blocked in capsys.readouterr().err) is bool(status)

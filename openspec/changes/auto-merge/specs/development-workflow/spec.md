@@ -44,6 +44,11 @@ blockers as on the pull request, so a blocker opened or reopened after the pull 
   queued
 - **THEN** the merge group's check fails under `blocked-by`, and the pull request leaves the queue unmerged
 
+#### Scenario: Troupe's release pull request in the queue
+- **WHEN** a merge group is built for troupe's release pull request, whose own branch is
+  `release-please--branches--main` in troupe-run/troupe, and its changelog says "resolve #12" about a blocked issue
+- **THEN** the merge group's check doesn't fail under `blocked-by`, as the pull request's own check didn't
+
 #### Scenario: The merge group's pull request can't be found
 - **WHEN** a merge group's branch name doesn't give a pull request number
 - **THEN** the GitHub check fails under `blocked-by`, saying it couldn't tell which pull request the group is for

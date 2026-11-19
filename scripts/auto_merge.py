@@ -992,8 +992,6 @@ def judge(pr: PullRequest) -> Verdict:
 
 # --- Complexity, from git data: nothing of the pull request's is run (design D2) ------------------
 
-HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", re.MULTILINE)
-
 
 def _git(where: Path, *args: str) -> str:
     done = subprocess.run(
@@ -1004,22 +1002,13 @@ def _git(where: Path, *args: str) -> str:
     return done.stdout
 
 
-def changed_lines(clone: Path, base: str, head: str) -> dict[str, set[int]]:
-    """Each file there at ``head`` that changed since ``base``, with its new or edited lines."""
-    diff = _git(
-        clone, "diff", "-U0", "--no-renames", "--no-ext-diff", "--no-color", base, head, "--"
+def changed_paths(clone: Path, base: str, head: str) -> list[str]:
+    """Each file there at ``head`` that changed since ``base``, read NUL-separated, so a name git
+    would quote (non-ASCII, a quote, a backslash) comes through as it is (#359's review)."""
+    names = _git(
+        clone, "diff", "--name-only", "-z", "--no-renames", "--diff-filter=d", base, head, "--"
     )
-    changed: dict[str, set[int]] = {}
-    for section in re.split(r"^diff --git ", diff, flags=re.MULTILINE)[1:]:
-        target = re.search(r"^\+\+\+ b/(.+)$", section, re.MULTILINE)
-        if target is None:
-            continue  # deleted, or binary
-        lines: set[int] = set()
-        for start, length in HUNK.findall(section):
-            count = int(length) if length else 1
-            lines.update(range(int(start), int(start) + count))
-        changed[target.group(1)] = lines
-    return changed
+    return [name for name in names.split("\0") if name]
 
 
 def _copies(clone: Path, revision: str, paths: Iterable[str], into: Path) -> list[str]:
@@ -1058,7 +1047,7 @@ def complexity(clone: Path, base: str, head: str, rules: Rules, lizard: str) -> 
     extensions = tuple(ext for language in rules.languages for ext in LANGUAGES[language])
     changes = [
         path
-        for path in changed_lines(clone, base, head)
+        for path in changed_paths(clone, base, head)
         if path.endswith(extensions) and not excluded(path, rules.complexity_exclude)
     ]
     if not changes:

@@ -4414,7 +4414,24 @@ def blocked_by_on_github(
                 f"couldn't tell which pull request this merge group is for, or read it: {error}.",
                 "Re-run the check. If it fails again, tell the owner, with the run's URL.",
             )
-        body = pull.get("body") if isinstance(pull, dict) else None
+        if not isinstance(pull, dict):
+            return Decision(
+                BLOCKED_RULE,
+                f"the merge group's pull request #{number} isn't an object.",
+                "Re-run the check. If it fails again, tell the owner, with the run's URL.",
+            )
+        # A release pull request is exempt in the queue as it was as a pull request (#359's
+        # review): its own branch, not the queue's, says whether it's one.
+        head = pull.get("head")
+        head = head if isinstance(head, dict) else {}
+        head_repo = head.get("repo")
+        head_name = head_repo.get("full_name") if isinstance(head_repo, dict) else None
+        ref = head.get("ref")
+        if reserved_release_branch(
+            ref if isinstance(ref, str) else None, head_name if isinstance(head_name, str) else None
+        ):
+            return ALLOW
+        body = pull.get("body")
         description = body if isinstance(body, str) else ""
     return blocked_by(description or "", repository, read)
 
