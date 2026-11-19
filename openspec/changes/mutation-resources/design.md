@@ -52,7 +52,7 @@ plugin copy and `.venv`, the same rule the root unit uses for the checkout. trou
 ### D4. The plugins come after a successful dry run of the packages
 
 Order of work: D1-D3, merge and apply, then a dry run for troupe. If it finishes within the budget, the six plugins
-are added as units in a second pull request, and a second dry run checks them. Splitting it this way keeps a run that
+are added as units in a second pull request, under #339, and a second dry run checks them. Splitting it this way keeps a run that
 still fails readable: one change at a time.
 
 If the packages alone don't fit the budget at 2 children, or the plugins push it over, the fallback is to split
