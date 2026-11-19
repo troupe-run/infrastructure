@@ -274,6 +274,34 @@ def excluded(path: str, patterns: Sequence[str]) -> bool:
     return any(glob_pattern(pattern).match(path) for pattern in patterns)
 
 
+DELIVERY_LIST = ".github/guard-delivery.json"
+"""The files infrastructure delivers to this repository (spec: guard-delivery). They're measured at
+their source, so every gate leaves them out here (#333)."""
+
+
+def delivered_paths(root: Path) -> frozenset[str]:
+    """The repository-relative paths the delivered list names. No list means nothing is delivered,
+    as in infrastructure, their source; a list that can't be read is an error, never "nothing"."""
+    path = root / DELIVERY_LIST
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return frozenset()
+    except (OSError, UnicodeDecodeError) as error:
+        raise GateError(f"couldn't read {DELIVERY_LIST}: {error}.") from error
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise GateError(f"{DELIVERY_LIST} isn't valid JSON: {error}.") from error
+    files = data.get("files") if isinstance(data, dict) else None
+    if not isinstance(files, list) or not all(isinstance(item, str) for item in files):
+        raise GateError(
+            f"{DELIVERY_LIST} must be an object whose `files` is a list of paths. It's written by "
+            "infrastructure's delivery: fix it there, never by hand."
+        )
+    return frozenset(files)
+
+
 # --- Git ------------------------------------------------------------------------------------------
 
 
@@ -420,11 +448,13 @@ def _base_copies(root: Path, base: str, paths: Sequence[str], into: Path) -> lis
 def complexity_problems(
     root: Path, base: str, config: ComplexityConfig, lizard: str
 ) -> list[ComplexityProblem]:
-    """Each function the work adds or edits that is above the limit, and new or more complex."""
+    """Each function the work adds or edits that is above the limit, and new or more complex.
+    Delivered files are measured at their source, not here (#333)."""
+    delivered = delivered_paths(root)
     changes = {
         path: lines
         for path, lines in changed_lines(root, base).items()
-        if measured_path(path, config) and (root / path).is_file()
+        if measured_path(path, config) and path not in delivered and (root / path).is_file()
     }
     paths = sorted(changes)
     with tempfile.TemporaryDirectory() as scratch:
@@ -912,7 +942,9 @@ def _coverage(args: argparse.Namespace, root: Path, config: Config) -> int:
     except (OSError, json.JSONDecodeError) as error:
         raise GateError(f"couldn't read the coverage report {report_path}: {error}.") from error
     files = coveragepy_counts(report, root) if args.coveragepy else vitest_counts(report, root)
-    result = coverage_result(files, config.coverage)
+    delivered = delivered_paths(root)
+    measured = {path: counts for path, counts in files.items() if path not in delivered}
+    result = coverage_result(measured, config.coverage)
     for line in result.lines:
         print(f"coverage: {line}")
     for problem in result.problems:

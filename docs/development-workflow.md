@@ -397,7 +397,11 @@ the check rather than switching a gate off.
 
 - **Complexity** judges the work against where it left `origin/main` locally (staged, unstaged and new files
   included), or the base CI names. Existing complex functions can be edited, but not made more complex: split them
-  first. Tests, delivered files and generated code are excluded in each repository's config.
+  first. Tests and generated code are excluded in each repository's config.
+- **Delivered files are left out by the gates themselves.** Every gate reads the repository's
+  `.github/guard-delivery.json` and skips the files it names, which are measured here, at their source (#333). A
+  repository writes no pattern for them in `quality-gates.toml` or its coverage settings. A list that can't be read
+  fails the gate rather than counting as empty.
 - **Coverage applies only to the repositories that get mutation testing too**: those `scripts/mutation.json`'s
   `repositories` names (owner, 2026-11-18, #332; see "Mutation testing" below). Only they declare `[coverage]`;
   the rest leave it out, and their coverage leg says coverage isn't measured there. Today that's troupe alone, so this

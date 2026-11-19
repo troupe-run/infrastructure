@@ -250,6 +250,20 @@ def test_an_excluded_path_isnt_measured(repo: Path) -> None:
     assert qg.complexity_problems(repo, base, qg.read_config(repo).complexity, LIZARD) == []
 
 
+def test_a_delivered_file_isnt_measured(repo: Path) -> None:
+    """A delivered file's complexity is judged at its source, with no pattern in the config."""
+    base = commit(repo, {"a.py": "x = 1\n"})
+    (repo / "scripts").mkdir()
+    (repo / "scripts" / "mutation_run.py").write_text(branches(9), encoding="utf-8")
+    config = qg.read_config(repo).complexity
+    assert [p.function.path for p in qg.complexity_problems(repo, base, config, LIZARD)] == [
+        "scripts/mutation_run.py"
+    ]
+    (repo / ".github").mkdir()
+    shutil.copy(FIXTURES / "troupe-delivery-list.json", repo / ".github" / "guard-delivery.json")
+    assert qg.complexity_problems(repo, base, config, LIZARD) == []
+
+
 def test_a_language_the_config_doesnt_name_isnt_measured(repo: Path) -> None:
     base = commit(repo, {"a.py": "x = 1\n"})
     js = "function f(x) {\n" + "".join(f"  if (x === {i}) return {i};\n" for i in range(9)) + "}\n"
@@ -473,6 +487,113 @@ def test_the_coverage_command_without_coverage_says_so_and_passes(
     assert capsys.readouterr().out.splitlines() == [
         "coverage: not measured in this repository (no [coverage] in quality-gates.toml)"
     ]
+
+
+# --- Delivered files (#333) -----------------------------------------------------------------------
+
+TROUPE_SCRIPTS = """\
+version = 1
+
+[coverage]
+floor = 80.0
+tolerance = 0.6
+
+[coverage.packages.scripts]
+paths = ["scripts"]
+baseline = 88.4
+
+[complexity]
+block_above = 25
+languages = ["python"]
+
+[audit]
+lock_files = ["uv.lock"]
+block = ["high", "critical"]
+"""
+"""troupe's `scripts` package and tolerance, from its quality-gates.toml at 4ffa922d."""
+
+
+def _statements(covered: int, total: int) -> dict[str, dict[str, int]]:
+    return {"summary": {"covered_lines": covered, "num_statements": total,
+                        "covered_branches": 0, "num_branches": 0}}  # fmt: skip
+
+
+def troupe_after_325(root: Path) -> Path:
+    """troupe as troupe-run/troupe#444 found it on 2026-11-18: its delivered list (copied from
+    troupe 4ffa922d) names the five scripts/mutation_*.py files #325 began delivering, 626
+    statements untested in troupe, and no pattern of troupe's own leaves them out. Its own scripts
+    measured 88.5%; with the delivered ones counted, 71.9%. The report's statement counts are
+    those figures, split over the files."""
+    (root / "quality-gates.toml").write_text(TROUPE_SCRIPTS, encoding="utf-8")
+    (root / ".github").mkdir()
+    shutil.copy(FIXTURES / "troupe-delivery-list.json", root / ".github" / "guard-delivery.json")
+    delivered = ["children", "pr", "report", "run", "settings"]
+    report = {
+        "files": {
+            "scripts/check.py": _statements(2399, 2711),
+            **{f"scripts/mutation_{name}.py": _statements(0, 125) for name in delivered[:-1]},
+            "scripts/mutation_settings.py": _statements(0, 126),
+        }
+    }
+    (root / "coverage.json").write_text(json.dumps(report), encoding="utf-8")
+    return root / "coverage.json"
+
+
+def test_delivered_scripts_dont_count_in_a_receiving_repositorys_coverage(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    report = troupe_after_325(tmp_path)
+    assert qg.main(["coverage", "--coveragepy", str(report)], root=tmp_path) == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "coverage: scripts: 88.5% (baseline 88.4%, +0.1)"
+    ]
+
+
+def test_a_delivered_file_under_no_package_isnt_named(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    report = troupe_after_325(tmp_path)
+    data = json.loads(report.read_text(encoding="utf-8"))
+    data["files"][".claude/settings.json"] = _statements(0, 3)  # delivered, under no package
+    data["files"]["tools/own.py"] = _statements(1, 1)  # troupe's own, under no package
+    report.write_text(json.dumps(data), encoding="utf-8")
+    assert qg.main(["coverage", "--coveragepy", str(report)], root=tmp_path) == 1
+    failures = [line for line in capsys.readouterr().out.splitlines() if "FAIL" in line]
+    assert failures == [
+        "coverage: FAIL tools/own.py is in no package. "
+        "Fix: add it to a package's paths in quality-gates.toml."
+    ]
+
+
+def test_without_a_delivered_list_every_file_is_measured(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """infrastructure, the source, holds no list: the scripts it delivers count there."""
+    report = troupe_after_325(tmp_path)
+    (tmp_path / ".github" / "guard-delivery.json").unlink()
+    assert qg.main(["coverage", "--coveragepy", str(report)], root=tmp_path) == 1
+    assert "coverage: scripts: 71.9% (baseline 88.4%, -16.5)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("text", "problem"),
+    [
+        ("{not json", "isn't valid JSON"),
+        ('["scripts/guard.py"]', "must be an object whose `files` is a list of paths"),
+        ('{"source": "troupe-run/infrastructure"}', "must be an object whose `files`"),
+        ('{"files": "scripts/guard.py"}', "must be an object whose `files`"),
+        ('{"files": ["scripts/guard.py", 3]}', "must be an object whose `files`"),
+    ],
+)
+def test_a_malformed_delivered_list_stops_the_gate(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str, problem: str
+) -> None:
+    report = troupe_after_325(tmp_path)
+    (tmp_path / ".github" / "guard-delivery.json").write_text(text, encoding="utf-8")
+    assert qg.main(["coverage", "--coveragepy", str(report)], root=tmp_path) == 2
+    error = capsys.readouterr().err
+    assert ".github/guard-delivery.json" in error
+    assert problem in error
 
 
 # --- Audit ----------------------------------------------------------------------------------------

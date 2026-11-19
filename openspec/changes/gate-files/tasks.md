@@ -2,15 +2,15 @@
 
 ## 1. Delivered files are left out by the gates (#333; design D1–D3)
 
-- [ ] 1.1 Copy troupe's delivered list at 4ffa922d to `scripts/tests/fixtures/quality-gates/troupe-guard-delivery.json`
+- [x] 1.1 Copy troupe's delivered list at 4ffa922d to `scripts/tests/fixtures/quality-gates/troupe-delivery-list.json`
   and write the failing test from design D3 (troupe's `scripts` package, baseline 88.4, an uncovered
   `scripts/mutation_run.py`); verify it fails on the current script for that reason
-- [ ] 1.2 Read `.github/guard-delivery.json` strictly (missing: nothing delivered; malformed: `GateError` naming the
+- [x] 1.2 Read `.github/guard-delivery.json` strictly (missing: nothing delivered; malformed: `GateError` naming the
   file and problem) and drop delivered paths in the coverage gate before packages are mapped; verify 1.1 passes, plus
   tests for "in no package", a missing list and each malformed shape
-- [ ] 1.3 Skip delivered paths in the complexity gate; verify with a lizard test where a complex function in a
+- [x] 1.3 Skip delivered paths in the complexity gate; verify with a lizard test where a complex function in a
   delivered, non-excluded file passes, and the same file undelivered fails
-- [ ] 1.4 Update `docs/development-workflow.md` ("The merge gates": delivered files are left out by the gates
+- [x] 1.4 Update `docs/development-workflow.md` ("The merge gates": delivered files are left out by the gates
   themselves, not by each repository's config) and the comments in `quality-gates.toml`; verify `uv run
   scripts/check.py` passes (ask the orchestrator before running it)
 
