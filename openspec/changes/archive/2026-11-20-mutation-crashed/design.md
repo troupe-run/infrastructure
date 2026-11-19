@@ -33,6 +33,17 @@ After the module table, `summary()` lists every crashed mutant:
 under one line that says what they ended: "each ended only its own test process; mutmut recorded it and went on". A
 crash that ends the run never reaches the report: the step's `::error::` says how the run ended (#345 D3).
 
+### D4. The step keeps the host's account of how it ended
+
+Dry run 44633465646 ended with SIGTERM to the step's own shell (exit 143): `run_contained`'s message never printed,
+and nothing inside the run's namespace can signal that shell. Free memory had fallen 4.7 GB in the last minute. The
+readings couldn't say who sent it. So the sampler's exit trap now also runs `sudo -n journalctl --since <step start>`
+and keeps only the lines that can say who ended a run: OOM kills, memory cgroup, systemd-oomd, unit stops, SIGTERM and
+SIGKILL, at most 200. It saves them to the log (`journal: …`) and to `out/journal-<repository>.log`, which uploads with
+the readings (the pull request report's `journal-pr.log` too). With none, or no readable journal, it saves nothing.
+`sudo -n` fails quietly where sudo can't run. The orchestrator folded this into #361 (2026-11-20): it's the same
+diagnostic purpose, in the same steps.
+
 ## Risks / Trade-offs
 
 - **Many crashes make a long summary** → it's a dry-run and weekly summary for the owner to read once. Issues still
