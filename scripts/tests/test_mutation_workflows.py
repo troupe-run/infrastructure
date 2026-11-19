@@ -525,6 +525,13 @@ sys.exit(1)
 """
 
 
+def test_the_runs_init_waits_for_the_command_rather_than_becoming_it() -> None:
+    """The restoring bash stays pid 1 of the namespace, so it reaps orphans (#347, design D1)."""
+    block = containment_block(WEEKLY, "Mutate")
+    assert """bash -c 'source "$1"; shift; "$@" & wait "$!"' restore""" in block
+    assert 'exec "$@"' not in block
+
+
 @CONTAINED
 def test_an_orphan_reparented_to_the_runs_init_is_reaped(tmp_path: Path) -> None:
     """troupe's grandchild test, in small: a Python command (as mutation_run.py is) orphans a
