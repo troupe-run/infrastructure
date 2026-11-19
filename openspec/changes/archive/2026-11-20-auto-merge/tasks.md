@@ -100,9 +100,10 @@ troupe, infrastructure and website pull requests, not written by hand
 - [x] 4.2 `tofu/auto_merge.tf`: the `auto-merge` environment (main only, no admin bypass), `MERGE_APP_CLIENT_ID`, and
       `AUTO_MERGE = "dry-run"` in the three repositories. Add `auto-merge` to `test_main_only_environments.py`.
       Verify `tofu fmt`, `validate` and the test pass
-- [ ] 4.3 `hold` and `auto-merged` in `tofu/labels/workflow.json`. Verify the labels test passes and, at the PR's plan,
+- [x] 4.3 `hold` and `auto-merged` in `tofu/labels/workflow.json`. Verify the labels test passes and, at the PR's plan,
       the plan creates them in each managed repository
-      Waiting: the labels test passes; the plan runs once #359 is marked ready (plan (pull request))
+      Done: the labels test passes, and #359's plan (run 44632593090, head 8b9470d) adds `hold` and `auto-merged` to
+      `.github`, infrastructure, troupe and website: 8 labels added, none removed or changed
 - [x] 4.4 Declare the App in `oob/app-installations.json`, and its by-hand set-up in `oob/README.md`. Verify
       `uv run scripts/oob.py` reports no difference once the owner has created it
 
@@ -133,9 +134,10 @@ troupe, infrastructure and website pull requests, not written by hand
       - a 403;
       - a closed issue that doesn't exist.
       Verify they fail before 6.2
-- [ ] 6.2 Implement `blocked-by` in `guard.py ci`, and add `issues: read` and `pull-requests: read` to `guard.yml`.
+- [x] 6.2 Implement `blocked-by` in `guard.py ci`, and add `issues: read` and `pull-requests: read` to `guard.yml`.
       Verify 6.1 passes and the guard's tests pass on the three OSes in CI
-      Waiting: 6.1 passes locally; the guard's legs on the three OSes run once #359 is marked ready
+      Done: 6.1 passes, and on #359 at 8b9470d every guard leg passed (macOS, Ubuntu and Windows, Python 3.12 to 3.15,
+      Linux 3.15 in `check`)
 - [x] 6.3 Tests first, then refuse removing `hold` (D9): `gh pr edit` and `gh issue edit`, alone and in a comma list,
       any case. Adding `hold`, and removing another label, stay allowed. Verify the tests pass
 - [x] 6.4 `docs/development-workflow.md`: list `blocked-by` and the hold rule, and a new "Auto-merge" section with the
