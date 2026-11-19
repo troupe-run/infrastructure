@@ -506,6 +506,49 @@ def test_a_kill_of_every_process_inside_reaches_nothing_outside(tmp_path: Path) 
         sentinel.wait()
 
 
+ORPHAN = """
+import os, signal, subprocess, sys, time
+start = ["sh", "-c", "sleep 300 >/dev/null 2>&1 & echo $!"]
+out = subprocess.run(start, capture_output=True, text=True, check=True).stdout
+# Its parent, sh, has exited: it's an orphan, reparented to the namespace's pid 1.
+grandchild = int(out)
+os.kill(grandchild, signal.SIGKILL)
+for _ in range(50):
+    try:
+        state = open(f"/proc/{grandchild}/stat").read().rsplit(")", 1)[1].split()[0]
+    except FileNotFoundError:
+        print("reaped")
+        sys.exit(0)
+    time.sleep(0.1)
+print("left as", state)
+sys.exit(1)
+"""
+
+
+@CONTAINED
+def test_an_orphan_reparented_to_the_runs_init_is_reaped(tmp_path: Path) -> None:
+    """troupe's grandchild test, in small: a Python command (as mutation_run.py is) orphans a
+    grandchild and kills it. Unless pid 1 reaps it, it stays a zombie, which troupe counts as
+    running (#347)."""
+    script = tmp_path / "orphan.py"
+    script.write_text(ORPHAN, encoding="utf-8")
+    done = run_contained(tmp_path, f"run_contained python3 {script}")
+    assert done.returncode == 0, (done.returncode, done.stdout, done.stderr)
+    assert "reaped" in done.stdout
+
+
+@CONTAINED
+@pytest.mark.parametrize(
+    ("command", "status"),
+    [("sh -c 'exit 3'", 3), ("sh -c 'kill -9 $$'", 137)],
+)
+def test_the_commands_status_passes_through_the_init(
+    tmp_path: Path, command: str, status: int
+) -> None:
+    done = run_contained(tmp_path, f"run_contained {command}")
+    assert done.returncode == status, (done.returncode, done.stdout, done.stderr)
+
+
 @CONTAINED
 def test_a_status_above_128_is_reported_as_the_signal_it_means(tmp_path: Path) -> None:
     # The run is pid 1 of its namespace, which ignores a SIGKILL from inside it: a child dies,
