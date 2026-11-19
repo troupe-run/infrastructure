@@ -447,9 +447,13 @@ still can't merge (`owner-only`).
 The protected list and the limits are in `auto-merge.toml`: 800 changed code lines (lock files, fixtures,
 `openspec/`, `docs/` and Markdown left out), 30 files, a cyclomatic complexity of 15 for any function it adds or makes
 more complex, and a total rise of 40. A refactor that lowers complexity, or an edit that adds no branching, never
-counts. The protected list covers `.github/`, the guard and every delivered file, the merge gates'
-config, release configuration, and here `tofu/`, `oob/` and the rule's own files. In troupe it also covers credential
-and masking code. Deleting a component (a `pyproject.toml`, a `package.json` or a spec) is protected too.
+counts. The protected list covers:
+- `.github/`, the guard and every delivered file;
+- the merge gates' config and release configuration;
+- what defines green: `scripts/check.py`, `scripts/check-paths.toml`, and the root `pyproject.toml` and `package.json`;
+- in this repository, `tofu/`, `oob/` and every script, the rule's own included;
+- in troupe, credential and masking code;
+- deleting a component (a `pyproject.toml`, a `package.json` or a spec).
 
 **The switch.** Each repository's variable `AUTO_MERGE` is `off`, `dry-run` or `on`. Unset is `off`, and any other
 value is an error that does nothing. OpenTofu sets it, so a change is a plan the owner approves. Setting it to `off`

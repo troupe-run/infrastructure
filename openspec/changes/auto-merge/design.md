@@ -136,12 +136,13 @@ generated = ["**/uv.lock", "**/package-lock.json", "**/fixtures/**"]
 prose = ["openspec/**", "docs/**", "**/*.md"]
 protected = [".github/**", ".githooks/**", ".claude/**", "scripts/guard.py", "scripts/guard_pytest.py",
              "scripts/quality_gates.py", "quality-gates.toml", "release-please-config.json",
-             ".release-please-manifest.json"]
+             ".release-please-manifest.json", "scripts/check.py", "scripts/check-paths.toml",
+             "pyproject.toml", "package.json"]
 complexity_exclude = ["**/tests/**", "**/test_*.py"]
 languages = ["python", "typescript", "javascript"]
 
 [repositories.infrastructure]
-protected = ["tofu/**", "oob/**", "org-profile/**", "auto-merge.toml", "scripts/auto_merge*.py"]
+protected = ["tofu/**", "oob/**", "org-profile/**", "auto-merge.toml", "scripts/**"]
 
 [repositories.troupe]
 protected = ["**/*masking*.py", "**/*credential*.py", "**/masking_checks.py"]
@@ -327,7 +328,23 @@ percentage of all and of eligible:
 Only size, complexity and the protected list are modelled. Some of these pull requests had review coverage only at
 the floor, so the real rates are somewhat lower. The dry-run week measures them.
 
-Distributions over eligible pull requests (p50 / p75 / p90):
+**Widened protected list (owner, 2026-11-20, #359's review, option A).** The review found that infrastructure's list
+left out what defines green and the scripts that run with an App's key. As the source, infrastructure has no delivered
+list to protect its own scripts by. The owner chose to protect:
+- in every repository, `scripts/check.py`, `scripts/check-paths.toml` and the root `pyproject.toml` and
+  `package.json` (root only: deleting a package's own manifest is protected as deleting a component);
+- all of infrastructure's `scripts/**`.
+
+The same sample, re-run with the evaluator's own rules and measure at the chosen limits (cells as above):
+
+| repo | all | dependabot | protected | eligible | tighter 400/15/10/+20 | **chosen 800/30/15/+40** | looser 1500/50/20/+80 |
+|---|---|---|---|---|---|---|---|
+| troupe | 120 | 18 | 37 | 65 | 33 (28% / 51%) | 43 (36% / 66%) | 51 (42% / 78%) |
+| infrastructure | 120 | 18 | 101 | 1 | 1 (1% / 100%) | 1 (1% / 100%) | 1 (1% / 100%) |
+| website | 62 | 20 | 20 | 22 | 13 (21% / 59%) | 17 (27% / 77%) | 21 (34% / 95%) |
+| overall | 302 | 56 | 158 | 88 | 47 (16% / 53%) | 61 (20% / 69%) | 73 (24% / 83%) |
+
+Distributions over eligible pull requests, before the widening (p50 / p75 / p90):
 
 | measure | troupe | website |
 |---|---|---|
