@@ -26,10 +26,18 @@ earlier form, `"$@" & wait "$!"`, didn't: in a non-interactive bash, a backgroun
 and SIGINT/SIGQUIT ignored, and every process it starts inherits that. A local check confirmed it (SIGINT ignored,
 stdin empty), and a CI test now holds the foreground form to the default SIGINT handler and the step's stdin.
 
-The command is no longer pid 1, which doesn't change what it can signal:
-- a `kill(-1)` now spares bash (pid 1) and the caller, and still reaches nothing outside;
-- a `kill(0)` reaches the run's session, bash included, but pid 1 ignores a SIGKILL from inside its namespace, so bash
-  lives to report the command's 137.
+The command is no longer pid 1. That doesn't change what it can signal, but it does change what can signal it, as the
+review of #360 pointed out:
+- A mutant's `kill(-1)` now reaches `mutation_run.py` too: it spares only pid 1 (bash) and the caller. Under `exec`,
+  `mutation_run.py` was pid 1 and survived. But mutmut's own main process, its subprocess, never did. So under either
+  form a `kill(-1)` mutant ends the unit's mutmut, the unit gets no report, and the run fails. The run used to end
+  with 2 ("mutmut failed for <unit>"); it now ends with 137, and the step says "killed by signal 9". **Accepted:** the
+  runner and the job are untouched either way, which is what #345 secures. Letting the run go on past such a mutant
+  would take a PID namespace per mutant, beyond this change, and to raise if it shows up in practice.
+- A mutant's `kill(0)` reaches only its own session (#341's per-mutant `setsid`), so it ends only that mutant, as
+  before.
+- A `kill(0)` from the command itself reaches the run's session, bash included. pid 1 ignores a SIGKILL from inside
+  its namespace, so bash lives to report the command's 137.
 
 *Alternative:* `tini` or `dumb-init`. Rejected because they aren't on the runner image, and installing one in every
 run adds a download for what bash already does. *Alternative:* `set -m` before a background launch. Rejected because
