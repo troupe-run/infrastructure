@@ -201,6 +201,14 @@ def test_complexity_runs_before_the_tests_and_takes_the_base() -> None:
     assert dict(steps)["complexity"][-3:] == ["complexity", "--base", "abc123"]
 
 
+def test_every_check_runs_the_size_gate_after_complexity_with_the_base() -> None:
+    """Local and on the leg alike (gate-files design D4)."""
+    for steps in (check.gates(base="abc123"), check.gates(base="abc123", leg=True, coverage=False)):
+        assert labels(steps).index("complexity") < labels(steps).index("size")
+        assert labels(steps).index("size") < labels(steps).index("tests")
+        assert dict(steps)["size"][-3:] == ["size", "--base", "abc123"]
+
+
 def test_the_leg_measures_coverage_from_the_full_test_run_and_audits() -> None:
     steps = check.gates(base="abc123", leg=True, coverage=True)
     report = str(check.coverage_report())

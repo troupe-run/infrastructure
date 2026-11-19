@@ -36,21 +36,21 @@ declares (its own ceiling, if the exception list names it, otherwise `[size] blo
 at the base. The failure SHALL name the file, its size before and after, the limit, and the fix.
 
 #### Scenario: A file grows past the limit
-- **WHEN** a pull request takes a test file from 60,000 to 70,000 bytes, with `block_above = 65536`
-- **THEN** the check fails, naming the file, 60,000, 70,000, the limit, and saying to split the file or declare it in
+- **WHEN** a pull request takes a test file from 45,000 to 52,000 bytes, with `block_above = 49152`
+- **THEN** the check fails, naming the file, 45,000, 52,000, the limit, and saying to split the file or declare it in
   `[size.allow]`
 
 #### Scenario: A file already above the limit shrinks
-- **WHEN** a pull request edits a file from 80,000 to 79,000 bytes, with `block_above = 65536` and no allowance
+- **WHEN** a pull request edits a file from 60,000 to 59,000 bytes, with `block_above = 49152` and no allowance
 - **THEN** the size gate passes
 
 #### Scenario: A declared file within its ceiling
-- **WHEN** `[size.allow]` sets `"docs/development-workflow.md" = 81920` and a pull request grows it from 73,297 to
+- **WHEN** `[size.allow]` sets `"docs/development-workflow.md" = 90112` and a pull request grows it from 73,297 to
   75,000 bytes
 - **THEN** the size gate passes
 
 #### Scenario: A declared file past its ceiling
-- **WHEN** a pull request grows a file `[size.allow]` caps at 81,920 bytes to 82,000
+- **WHEN** a pull request grows a file `[size.allow]` caps at 90,112 bytes to 90,200
 - **THEN** the check fails, naming the file, its sizes, its ceiling and the fix
 
 ### Requirement: Large files are noted before they block
@@ -58,8 +58,8 @@ The size gate SHALL print each file the work adds or changes that is above `[siz
 with its size, without failing.
 
 #### Scenario: A file over one Read
-- **WHEN** a pull request grows a file to 45,000 bytes, with `warn_above = 40960` and `block_above = 65536`
-- **THEN** the size gate passes and prints the file, 45,000 and the warning threshold
+- **WHEN** a pull request grows a file to 40,000 bytes, with `warn_above = 32768` and `block_above = 49152`
+- **THEN** the size gate passes and prints the file, 40,000 and the warning threshold
 
 ### Requirement: Some files are never measured for size
 The size gate SHALL NOT measure binary files (any file containing a NUL byte or not valid UTF-8), delivered files, or
@@ -79,11 +79,11 @@ Each `[size.allow]` entry SHALL name a file and its ceiling in bytes, above `blo
 an entry names a file that doesn't exist, or that is at or under `block_above`, saying to remove the entry.
 
 #### Scenario: A declared file is split
-- **WHEN** a pull request splits a file `[size.allow]` names, leaving it at 30,000 bytes, with `block_above = 65536`
+- **WHEN** a pull request splits a file `[size.allow]` names, leaving it at 30,000 bytes, with `block_above = 49152`
 - **THEN** the check fails, naming the entry and saying to remove it from `[size.allow]`
 
 #### Scenario: A ceiling at or below the limit
-- **WHEN** `[size.allow]` gives a file a ceiling of 60,000 with `block_above = 65536`
+- **WHEN** `[size.allow]` gives a file a ceiling of 45,000 with `block_above = 49152`
 - **THEN** the check fails, naming the entry and saying a ceiling must be above `block_above`
 
 ### Requirement: A repository declares the size gate's limits in its gate config
@@ -97,5 +97,5 @@ declared in this repository, and the other gates run as usual.
 - **THEN** the size gate measures nothing and says it isn't declared in this repository, and the other gates run
 
 #### Scenario: Warning above the limit
-- **WHEN** `[size]` sets `warn_above = 70000` and `block_above = 65536`
+- **WHEN** `[size]` sets `warn_above = 50000` and `block_above = 49152`
 - **THEN** the check fails, naming `size.warn_above` and saying it must be at or below `block_above`

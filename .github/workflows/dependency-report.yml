@@ -4,7 +4,8 @@ name: dependency report
 # weekly"; quality-gates design D8). A pull request that changes uv.lock is blocked only by a high or
 # critical advisory with a fix; this audits the whole lock file on main every Monday and keeps one
 # "Dependency advisories" issue: opened when there are advisories, its list replaced while there
-# are, and closed when there are none. scripts/quality_gates.py is the same module the check runs.
+# are, and closed when there are none. scripts/quality_gates.py (whose report is in
+# scripts/quality_audit.py) is the same module the check runs.
 #
 #   audit   GITHUB_TOKEN, issues: write    audits uv.lock; opens, updates or closes the issue
 #   board   env board (main only)          adds a newly opened issue to the troupe roadmap board

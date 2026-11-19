@@ -9,9 +9,10 @@ With --scope, every gate still runs, but the tests narrow to those marked with a
 declared in scripts/check-paths.toml. The guard passes scopes when a commit stages only paths
 they cover (spec: development-workflow; commit-check-paths design D8).
 
-Every run measures the complexity of the functions the work adds or edits since --base, or since
-where it left origin/main (spec: quality-gates). Coverage and the dependency audit run only on CI's
-coverage leg, which sets QUALITY_GATES_LEG=true; never locally (owner, 2026-11-18).
+Every run measures the complexity of the functions the work adds or edits, and the size of the
+files it adds or changes, since --base, or since where it left origin/main (spec: quality-gates).
+Coverage and the dependency audit run only on CI's coverage leg, which sets QUALITY_GATES_LEG=true;
+never locally (owner, 2026-11-18).
 
 The same script runs locally and in CI, so the two can't diverge (design D8). It needs no
 secret: `tofu validate` reads neither state nor variable values. Every repo the org builds in
@@ -163,6 +164,7 @@ def gates(
         ("ruff format", [tool("ruff"), "format", "--check", "."]),
         ("mypy --strict", [tool("mypy")]),
         ("complexity", [sys.executable, QUALITY_GATES, "complexity", *on_base]),
+        ("size", [sys.executable, QUALITY_GATES, "size", *on_base]),
         ("tests", pytest),
     ]
     if measure:
@@ -224,7 +226,9 @@ def run_gates(steps: list[tuple[str, list[str]]], cwd: Path, scopes: tuple[str, 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--scope", action="append", default=[], help="a declared scope")
-    parser.add_argument("--base", help="the commit the complexity and audit gates compare with")
+    parser.add_argument(
+        "--base", help="the commit the complexity, size and audit gates compare with"
+    )
     args = parser.parse_args(argv)
     names = args.scope
     scopes: tuple[str, ...] = ()

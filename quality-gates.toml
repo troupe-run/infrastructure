@@ -19,3 +19,25 @@ exclude = ["**/tests/**"]
 [audit]
 lock_files = ["uv.lock"]
 block = ["high", "critical"]
+
+# The size in bytes of each file a change adds or changes (#271): above block_above it may not be new or larger than
+# before, unless [size.allow] gives it its own ceiling; above warn_above it's noted. A review reads every changed file
+# whole, and one Read holds about 25,000 tokens. Limits set by the owner on 2026-11-19
+# (openspec/changes/gate-files/design.md, D5 and D6). Fixtures, archived changes, the lock file and the state aren't
+# reviewed as code, so they aren't measured; binary files never are.
+[size]
+block_above = 49152
+warn_above = 32768
+exclude = ["**/fixtures/**", "openspec/changes/archive/**", "uv.lock", "tofu/terraform.tfstate"]
+
+# The files over block_above on 2026-11-19, each capped at its size then plus 16 KiB. Each has an issue to split it.
+# Remove an entry once its file is under block_above: the check fails on an entry that's no longer needed.
+[size.allow]
+"scripts/guard.py" = 222208
+"scripts/tests/test_claude_review_workflow.py" = 195584
+".github/workflows/claude-review.yml" = 136192
+"openspec/specs/development-workflow/spec.md" = 116736
+"docs/development-workflow.md" = 90112
+"scripts/tests/test_guard_dependabot.py" = 77824
+"scripts/tests/test_dependabot_issues.py" = 74752
+"openspec/specs/pr-review/spec.md" = 67584

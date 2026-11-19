@@ -16,25 +16,31 @@
 
 ## 2. The size gate (#271; design D4–D7)
 
-- [ ] 2.1 Owner sets the thresholds (D5) and the exception list's shape (D6); record the decision and its date in
+- [x] 2.1 Owner sets the thresholds (D5) and the exception list's shape (D6); record the decision and its date in
   design.md, and update the spec delta and these tasks if it differs from the proposal
-- [ ] 2.2 Parse an optional `[size]` table (`block_above`, `warn_above`, `exclude`, `allow`) strictly; verify config
+- [x] 2.2 Parse an optional `[size]` table (`block_above`, `warn_above`, `exclude`, `allow`) strictly; verify config
   tests for each key's type and range, `warn_above` above `block_above`, a ceiling at or under `block_above`, and no
   table
-- [ ] 2.3 Add the `size` gate: measured files (not delivered, excluded or binary), limit by allowance, fail when above
+- [x] 2.3 Add the `size` gate: measured files (not delivered, excluded or binary), limit by allowance, fail when above
   and new or grown, note above `warn_above`, stale-entry check; verify tests on scratch git repositories for each
   spec scenario
-- [ ] 2.4 Run it from `scripts/check.py` after complexity, with `--base`; verify `test_check.py` covers the step
-- [ ] 2.5 Add `[size]` to infrastructure's `quality-gates.toml` with the owner's thresholds, `exclude` and
+- [x] 2.4 Run it from `scripts/check.py` after complexity, with `--base`; verify `test_check.py` covers the step
+- [x] 2.5 Add `[size]` to infrastructure's `quality-gates.toml` with the owner's thresholds, `exclude` and
   `[size.allow]` (today's files over the limit); verify `uv run scripts/quality_gates.py size` passes on this branch
-- [ ] 2.6 List the size gate in `docs/development-workflow.md` ("The merge gates" table and notes); verify the doc
+- [x] 2.6 List the size gate in `docs/development-workflow.md` ("The merge gates" table and notes); verify the doc
   names the rule, where it runs, and the fix
+- [x] 2.7 Split `scripts/quality_gates.py`, which the size gate left at 47.4 KB, under its own limit: the audit and
+  report to a delivered `scripts/quality_audit.py`, the CLI unchanged (D8); verify the moved tests pass, a test runs
+  the script as a process and an audit error exits 2 (and fails without the entry-point fix), and
+  `tofu/guard_delivery.tf` delivers it
 
 ## 3. Integration
 
 - [ ] 3.1 Full `uv run scripts/check.py` passes (one heavy run, after the orchestrator says go)
-- [ ] 3.2 Raise the follow-up issues on the board: troupe and website add `[size]` and drop their delivered-file
-  patterns after the apply; infrastructure makes `[size]` required once both have it (D7)
+- [ ] 3.2 Raise the follow-up issues, each on the board with no milestone, and link them from #271: one split issue
+  per `[size.allow]` file (8 in infrastructure, 7 in troupe, 1 in website; design D6); troupe and website each add
+  `[size]` and drop their delivered-file patterns after the apply; infrastructure makes `[size]` required once both
+  have it (D7). Verify each with `gh issue view <n> --json projectItems`
 
 ## Workflow follow-up
 

@@ -39,7 +39,9 @@ DEPENDS_ON = (
     # The merge gates' measures, delivered too and run in troupe's check on every OS (spec:
     # quality-gates), and the real tool output its tests read.
     "scripts/quality_gates.py",
+    "scripts/quality_audit.py",
     "scripts/tests/fixtures/quality-gates/",
+    "scripts/tests/quality_gates_support.py",
     # The same, for the pull request mutation report and what it runs (spec: mutation-testing).
     ".github/workflows/mutation-pr.yml",
     "scripts/mutation.json",
