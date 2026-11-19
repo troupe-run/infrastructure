@@ -960,3 +960,41 @@ def test_a_help_request_is_granted_only_as_the_command_it_asks_about_would_be(
     command: str, granted: bool
 ) -> None:
     assert guard.grantable(command, Path.cwd(), Path.cwd()) is granted
+
+
+# Lifting a hold is the owner's (spec: development-workflow, "Removing the hold label is the
+# owner's"; auto-merge design D9): the label stops auto-merge, so an agent can't lift its own.
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh pr edit 41 --remove-label hold",
+        "gh pr edit 41 --remove-label bug,hold",
+        "gh pr edit 41 --remove-label=HOLD -R troupe-run/troupe",
+        "gh pr edit 41 --add-label x --remove-label 'needs:owner, Hold'",
+        "gh issue edit 41 --remove-label hold",
+        "gh pr edit 41 --remove-label bug --remove-label hold",
+    ],
+)
+def test_removing_the_hold_label_is_owner_only(command: str) -> None:
+    found = refusal(command)
+    assert found is not None
+    assert found.rule == "owner-only"
+    problem, fix = guard.OWNER_ONLY_MESSAGES["hold"]
+    assert found.problem.startswith(problem)
+    assert found.fix.startswith(fix)
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh pr edit 41 --add-label hold",
+        "gh pr edit 41 --remove-label needs:owner",
+        "gh pr edit 41 --remove-label holdout",
+        "gh issue edit 41 --remove-label bug",
+        "gh pr edit 41 --remove-label hold -R troupe-run/infra-probe-x",
+    ],
+)
+def test_adding_hold_and_removing_other_labels_stay_allowed(command: str) -> None:
+    assert refusal(command) is None

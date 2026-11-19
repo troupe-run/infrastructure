@@ -1,6 +1,7 @@
 """dependabot-dispatch.yml starts infrastructure's dependabot-issues when Dependabot acts in troupe
-or website, and its one job can do nothing but that dispatch (specs: dependency-updates,
-dependabot-dispatch-credentials; dependabot-issues-on-events design D1, D2).
+or website, and its auto-merge.yml when a pull request's state changes there; each of its two jobs
+can do nothing but its one dispatch (specs: dependency-updates, dependabot-dispatch-credentials;
+dependabot-issues-on-events design D1, D2; auto-merge design D8).
 
 GitHub evaluates the workflow, so these tests pin what it's given: when it runs, where its job is
 skipped, what its token may do, the environment that holds the key, and the dispatch it sends."""
@@ -14,12 +15,29 @@ import yaml
 from conftest import REPO
 
 WORKFLOW = REPO / ".github" / "workflows" / "dependabot-dispatch.yml"
-DEPENDABOT_RUNS = {"workflows": ["Dependabot Updates"], "types": ["completed"]}
-# infrastructure holds the file as its source and is started directly (design D1).
-SKIP_SOURCE = "github.repository != 'troupe-run/infrastructure'"
-# main, no inputs: every run reads everything it needs itself.
-DISPATCH = "gh workflow run dependabot-issues.yml -R troupe-run/infrastructure --ref main"
-# What the dispatch reads its token from: the minted one, never GITHUB_TOKEN.
+TRIGGERS = {
+    "workflow_run": {
+        "workflows": ["Dependabot Updates", "CI", "guard", "claude review"],
+        "types": ["completed"],
+    },
+    "pull_request_target": {"types": ["labeled", "unlabeled"]},
+}
+# infrastructure holds the file as its source and is started directly (design D1); each job starts
+# on its own events only, read in its `if:`, the one place the event is read.
+JOBS = {
+    "dispatch": {
+        "if": "github.repository != 'troupe-run/infrastructure' && github.event_name == "
+        "'workflow_run' && github.event.workflow_run.name == 'Dependabot Updates'",
+        # main, no inputs: every run reads everything it needs itself.
+        "command": "gh workflow run dependabot-issues.yml -R troupe-run/infrastructure --ref main",
+    },
+    "auto-merge": {
+        "if": "github.repository != 'troupe-run/infrastructure' && (github.event_name == "
+        "'pull_request_target' || github.event.workflow_run.name != 'Dependabot Updates')",
+        "command": "gh workflow run auto-merge.yml -R troupe-run/infrastructure --ref main",
+    },
+}
+DISPATCH = JOBS["dispatch"]["command"]
 MINTED = "${{ steps.app-token.outputs.token }}"
 HEADER = (
     "# Source: troupe-run/infrastructure. Change it there; copies in other repositories are "
@@ -42,41 +60,47 @@ def steps_using(job: dict[str, Any], action: str) -> list[dict[str, Any]]:
 def problems(workflow: dict[str, Any]) -> list[str]:
     found = []
     on = workflow.get("on") or {}
-    if set(on) != {"workflow_run"}:
-        found.append(f"it runs on {sorted(on)}, not on Dependabot's runs only")
-    if on.get("workflow_run") != DEPENDABOT_RUNS:
-        found.append(f"its workflow_run is {on.get('workflow_run')!r}, not Dependabot's runs")
+    if on != TRIGGERS:
+        found.append(
+            f"it runs on {on!r}, not on Dependabot's, CI's, guard's and the review's runs and "
+            "label changes only"
+        )
     if workflow.get("permissions") != {}:
         found.append(f"the default permissions are {workflow.get('permissions')!r}, not {{}}")
-    if re.search(r"github\.event\b", yaml.safe_dump(workflow)):
-        found.append("an expression reads github.event: nothing from the event is passed on")
-
     jobs = workflow.get("jobs") or {}
-    if set(jobs) != {"dispatch"}:
-        return [*found, f"its jobs are {sorted(jobs)}, not dispatch only"]
-    job = jobs["dispatch"]
+    if set(jobs) != set(JOBS):
+        return [*found, f"its jobs are {sorted(jobs)}, not {sorted(JOBS)}"]
+    for name, wanted in JOBS.items():
+        found += job_problems(name, jobs[name], wanted)
+    return found
 
-    if " ".join(str(job.get("if", "")).split()) != SKIP_SOURCE:
-        found.append(f"dispatch runs when {job.get('if')!r}, not everywhere but infrastructure")
+
+def job_problems(name: str, job: dict[str, Any], wanted: dict[str, str]) -> list[str]:
+    found = []
+    if " ".join(str(job.get("if", "")).split()) != wanted["if"]:
+        found.append(f"{name} runs when {job.get('if')!r}, not {wanted['if']!r}")
+    rest = {key: value for key, value in job.items() if key != "if"}
+    if re.search(r"github\.event\b", yaml.safe_dump(rest)):
+        found.append(f"an expression in {name} reads github.event: nothing from it is passed on")
     environment = job.get("environment")
-    name = environment.get("name") if isinstance(environment, dict) else environment
-    if name != "dependabot-dispatch":
-        found.append(f"dispatch's environment is {environment!r}, not dependabot-dispatch")
+    env_name = environment.get("name") if isinstance(environment, dict) else environment
+    if env_name != "dependabot-dispatch":
+        found.append(f"{name}'s environment is {environment!r}, not dependabot-dispatch")
     if job.get("permissions") != {}:
-        found.append(f"dispatch's GITHUB_TOKEN permissions are {job.get('permissions')!r}")
+        found.append(f"{name}'s GITHUB_TOKEN permissions are {job.get('permissions')!r}")
     if steps_using(job, "actions/checkout"):
-        found.append("dispatch checks out the repository; it needs no code")
+        found.append(f"{name} checks out the repository; it needs no code")
     others = [
         step
         for step in job.get("steps", [])
         if "uses" in step and "create-github-app-token" not in str(step["uses"])
     ]
     if others:
-        found.append(f"dispatch uses {[step['uses'] for step in others]}; it runs no other action")
+        found.append(f"{name} uses {[step['uses'] for step in others]}; it runs no other action")
 
     tokens = steps_using(job, "create-github-app-token")
     if len(tokens) != 1:
-        found.append("dispatch doesn't mint exactly one App token")
+        found.append(f"{name} doesn't mint exactly one App token")
     else:
         token = tokens[0]
         inputs = token.get("with") or {}
@@ -84,28 +108,29 @@ def problems(workflow: dict[str, Any]) -> list[str]:
             found.append(f"the token step's id is {token.get('id')!r}, not app-token")
         granted = {key: value for key, value in inputs.items() if key.startswith("permission-")}
         if granted != {"permission-actions": "write"}:
-            found.append(f"dispatch's token asks for {granted}, not actions write only")
+            found.append(f"{name}'s token asks for {granted}, not actions write only")
         if inputs.get("owner") != "troupe-run" or inputs.get("repositories") != "infrastructure":
             found.append(
-                f"dispatch's token is for {inputs.get('owner')!r}/{inputs.get('repositories')!r},"
+                f"{name}'s token is for {inputs.get('owner')!r}/{inputs.get('repositories')!r},"
                 " not troupe-run/infrastructure only"
             )
         if inputs.get("private-key") != "${{ secrets.DISPATCH_APP_PRIVATE_KEY }}":
-            found.append(f"dispatch's token is minted from {inputs.get('private-key')!r}")
+            found.append(f"{name}'s token is minted from {inputs.get('private-key')!r}")
         if inputs.get("client-id") != "${{ vars.DISPATCH_APP_CLIENT_ID }}":
-            found.append(f"dispatch's token names the App with {inputs.get('client-id')!r}")
+            found.append(f"{name}'s token names the App with {inputs.get('client-id')!r}")
 
     runs = [step for step in job.get("steps", []) if "run" in step]
     if len(runs) != 1:
-        found.append(f"dispatch runs {len(runs)} commands, not the one dispatch")
+        found.append(f"{name} runs {len(runs)} commands, not the one dispatch")
     else:
         step = runs[0]
         command = " ".join(str(step["run"]).split())
-        if command != DISPATCH:
-            found.append(f"dispatch sends {command!r}, not {DISPATCH!r}")
+        if command != wanted["command"]:
+            found.append(f"{name} sends {command!r}, not {wanted['command']!r}")
         if (step.get("env") or {}) != {"GH_TOKEN": MINTED}:
             found.append(
-                f"the dispatch runs with {step.get('env')!r}, not the dispatch App's token only"
+                f"{name}'s dispatch runs with {step.get('env')!r}, not the dispatch App's token "
+                "only"
             )
     return found
 
@@ -134,21 +159,24 @@ def command(jobs: dict[str, Any], run: str) -> None:
 @pytest.mark.parametrize(
     ("change", "named"),
     [
-        (lambda w: w["on"].update({"pull_request": None}), "not on Dependabot's runs only"),
-        (lambda w: w["on"].update({"pull_request_target": None}), "not on Dependabot's runs only"),
-        (lambda w: w["on"].update({"workflow_dispatch": None}), "not on Dependabot's runs only"),
-        (lambda w: w["on"]["workflow_run"].update({"workflows": ["CI"]}), "not Dependabot's runs"),
+        (lambda w: w["on"].update({"pull_request": None}), "not on Dependabot's, CI's"),
+        (lambda w: w["on"].pop("pull_request_target"), "not on Dependabot's, CI's"),
+        (lambda w: w["on"].update({"workflow_dispatch": None}), "not on Dependabot's, CI's"),
+        (
+            lambda w: w["on"]["workflow_run"].update({"workflows": ["CI"]}),
+            "not on Dependabot's, CI's",
+        ),
         (
             lambda w: w["on"]["workflow_run"].update({"types": ["requested"]}),
-            "not Dependabot's runs",
+            "not on Dependabot's, CI's",
         ),
         (lambda w: w.update({"permissions": {"contents": "read"}}), "not {}"),
         (lambda w: w.pop("permissions"), "not {}"),
-        (lambda w: w["jobs"].update({"other": {}}), "not dispatch only"),
-        (lambda w: w["jobs"]["dispatch"].pop("if"), "not everywhere but infrastructure"),
+        (lambda w: w["jobs"].update({"other": {}}), "not ['auto-merge', 'dispatch']"),
+        (lambda w: w["jobs"]["dispatch"].pop("if"), "dispatch runs when"),
         (
             lambda w: w["jobs"]["dispatch"].update({"if": "always()"}),
-            "not everywhere but infrastructure",
+            "dispatch runs when",
         ),
         (lambda w: w["jobs"]["dispatch"].pop("environment"), "not dependabot-dispatch"),
         (
@@ -207,6 +235,39 @@ def command(jobs: dict[str, Any], run: str) -> None:
         (
             lambda w: dispatch(w["jobs"]).update({"env": {"GH_TOKEN": "${{ github.token }}"}}),
             "not the dispatch App's token only",
+        ),
+        # The auto-merge job (auto-merge design D8).
+        (lambda w: w["jobs"].pop("auto-merge"), "not ['auto-merge', 'dispatch']"),
+        (lambda w: w["jobs"]["auto-merge"].pop("if"), "auto-merge runs when"),
+        (
+            lambda w: w["jobs"]["auto-merge"].update({"if": "github.repository != 'x'"}),
+            "auto-merge runs when",
+        ),
+        (
+            lambda w: next(s for s in w["jobs"]["auto-merge"]["steps"] if "run" in s).update(
+                {"run": DISPATCH}
+            ),
+            "auto-merge sends",
+        ),
+        (
+            lambda w: next(s for s in w["jobs"]["auto-merge"]["steps"] if "run" in s).update(
+                {"run": JOBS["auto-merge"]["command"] + " -f pr=${{ github.event.number }}"}
+            ),
+            "an expression in auto-merge reads github.event",
+        ),
+        (
+            lambda w: steps_using(w["jobs"]["auto-merge"], "create-github-app-token")[0][
+                "with"
+            ].update({"permission-pull-requests": "write"}),
+            "auto-merge's token asks for",
+        ),
+        (
+            lambda w: w["jobs"]["auto-merge"].update({"environment": "auto-merge"}),
+            "auto-merge's environment",
+        ),
+        (
+            lambda w: w["on"]["pull_request_target"].update({"types": ["opened"]}),
+            "not on Dependabot's, CI's",
         ),
     ],
 )

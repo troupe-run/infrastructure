@@ -1,0 +1,80 @@
+name: auto-merge
+
+# Queues the pull requests that pass the safe-PR rule (#319; spec: auto-merge; auto-merge design).
+# For each open pull request in troupe, infrastructure and website, scripts/auto_merge.py judges
+# the rule's conditions from GitHub's API and git data, never running a pull request's code, and
+# does what that repository's AUTO_MERGE variable says: on queues it, dry-run comments that it
+# would have, and off (or unset) does nothing. auto-merge.toml holds the rule's settings.
+#
+#   judge   env auto-merge (main only)   scripts/auto_merge.py run, with the troupe-run-merge App's
+#                                        token for the three repositories
+#
+# Started here by this repository's CI, guard and review runs and label changes, from troupe and
+# website by their delivered dependabot-dispatch.yml, and every 15 minutes as a backstop: resolving
+# a conversation, DCO's check and the merge queue's outcome start no workflow (design D1). Every
+# trigger runs main's copy of this file, no expression reads the event, and each run judges every
+# open pull request, so a run carries nothing from what started it.
+on:
+  workflow_run:
+    workflows: ["CI", "guard", "claude review"]
+    types: [completed]
+  pull_request_target:
+    types: [labeled, unlabeled]
+  # Off the quarter hour, when GitHub's load peaks; schedules here start late, which the backstop
+  # tolerates (scripts/watched-schedules.json reports one that stops).
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+# Two runs at once could each queue or comment on the same pull request. One stays in progress,
+# and a newer pending run replaces an older, so a burst ends with a run that starts after its last
+# event (as dependabot-issues does).
+concurrency:
+  group: auto-merge
+  cancel-in-progress: false
+
+jobs:
+  judge:
+    name: judge and queue
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Limited to main, and holds only the troupe-run-merge App's key (tofu/auto_merge.tf; spec:
+    # merge-credentials).
+    environment:
+      name: auto-merge
+      deployment: false
+    permissions:
+      contents: read
+    steps:
+      # This repository's main: the evaluator, its config and lizard's lock. No pull request's code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+      # Once any permission is listed the token gets only those, so it asks for every one the App
+      # is declared with in oob/app-installations.json, and the workflow test holds the two together
+      # (#238). Queueing needs contents write (design D10's probe).
+      - name: Mint the troupe-run-merge App's token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.MERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MERGE_APP_PRIVATE_KEY }}
+          owner: troupe-run
+          repositories: troupe,infrastructure,website
+          permission-actions: read
+          permission-actions-variables: read
+          permission-checks: read
+          permission-contents: write
+          permission-issues: read
+          permission-merge-queues: write
+          permission-pull-requests: write
+      - name: Judge every open pull request, and act as each repository's switch says
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: uv run --locked scripts/auto_merge.py run

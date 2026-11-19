@@ -28,6 +28,7 @@ TF_FILES = (
     REPO / "tofu" / "dependabot_issues.tf",
     REPO / "tofu" / "dependabot_dispatch.tf",
     REPO / "tofu" / "test_quality.tf",
+    REPO / "tofu" / "auto_merge.tf",
 )
 
 
@@ -48,6 +49,7 @@ MAIN_ONLY = {
     ("repo_troupe", "dependabot-dispatch"): False,
     ("repo_website", "dependabot-dispatch"): False,
     ("repo_infrastructure", "mutation-issues"): False,
+    ("repo_infrastructure", "auto-merge"): False,
 }
 
 

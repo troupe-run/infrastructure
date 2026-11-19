@@ -17,6 +17,8 @@ relies on it.
   - every required check is green on its head;
   - Claude's review read everything and no conversation is open;
   - every commit is signed off and its change is archived;
+  - no commit is a bot's, and its head was pushed by its author (owner, 2026-11-19: a push by the App can never be
+    auto-queued);
   - it closes no Decision, no `needs:owner` issue and no blocked issue;
   - it changes nothing on the protected list and is within the size and complexity limits.
 - **One config file**, `auto-merge.toml`, holding the protected list and the limits, per repository, read strictly.

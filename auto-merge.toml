@@ -1,0 +1,40 @@
+# The safe-PR rule's settings (spec: auto-merge; #319, #320). scripts/auto_merge.py reads it strictly: an unknown key,
+# a wrong type, a negative limit, or a governed repository with no table fails the run, which then queues nothing.
+# It's on the rule's own protected list, so a change to it is always the owner's to merge. Defaults chosen by the
+# owner on 2026-11-19 from the calibration in openspec/changes/archive/*-auto-merge/design.md.
+version = 1
+
+[defaults]
+# Changed lines, leaving out `generated` and `prose`; changed files, leaving out `generated` only.
+max_lines = 800
+max_files = 30
+# Cyclomatic complexity (lizard) of any function the change adds or edits, and the sum of the increases over them.
+max_function_complexity = 15
+max_complexity_increase = 40
+generated = ["**/uv.lock", "**/package-lock.json", "**/fixtures/**"]
+prose = ["openspec/**", "docs/**", "**/*.md"]
+complexity_exclude = ["**/tests/**", "**/test_*.py"]
+languages = ["python", "typescript", "javascript"]
+# Never auto-merged. A repository's own `protected` adds to these. Every path in a repository's
+# .github/guard-delivery.json, and deleting a component (a pyproject.toml, a package.json or an
+# openspec/specs/*/spec.md), are protected as well, by the rule itself.
+protected = [
+  ".github/**",
+  ".githooks/**",
+  ".claude/**",
+  "scripts/guard.py",
+  "scripts/guard_pytest.py",
+  "scripts/quality_gates.py",
+  "quality-gates.toml",
+  "release-please-config.json",
+  ".release-please-manifest.json",
+]
+
+[repositories.infrastructure]
+protected = ["tofu/**", "oob/**", "org-profile/**", "auto-merge.toml", "scripts/auto_merge*.py"]
+
+[repositories.troupe]
+# Credential and masking code, and their tests.
+protected = ["**/*masking*.py", "**/*credential*.py"]
+
+[repositories.website]
