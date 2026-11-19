@@ -17,8 +17,8 @@ runner out of memory, ends at most the run.
 
 #### Scenario: A mutant signals every process
 - **WHEN** a mutant makes the code under test send SIGKILL to every process it may (`kill(-1, …)`)
-- **THEN** only the run's own processes die, the step fails saying the run was killed by a signal, and the job and
-  its log carry on
+- **THEN** only processes inside the run's namespace die (the run's first process, its init, is spared), no process
+  outside it does, the step reports how the run ended, and the job and its log carry on
 
 #### Scenario: The run runs out of memory
 - **WHEN** the run's processes use more memory than its limit

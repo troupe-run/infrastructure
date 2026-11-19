@@ -463,7 +463,7 @@ def test_the_contained_run_sees_only_its_own_processes_as_the_runner_with_the_st
     done = run_contained(
         tmp_path,
         "run_contained bash -c "
-        "'echo \"pid=$$ uid=$(id -u) var=$PROBE_VAR\"; ps -e -o pid= | wc -l'",
+        "'echo \"pid=$$ uid=$(id -u) var=$PROBE_VAR path=$PATH\"; ps -e -o pid= | wc -l'",
         PROBE_VAR="kept",
     )
     assert done.returncode == 0, (done.stdout, done.stderr)
@@ -472,6 +472,7 @@ def test_the_contained_run_sees_only_its_own_processes_as_the_runner_with_the_st
     assert fields["pid"] in {"1", "2"}, first
     assert fields["uid"] == str(os.getuid())
     assert fields["var"] == "kept"
+    assert fields["path"] == os.environ["PATH"], "sudo's secure path replaced the step's PATH"
     assert int(count) <= 5, f"the run sees {count} processes: not a namespace of its own"
 
 
@@ -487,8 +488,27 @@ def test_a_run_over_its_memory_limit_ends_and_says_it_ran_out_of_memory(tmp_path
 
 
 @CONTAINED
-def test_a_run_killed_by_a_signal_says_so(tmp_path: Path) -> None:
-    # The run is pid 1 of its namespace, which ignores a SIGKILL from inside it: a child dies.
+def test_a_kill_of_every_process_inside_reaches_nothing_outside(tmp_path: Path) -> None:
+    """The case #345 is about: a mutant's kill(-1). A process of the same user outside the
+    namespace stands in for the runner agent, and survives. Inside, everything but the run's init
+    dies; the init (pid 1) is spared, as kill(-1) always spares it, so the run ends normally."""
+    sentinel = subprocess.Popen(["sleep", "300"], start_new_session=True)
+    try:
+        done = run_contained(
+            tmp_path, "run_contained bash -c 'sleep 30 & kill -9 -1; wait; echo inside-done'"
+        )
+        assert sentinel.poll() is None, "kill -9 -1 inside reached a process outside the namespace"
+        assert done.returncode == 0, (done.returncode, done.stdout, done.stderr)
+        assert "inside-done" in done.stdout
+    finally:
+        sentinel.kill()
+        sentinel.wait()
+
+
+@CONTAINED
+def test_a_status_above_128_is_reported_as_the_signal_it_means(tmp_path: Path) -> None:
+    # The run is pid 1 of its namespace, which ignores a SIGKILL from inside it: a child dies,
+    # and the run passes its 137 on.
     done = run_contained(tmp_path, "run_contained bash -c 'sh -c \"kill -9 \\$\\$\"; exit $?'")
     assert done.returncode == 137, (done.returncode, done.stdout, done.stderr)
     assert "::error::the mutation run was killed by signal 9" in done.stdout

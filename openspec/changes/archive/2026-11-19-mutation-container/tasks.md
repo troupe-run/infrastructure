@@ -9,9 +9,10 @@
       Real tests, needing Linux, passwordless sudo, systemd-run, unshare and setpriv (CI's legs), skipped elsewhere
       saying why:
       - the contained command sees its own PID namespace (it's pid 1 or 2, and `ps` lists only its own processes);
-      - it runs as the runner's uid, with a step variable and `PATH`;
+      - it runs as the runner's uid, with a step variable and the step's `PATH`;
+      - a `kill -9 -1` inside leaves a process of the same user outside the namespace alive (from the review);
       - an allocation over a small limit ends with 137, and the function says "ran out of memory";
-      - a self-inflicted `kill -9 $$` says "killed by signal 9".
+      - a status above 128 is reported as the signal it means ("killed by signal 9").
 - [x] 1.2 The function in both workflows; every run line through it
 - [x] 1.3 On GitHub Actions on Linux, a test fails if the real containment tests can't run (design D3a), with its
       rule tested both ways
