@@ -366,18 +366,135 @@ RUNS = {
 }
 
 
-def test_both_runs_mutate_in_a_session_of_their_own() -> None:
-    """A step shares the runner agent's process group: a mutant's group kill would lose the
-    runner (#341's probe). Each run line is under setsid --wait, after the sampler, which stays in
-    the step's shell (design D2)."""
+CONTAIN_BEGIN, CONTAIN_END = "# containment: begin", "# containment: end"
+
+
+def containment_block(path: Path, step: str) -> str:
+    script = step_script(path, "mutate", step)
+    assert CONTAIN_BEGIN in script, f"{path.name}'s {step!r} step doesn't contain its run"
+    return script[script.index(CONTAIN_BEGIN) : script.index(CONTAIN_END) + len(CONTAIN_END)]
+
+
+def test_both_runs_mutate_in_their_own_namespace_and_cgroup() -> None:
+    """A mutant that signals every process (kill -1), or starvation, lost the runner four times;
+    the run is contained instead, the same way in both workflows, after the sampler, which stays
+    in the step's shell (#345, mutation-container design D2)."""
+    blocks = {containment_block(path, step) for path, step in RUNS}
+    assert len(blocks) == 1, "the two workflows' containment blocks differ"
+    [block] = blocks
+    for part in (
+        "sudo --preserve-env env",
+        "systemd-run --scope",
+        "-p MemoryMax=",
+        "-p MemorySwapMax=0",
+        "-p TasksMax=",
+        "unshare --pid --fork --mount-proc --kill-child",
+        "setpriv --reuid=",
+        "MUTATION_MEMORY_MAX:-12G",
+        "MUTATION_TASKS_MAX:-8192",
+        "journalctl -k",
+    ):
+        assert part in block, part
     for (path, step), lines in RUNS.items():
         script = step_script(path, "mutate", step)
         for line in lines:
-            assert f"setsid --wait {line}" in script, (path.name, line)
-        assert script.index(END) < script.index("setsid --wait"), path.name
+            assert f"run_contained {line}" in script, (path.name, line)
+        assert "setsid --wait" not in script, path.name
+        assert script.index(END) < script.index(CONTAIN_BEGIN), path.name
 
 
-@pytest.mark.skipif(shutil.which("setsid") is None, reason="setsid is util-linux's: CI runs this")
+def can_contain() -> bool:
+    """Linux with passwordless sudo and the tools: CI's runners, never a laptop (design D4)."""
+    tools = ("sudo", "systemd-run", "unshare", "setpriv", "journalctl")
+    if sys.platform != "linux" or any(shutil.which(t) is None for t in tools):
+        return False
+    return subprocess.run(["sudo", "-n", "true"], capture_output=True, check=False).returncode == 0
+
+
+def containment_required(env: dict[str, str] | os._Environ[str], platform: str) -> bool:
+    """Where the containment tests must run, never skip: GitHub Actions on Linux, CI's check leg,
+    whose runner has passwordless sudo and systemd-run (#345)."""
+    return env.get("GITHUB_ACTIONS") == "true" and platform == "linux"
+
+
+@pytest.mark.parametrize(
+    ("env", "platform", "required"),
+    [
+        ({"GITHUB_ACTIONS": "true"}, "linux", True),
+        ({"GITHUB_ACTIONS": "true"}, "darwin", False),
+        ({}, "linux", False),
+        ({"GITHUB_ACTIONS": "false"}, "linux", False),
+    ],
+)
+def test_the_containment_tests_are_required_on_ci_linux_only(
+    env: dict[str, str], platform: str, required: bool
+) -> None:
+    assert containment_required(env, platform) is required
+
+
+def test_the_containment_tests_run_where_they_must() -> None:
+    """They skip without Linux, passwordless sudo and systemd-run. On CI's check leg that would
+    make them no tests at all, so it fails here instead."""
+    if containment_required(os.environ, sys.platform):
+        assert can_contain(), (
+            "CI's check leg can't run the containment tests (sudo -n, systemd-run, unshare, "
+            "setpriv or journalctl missing): they'd all skip"
+        )
+
+
+CONTAINED = pytest.mark.skipif(
+    not can_contain(), reason="needs Linux with passwordless sudo and systemd-run: CI runs this"
+)
+
+
+def run_contained(tmp_path: Path, command: str, **env: str) -> subprocess.CompletedProcess[str]:
+    """The block, run in a fresh session of its own, so nothing it does reaches this test."""
+    script = "set -euo pipefail\n" + containment_block(WEEKLY, "Mutate") + "\n" + command + "\n"
+    return subprocess.run(
+        ["bash", "-c", script], cwd=tmp_path, env=dict(os.environ) | env,
+        capture_output=True, text=True, check=False, timeout=120, start_new_session=True,
+    )  # fmt: skip
+
+
+@CONTAINED
+def test_the_contained_run_sees_only_its_own_processes_as_the_runner_with_the_steps_variables(
+    tmp_path: Path,
+) -> None:
+    done = run_contained(
+        tmp_path,
+        "run_contained bash -c "
+        "'echo \"pid=$$ uid=$(id -u) var=$PROBE_VAR\"; ps -e -o pid= | wc -l'",
+        PROBE_VAR="kept",
+    )
+    assert done.returncode == 0, (done.stdout, done.stderr)
+    first, count = done.stdout.split("\n")[:2]
+    fields = dict(field.split("=", 1) for field in first.split())
+    assert fields["pid"] in {"1", "2"}, first
+    assert fields["uid"] == str(os.getuid())
+    assert fields["var"] == "kept"
+    assert int(count) <= 5, f"the run sees {count} processes: not a namespace of its own"
+
+
+@CONTAINED
+def test_a_run_over_its_memory_limit_ends_and_says_it_ran_out_of_memory(tmp_path: Path) -> None:
+    done = run_contained(
+        tmp_path,
+        "run_contained python3 -c 'b = bytearray(512 * 1024 * 1024)'",
+        MUTATION_MEMORY_MAX="64M",
+    )
+    assert done.returncode == 137, (done.returncode, done.stdout, done.stderr)
+    assert "::error::the mutation run ran out of memory (MemoryMax 64M)" in done.stdout
+
+
+@CONTAINED
+def test_a_run_killed_by_a_signal_says_so(tmp_path: Path) -> None:
+    # The run is pid 1 of its namespace, which ignores a SIGKILL from inside it: a child dies.
+    done = run_contained(tmp_path, "run_contained bash -c 'sh -c \"kill -9 \\$\\$\"; exit $?'")
+    assert done.returncode == 137, (done.returncode, done.stdout, done.stderr)
+    assert "::error::the mutation run was killed by signal 9" in done.stdout
+
+
+@CONTAINED
 def test_a_run_that_kills_its_own_group_fails_the_step_and_spares_its_shell(
     tmp_path: Path,
 ) -> None:
