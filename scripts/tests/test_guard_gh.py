@@ -975,6 +975,9 @@ def test_a_help_request_is_granted_only_as_the_command_it_asks_about_would_be(
         "gh pr edit 41 --add-label x --remove-label 'needs:owner, Hold'",
         "gh issue edit 41 --remove-label hold",
         "gh pr edit 41 --remove-label bug --remove-label hold",
+        'gh pr edit 41 --remove-label "$L"',
+        'gh pr edit 41 --remove-label "$(printf ho)ld"',
+        "gh issue edit 41 --remove-label bug,`echo hold`",
     ],
 )
 def test_removing_the_hold_label_is_owner_only(command: str) -> None:
