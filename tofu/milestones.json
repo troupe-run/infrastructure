@@ -88,7 +88,7 @@
       "key": "0.14.0",
       "title": "0.2.0",
       "state": "open",
-      "description": "Other runners: an actor runs on a local model through its engine’s own API, or on any OpenAI-style API, without Claude Code"
+      "description": "Other runners: an actor runs without Claude Code, on OpenAI’s Responses API, Claude’s Messages API, a local model through Ollama or mistral.rs, or an engine that serves either API; troupe init auditions one"
     },
     {
       "key": "0.15.0",
