@@ -67,7 +67,8 @@ relies on it.
 
 ## Impact
 
-- New: `scripts/auto_merge.py` and its tests, `auto-merge.toml`, `.github/workflows/auto-merge.yml`,
+- New: `scripts/auto_merge.py` and `scripts/auto_merge_github.py` (its transport, split so each file passes the size
+  gate) and their tests, `auto-merge.toml`, `.github/workflows/auto-merge.yml`,
   `tofu/auto_merge.tf` (environment, client ID variable, `AUTO_MERGE` variables), the App's `oob/` declaration and
   set-up notes.
 - Changed:
