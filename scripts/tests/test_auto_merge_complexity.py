@@ -129,3 +129,9 @@ def test_a_file_named_like_a_lizard_option_hides_nothing(repo: Path) -> None:
     nothing would be measured (checked by hand on lizard 1.26.1 for #359's review)."""
     after = {"--output_file=o.py": "x = 1\n", "b.py": branches(17)}
     assert measure(repo, {"a.py": "x = 1\n"}, after) == (18, 18)
+
+
+def test_a_file_whose_name_git_would_quote_is_measured(repo: Path) -> None:
+    """git's diff text quotes `café.py` ("b/caf\\303\\251.py"), which a reader of that text would
+    drop (#359's review)."""
+    assert measure(repo, {"a.py": "x = 1\n"}, {"café.py": branches(17)}) == (18, 18)

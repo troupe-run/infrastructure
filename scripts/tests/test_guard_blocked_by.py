@@ -310,3 +310,30 @@ def test_the_github_check_passes_once_the_blocker_closes(
     assert guard.run_ci_entry(repo.path, None, None, None, read_github=read) == 0, (
         capsys.readouterr().err
     )
+
+
+@pytest.mark.parametrize(
+    ("head", "fails"),
+    [
+        ({"ref": RELEASE_BRANCH, "repo": {"full_name": TROUPE}}, False),
+        ({"ref": "fix-the-runner", "repo": {"full_name": TROUPE}}, True),
+        ({"ref": RELEASE_BRANCH, "repo": {"full_name": "someone/troupe"}}, True),
+    ],
+)
+def test_a_merge_group_exempts_a_release_pull_request_by_its_own_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, head: dict[str, object], fails: bool
+) -> None:
+    """In the queue, the run's branch is main, so the queued pull request's own head says whether
+    it's troupe's release pull request (#359's review). A fork's release-named branch isn't."""
+    event = tmp_path / "event.json"
+    event.write_text('{"merge_group": {"head_ref": "' + QUEUE_REF + '"}}', encoding="utf-8")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "merge_group")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    read = reader(
+        {
+            f"repos/{TROUPE}/pulls/41": {"number": 41, "body": "* resolve #12 flake", "head": head},
+            blocked_path(TROUPE, 12): [blocker(TROUPE, 11, "open")],
+        }
+    )
+    decision = guard.blocked_by_on_github("merge_group", guard._event_payload(), None, TROUPE, read)
+    assert decision.refused is fails
