@@ -1022,6 +1022,11 @@ def run(
                 line = act(pr, mode)
             except AutoMergeError as error:
                 line = f"error: {error}"
+            except Exception as error:  # one pull request never stops the sweep
+                # Anything unforeseen (a file name that isn't UTF-8, one too long to copy, a
+                # malformed answer) is that pull request's error, never a pass, and the rest are
+                # still judged (#359's review).
+                line = f"error: {type(error).__name__}: {error}"
             if line.startswith("error"):
                 status = 1
             say(f"  - #{number}: {line}")

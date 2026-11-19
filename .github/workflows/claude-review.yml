@@ -2089,7 +2089,10 @@ jobs:
           with open("review-result.json", "w", encoding="utf-8") as out:
               json.dump(result, out)
           print(json.dumps(result))
+      # A failed upload mustn't fail the check for a review that completed: auto-merge reads a
+      # missing result as "no result recorded" and doesn't queue (#359's review).
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        continue-on-error: true
         with:
           name: review-result
           path: review-result.json

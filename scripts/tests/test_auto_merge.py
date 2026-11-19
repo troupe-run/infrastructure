@@ -637,3 +637,31 @@ def test_a_recorder_sends_reads_and_keeps_writes() -> None:
     recorder.graphql("mutation($id: ID!) { x }", {"id": "1"})
     assert inner.writes == []
     assert len(recorder.writes) == 2
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"),
+        OSError(63, "File name too long"),
+        json.JSONDecodeError("Expecting value", "{", 1),
+    ],
+)
+def test_an_unforeseen_failure_on_one_pull_request_is_its_error_and_the_sweep_goes_on(
+    tape: dict[str, Any], failure: Exception
+) -> None:
+    """A file name that isn't UTF-8, one too long to copy, or a malformed answer (#359's review):
+    that pull request isn't queued, the run is red, and the next repository is still judged."""
+    again = everything(tape, {"troupe": "on", "website": "on"})
+
+    def measure(_: am.PullRequest) -> tuple[int, int]:
+        raise failure
+
+    replay = am.Replay(again)
+    lines: list[str] = []
+    config = am.read_config(Path(__file__).resolve().parents[2])
+    status = am.run(replay, config, measure, lines.append)
+    assert status == 1
+    assert replay.writes == []
+    assert any(line.startswith(f"  - #467: error: {type(failure).__name__}") for line in lines)
+    assert "- troupe-run/website (on): 0 open pull request(s)" in lines
