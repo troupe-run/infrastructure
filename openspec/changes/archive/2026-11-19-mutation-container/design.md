@@ -30,21 +30,27 @@ It sits between `# containment: begin` and `# containment: end`, identical in bo
 is. A test holds the two copies equal.
 
 ```
-sudo --preserve-env env "PATH=$PATH" \
-  systemd-run --scope --quiet --unit="$unit" \
+export -p > "$saved"
+sudo systemd-run --scope --quiet --expand-environment=no --unit="$unit" \
     -p MemoryMax="$MUTATION_MEMORY_MAX" -p MemorySwapMax=0 -p TasksMax="$MUTATION_TASKS_MAX" \
   unshare --pid --fork --mount-proc --kill-child \
-  setpriv --reuid="$uid" --regid="$gid" --init-groups -- "$@"
+  setsid --wait \
+  setpriv --reuid="$uid" --regid="$gid" --init-groups -- \
+  bash -c 'source "$1"; shift; exec "$@"' restore "$saved" "$@"
 ```
 
-- `sudo --preserve-env` keeps the step's variables, and `env PATH=` restores the `PATH` that sudo's secure path
-  replaces. `HOME` is kept the same way.
+- The step's environment is saved with `export -p` and restored inside, because the runner's sudo refuses
+  `--preserve-env` and resets it. CI's first run of the real tests found `PROBE_VAR` arriving empty.
 - `systemd-run --scope` runs the command in a transient cgroup with the limits: 12G of the runner's 16 GB, no swap,
-  and 8192 tasks. The constants live in the function, one place for both workflows.
+  and 8192 tasks. `--expand-environment=no`, because systemd-run expands `$` in its command line, which turned a
+  test's `$$` into `$`. The constants live in the function, one place for both workflows.
 - `unshare --pid --fork --mount-proc --kill-child`: the run's processes see only each other, so `kill(-1)` reaches
-  only them, and they all die with the run.
+  only them, sparing the namespace's init, as `kill(-1)` always does. They all die with the run.
+- `setsid --wait`: a PID namespace doesn't separate process groups, and a `kill(0)` from inside reached the step's
+  shell in CI's first run. A session of its own keeps it in.
 - `setpriv` drops back to the runner's uid and gid with its groups, so everything runs as it did.
-- `--unit` names the scope (`mutation-<run id>-<job>-<random>`), so the kernel log can be matched to it.
+- `--unit` names the scope (`mutation-<run id>-<job>-<random>`), and only kernel log lines naming it count as its
+  OOM. The generic "Memory cgroup out of memory" line also matched another scope's kill.
 
 Every run line in both steps (`mutation_run.py`, `mutation_pr.py`, the `python3` and `uv run` forms) goes through it,
 replacing #341's `setsid --wait`. #341's per-mutant `os.setsid()` stays: it keeps one mutant's own-group kill from
