@@ -405,10 +405,11 @@ and is read strictly: a misspelt key or a missing file fails the check rather th
   and has an issue to split it; an entry for a file that's back under the limit fails the check, so the list only
   shrinks. Fixtures, archived changes, lock files and binary files aren't measured, and CRLF counts as LF. The fix
   when it fails: split the file. `[size]` is optional until troupe and website declare it.
-- **Delivered files are left out by the gates themselves.** Every gate reads the repository's
-  `.github/guard-delivery.json` and skips the files it names, which are measured here, at their source (#333). A
-  repository writes no pattern for them in `quality-gates.toml` or its coverage settings. A list that can't be read
-  fails the gate rather than counting as empty.
+- **Delivered files are left out by the gates themselves.** The complexity, size and coverage gates read the
+  repository's `.github/guard-delivery.json` and skip the files it names, which are measured here, at their source
+  (#333); the audit works from lock files and doesn't read it. A repository writes no pattern for them in
+  `quality-gates.toml` or its coverage settings. A list that can't be read fails the gate rather than counting as
+  empty.
 - **Coverage applies only to the repositories that get mutation testing too**: those `scripts/mutation.json`'s
   `repositories` names (owner, 2026-11-18, #332; see "Mutation testing" below). Only they declare `[coverage]`;
   the rest leave it out, and their coverage leg says coverage isn't measured there. Today that's troupe alone, so this
