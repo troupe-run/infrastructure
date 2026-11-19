@@ -8,7 +8,8 @@ version = 1
 # Changed lines, leaving out `generated` and `prose`; changed files, leaving out `generated` only.
 max_lines = 800
 max_files = 30
-# Cyclomatic complexity (lizard) of any function the change adds or edits, and the sum of the increases over them.
+# Cyclomatic complexity (lizard) of any function the change adds or makes more complex, and the sum of those rises (a
+# new function's whole complexity). A refactor that lowers it, or an edit that adds no branching, counts for nothing.
 max_function_complexity = 15
 max_complexity_increase = 40
 generated = ["**/uv.lock", "**/package-lock.json", "**/fixtures/**"]

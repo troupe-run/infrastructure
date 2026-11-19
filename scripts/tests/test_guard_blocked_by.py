@@ -15,7 +15,14 @@ from pathlib import Path
 import pytest
 from conftest import Repo
 from test_guard_pr_description import passing_openspec, pull_request_with  # noqa: F401 (a fixture)
-from test_guard_push_and_ci import commit_without_hooks, pr_repo
+from test_guard_push_and_ci import (
+    RELEASE_BOT,
+    RELEASE_BRANCH,
+    commit_as,
+    commit_without_hooks,
+    pr_repo,
+    release_repo,
+)
 
 import guard
 
@@ -180,9 +187,54 @@ def test_a_pull_request_event_judges_its_own_description() -> None:
     assert decision.refused
 
 
-def test_a_release_pull_request_with_no_description_to_judge_passes() -> None:
+def test_no_description_to_judge_reads_nothing() -> None:
     read = reader({})
     assert not guard.blocked_by_on_github("pull_request", {}, None, TROUPE, read).refused
+    assert read.asked == []  # type: ignore[attr-defined]
+
+
+@pytest.mark.usefixtures("passing_openspec")
+def test_a_release_pull_request_s_body_isn_t_judged(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Through run_ci_entry, as GitHub runs it: troupe's release pull request is exempt from
+    blocked-by as from pr-closes-issue, so a "Fixes #5" in its changelog body reads nothing."""
+    repo, _ = release_repo(make_repo, tmp_path)
+    repo.switch(RELEASE_BRANCH)
+    commit_as(repo, RELEASE_BOT, "chore: release main", "CHANGELOG.md")
+    body = "## Changelog\n\n* Fixes #5 in the runner"
+    pull_request_with(
+        repo, tmp_path, monkeypatch,
+        {"title": "chore: release main", "body": body, "head": {"repo": {"full_name": TROUPE}}},
+    )  # fmt: skip
+    monkeypatch.setenv("GITHUB_HEAD_REF", RELEASE_BRANCH)
+    monkeypatch.setenv("GITHUB_REPOSITORY", TROUPE)
+    read = reader({blocked_path(TROUPE, 5): [blocker(TROUPE, 4, "open")]})
+    assert guard.run_ci_entry(repo.path, None, None, None, read_github=read) == 0, (
+        capsys.readouterr().err
+    )
+    assert read.asked == []  # type: ignore[attr-defined]
+
+
+@pytest.mark.usefixtures("passing_openspec")
+def test_the_same_body_on_an_ordinary_pull_request_is_judged(
+    make_repo: Callable[[], Repo],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo, _ = pr_repo(make_repo, tmp_path)
+    commit_without_hooks(repo, "feat(thing): add a thing", "a.txt")
+    pull_request_with(
+        repo, tmp_path, monkeypatch, {"title": "feat: x", "body": "* Fixes #5 in the runner"}
+    )
+    monkeypatch.setenv("GITHUB_REPOSITORY", TROUPE)
+    read = reader({blocked_path(TROUPE, 5): [blocker(TROUPE, 4, "open")]})
+    assert guard.run_ci_entry(repo.path, None, None, None, read_github=read) == 1
+    assert "troupe-run/troupe#5 is blocked by troupe-run/troupe#4" in capsys.readouterr().err
 
 
 def test_a_push_reads_nothing() -> None:

@@ -30,8 +30,10 @@ count, whatever its type. The refusal SHALL name the closed issue, the blocker a
 - **THEN** the GitHub check doesn't fail under `blocked-by`
 
 #### Scenario: A release pull request
-- **WHEN** troupe's release pull request, which closes no issue, is checked
-- **THEN** the GitHub check doesn't fail under `blocked-by`
+- **WHEN** troupe's release pull request is checked, and its body, release-please's changelog, says "Fixes #5"
+  about an issue blocked by an open one
+- **THEN** the GitHub check doesn't fail under `blocked-by`: a release branch that passes the branch rule is exempt,
+  as from `pr-closes-issue`, and its body isn't read
 
 ### Requirement: The merge queue re-checks blocked issues
 In a merge group, the GitHub check SHALL read the pull request the group was built for, and judge its closed issues'
@@ -70,6 +72,11 @@ In a Claude Code session, removing the `hold` label from a pull request or an is
 
 #### Scenario: Through issue edit
 - **WHEN** an agent runs `gh issue edit 41 --remove-label hold`
+- **THEN** the command is refused the same way
+
+#### Scenario: Through the API
+- **WHEN** an agent runs `gh api -X DELETE repos/troupe-run/troupe/issues/41/labels/hold`, or
+  `gh api -X PATCH repos/troupe-run/troupe/issues/41 -f 'labels[]=bug'`, which replaces the labels
 - **THEN** the command is refused the same way
 
 #### Scenario: An agent adds a hold

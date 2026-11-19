@@ -998,3 +998,49 @@ def test_removing_the_hold_label_is_owner_only(command: str) -> None:
 )
 def test_adding_hold_and_removing_other_labels_stay_allowed(command: str) -> None:
     assert refusal(command) is None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh api -X DELETE repos/troupe-run/troupe/issues/41/labels/hold",
+        "gh api -X DELETE repos/troupe-run/troupe/issues/41/labels/HOLD",
+        "gh api -X DELETE repos/troupe-run/troupe/issues/41/labels/%68old",
+        "gh api -X DELETE repos/troupe-run/troupe/issues/41/labels",
+        "gh api -X PATCH repos/troupe-run/troupe/issues/41 -f 'labels[]=bug'",
+        "gh api -X PATCH repos/troupe-run/troupe/issues/41 -F labels=@labels.json",
+        "gh api -X PATCH repos/troupe-run/troupe/issues/41 --input missing.json",
+    ],
+)
+def test_lifting_a_hold_through_the_api_is_owner_only(command: str) -> None:
+    found = refusal(command)
+    assert found is not None
+    assert found.rule == "owner-only"
+    assert found.problem.startswith(guard.OWNER_ONLY_MESSAGES["hold"][0])
+
+
+def test_a_patch_whose_input_sets_labels_is_owner_only(tmp_path: Path) -> None:
+    (tmp_path / "edit.json").write_text('{"labels": ["bug"]}', encoding="utf-8")
+    command = "gh api -X PATCH repos/troupe-run/troupe/issues/41 --input edit.json"
+    found = refusal(command, tmp_path)
+    assert found is not None
+    assert found.rule == "owner-only"
+
+
+@pytest.mark.parametrize("mutation", ["removeLabelsFromLabelable", "clearLabelsFromLabelable"])
+def test_lifting_a_hold_through_graphql_is_refused(mutation: str) -> None:
+    query = f'mutation {{ {mutation}(input: {{labelableId: "I_1"}}) {{ clientMutationId }} }}'
+    found = refusal(f"gh api graphql -f query='{query}'")
+    assert found is not None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh api -X DELETE repos/troupe-run/troupe/issues/41/labels/bug",
+        "gh api -X POST repos/troupe-run/troupe/issues/41/labels -f 'labels[]=hold'",
+        "gh api -X PATCH repos/troupe-run/troupe/issues/41 -f body=x",
+    ],
+)
+def test_other_label_and_issue_writes_through_the_api_stay_allowed(command: str) -> None:
+    assert refusal(command) is None

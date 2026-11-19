@@ -226,12 +226,17 @@ its own workflow. Nothing from the event is passed. The only expressions that re
 
 ### D9. The guard: lifting a hold is the owner's
 
-- `gh pr edit` and `gh issue edit` with `--remove-label` naming `hold` (alone or in a comma list, in any case) are
-  refused under `owner-only`.
-- `DELETE .../issues/<n>/labels/hold`, and the label-set endpoints, are already off the allow-list (one way per
-  write).
+Each route that can take `hold` off a pull request or an issue is refused under `owner-only`:
+- `gh pr edit` and `gh issue edit` with `--remove-label` naming `hold`, alone or in a comma list, in any case.
+- `gh api -X DELETE .../issues/<n>/labels/hold` (any case, URL-encoded or not), and `DELETE .../issues/<n>/labels`,
+  which removes every label.
+- `gh api -X PATCH .../issues/<n>` that sets `labels`, which replaces the set, whether through a field or an
+  `--input` file. An `--input` that can't be read is judged as setting them.
 - GraphQL `removeLabelsFromLabelable` and `clearLabelsFromLabelable` are already refused as unlisted mutations.
-- A test pins each route.
+
+A test pins each route. The first draft of this decision said the API routes were already off the allow-list.
+#359's review found they weren't: `GH_API_WORKFLOW_WRITES` allows label `DELETE` and issue `PATCH`. They're refused
+now, and the design is corrected.
 
 ### D10. The merge App and its environment
 

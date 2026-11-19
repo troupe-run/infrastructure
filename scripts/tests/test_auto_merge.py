@@ -508,9 +508,13 @@ def test_the_record_says_what_each_condition_saw(tape: dict[str, Any]) -> None:
     _, _, replay = run(everything(tape, {"troupe": "on"}))
     body = text(replay.writes[0])
     assert f"**Queued by auto-merge** at `{HEAD}`, under the safe-PR rule v1 (#319)." in body
+    for name in ("check", "DCO", "guard (workflow rules)", "claude review completed"):
+        newest = max(
+            (r for r in tape[CHECK_RUNS]["check_runs"] if r["name"] == name), key=lambda r: r["id"]
+        )
+        assert f"[{name}]({newest['html_url']})" in body, name
+    assert "| required checks | all 4 green on d61dfd0: [check](https://github.com/" in body
     for line in (
-        "| required checks | all 4 green on d61dfd0: check, DCO, guard (workflow rules), claude "
-        "review completed |",
         "| closed issues | no Decision, no needs:owner, nothing blocked: troupe-run/troupe#442 |",
         "| size | lines 36/800, files 5/30, max complexity 0/15, increase 0/40 |",
         "| review | coverage complete on d61dfd0 |",

@@ -37,6 +37,7 @@ import threading
 import time
 import tomllib
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -2763,6 +2764,8 @@ def _classify_api(rest: Sequence[str], cwd: Path) -> tuple[str, str | None, str 
     for pattern, group in GH_API_OWNER_ONLY:
         if pattern.fullmatch(endpoint) and method in _WRITES:
             return "owner", group, repository, []
+    if api_lifts_hold(endpoint, method, rest, cwd):
+        return "owner", "hold", repository, []
     for pattern, methods in GH_API_WORKFLOW_WRITES:
         if pattern.fullmatch(endpoint) and method in methods:
             return "allow", None, repository, []
@@ -2772,6 +2775,34 @@ def _classify_api(rest: Sequence[str], cwd: Path) -> tuple[str, str | None, str 
 HOLD_LABEL = "hold"
 """The label that stops auto-merge for one pull request: anyone may add it, only the owner lifts it
 (spec: development-workflow; auto-merge design D9)."""
+
+
+_ISSUE = re.compile(rf"{_REPO}/issues/{_SEG}")
+_ISSUE_LABELS = re.compile(rf"{_REPO}/issues/{_SEG}/labels(?:/(?P<name>{_SEG}))?")
+
+
+def api_lifts_hold(endpoint: str, method: str, rest: Sequence[str], cwd: Path) -> bool:
+    """Whether a gh api write could remove `hold` from an issue or pull request: deleting that
+    label or every label, or a PATCH of the issue that sets its labels, which replaces them. A
+    PATCH whose --input can't be read is judged as setting them (auto-merge design D9)."""
+    labels = _ISSUE_LABELS.fullmatch(endpoint)
+    if labels is not None and method == "DELETE":
+        name = labels.group("name")
+        return name is None or urllib.parse.unquote(name).lower() == HOLD_LABEL
+    if method != "PATCH" or not _ISSUE.fullmatch(endpoint):
+        return False
+    if any(re.match(r"labels(\[\])?=", value) for value, _ in _api_fields(rest)):
+        return True
+    for index, word in enumerate(rest):
+        given = rest[index + 1] if word == "--input" and index + 1 < len(rest) else None
+        if word.startswith("--input="):
+            given = word.partition("=")[2]
+        if given is None:
+            continue
+        text = _read_named(given, cwd)
+        if text is None or re.search(r'"labels"\s*:', text):
+            return True
+    return False
 
 
 def removed_labels(rest: Sequence[str]) -> set[str]:
@@ -4615,11 +4646,13 @@ def run_ci_entry(
         print(note)
     if labels.refused:
         refusals.append(labels)
-    # The repository the run is in resolves a bare #n, as GitHub's own closing keywords do.
+    # The repository the run is in resolves a bare #n, as GitHub's own closing keywords do. A
+    # release pull request is exempt, as from pr-closes-issue: its body is release-please's
+    # changelog, whose words aren't closing lines (#359's review).
     blocked = blocked_by_on_github(
         os.environ.get("GITHUB_EVENT_NAME", "") if from_github else "",
         _event_payload(),
-        description,
+        None if reserved_release_branch(branch, repository) else description,
         os.environ.get("GITHUB_REPOSITORY") or None,
         read_github or github_get,
     )

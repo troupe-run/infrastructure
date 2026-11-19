@@ -102,14 +102,17 @@ troupe, infrastructure and website pull requests, not written by hand
       Verify `tofu fmt`, `validate` and the test pass
 - [ ] 4.3 `hold` and `auto-merged` in `tofu/labels/workflow.json`. Verify the labels test passes and, at the PR's plan,
       the plan creates them in each managed repository
+      Waiting: the labels test passes; the plan runs once #359 is marked ready (plan (pull request))
 - [x] 4.4 Declare the App in `oob/app-installations.json`, and its by-hand set-up in `oob/README.md`. Verify
       `uv run scripts/oob.py` reports no difference once the owner has created it
 
 ## 5. The review result and the dispatcher (design D6, D8)
 
-- [ ] 5.1 Make `claude-review.yml`'s `completed` job write and upload `review-result`. Verify the workflow's tests
+- [x] 5.1 Make `claude-review.yml`'s `completed` job write and upload `review-result`. Verify the workflow's tests
       pass, and on this pull request's own review run (memory: review-change-tests-itself) the artifact has this head
       and its coverage
+      Done: #359's own review run 44528307172 recorded `{"head": "2d16ed2…", "coverage": "incomplete", "code":
+      "all"}` for its head 2d16ed2. The record step is also run by its tests (#359's review)
 - [x] 5.2 Add the auto-merge job to `dependabot-dispatch.yml` per D8. Extend `test_dependabot_dispatch_workflow.py`:
       - each job starts only its workflow;
       - no event data is passed;
@@ -132,6 +135,7 @@ troupe, infrastructure and website pull requests, not written by hand
       Verify they fail before 6.2
 - [ ] 6.2 Implement `blocked-by` in `guard.py ci`, and add `issues: read` and `pull-requests: read` to `guard.yml`.
       Verify 6.1 passes and the guard's tests pass on the three OSes in CI
+      Waiting: 6.1 passes locally; the guard's legs on the three OSes run once #359 is marked ready
 - [x] 6.3 Tests first, then refuse removing `hold` (D9): `gh pr edit` and `gh issue edit`, alone and in a comma list,
       any case. Adding `hold`, and removing another label, stay allowed. Verify the tests pass
 - [x] 6.4 `docs/development-workflow.md`: list `blocked-by` and the hold rule, and a new "Auto-merge" section with the
@@ -150,7 +154,8 @@ troupe, infrastructure and website pull requests, not written by hand
       - infrastructure#349: `plan (pull request)` is waiting. Checked: pending for the owner's approval.
       - website#55: its mergeability wasn't computed yet. Checked: GitHub answered `MERGEABLE` a minute later,
         so the next run judges it on (D3's fail-safe).
-- [ ] 7.2 The full check (`uv run scripts/check.py`), after asking the orchestrator. Verify it passes
+- [x] 7.2 The full check (`uv run scripts/check.py`), after asking the orchestrator. Verify it passes
+      Done: passed before 2d16ed2 (3815 passed, 20 skipped for platform reasons), and again before the review's fixes
 
 ## Workflow follow-up
 
