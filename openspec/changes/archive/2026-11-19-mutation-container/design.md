@@ -59,7 +59,7 @@ ending the whole run.
 ### D3. Saying why the run died
 
 The function notes the time before it starts. After a non-zero exit it reads `sudo journalctl -k --since <time>` for
-an OOM kill in the scope's cgroup (`oom-kill` with the unit's name, or "Memory cgroup out of memory"):
+an OOM kill in a kernel line naming the run's scope unit (and only such lines, D2):
 - if there is one: `::error::the mutation run ran out of memory (MemoryMax <limit>)`;
 - otherwise, for 128+N: `::error::the mutation run was killed by signal N`, or for anything else
   `::error::the mutation run exited with status N`.
