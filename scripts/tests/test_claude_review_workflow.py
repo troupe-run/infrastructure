@@ -798,6 +798,8 @@ def completed_job_problems(job: dict[str, Any]) -> list[str]:
     found += own_step_problems(steps[0], RESULT_STEP, RESULT_SHA256, repr(RESULT_STEP_NAME))
     if steps[1].get("with") != RESULT_UPLOAD:
         found.append(f"the review result's upload is given {steps[1].get('with')!r}")
+    if steps[1].get("continue-on-error") is not True:
+        found.append("the review result's upload can fail the check: it needs continue-on-error")
     found += own_step_problems(
         steps[2], COMPLETED_STEP, COMPLETED_SHA256, repr(COMPLETED_STEP_NAME)
     )
@@ -1484,6 +1486,10 @@ CASES: list[tuple[Change, str]] = [
     (
         lambda w: completed_job(w)["steps"][1]["with"].update({"overwrite": False}),
         "the review result's upload is given",
+    ),
+    (
+        lambda w: completed_job(w)["steps"][1].pop("continue-on-error"),
+        "the review result's upload can fail the check",
     ),
     (
         lambda w: completed_job(w)["steps"].insert(2, completed_job(w)["steps"].pop(0)),

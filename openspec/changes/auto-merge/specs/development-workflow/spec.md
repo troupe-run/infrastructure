@@ -69,7 +69,8 @@ never treat the issue as not blocked.
 
 ### Requirement: Removing the hold label is the owner's
 In a Claude Code session, removing the `hold` label from a pull request or an issue SHALL be refused under
-`owner-only`, in any repository. Adding `hold`, and removing any other label, SHALL be allowed as before.
+`owner-only`, in any repository but the throwaway ones, which every owner-only act exempts. Adding `hold`, and removing
+any other label, SHALL be allowed as before.
 
 #### Scenario: An agent lifts a hold
 - **WHEN** an agent runs `gh pr edit 41 --remove-label hold`, or `gh pr edit 41 --remove-label bug,hold`
@@ -83,6 +84,10 @@ In a Claude Code session, removing the `hold` label from a pull request or an is
 - **WHEN** an agent runs `gh api -X DELETE repos/troupe-run/troupe/issues/41/labels/hold`, or
   `gh api -X PATCH repos/troupe-run/troupe/issues/41 -f 'labels[]=bug'`, which replaces the labels
 - **THEN** the command is refused the same way
+
+#### Scenario: A throwaway repository
+- **WHEN** an agent runs `gh pr edit 41 --remove-label hold -R troupe-run/infra-probe-x`
+- **THEN** the command is allowed, as any owner-only act is in a throwaway repository
 
 #### Scenario: An agent adds a hold
 - **WHEN** an agent runs `gh pr edit 41 --add-label hold`
