@@ -383,12 +383,13 @@ def test_both_runs_mutate_in_their_own_namespace_and_cgroup() -> None:
     assert len(blocks) == 1, "the two workflows' containment blocks differ"
     [block] = blocks
     for part in (
-        "sudo --preserve-env env",
-        "systemd-run --scope",
+        'export -p > "$saved"',
+        "systemd-run --scope --quiet --expand-environment=no",
         "-p MemoryMax=",
         "-p MemorySwapMax=0",
         "-p TasksMax=",
         "unshare --pid --fork --mount-proc --kill-child",
+        "setsid --wait",
         "setpriv --reuid=",
         "MUTATION_MEMORY_MAX:-12G",
         "MUTATION_TASKS_MAX:-8192",
@@ -399,7 +400,7 @@ def test_both_runs_mutate_in_their_own_namespace_and_cgroup() -> None:
         script = step_script(path, "mutate", step)
         for line in lines:
             assert f"run_contained {line}" in script, (path.name, line)
-        assert "setsid --wait" not in script, path.name
+            assert f"setsid --wait {line}" not in script, (path.name, "#341's prefix is left", line)
         assert script.index(END) < script.index(CONTAIN_BEGIN), path.name
 
 
@@ -522,7 +523,9 @@ def test_a_run_that_kills_its_own_group_fails_the_step_and_spares_its_shell(
     runs in a fresh session, so even a broken step can't reach this test."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    (bin_dir / "uv").write_text("#!/bin/sh\nkill -9 0\n", encoding="utf-8")
+    # A child kills its group: the run's own top process is pid 1 of its namespace, which ignores a
+    # SIGKILL from inside it, as mutation_run.py does in a real run.
+    (bin_dir / "uv").write_text("#!/bin/sh\nsh -c 'kill -9 0'\nexit $?\n", encoding="utf-8")
     (bin_dir / "uv").chmod(0o755)
     (tmp_path / "target").mkdir()
     readings = tmp_path / "out" / "resources-troupe.log"

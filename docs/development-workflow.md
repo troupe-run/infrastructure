@@ -654,14 +654,14 @@ load and running mutants once a minute, as `resources:` lines in the log and in 
 pull request report's is `resources-pr.log`), uploaded with the report even when the run fails. The run's summary
 gives the lowest free memory seen. If a runner is lost, its last readings in the log say what ran out.
 
-**A mutant can't stop the runner.** A GitHub step shares the runner agent's process group and user, so a mutant
-that kills its own group, or signals every process (`kill(-1)`), or a run that exhausts memory, would kill the
-runner itself: the job is lost, with no log (#341, #345, each proved by a probe). So each mutant's tests start a
-session of their own (the plugin mutmut loads), and the whole run goes through `run_contained`, the same in both
-workflows. It runs under `sudo systemd-run --scope` with `MemoryMax=12G`, no swap and `TasksMax=8192`, in its own PID
-namespace (`unshare`), back as the runner's user with the step's environment (`setpriv`). Whatever a mutant does ends
-at most the run. The step then says "ran out of memory (MemoryMax 12G)", "killed by signal N" or "exited with status
-N", read from the kernel log.
+**A mutant can't stop the runner.** A GitHub step shares the runner agent's process group and user, so a mutant that
+kills its own group, or signals every process (`kill(-1)`), or a run that exhausts memory, would kill the runner itself:
+the job is lost, with no log (#341, #345, each proved by a probe). So each mutant's tests start a session of their own
+(the plugin mutmut loads), and the whole run goes through `run_contained`, the same in both workflows. It runs under
+`sudo systemd-run --scope` with `MemoryMax=12G`, no swap and `TasksMax=8192`, in its own PID namespace (`unshare`) and
+session (`setsid`), back as the runner's user with the step's environment (`setpriv`). Whatever a mutant does ends at
+most the run. The step then says "ran out of memory (MemoryMax 12G)", "killed by signal N" or "exited with status N",
+read from the kernel log.
 
 **Mutation runs happen only in CI.** Never run them on your own machine: a `kill(-1)` mutant would kill every process
 of your login, and macOS can't contain it. The scripts' tests never run a mutant.
