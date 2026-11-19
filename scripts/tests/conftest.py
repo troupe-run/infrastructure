@@ -166,3 +166,20 @@ class History:
 def history(tmp_path: Path) -> History:
     """main's history: merges by a person, and the App's state commits."""
     return History(tmp_path / "repo")
+
+
+@pytest.fixture(autouse=True)
+def no_github_reads(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The guard's blocked-by reads GitHub's API on a pull request or merge group run. No test
+    reaches the network: unless a test passes its own reader, every closed issue has no blockers and
+    every queued pull request has an empty description (test_guard_blocked_by judges the rule)."""
+    import guard
+
+    def no_blockers(path: str) -> object:
+        if "/dependencies/blocked_by" in path:
+            return []
+        if "/pulls/" in path:
+            return {"body": ""}
+        raise guard.UnreadableGitHubError(f"a test read {path}, which the fake doesn't answer")
+
+    monkeypatch.setattr(guard, "github_get", no_blockers)

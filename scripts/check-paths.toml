@@ -40,6 +40,10 @@ paths = ["tofu/dependabot.json", "tofu/dependabot/**"]
 [scopes.mutation]
 paths = ["scripts/mutation.json"]
 
+# Auto-merge's rule settings (spec: auto-merge).
+[scopes.auto_merge]
+paths = ["auto-merge.toml"]
+
 # The workflows the schedule watch reads (spec: schedule-watch).
 [scopes.schedules]
 paths = ["scripts/watched-schedules.json"]
@@ -60,6 +64,7 @@ paths = [
   "tofu/release.tf",
   "tofu/repositories.tf",
   "tofu/test_quality.tf",
+  "tofu/auto_merge.tf",
   "tofu/versions.tf",
   "tofu/modules/**",
   "tofu/required-checks.json",

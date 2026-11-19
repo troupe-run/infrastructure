@@ -1,0 +1,5 @@
+{
+ "source": "https://github.com/troupe-run/troupe/pull/467",
+ "recorded": "2026-11-19",
+ "how": "uv run scripts/auto_merge.py judge troupe 467 --every --tape <file>, as the owner's read-only login; patch bodies and account URL fields removed to keep it small. The pull request had merged, so tests set it open and mergeable; no review-result artifact existed yet (design D6 adds it), so tests add one in the shape claude-review.yml writes."
+}

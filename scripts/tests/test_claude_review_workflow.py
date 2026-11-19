@@ -399,6 +399,25 @@ COMPLETED_STEP = {
     },
 }
 COMPLETED_SHA256 = "5a5583f59cca88275099a99086dcb1be8f65e20c72efd93693f6eef85871b561"
+# Before the check decides, the head's result is written and uploaded for auto-merge to read (spec:
+# pr-review, "The review's result for the head is recorded for auto-merge"; auto-merge design D6).
+RESULT_STEP_NAME = "Record the review's result for the head"
+RESULT_STEP = {
+    "shell": "python3 {0}",
+    "env": {
+        "HEAD": "${{ github.event.pull_request.head.sha }}",
+        "COVERAGE": "${{ needs.resolve.outputs.coverage }}",
+        "CODE": "${{ needs.resolve.outputs.code }}",
+    },
+}
+RESULT_SHA256 = "b18785a68a83dcdbde30c132159ede3d8decf10ac5a4571562ebc063b804f2d9"
+RESULT_UPLOAD = {
+    "name": "review-result",
+    "path": "review-result.json",
+    "if-no-files-found": "error",
+    "overwrite": True,
+    "retention-days": 30,
+}
 # What Claude returns, and all the report job reads from it (design D4; review-splits-large-prs
 # design D6).
 SCHEMA = {
@@ -769,10 +788,18 @@ def completed_job_problems(job: dict[str, Any]) -> list[str]:
         )
     found += job_problems("completed", job, permissions={})
     steps = job.get("steps") or []
-    if [s.get("name") for s in steps] != [COMPLETED_STEP_NAME] or "uses" in steps[0]:
-        return [*found, f"completed's steps aren't the one step {COMPLETED_STEP_NAME!r}"]
+    shape = [label(step) for step in steps]
+    if shape != [RESULT_STEP_NAME, "upload", COMPLETED_STEP_NAME] or "uses" in steps[2]:
+        return [
+            *found,
+            f"completed's steps are {shape}, not the record, its upload and "
+            f"{COMPLETED_STEP_NAME!r}",
+        ]
+    found += own_step_problems(steps[0], RESULT_STEP, RESULT_SHA256, repr(RESULT_STEP_NAME))
+    if steps[1].get("with") != RESULT_UPLOAD:
+        found.append(f"the review result's upload is given {steps[1].get('with')!r}")
     found += own_step_problems(
-        steps[0], COMPLETED_STEP, COMPLETED_SHA256, repr(COMPLETED_STEP_NAME)
+        steps[2], COMPLETED_STEP, COMPLETED_SHA256, repr(COMPLETED_STEP_NAME)
     )
     return found
 
@@ -938,6 +965,10 @@ def completed_job(w: dict[str, Any]) -> dict[str, Any]:
 
 
 def completed(w: dict[str, Any]) -> dict[str, Any]:
+    return completed_job(w)["steps"][2]  # type: ignore[no-any-return]
+
+
+def result_step(w: dict[str, Any]) -> dict[str, Any]:
     return completed_job(w)["steps"][0]  # type: ignore[no-any-return]
 
 
@@ -1436,11 +1467,27 @@ CASES: list[tuple[Change, str]] = [
         lambda w: completed_job(w)["steps"].insert(
             0, {"uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"}
         ),
-        "completed's steps aren't the one step",
+        "completed's steps are",
     ),
     (
         lambda w: completed(w)["env"].update({"TOKEN": "${{ secrets.REVIEW_APP_PRIVATE_KEY }}"}),
         f"{COMPLETED_STEP_NAME!r} is given",
+    ),
+    # The record auto-merge reads (auto-merge design D6).
+    (lambda w: result_step(w)["env"].pop("COVERAGE"), f"{RESULT_STEP_NAME!r} is given"),
+    (
+        lambda w: result_step(w).update(
+            {"run": str(result_step(w)["run"]).replace('"complete", ', "")}
+        ),
+        f"{RESULT_STEP_NAME!r}'s script isn't the one",
+    ),
+    (
+        lambda w: completed_job(w)["steps"][1]["with"].update({"overwrite": False}),
+        "the review result's upload is given",
+    ),
+    (
+        lambda w: completed_job(w)["steps"].insert(2, completed_job(w)["steps"].pop(0)),
+        "completed's steps are",
     ),
     (
         lambda w: completed(w)["env"].update({"REVIEW": "${{ needs.gate.result }}"}),

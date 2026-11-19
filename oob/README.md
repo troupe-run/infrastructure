@@ -90,6 +90,7 @@ lists below are checked by hand in each App's settings, by any change that adds,
 | `troupe-run-review` | `troupe`, `infrastructure`, `website` | 2026-10-26, owner |
 | `troupe-run-dispatch` | `infrastructure` | 2026-10-27, by the App's own token (`GET /installation/repositories`, after the probe repository was deleted) |
 | `troupe-run-test-quality` | `troupe`, `infrastructure`, `website` | 2026-11-18, owner |
+| `troupe-run-merge` | `troupe`, `infrastructure`, `website` | 2026-11-19, owner (a probe repository was added for an hour, then deleted) |
 
 A repository the infrastructure App isn't installed on shows only its public view to OpenTofu (merge settings read as
 off, no security settings), so the first plan after adding one will show that it's missing from this list.
@@ -367,6 +368,60 @@ backstop at the latest, reports any pull request it left without its issue or cl
 
 **Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run the
 command above again. Then delete the old key in the App's settings.
+
+## The merge App (set up by hand)
+
+`.github/workflows/auto-merge.yml` queues the pull requests that pass the safe-PR rule (spec: auto-merge,
+merge-credentials; #319, #320). It mints the `troupe-run-merge` App's token to read the three governed
+repositories' pull requests, checks, issues, runs and variables, to comment on and label pull requests, and to add
+them to or take them out of the merge queue.
+
+Queueing needs contents write, and contents write also lets the token push a branch. It can't change `main` except
+through the queue, change a variable, or merge directly (probed 2026-11-19, auto-merge design D10). Auto-merge never
+queues a pull request with a bot's commit, or a head someone other than its author pushed (design D12). GitHub has no
+API for creating an App, and OpenTofu never holds a secret, so these steps are the owner's. `tofu/auto_merge.tf`
+declares the `auto-merge` environment on infrastructure and the client-ID variable.
+
+**Creating it** (done 2026-11-19, App ID 5832075). In the org's settings, under GitHub Apps, create a new App:
+- name `troupe-run-merge`, installable only on this account, webhook off;
+- repository permissions:
+  - "Pull requests: read and write";
+  - "Contents: read and write";
+  - "Merge queues: read and write";
+  - "Issues", "Checks", "Actions" and "Variables": read;
+  - no organisation or account permissions. GitHub adds "Metadata: read";
+- install it with "Only select repositories" and select `troupe`, `infrastructure` and `website`.
+
+Its installation is checked by `oob.py` against `app-installations.json`. Its client ID goes in `tofu/auto_merge.tf`.
+
+**Its key.** Generate a private key in the App's settings. Store it in 1Password as an SSH Key item named
+`troupe-run-merge` in vault `troupe.run`, by importing the downloaded `.pem`, then delete the file. Once the
+`auto-merge` environment exists on infrastructure (after the apply that creates it), set the secret there and only
+there. Nothing is printed:
+
+```sh
+export OP_ACCOUNT=l-a-u.1password.com
+# gh runs only once op has read the key, and only if it's PKCS#1 or PKCS#8 (create-github-app-token refuses OpenSSH).
+key=$(op read -n "op://troupe.run/troupe-run-merge/private key") &&
+  case "$key" in "-----BEGIN RSA PRIVATE KEY-----"*|"-----BEGIN PRIVATE KEY-----"*) ;; *) false ;; esac &&
+  printf '%s' "$key" | gh secret set MERGE_APP_PRIVATE_KEY --env auto-merge -R troupe-run/infrastructure
+unset key
+```
+
+Check it by name, never by value:
+
+```sh
+gh api repos/troupe-run/infrastructure/environments/auto-merge/secrets --jq '.secrets[].name'
+```
+
+Until it's set, every auto-merge run fails at minting its token, and nothing is queued or commented.
+
+**Rotating the key.** Generate a new key in the App's settings, replace the 1Password item's key with it, and run the
+command above again. Then delete the old key in the App's settings.
+
+**Switching it off.** Set a repository's `AUTO_MERGE` to `off` in `tofu/auto_merge.tf` by pull request. As the
+break-glass, set it on GitHub (Settings, Secrets and variables, Actions, Variables), and the next plan shows the
+difference.
 
 ## The review App and the Claude token (set up by hand)
 

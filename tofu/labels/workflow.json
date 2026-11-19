@@ -8,5 +8,15 @@
     "name": "parked",
     "color": "C5DEF5",
     "description": "Agreed or deferred until a named later change"
+  },
+  {
+    "name": "hold",
+    "color": "B60205",
+    "description": "Auto-merge must not queue this; only the owner lifts it"
+  },
+  {
+    "name": "auto-merged",
+    "color": "0E8A16",
+    "description": "Queued by auto-merge under the safe-PR rule"
   }
 ]

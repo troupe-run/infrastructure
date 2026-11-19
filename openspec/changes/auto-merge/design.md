@@ -88,8 +88,20 @@ Everything is read through the API as the App, or as git data:
 - the variable `AUTO_MERGE`;
 - the review's `review-result` artifact (D6).
 
-For size and complexity it fetches `refs/pull/<n>/head` into a blobless clone and runs `quality_gates`' diff and
-lizard functions on the base and the head. lizard parses files; nothing from the pull request is executed.
+For size and complexity it fetches `refs/pull/<n>/head` into a blobless clone, copies each changed file at the base
+and at the head out of git, and runs `quality_gates`' lizard reader on both. lizard parses files; nothing from the
+pull request is executed.
+
+The functions that count are the new ones and those whose complexity rose, matched by file and name, so one whose
+parameters change is edited, not new. Each counts at its complexity at the head, and its rise (a new function's
+whole complexity) adds to the increase. A refactor that lowers complexity never blocks, and nor does editing a
+complex function without adding branching. New branching anywhere counts.
+
+**The owner chose this measure** (2026-11-19, 22:48 AEST, revising an earlier "adds or edits"). It's the
+calibration's measure, so the evidence and the rule agree. Replaying the evaluator over the sample at the chosen
+limits qualifies the same pull requests the calibration's table showed: 47 of 72 eligible troupe, 22 of 28 website
+and 4 of 4 infrastructure. "Adds or edits" would have qualified 43 of 72 troupe: an edit inside an already-complex
+function, such as troupe#410's inside one of complexity 25, would have counted.
 
 ### D3. The rule's order and its result
 
@@ -99,7 +111,7 @@ The conditions are checked cheapest first:
 3. queued before on this head (D5);
 4. required checks;
 5. conversations and requested changes;
-6. sign-off and archive;
+6. sign-off and archive, no bot's commit, and the head pushed by the author (D12);
 7. closed issues;
 8. protected paths;
 9. size and complexity;
@@ -189,14 +201,17 @@ override is consumed. It's part of `guard.py ci` after the git-level rules.
   (`refs/heads/gh-readonly-queue/main/pr-<n>-<sha>`), then the description from `GET pulls/<n>`. A head_ref of
   another shape fails the rule.
 - **Push:** nothing to check.
-- For each closed issue: `GET repos/<o>/<r>/issues/<n>/dependencies/blocked_by`, and each blocker's `state`. An open
+- For each closed issue: `GET repos/<o>/<r>/issues/<n>/dependencies/blocked_by`, which gives each blocker's `state`. An open
   blocker fails, with the message #275 asked for. Anything unreadable fails (owner, 2026-11-19).
 - A release pull request exempt from `pr-closes-issue` closes nothing, so it passes.
 
-Token: `github.token`, with `issues: read` and `pull-requests: read` added to `guard.yml`. All three repositories are
-public, so the token can read another repository's issues. Task 1.1 probes this on an `infra-probe-*` repository
-before anything depends on it. If it can't, the fallback is the merge App's token, which would need a decision,
-because it moves the key.
+Token: `github.token`, with `issues: read` and `pull-requests: read` added to `guard.yml`. **Probed (task 1.1,
+2026-11-19, troupe-run/infra-probe-merge-20261119)**: with exactly those permissions, a `push`, a `pull_request` and a
+`merge_group` run all read `dependencies/blocked_by` with 200, both for an issue in their own repository and for
+troupe-run/troupe#286 and troupe-run/infrastructure#339, and read `pulls/<n>` with 200. The merge group's `head_ref`
+was `refs/heads/gh-readonly-queue/main/pr-3-b54dfa1…`, which gave the pull request number 3. Each blocker in the list
+carries its own `state`, so no second read is needed per blocker. The list is read with `per_page=100`, following
+pagination.
 
 Re-checking: a blocker closing doesn't re-run `guard`. The merge group re-checks, the evaluator checks blockers
 itself before queueing, and a red check is re-run with `gh run rerun`.
@@ -220,11 +235,13 @@ its own workflow. Nothing from the event is passed. The only expressions that re
 
 ### D10. The merge App and its environment
 
-The `troupe-run-merge` App, created by the owner:
+The `troupe-run-merge` App was created by the owner on 2026-11-19 (App ID 5832075, client ID `Iv23liKUpo42H7OQcQ4g`).
+The owner approved these permissions on 2026-11-19, the reads included ("OK as listed (including Checks, Actions and
+Variables read-only)"):
 - **Repository permissions:**
   - pull requests: write (comment, label, queue, dequeue);
-  - contents: write. The owner listed it. Task 1.2 probes whether `merge_queues: write` alone queues; contents write
-    is kept only if it's needed;
+  - contents: write (queueing needs it: see the probe below);
+  - merge queues: write;
   - issues: read (closed issues, their types and dependencies);
   - checks: read;
   - actions: read (the review artifact);
@@ -234,10 +251,47 @@ The `troupe-run-merge` App, created by the owner:
 - **Events:** none (no webhook).
 - **Installation:** selected repositories troupe, infrastructure and website.
 
-Task 1.2 trims anything the probe shows isn't needed before the declaration in `oob/app-installations.json` is
-written. The environment `auto-merge` on infrastructure is main-only, with no reviewers and no admin bypass, and holds
+**Probed (task 1.2, 2026-11-19).** The run was on troupe-run/infra-probe-merge-20261119, with every token scoped to
+that repository. The repository and its copy of the key were deleted straight afterwards.
+- Every read worked: the pull request, check runs, `AUTO_MERGE`, a run's artifact (listed and downloaded),
+  `blocked_by`.
+- Comment, label and unlabel worked, as `troupe-run-merge[bot]`.
+- **With contents read, `enqueuePullRequest` and `dequeuePullRequest` were refused (403)**, though merge queues was
+  write. With contents write:
+  - a stale `expectedHeadOid` was refused ("expected head oid does not match the current head oid");
+  - the right one queued, and dequeue worked;
+  - setting a variable was refused (403);
+  - a direct REST merge was refused (405, "Changes must be made through the merge queue");
+  - **creating a branch worked.**
+
+So contents write stays.
+
+The owner accepted contents write (2026-11-19), and closed the gap it leaves with a condition: "auto-merge never
+queues a PR with any commit authored or committed by a bot (troupe-run-merge[bot] included), or whose head was pushed
+by anyone other than the PR's author". See D12. The environment `auto-merge` on infrastructure is main-only, with no reviewers and no admin bypass, and holds
 `MERGE_APP_PRIVATE_KEY` (secret) and `MERGE_APP_CLIENT_ID` (variable), as `dependabot-issues` does. It's added to
 `scripts/tests/test_main_only_environments.py`.
+
+### D12. No bot's commits, and a head pushed by the author (owner, 2026-11-19)
+
+A leaked merge key could push a commit onto a person's pull request branch, whose new head might then pass the review
+and be queued. Two reads refuse that:
+- **Commits:** each commit the pull request adds (REST `pulls/<n>/commits`) has its `author` and `committer` read.
+  A GitHub account of type `Bot`, or a git email of the form `…[bot]@users.noreply.github.com`, fails the
+  condition. A commit whose author or committer has neither a GitHub account nor an email fails too, as unreadable.
+- **The pusher:** GitHub records who started each workflow run (`actor`, `triggering_actor`). A push to a pull
+  request's branch starts its `pull_request` workflows (CI, guard, review) as the pusher. Every run listed for the
+  head SHA with event `pull_request` has to have the pull request's author as both. No such run, or a list that
+  can't be read, fails the condition.
+
+  The timeline's `head_ref_force_pushed` events name only force-pushes, and the events API keeps 300 events, so
+  neither can read every push.
+
+  A push made with an App's token that starts no workflow leaves the head with no required checks. Such a head is
+  never green, so it's refused by condition 4 anyway.
+
+Agents and the owner share one login (#47), so this tells a person's push from an App's, not an agent's from the
+owner's. That's the gap the owner set out to close.
 
 ### D11. Labels and variables in OpenTofu
 
@@ -281,14 +335,13 @@ Distributions over eligible pull requests (p50 / p75 / p90):
 
 - **[A wrong rule merges something unsafe]** → a week of dry-run first, each condition tested against recorded
   pull-request shapes, the merge group's checks still run, and `hold` and `AUTO_MERGE=off` stop it at once.
-- **[The App's key leaks]** → it can queue and comment, not push, change settings or merge past the queue. Its key is
-  in one main-only environment.
+- **[The App's key leaks]** → it can queue, comment and push a branch, but can't change `main` other than through the
+  queue, change settings or variables, or merge directly. A push by it is never auto-queued (D12). Its key is in one
+  main-only environment.
 - **[An agent games a condition]** (for example, resolving conversations it shouldn't) → unchanged: agents can't
   resolve must-fixes or decisions (guard), and lifting `hold` becomes owner-only.
 - **[A run errs in a loop every 15 minutes]** → it fails red, and the schedule watch reports a stopped schedule. A
   failure on one pull request doesn't stop the others being judged.
-- **[GITHUB_TOKEN can't read another repository's issue dependencies]** → probed first (task 1.1). The fallback needs
-  the owner's decision.
 - **[Review result missing in troupe and website until the delivery]** → those pull requests aren't queued until
   then (fail-safe).
 - **[Lizard measuring TypeScript or Astro differently]** → `.astro` isn't measured (lizard can't). Its lines still

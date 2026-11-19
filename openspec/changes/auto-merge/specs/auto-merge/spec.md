@@ -99,6 +99,27 @@ and its head has no change left under `openspec/changes/` outside `archive/` wit
 - **WHEN** `openspec/changes/<branch>/` still exists at the head
 - **THEN** it isn't queued
 
+### Requirement: Every commit is a person's and the head was pushed by the author
+A pull request SHALL qualify only when no commit it adds is authored or committed by a bot account, and every
+workflow run GitHub started for its head from a pull request event was started by the pull request's author. A
+commit or a run whose author, committer or actor can't be read, or a head with no such run, SHALL fail the condition.
+
+#### Scenario: A commit from the merge App
+- **WHEN** a commit on the pull request's branch was committed by `troupe-run-merge[bot]`
+- **THEN** it isn't queued, whatever else holds
+
+#### Scenario: A commit authored by another bot
+- **WHEN** a commit was authored by `dependabot[bot]` on a person's pull request
+- **THEN** it isn't queued
+
+#### Scenario: Someone else pushed the head
+- **WHEN** the pull request's author is A, and its head's `pull_request` runs were started by B
+- **THEN** it isn't queued
+
+#### Scenario: The pusher can't be read
+- **WHEN** listing the head's workflow runs fails, or finds none from a pull request event
+- **THEN** it isn't queued, and the run's summary says the pusher couldn't be read
+
 ### Requirement: The issues it closes are neither decisions nor blocked
 A pull request SHALL qualify only when every issue it closes, through its description's closing lines or GitHub's
 closing references, in any repository, isn't of type Decision, has no `needs:owner` label, and is blocked by
@@ -143,8 +164,8 @@ deleting a component. Every path in the repository's `.github/guard-delivery.jso
 
 ### Requirement: The change is within the size and complexity limits
 A pull request SHALL qualify only when its changed lines, its changed files, the highest cyclomatic complexity of any
-function it adds or edits, and the total increase in complexity over those functions are each within the limit its
-repository's config sets.
+function it adds or makes more complex, and the sum of those rises (a new function's whole complexity) are each within
+the limit its repository's config sets.
 
 #### Scenario: Too many lines
 - **WHEN** a pull request changes 1,200 code lines and the limit is 800
@@ -153,6 +174,14 @@ repository's config sets.
 #### Scenario: One complex function
 - **WHEN** a pull request adds one function of complexity 18, and the limit is 15
 - **THEN** it isn't queued, though the blocking complexity gate at 25 passes
+
+#### Scenario: An edit inside a complex function that adds no branching
+- **WHEN** a pull request changes one line inside an existing function of complexity 25, and its complexity stays 25
+- **THEN** that function counts for nothing toward the complexity limits
+
+#### Scenario: A function made simpler
+- **WHEN** a pull request lowers a function's complexity from 20 to 16
+- **THEN** that function counts for nothing toward the complexity limits
 
 #### Scenario: A similar line in many files
 - **WHEN** a pull request adds one similar line to each of 40 files, with no new branching
