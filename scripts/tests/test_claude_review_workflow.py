@@ -3954,3 +3954,54 @@ def test_troupe_325_fails_if_its_follow_ups_stop_early_too(tmp_path: Path) -> No
                          FOLLOW_2_PARTS=json.dumps(second), REVIEW_3="success")  # fmt: skip
     assert done.returncode == 1
     assert all(path in done.stdout for path in PR_325_CODE[:10])
+
+
+# The record auto-merge reads (spec: pr-review, "The review's result for the head is recorded for
+# auto-merge"; auto-merge design D6): run, not only pinned, so its contract with
+# scripts/auto_merge.py, which reads review-result.json's head and coverage, is checked.
+
+
+@pytest.mark.parametrize(
+    ("coverage", "code", "recorded"),
+    [
+        ("complete", "all", ("complete", "all")),
+        ("incomplete", "all", ("incomplete", "all")),
+        ("complete", "none", ("complete", "none")),
+        ("unknown", "unknown", ("unknown", "unknown")),
+        ("", "", ("unknown", "unknown")),
+        ("everything", "some", ("unknown", "unknown")),
+    ],
+)
+def test_the_review_result_records_the_head_and_its_coverage(
+    tmp_path: Path, coverage: str, code: str, recorded: tuple[str, str]
+) -> None:
+    head = "2d16ed2f4016f504875cdea9af3d92b2f36d545e"
+    done = run_step(
+        result_step(review()),
+        tmp_path,
+        tmp_path,
+        {"HEAD": head, "COVERAGE": coverage, "CODE": code},
+    )
+    assert done.returncode == 0, done.stderr
+    written = json.loads(
+        (tmp_path / "workspace" / "review-result.json").read_text(encoding="utf-8")
+    )
+    assert written == {"head": head, "coverage": recorded[0], "code": recorded[1]}
+
+
+def test_the_review_result_is_what_auto_merge_reads(tmp_path: Path) -> None:
+    import auto_merge
+
+    done = run_step(
+        result_step(review()),
+        tmp_path,
+        tmp_path,
+        {"HEAD": "a" * 40, "COVERAGE": "complete", "CODE": "all"},
+    )
+    assert done.returncode == 0, done.stderr
+    written = json.loads(
+        (tmp_path / "workspace" / "review-result.json").read_text(encoding="utf-8")
+    )
+    assert RESULT_UPLOAD["name"] == auto_merge.REVIEW_ARTIFACT
+    assert written["head"] == "a" * 40
+    assert written["coverage"] == "complete"

@@ -613,33 +613,46 @@ def required_checks(pr: PullRequest) -> Check:
         _dict(pr.gh.get(f"repos/{pr.full}/commits/{pr.head}/status"), "status").get("statuses"),
         "statuses",
     )
-    failing = []
+    failing, seen = [], []
     for context, integration in required:
-        mine = [
-            run for run in runs
-            if run.get("name") == context
-            and (integration is None or _dict(run.get("app") or {}, "app").get("id") == integration)
-        ]  # fmt: skip
-        if mine:
-            latest = max(mine, key=lambda run: int(str(run.get("id", 0))))
-            if latest.get("status") != "completed":
-                failing.append(f"{context} is still {latest.get('status')}")
-            elif latest.get("conclusion") not in PASSING:
-                failing.append(f"{context} {latest.get('conclusion')}")
-            continue
-        status = [
-            _dict(s, "status") for s in statuses if _dict(s, "status").get("context") == context
-        ]
-        if status and status[0].get("state") == "success":
-            continue
-        failing.append(f"{context} hasn't reported")
+        problem, url = _required_check(context, integration, runs, statuses)
+        if problem is not None:
+            failing.append(problem)
+        seen.append(f"[{context}]({url})" if url else context)
     if failing:
         return Check("required checks", False, "; ".join(failing))
     return Check(
-        "required checks",
-        True,
-        f"all {len(required)} green on {pr.head[:7]}: " + ", ".join(c for c, _ in required),
+        "required checks", True, f"all {len(required)} green on {pr.head[:7]}: " + ", ".join(seen)
     )
+
+
+def _required_check(
+    context: str,
+    integration: int | None,
+    runs: Sequence[Mapping[str, object]],
+    statuses: Sequence[object],
+) -> tuple[str | None, str | None]:
+    """Whether one required check passed on the head (None, or what's wrong), and the link to the
+    run that decided it, for the record (spec: "A queued pull request records why")."""
+    mine = [
+        run for run in runs
+        if run.get("name") == context
+        and (integration is None or _dict(run.get("app") or {}, "app").get("id") == integration)
+    ]  # fmt: skip
+    if mine:
+        latest = max(mine, key=lambda run: int(str(run.get("id", 0))))
+        url = latest.get("html_url")
+        link = url if isinstance(url, str) else None
+        if latest.get("status") != "completed":
+            return f"{context} is still {latest.get('status')}", link
+        if latest.get("conclusion") not in PASSING:
+            return f"{context} {latest.get('conclusion')}", link
+        return None, link
+    status = [_dict(s, "status") for s in statuses if _dict(s, "status").get("context") == context]
+    if status and status[0].get("state") == "success":
+        url = status[0].get("target_url")
+        return None, url if isinstance(url, str) else None
+    return f"{context} hasn't reported", None
 
 
 def conversations(pr: PullRequest) -> Check:

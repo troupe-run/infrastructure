@@ -737,3 +737,14 @@ def test_an_allowance_for_a_binary_file_is_refused(repo: Path) -> None:
     assert size_problems(repo, base) == [
         "`size.allow` names docs/big.md, which isn't measured, being binary. Fix: remove its entry."
     ]
+
+
+def test_a_file_named_like_a_lizard_option_is_read_as_a_file(tmp_path: Path) -> None:
+    """Passed bare, `--output_file=o.py` would send lizard's report to a file and hide every
+    function, from this gate and from auto-merge alike (#359's review)."""
+    (tmp_path / "--output_file=o.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text(
+        "def f(x):\n    if x:\n        return 1\n    return 0\n", encoding="utf-8"
+    )
+    found = qg.lizard_functions(LIZARD, tmp_path, ["--output_file=o.py", "b.py"])
+    assert [(f.path, f.name, f.complexity) for f in found] == [("b.py", "f", 2)]

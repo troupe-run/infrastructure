@@ -122,3 +122,10 @@ def test_a_similar_line_in_many_files_adds_no_branching(repo: Path) -> None:
 
 def test_a_deleted_file_isnt_measured(repo: Path) -> None:
     assert measure(repo, {"a.py": branches(30)}, {"a.py": None, "b.py": "y = 2\n"}) == (0, 0)
+
+
+def test_a_file_named_like_a_lizard_option_hides_nothing(repo: Path) -> None:
+    """A file named `--output_file=o.py`, passed bare, sends lizard's whole report to a file, so
+    nothing would be measured (checked by hand on lizard 1.26.1 for #359's review)."""
+    after = {"--output_file=o.py": "x = 1\n", "b.py": branches(17)}
+    assert measure(repo, {"a.py": "x = 1\n"}, after) == (18, 18)
