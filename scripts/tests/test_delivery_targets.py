@@ -83,7 +83,7 @@ def listed() -> set[str]:
 
 def test_every_target_gets_the_guards_files_and_its_list(deliveries: dict[str, Any]) -> None:
     common = set(tofu_text.guard_files(tofu_text.GUARD_DELIVERY_TF.read_text("utf-8")))
-    assert "scripts/quality_gates.py" in common
+    assert {"scripts/quality_gates.py", "scripts/quality_audit.py"} <= common
     for repository in TARGETS.values():
         assert common | {LIST} <= files(deliveries, repository), repository
 

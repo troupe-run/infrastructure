@@ -383,21 +383,28 @@ Another runner, such as vitest, follows the same contract with its own adapter t
 
 ## The merge gates
 
-Besides its linters and tests, every governed repository's check runs three gates, decided in #321 and specified in
-the `quality-gates` spec. Their measures are `scripts/quality_gates.py`, delivered from here with the guard's files,
-so troupe, website and this repository measure alike. Their thresholds are each repository's own, in
-`quality-gates.toml` at its root, which isn't delivered and is read strictly: a misspelt key or a missing file fails
-the check rather than switching a gate off.
+Besides its linters and tests, every governed repository's check runs four gates, decided in #321 and #271 and
+specified in the `quality-gates` spec. Their measures are `scripts/quality_gates.py` (with the audit in
+`scripts/quality_audit.py`), delivered from here with the guard's files, so troupe, website and this repository
+measure alike. Their thresholds are each repository's own, in `quality-gates.toml` at its root, which isn't delivered
+and is read strictly: a misspelt key or a missing file fails the check rather than switching a gate off.
 
 | Gate | What fails | Where it runs |
 |---|---|---|
 | complexity | a function the change adds or edits whose cyclomatic complexity (lizard) is above `[complexity] block_above` and is new or higher than before | every check, local and CI |
+| size | a file the change adds or changes that is above `[size] block_above` bytes (or its own ceiling in `[size.allow]`) and is new or larger than before; above `warn_above` it's only noted | every check, local and CI, where `[size]` is declared |
 | coverage | a package whose branch coverage is below its `baseline` by more than `tolerance`, or below `floor` with no baseline; a source file in no package | CI's coverage leg only, in the repositories that get coverage and mutation testing |
 | audit | a changed lock file with an advisory whose severity is in `[audit] block` (or unknown) and that has a fix | CI's coverage leg only |
 
 - **Complexity** judges the work against where it left `origin/main` locally (staged, unstaged and new files
   included), or the base CI names. Existing complex functions can be edited, but not made more complex: split them
   first. Tests and generated code are excluded in each repository's config.
+- **Size** keeps each file short enough for a review to read whole: Claude's review reads every changed file, and one
+  Read holds about 25,000 tokens (#271). The owner set the limits on 2026-11-19: noted above 32 KiB, blocked above
+  48 KiB. A file already over the limit is listed in `[size.allow]` with its own ceiling, its size then plus 16 KiB,
+  and has an issue to split it; an entry for a file that's back under the limit fails the check, so the list only
+  shrinks. Fixtures, archived changes, lock files and binary files aren't measured, and CRLF counts as LF. The fix
+  when it fails: split the file. `[size]` is optional until troupe and website declare it.
 - **Delivered files are left out by the gates themselves.** Every gate reads the repository's
   `.github/guard-delivery.json` and skips the files it names, which are measured here, at their source (#333). A
   repository writes no pattern for them in `quality-gates.toml` or its coverage settings. A list that can't be read
@@ -459,7 +466,7 @@ copies that the infrastructure App delivers straight to its `main`, after the ow
 
 - `scripts/guard.py`, `scripts/guard_pytest.py`, `.githooks/`, `.claude/settings.json` and
   `.github/workflows/guard.yml`;
-- `scripts/quality_gates.py`, the merge gates' measures (see "The merge gates");
+- `scripts/quality_gates.py` and `scripts/quality_audit.py`, the merge gates' measures (see "The merge gates");
 - `.github/guard-delivery.json`, which lists the delivered files. Its presence is what marks a repository as one that
   receives the guard.
 

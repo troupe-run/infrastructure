@@ -68,8 +68,8 @@ delivered files are dropped.
 
 A fourth gate, `quality_gates.py size [--base REV]`, run by `scripts/check.py` beside complexity on every check, local
 and CI. It reuses `resolve_base` and `changed_lines` for the files the work adds or changes (deleted files aren't
-measured), and for each measured file compares its size in the working tree with its size at the base (`git cat-file
--s base:path`, absent for a new file).
+measured), and for each measured file compares its size in the working tree with its size at the base (`git show
+base:path`, measured the same way; absent for a new file).
 
 - A file is **measured** unless it's delivered, matches `[size] exclude`, or is binary: contains a NUL byte or isn't
   valid UTF-8. Lock files and state are text, so they go in `exclude`.
@@ -80,30 +80,50 @@ measured), and for each measured file compares its size in the working tree with
 - Every run checks `[size.allow]`: an entry whose file is missing, or whose size is at or under `block_above`, fails
   as stale, saying to remove it; an entry whose ceiling isn't above `block_above` fails as a config error.
 
+Sizes count each CRLF as LF, at the base and in the working tree alike. troupe and website have no `eol`
+attribute, so a Windows checkout may write CRLF, and the guard's legs run the check on Windows: without this a file
+would measure larger there, and an unchanged file could look grown.
+
 Bytes, not characters or tokens: what git stores, cheap to read, and within a few percent of the Read cap's ratio for
 the source here.
 
-### D5. Thresholds (owner's decision, pending)
+### D5. Thresholds: warn above 32 KiB, block above 48 KiB (owner, 2026-11-19)
 
-Proposed, with figures in that comment: `warn_above = 40960` (40 KiB, about one Read of code) and
-`block_above = 65536` (64 KiB, two to three Reads). Alternatives: 48 KiB (adds 4 troupe and 3 infrastructure files to
-the exception list) or 100 KiB (only 3 infrastructure files over; lets a file need four Reads). Each repository
-declares its own values; the proposal is the same values in all three.
+`warn_above = 32768` and `block_above = 49152`, the same in all three repositories, each declaring its own (owner's
+decision of 2026-11-19, relayed by the orchestrator). Proposed had been 40 KiB and 64 KiB; the owner chose tighter
+limits, at under one Read of long-line text and about two Reads of code. Figures for each size are in the
+measurements comment linked in Context.
 
-### D6. The exception list (owner's decision, pending)
+### D6. The exception list: `[size.allow]`, today's size + 16 KiB (owner, 2026-11-19)
 
-Proposed: `[size.allow]`, a table of path to ceiling in bytes, each set to the file's size today plus 8 KiB headroom,
-rounded up to 1 KiB. The ceiling lets the most-edited files (infrastructure's `docs/development-workflow.md` and the
-development-workflow spec, touched by 81 commits in the last month, and touched by this change) take ordinary edits,
-while still stopping unbounded growth, and the stale check makes the list shrink as files are split.
+`[size.allow]` is a table of path to ceiling in bytes, each set to the file's size on main on 2026-11-19 plus 16 KiB,
+rounded up to the next 1 KiB (owner's decision of 2026-11-19, the proposed shape with double the proposed 8 KiB
+headroom). A listed file can't grow past its ceiling, and an entry for a file now at or under `block_above` fails as
+stale, so the list only shrinks. The headroom lets the most-edited files (infrastructure's
+`docs/development-workflow.md` and the development-workflow spec, touched by 81 commits in the last month, and by this
+change) take ordinary edits while still stopping unbounded growth.
 
-Alternatives: no headroom (a declared file can't grow at all; the next change that adds to it splits it), or fully
-exempt entries with a split issue per file.
+The owner also chose one split issue per listed file, on the board, with no milestone. A delivered file's issue is in
+infrastructure, where it's split; troupe and website skip delivered files.
 
-Infrastructure's list, if the proposal is taken: `scripts/guard.py`, `scripts/tests/test_claude_review_workflow.py`,
-`.github/workflows/claude-review.yml`, `openspec/specs/development-workflow/spec.md`, `docs/development-workflow.md`.
-Its `exclude`: `**/fixtures/**`, `openspec/changes/archive/**`,
-`uv.lock`, `tofu/terraform.tfstate`.
+Alternatives not taken: no headroom (the next change that adds to a listed file splits it), or fully exempt entries.
+
+Files over 48 KiB on 2026-11-19, not excluded, not delivered (bytes → ceiling):
+
+- infrastructure: `scripts/guard.py` 205,573 → 222,208; `scripts/tests/test_claude_review_workflow.py` 178,704 →
+  195,584; `.github/workflows/claude-review.yml` 119,478 → 136,192; `openspec/specs/development-workflow/spec.md`
+  99,855 → 116,736; `docs/development-workflow.md` 73,297 → 90,112; `scripts/tests/test_guard_dependabot.py` 60,995
+  → 77,824; `scripts/tests/test_dependabot_issues.py` 57,746 → 74,752; `openspec/specs/pr-review/spec.md` 50,784 →
+  67,584.
+- troupe (its own follow-up, D7): `protocol/schemas/error.schema.json` and
+  `packages/troupe/src/troupe/protocol/error.schema.json` 70,680 → 88,064 each; `contributing/runners.md` 67,684 →
+  84,992; `packages/troupe/tests/test_run_host.py` 66,733 → 83,968; `openspec/specs/runner-protocol/spec.md` 54,744
+  → 71,680; `packages/troupe/tests/test_platform_processes.py` 52,812 → 69,632; `openspec/specs/openai-runner/spec.md`
+  51,218 → 68,608.
+- website (its own follow-up, D7): `docs/superpowers/plans/2026-10-07-troupe-run-site.md` 129,208 → 146,432.
+
+Each repository's `exclude`: `**/fixtures/**`, `openspec/changes/archive/**` and its lock file (`uv.lock`,
+`package-lock.json`); infrastructure also `tofu/terraform.tfstate`.
 
 ### D7. Sequencing across repositories: `[size]` is optional in this change
 
@@ -125,6 +145,31 @@ repository" and its other gates run. Order:
 Alternative considered: required from the start, with the delivery held until troupe and website are ready. Rejected:
 they can't be ready, since their current script refuses the table.
 
+### D8. quality_gates.py is split now, not left at the limit
+
+With the size gate, `scripts/quality_gates.py` reached 47,397 bytes, just under the 48 KiB limit it adds, so the next
+change to add to it would have to split it first. The orchestrator suggested splitting it here instead, and it is:
+the dependency audit and weekly report move to a new delivered `scripts/quality_audit.py` (about 15.8 KB), leaving
+`quality_gates.py` at about 33 KB. The audit is the natural seam: it shares only the config, the errors and the
+process and git helpers with the other gates, and it's the one part that talks to the network.
+
+- **The command line doesn't change.** `quality_gates.py audit` and `report` still exist and call
+  `quality_audit.audit_command` and `report_command`, so troupe's and website's `check.py` and the
+  `dependency-report` workflow need no edit. `quality_gates.py` imports `quality_audit` inside `main`, since
+  `quality_audit` imports `quality_gates` for what they share.
+- **One module, run as a script.** Run as a file, `quality_gates.py` is `__main__`; `quality_audit`'s
+  `import quality_gates` would load a second copy, and `main` couldn't catch the audit's `GateError`. The entry point
+  imports `quality_gates` and calls its `main`, so there's one copy. A test runs the script as a process and checks
+  an audit error exits 2.
+- **Delivery.** `scripts/quality_audit.py` joins `guard_files` in `tofu/guard_delivery.tf`, so troupe and website
+  receive it in the same apply as the new `quality_gates.py`, and their delivered lists name it. The guard's
+  test-dependency list (`scripts/guard_tests_needed.py`) names it, so changing it runs every leg.
+- **Tests** split the same way: the audit's go to `scripts/tests/test_guard_quality_audit.py`, and what both files
+  share (the config, fixtures and scratch repositories) to `scripts/tests/quality_gates_support.py`.
+
+Alternative: leave it at 47.4 KB with an allowance. Rejected: the allowance would exist only to postpone a split this
+change is best placed to make.
+
 ## Risks / Trade-offs
 
 - [A repository gets a file delivered that it also authors] → can't happen: the guard refuses edits to delivered
@@ -142,4 +187,4 @@ D7. Rollback: revert the commit; the delivered script reverts with the next appl
 
 ## Open Questions
 
-- D5 thresholds and D6 exception-list shape: the owner's (asked 2026-11-19 through the orchestrator).
+None: D5 and D6 were settled by the owner on 2026-11-19.

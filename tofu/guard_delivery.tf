@@ -18,6 +18,9 @@ locals {
     # The merge gates' measures, so every repository measures alike (spec: quality-gates;
     # quality-gates design D1). Each repository's thresholds stay in its own quality-gates.toml.
     "scripts/quality_gates.py",
+    # Their dependency audit and weekly report, split from quality_gates.py to keep each file short
+    # enough to review in one read (#271; gate-files design D8).
+    "scripts/quality_audit.py",
     ".githooks/pre-commit",
     ".githooks/commit-msg",
     ".githooks/pre-push",

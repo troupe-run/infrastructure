@@ -29,8 +29,11 @@ Two gaps in the merge gates, both in the delivered `scripts/quality_gates.py`:
   (design D7).
 - `docs/development-workflow.md` lists the size gate and says delivered files are left out by the gates themselves.
 - Infrastructure's own `quality-gates.toml` gains `[size]` with its exception list.
+- `scripts/quality_gates.py` is split, so it isn't left at the limit it adds: the audit and weekly report move to a new
+  delivered `scripts/quality_audit.py`, with the same command line (design D8).
 
-Thresholds and the exception list's shape are the owner's (pending; proposed in design D5–D6).
+The owner set the thresholds (warn above 32 KiB, block above 48 KiB) and the exception list's shape (each listed
+file's ceiling at its size today plus 16 KiB) on 2026-11-19 (design D5–D6).
 
 ## Capabilities
 
@@ -41,13 +44,14 @@ None.
 ### Modified Capabilities
 
 - `quality-gates`: delivered files are left out of coverage and complexity by reading the delivered list; a new size
-  gate with a declared exception list; `[size]` joins the required tables.
+  gate with a declared exception list, declared in an optional `[size]` table.
 
 ## Impact
 
-- `scripts/quality_gates.py` (delivered to troupe and website), its tests `scripts/tests/test_guard_quality_gates.py`,
+- `scripts/quality_gates.py` and the new `scripts/quality_audit.py` (both delivered to troupe and website), their
+  tests `scripts/tests/test_guard_quality_gates.py` and `test_guard_quality_audit.py`, `tofu/guard_delivery.tf`,
   `scripts/check.py` (a `size` step), `quality-gates.toml`, `docs/development-workflow.md`.
 - troupe and website: after delivery, each removes its hand-written delivered-file patterns, and needs `[size]` in its
   `quality-gates.toml` before the delivered script requires it (follow-up pull requests there, sequenced in design).
-- No OpenTofu resource changes beyond the delivered file's content (the plan updates `scripts/quality_gates.py` in
-  troupe and website).
+- The plan updates `scripts/quality_gates.py`, adds `scripts/quality_audit.py` and updates the delivered list in
+  troupe and website.
