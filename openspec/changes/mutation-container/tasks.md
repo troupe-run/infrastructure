@@ -2,7 +2,7 @@
 
 ## 1. The contained run (design D2, D3)
 
-- [ ] 1.1 Tests first in `test_mutation_workflows.py`:
+- [x] 1.1 Tests first in `test_mutation_workflows.py`:
       - both workflows carry the same `# containment` block, and every run line uses `run_contained`, with no
         `setsid --wait` left;
       - the block's limits and command are as designed.
@@ -12,13 +12,15 @@
       - it runs as the runner's uid, with a step variable and `PATH`;
       - an allocation over a small limit ends with 137, and the function says "ran out of memory";
       - a self-inflicted `kill -9 $$` says "killed by signal 9".
-- [ ] 1.2 The function in both workflows; every run line through it
+- [x] 1.2 The function in both workflows; every run line through it
+- [x] 1.3 On GitHub Actions on Linux, a test fails if the real containment tests can't run (design D3a), with its
+      rule tested both ways
 
 ## 2. Docs and verification
 
-- [ ] 2.1 `docs/development-workflow.md`'s "Mutation testing": the namespace and cgroup, the limits, the messages, and
+- [x] 2.1 `docs/development-workflow.md`'s "Mutation testing": the namespace and cgroup, the limits, the messages, and
       that local mutation runs are out
-- [ ] 2.2 The full check passes (in the orchestrator's slot)
+- [x] 2.2 The full check passes (in the commit hook, in the orchestrator's slot, 2026-11-19)
 
 ## Workflow follow-up
 

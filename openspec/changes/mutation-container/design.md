@@ -60,6 +60,12 @@ an OOM kill in the scope's cgroup (`oom-kill` with the unit's name, or "Memory c
 
 It returns the run's status unchanged, so the step fails as before.
 
+### D3a. The containment tests can't quietly skip
+
+The real tests need Linux with passwordless sudo, `systemd-run`, `unshare`, `setpriv` and `journalctl`, and skip
+elsewhere, saying why. On GitHub Actions on Linux (CI's check leg, `GITHUB_ACTIONS=true`), a test fails if those
+aren't there, so the four can't all turn into skips there unnoticed.
+
 ### D4. Local mutation runs are out
 
 A `kill(-1)` mutant run on the owner's Mac would kill every process of their login: every session, editor and
