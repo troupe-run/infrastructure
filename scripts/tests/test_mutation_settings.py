@@ -32,6 +32,8 @@ def test_the_declared_settings_load_with_the_owners_values() -> None:
     assert settings.budget_minutes == 240
     assert settings.pr_budget_minutes == 45
     assert settings.max_new_issues == 5
+    # Two mutants at once: four starved the hosted runner in both troupe dry runs (#337).
+    assert settings.max_children == 2
     # The one list of repositories that get coverage and mutation testing (#332, owner 2026-11-18).
     assert set(settings.repositories) == {"troupe"}
 
@@ -213,8 +215,8 @@ SHA_40 = "a" * 40
 # Every refusal, word for word (lint-mutation 6b: the pull request report's survivors)
 
 KEYS = (
-    "['budget_minutes', 'max_new_issues', 'min_mutants', 'pr_budget_minutes', 'repositories', "
-    "'threshold', 'tolerance', 'tools']"
+    "['budget_minutes', 'max_children', 'max_new_issues', 'min_mutants', 'pr_budget_minutes', "
+    "'repositories', 'threshold', 'tolerance', 'tools']"
 )
 
 
@@ -257,6 +259,18 @@ def changed(path: list[str | int], value: object) -> str:
         (
             changed(["max_new_issues"], 101),
             "max_new_issues is 101; it must be a whole number from 0 to 100",
+        ),
+        (
+            changed(["max_children"], 0),
+            "max_children is 0; it must be a whole number from 1 to 4",
+        ),
+        (
+            changed(["max_children"], 5),
+            "max_children is 5; it must be a whole number from 1 to 4",
+        ),
+        (
+            changed(["max_children"], 2.5),
+            "max_children is 2.5; it must be a whole number from 1 to 4",
         ),
         (changed(["repositories", "troupe"], []), "repositories.troupe isn't an object"),
         (
