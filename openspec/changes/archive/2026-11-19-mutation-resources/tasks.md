@@ -29,11 +29,12 @@ and runs in the commit hook of every commit since. Dry runs are in CI only.
 - [x] 4.1 `docs/development-workflow.md`'s "Mutation testing": `max_children`, the readings, what a package's unit
       copies
 - [x] 4.2 The full check passes: it ran in the commit hook of each commit (2026-11-19)
-- [ ] 4.3 The pull request's plan updates troupe's four
-      delivered files and nothing else
 
 ## Workflow follow-up
 
+- Read the pull request's plan: it updates troupe's four delivered files (`mutation-pr.yml`, `mutation.json`,
+  `mutation_run.py`, `mutation_settings.py`) and nothing else. Moved here from task 4.3 so the change could be archived
+  before the plan's one approval: it's a review of the pull request, not something this change builds.
 - After the merge and apply: dispatch `mutation.yml` as a dry run for troupe; report the scores, the runtime against
   the budget, and the lowest free memory.
 - If it fits: #339's change adds the six runner plugins as units, then another dry run (design D4).
