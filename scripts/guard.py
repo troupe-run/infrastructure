@@ -2807,14 +2807,17 @@ def api_lifts_hold(endpoint: str, method: str, rest: Sequence[str], cwd: Path) -
 
 def removed_labels(rest: Sequence[str]) -> set[str]:
     """The labels a gh pr/issue edit removes, lower-cased: --remove-label takes a comma-separated
-    list, given as the next word or after =, and may be repeated."""
+    list, given as the next word or after =, and may be repeated. One the shell builds counts as
+    `hold`."""
     names: list[str] = []
     for index, word in enumerate(rest):
         if word == "--remove-label" and index + 1 < len(rest):
             names.extend(rest[index + 1].split(","))
         elif word.startswith("--remove-label="):
             names.extend(word.removeprefix("--remove-label=").split(","))
-    return {name.strip().lower() for name in names}
+    # A name the shell builds ($L, `...`, $(...)) can't be read here, so it may be `hold`, as
+    # pr-closes-issue treats a shell-built description (#359's review).
+    return {HOLD_LABEL if SHELL_EXPANSION.search(name) else name.strip().lower() for name in names}
 
 
 def flagged_owner_only(key: tuple[str, str], rest: Sequence[str]) -> str | None:
