@@ -13,13 +13,18 @@ in troupe's `contributing/platform.md`), so its grandchild test waited 10 s and 
 ### D1. The restoring bash stays as the namespace's init
 
 ```
-bash -c 'source "$1"; shift; "$@" & wait "$!"' restore "$saved" "$@"
+bash -c 'source "$1"; shift; "$@"; exit $?' restore "$saved" "$@"
 ```
 
-`"$@" &` runs the command as bash's child, pid 2, and `wait "$!"` waits for it and returns its status: its exit
-status, or 128 + N for signal N. While waiting, bash handles SIGCHLD by reaping with `waitpid(-1, …)`, which collects
-any child, the reparented orphans included. When the command ends, bash exits with its status. The namespace then
-ends (`--kill-child`), and anything left in it goes with it.
+`"$@"` runs the command in the foreground as bash's child (pid 2). Because it isn't the last command, bash can't
+optimise it into an `exec`. While bash waits for it, its SIGCHLD handling reaps any child with `waitpid(-1, …)`,
+reparented orphans included. `exit $?` then returns the command's status: its exit status, or 128 + N for signal N.
+When bash exits, the namespace ends (`--kill-child`) and anything left goes with it.
+
+In the foreground, the command keeps its stdin and its signal dispositions. The review of #360 caught that an
+earlier form, `"$@" & wait "$!"`, didn't: in a non-interactive bash, a backgrounded command gets `/dev/null` as stdin
+and SIGINT/SIGQUIT ignored, and every process it starts inherits that. A local check confirmed it (SIGINT ignored,
+stdin empty), and a CI test now holds the foreground form to the default SIGINT handler and the step's stdin.
 
 The command is no longer pid 1, which doesn't change what it can signal:
 - a `kill(-1)` now spares bash (pid 1) and the caller, and still reaches nothing outside;
@@ -27,7 +32,8 @@ The command is no longer pid 1, which doesn't change what it can signal:
   lives to report the command's 137.
 
 *Alternative:* `tini` or `dumb-init`. Rejected because they aren't on the runner image, and installing one in every
-run adds a download for what bash already does.
+run adds a download for what bash already does. *Alternative:* `set -m` before a background launch. Rejected because
+job control in a non-interactive shell is more moving parts for what the foreground form gives directly.
 
 ## Risks / Trade-offs
 
