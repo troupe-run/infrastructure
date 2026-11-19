@@ -376,3 +376,17 @@ owner can decide on exclusions from them. No mutant SHALL be excluded without th
 #### Scenario: A malformed list
 - **WHEN** a report's module counts 2 crashed and lists 1 crashed mutant
 - **THEN** reading the report fails, naming the module and both numbers
+
+### Requirement: A run keeps the host's account of how it ended
+When a mutate step ends, it SHALL save the kernel's and systemd's lines since the step began that say who could have
+ended the run (OOM kills, memory cgroup, systemd-oomd, unit stops, SIGTERM and SIGKILL), to the job's log and to a
+`journal-<repository>.log` uploaded with the readings, and SHALL save nothing when there are none or the journal can't
+be read.
+
+#### Scenario: The host ends the step
+- **WHEN** something on the host sends the step SIGTERM, as in dry run 44633465646
+- **THEN** the uploaded journal file and the log name it, if the kernel or systemd recorded it
+
+#### Scenario: No journal
+- **WHEN** the journal can't be read, or holds none of those lines
+- **THEN** no journal file is written, and the step ends as it would have

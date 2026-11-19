@@ -30,6 +30,15 @@
       owner's
 - [x] 4.2 The full check passes (in the commit hook, in the orchestrator's slot, 2026-11-20)
 
+## 5. The host's account of how a run ended (design D4)
+
+- [x] 5.1 Tests first in `test_mutation_workflows.py`: with a stand-in sudo printing a journal, the exit trap keeps only
+      the OOM, oomd and unit-stop lines, saves them to `journal-troupe.log` and the log; with no readable journal it
+      saves nothing; the pull request run uploads `journal-pr.log` with its readings
+- [x] 5.2 Both workflows' sampler block: the start time, and the capture in its exit trap; the journal file is never the
+      readings file
+- [x] 5.3 The full check passes (in the orchestrator's slot)
+
 ## Workflow follow-up
 
 - Read the pull request's plan: troupe's `mutation_report.py` and `mutation_run.py` updated, nothing else.

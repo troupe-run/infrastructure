@@ -620,13 +620,76 @@ def test_a_run_that_kills_its_own_group_fails_the_step_and_spares_its_shell(
     assert "resources: lowest mem_available_mb=1500 at 09:00:00" in done.stdout
 
 
+JOURNAL = """\
+2026-11-19T23:20:00+00:00 runner sshd[5]: Accepted publickey for runner
+2026-11-19T23:26:23+00:00 runner kernel: Out of memory: Killed process 123 (python)
+2026-11-19T23:26:23+00:00 runner systemd-oomd[1]: Killed /system.slice/x.scope: memory pressure
+2026-11-19T23:26:24+00:00 runner systemd[1]: Stopping actions.runner.service...
+2026-11-19T23:26:25+00:00 runner CRON[9]: (root) CMD (true)
+"""
+
+
+def run_sampler_exit(tmp_path: Path, journal: str | None) -> tuple[str, Path]:
+    """The sampler block, exiting at once, with a stand-in sudo that prints `journal` for
+    journalctl (or fails, as sudo -n does where it can't run)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fixture = tmp_path / "journal.txt"
+    fixture.write_text(journal or "", encoding="utf-8")
+    body = f'case "$*" in *journalctl*) cat "{fixture}";; esac\n' if journal else "exit 1\n"
+    (bin_dir / "sudo").write_text("#!/bin/sh\n" + body, encoding="utf-8")
+    (bin_dir / "sudo").chmod(0o755)
+    readings = tmp_path / "out" / "resources-troupe.log"
+    script = "set -euo pipefail\n" + sampler_block(WEEKLY, "mutate", "Mutate") + "\nexit 0\n"
+    env = dict(os.environ) | {
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        "RESOURCES": str(readings),
+        "RESOURCES_MEMINFO": str(tmp_path / "meminfo"),
+        "RESOURCES_LOADAVG": str(tmp_path / "loadavg"),
+        "RESOURCES_SECONDS": "30",
+    }
+    (tmp_path / "meminfo").write_text("MemAvailable: 1024 kB\nSwapFree: 0 kB\n", encoding="utf-8")
+    (tmp_path / "loadavg").write_text("0.10 0 0 1/1 1\n", encoding="utf-8")
+    done = subprocess.run(
+        ["bash", "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True,
+        check=False, timeout=30,
+    )  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    return done.stdout, tmp_path / "out" / "journal-troupe.log"
+
+
+def test_the_step_saves_the_journal_lines_that_say_who_ended_the_run(tmp_path: Path) -> None:
+    """A SIGTERM to the step itself (dry run 44633465646) left no trace of its sender: the exit
+    trap now keeps the kernel's and systemd's OOM, oomd and unit-stop lines since the step began
+    (#361)."""
+    stdout, journal = run_sampler_exit(tmp_path, JOURNAL)
+    kept = journal.read_text(encoding="utf-8").splitlines()
+    assert kept == [
+        "2026-11-19T23:26:23+00:00 runner kernel: Out of memory: Killed process 123 (python)",
+        "2026-11-19T23:26:23+00:00 runner systemd-oomd[1]: "
+        "Killed /system.slice/x.scope: memory pressure",
+        "2026-11-19T23:26:24+00:00 runner systemd[1]: Stopping actions.runner.service...",
+    ]
+    assert [line for line in stdout.splitlines() if line.startswith("journal: ")] == [
+        f"journal: {line}" for line in kept
+    ]
+
+
+def test_without_a_readable_journal_the_step_saves_nothing_and_still_ends_cleanly(
+    tmp_path: Path,
+) -> None:
+    stdout, journal = run_sampler_exit(tmp_path, None)
+    assert not journal.exists()
+    assert "journal: " not in stdout
+
+
 def test_the_pull_request_run_keeps_its_readings_when_it_fails() -> None:
     [upload] = [
         s for s in load(PR)["jobs"]["mutate"]["steps"]
         if s.get("with", {}).get("name") == "resources"
     ]  # fmt: skip
     assert upload["if"] == "${{ !cancelled() }}"
-    assert upload["with"]["path"] == "out/resources-pr.log"
+    assert upload["with"]["path"].split() == ["out/resources-pr.log", "out/journal-pr.log"]
 
 
 def test_the_comment_job_checks_out_the_base_commit_only() -> None:
