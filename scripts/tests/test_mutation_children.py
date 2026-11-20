@@ -176,3 +176,21 @@ def test_nothing_is_recorded_without_a_status_file_a_config_or_a_peaks_path(
     monkeypatch.setenv("MUTANT_UNDER_TEST", "troupe.core.x_f__mutmut_3")
     children.pytest_unconfigure(object())
     assert not peaks.exists()
+
+
+def test_the_plugin_type_checks_as_windows_sees_it() -> None:
+    """troupe's Windows legs run mypy --strict over the delivered plugin: a POSIX-only module used
+    without narrowing on sys.platform failed all four of them (#369, mutation-win32 design D1)."""
+    from mypy import api
+
+    repo = Path(run.__file__).resolve().parent.parent
+    out, err, code = api.run(
+        [
+            "--config-file",
+            str(repo / "pyproject.toml"),
+            "--platform",
+            "win32",
+            str(repo / "scripts" / "mutation_children.py"),
+        ]
+    )
+    assert code == 0, out + err
