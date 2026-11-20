@@ -19,7 +19,7 @@
 
 - [x] 2.1 `docs/development-workflow.md`: the `commit-message` row lists the markup refusal and its fix. Verify: the
   docs tests (`test_guard_docs.py`) pass.
-- [ ] 2.2 `uv run scripts/check.py` passes in full, including the size gate on `scripts/guard.py`. Verify: its
+- [x] 2.2 `uv run scripts/check.py` passes in full, including the size gate on `scripts/guard.py`. Verify: its
   output kept in a scratch file, with the margin left under the ceiling noted in the PR.
 
 ## Workflow follow-up
