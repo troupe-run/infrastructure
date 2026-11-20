@@ -709,3 +709,32 @@ def test_a_force_pushed_branch_s_run_says_where_its_range_starts(
     out = capsys.readouterr().out
     assert f"the push's previous tip {old_tip[:7]} isn't in this clone" in out
     assert f"where the branch left main ({base[:7]})" in out
+
+
+def test_a_pull_request_with_a_no_verify_markup_commit_fails_naming_it(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    """guard-markup-in-commit-messages: a commit that skipped the hook is caught on GitHub."""
+    repo, base = pr_repo(make_repo, tmp_path)
+    bad = commit_without_hooks(repo, "fix: beat TROUPE_RUNTIME_<NAME>_MODEL", "a.txt")
+    [refusal] = guard.run_ci(repo.path, base, repo.head(), "add-thing")
+    assert refusal.rule == "commit-message"
+    assert bad[:7] in refusal.problem
+    assert "backticks" in refusal.fix.lower()
+
+
+def test_a_push_carrying_a_markup_commit_is_refused_naming_it(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    repo = make_repo()
+    repo.hooks_on()
+    with_remote(repo, tmp_path)
+    repo.change("add-thing")
+    repo.switch("add-thing")
+    git(repo.path, "add", "-A")
+    git(repo.path, "commit", "-q", "-m", "docs(openspec): plan add-thing")
+    bad = commit_without_hooks(repo, "fix: read <details>", "a.txt")
+    result = git(repo.path, "push", "-u", "origin", "add-thing", check=False)
+    assert result.returncode != 0
+    assert "guard: commit-message:" in result.stderr
+    assert bad[:7] in result.stderr

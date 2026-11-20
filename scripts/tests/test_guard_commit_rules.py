@@ -544,3 +544,76 @@ def test_a_path_in_two_overlapping_scopes_runs_both_scopes(make_repo: Callable[[
     decision, _ = checked(repo, "path1/blah.py")
     assert decision == guard.ALLOW
     assert runs(log) == ["--scope blah --scope blech"]
+
+
+# Rule: commit-message, text release notes read as markup (guard-markup-in-commit-messages).
+# Each case was measured through release-please 17.6.0's changelog writer and its parse, write-back
+# and parse of a merged release pull request's body (troupe-run/troupe#484).
+
+
+@pytest.mark.parametrize(
+    ("message", "quoted"),
+    [
+        ("fix(runtimes): the actor's model beats TROUPE_RUNTIME_<NAME>_MODEL", "<NAME>"),
+        ("fix: read `Vec<u8>`", "<u8>"),
+        ("fix: a <b", "<b"),
+        ("fix: close </details>", "</details>"),
+        ("fix: read <details>", "<details>"),
+        ("fix: hide <!-- this -->", "<!--"),
+        ("fix: read &lt;NAME&gt;", "&lt"),
+        ("fix: read &#60;b", "&#"),
+        ("fix: read &amp;lt;b", "&amp;"),
+        ("feat!: drop <Old>", "<Old>"),
+        ("fixup! fix: read <details>", "<details>"),
+        ("feat: x\n\nBREAKING CHANGE: runners now read <config>", "<config>"),
+        ("feat: x\n\nBREAKING-CHANGE: one\nand <two> on the next line", "<two>"),
+    ],
+)
+def test_text_release_notes_read_as_markup_is_refused_quoting_it(message: str, quoted: str) -> None:
+    decision = guard.commit_message(message)
+    assert decision.rule == "commit-message"
+    assert f"'{quoted}'" in decision.problem
+    assert "TROUPE_RUNTIME_{NAME}_MODEL" in decision.fix
+    assert "backticks" in decision.fix.lower()
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "fix: a < b",
+        "fix: a <= b",
+        "fix: 1<2",
+        "fix: <3",
+        "fix: a -> b",
+        "fix: R&D",
+        "fix: see <https://example.com>",
+        "fix: TROUPE_RUNTIME_{NAME}_MODEL",
+        "fix: x\n\nThe body may say <NAME>: release notes never carry it.",
+        "feat: x\n\nBREAKING CHANGE: plain\nCo-Authored-By: Claude <noreply@anthropic.com>\n"
+        "Signed-off-by: A Person <a@example.com>",
+        "feat: x\n\nBREAKING CHANGE: plain\n\nA later paragraph with <NAME>.",
+        "fix: x\n\nSigned-off-by: A Person <a@example.com>",
+    ],
+)
+def test_angle_brackets_release_notes_keep_as_text_are_accepted(message: str) -> None:
+    assert guard.commit_message(message) == guard.ALLOW
+
+
+@given(kind=st.sampled_from(guard.COMMIT_TYPES), subject=st.text(min_size=1))
+def test_a_conventional_subject_is_refused_only_for_the_markup_it_contains(
+    kind: str, subject: str
+) -> None:
+    line = f"{kind}: {subject}"
+    if not guard.COMMIT_PATTERN.match(line) or "\n" in subject or "\r" in subject:
+        return
+    refused = guard.commit_message(line).refused
+    assert refused == (guard.MARKUP.search(line) is not None)
+
+
+def test_a_pull_request_title_with_markup_is_refused_with_the_markup_fix() -> None:
+    decision = guard.pr_title("fix: read <details>")
+    assert decision.rule == "commit-message"
+    assert "'<details>'" in decision.problem
+    assert "isn't a Conventional Commit" not in decision.problem
+    assert "gh pr edit" in decision.fix
+    assert "backticks" in decision.fix.lower()
