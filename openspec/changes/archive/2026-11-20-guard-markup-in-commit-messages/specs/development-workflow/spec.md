@@ -31,3 +31,23 @@ write it without angle brackets and that backticks don't protect it.
 - **WHEN** a branch carrying such a commit is pushed, or a pull request's title contains such text
 - **THEN** the push, or the `guard` check, is refused under `commit-message`, naming the commit, or the title, and
   quoting the text
+
+## MODIFIED Requirements
+
+### Requirement: Commit messages are checked before a push
+A push SHALL be refused while any commit it would send, on any branch, has a message that isn't a Conventional
+Commit or holds text release notes would read as markup, or changes a file under `protocol/schemas/` under a type
+that releases nothing. The refusal names each such commit.
+
+#### Scenario: Pushing a non-conventional commit
+- **WHEN** a contributor pushes a branch carrying a commit whose first line is `Add a thing`
+- **THEN** the push is refused, naming that commit and the expected form
+
+#### Scenario: Pushing conventional commits
+- **WHEN** every commit being pushed is a Conventional Commit
+- **THEN** the push goes ahead
+
+#### Scenario: Pushing a schema change reworded after it was made
+- **WHEN** a contributor pushes a commit that changes a file under `protocol/schemas/`, whose message was amended or
+  reworded to `chore: tidy` after the commit was made
+- **THEN** the push is refused under `schema-commit-type`, naming that commit and its schema files
