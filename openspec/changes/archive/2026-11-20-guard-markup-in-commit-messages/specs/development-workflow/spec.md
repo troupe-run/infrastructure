@@ -29,4 +29,5 @@ write it without angle brackets and that backticks don't protect it.
 
 #### Scenario: The same text in a pushed commit or a pull request's title
 - **WHEN** a branch carrying such a commit is pushed, or a pull request's title contains such text
-- **THEN** the push, or the `guard` check, is refused under `commit-message` with the same reason and fix
+- **THEN** the push, or the `guard` check, is refused under `commit-message`, naming the commit, or the title, and
+  quoting the text

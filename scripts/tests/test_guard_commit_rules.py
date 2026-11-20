@@ -570,6 +570,7 @@ def test_a_path_in_two_overlapping_scopes_runs_both_scopes(make_repo: Callable[[
         ("fixup! fix: read <details>", "<details>"),
         ("feat: x\n\nBREAKING CHANGE: runners now read <config>", "<config>"),
         ("feat: x\n\nBREAKING-CHANGE: one\nand <two> on the next line", "<two>"),
+        ("feat: x\n\nBREAKING CHANGE: y\n## <NAME> as a heading line", "<NAME>"),
     ],
 )
 def test_text_release_notes_read_as_markup_is_refused_quoting_it(message: str, quoted: str) -> None:
@@ -596,6 +597,9 @@ def test_text_release_notes_read_as_markup_is_refused_quoting_it(message: str, q
         "Signed-off-by: A Person <a@example.com>",
         "feat: x\n\nBREAKING CHANGE: plain\n\nA later paragraph with <NAME>.",
         "fix: x\n\nSigned-off-by: A Person <a@example.com>",
+        "fix: a long s, <\u017fb>, isn't an ASCII letter to the parser",
+        "fix: nor is a Kelvin sign, <\u212ab>",
+        "fix: nor a dotted capital I, <\u0130>",
     ],
 )
 def test_angle_brackets_release_notes_keep_as_text_are_accepted(message: str) -> None:
