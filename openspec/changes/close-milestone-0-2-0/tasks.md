@@ -2,20 +2,22 @@
 
 ## 1. Close 0.2.0
 
-- [ ] 1.1 Rebase this branch onto `origin/main` after its latest state commit. Verify
+- [x] 1.1 Rebase this branch onto `origin/main` after its latest state commit. Verify
   `git rev-list --count HEAD..origin/main` is 0.
-- [ ] 1.2 Check 0.2.0 is still empty of open issues. Verify
+- [x] 1.2 Check 0.2.0 is still empty of open issues. Verify
   `gh issue list -R troupe-run/<repo> --milestone 0.2.0 --state open` lists nothing for troupe, infrastructure and
   website. If one has appeared, stop and ask the owner.
-- [ ] 1.3 In `tofu/milestones.json`, change the `state` of the entry titled 0.2.0 (key `0.14.0`) from `open` to
+- [x] 1.3 In `tofu/milestones.json`, change the `state` of the entry titled 0.2.0 (key `0.14.0`) from `open` to
   `closed`, and rename `test_today_s_release_in_progress_is_0_2_0` to `..._is_0_3_0`, asserting `0.3.0`. Verify
   `git diff` changes only those, and `uv run scripts/check.py` passes.
-- [ ] 1.4 Run a local plan. Verify it shows four updates in place, milestone 0.2.0 in each of troupe, infrastructure,
-  website and `.github`, each changing only `state` to `closed`, and nothing created, destroyed or replaced.
-- [ ] 1.5 Run `scripts/milestone_review.py` locally on that plan, the way the `tofu` workflow does. Verify it says 0.2.0
-  closes, lists the open issues with no milestone for troupe, infrastructure and website with their count, and leaves
-  `.github` out saying why. Compare its count with `gh issue list -R troupe-run/<repo> --state open --search
-  no:milestone`.
+- [ ] 1.4 Check the plan shows four updates in place, milestone 0.2.0 in each of troupe, infrastructure, website and
+  `.github`, each changing only `state` to `closed`, and nothing created, destroyed or replaced. Verified on the pull
+  request's CI plan (1.6), not a local plan: a local plan needs a 1Password approval that timed out on 2026-11-20, and
+  since #261 CI's plan is the real evidence (orchestrator, 2026-11-20, choosing the recommended option).
+- [ ] 1.5 Compare CI's list of open issues with no milestone (1.6) with
+  `gh issue list -R troupe-run/<repo> --state open --search no:milestone` for troupe, infrastructure and website. Verify
+  the counts match, `.github` is left out saying why, and record both on #375. On 2026-11-20 the query lists troupe 25,
+  infrastructure 25 (#375 among them) and website 4.
 - [ ] 1.6 Open a draft pull request with `Closes #375`, using `--body-file`. Verify the CI plan comment, once the pull
   request is ready and its plan has run, shows the same four updates as 1.4 and the same list as 1.5 (as it is then;
   since #261 it should not read "none").
