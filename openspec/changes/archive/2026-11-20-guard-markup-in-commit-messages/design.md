@@ -46,7 +46,9 @@ that decision through instead of rewriting it as a "not a Conventional Commit" r
 `MARKUP` matches `<!--|</?[A-Za-z][-.:0-9_A-Za-z]*(?:\s|/?>|$)`. That is kMarkupPattern's opening, plus the
 character that has to follow the tag name for a match. It refuses `<NAME>`, `Vec<u8>`, `a <b`, `</details>` and
 `<!--`. It allows `a < b`, `<=`, `1<2`, `<3`, `->`, `<https://…>` and `<a@b.c>`. Letters are ASCII only (`re.A`), as in the parser's `[a-zA-Z]`: with `re.I` alone,
-Python's `[A-Za-z]` would also match `ſ`, `K` (U+212A) and `İ`, which release-notes text keeps (found by the review). Those last two were measured: an
+Python's `[A-Za-z]` would also match `ſ`, `K` (U+212A) and `İ`, which release-notes text keeps (found by the review). `re.A` would also narrow `\s` to ASCII, while the parser's
+JavaScript `\s` includes U+00A0, U+3000, U+FEFF and other Unicode spaces (each measured: `<b` then one of them
+loses text), so the whitespace is spelled out as JavaScript's set. Those last two were measured: an
 address isn't markup, since `@` can't follow a tag name.
 
 An entity that decodes to `<` is markup too, once the round trip has decoded it (`&ltNAME`, `&amp;lt;`, `&#60;`).
@@ -55,8 +57,8 @@ or without the `;`: `&amplt;b>` reaches the notes as `<b>`) rather than copying 
 (`R&D`, `AT&T`) is allowed.
 
 Evidence: a differential run of 20,000 generated subjects through release-please 17.6.0's changelog writer and round
-trip. The subjects mixed `<`, `>`, `/`, `!`, `-`, letters, digits, `@`, `:`, `` ` ``, `&`, `;`, `&#60;`, `&#x3C` and
-`&amp;`. It found no subject that changes or drops notes that this rule allows. It over-refuses only entity text.
+trip. The subjects mixed `<`, `>`, `/`, `!`, `-`, letters, digits, `@`, `:`, `` ` ``, `&`, `;`, `&#60;`, `&#x3C`,
+`&amp;`, Unicode spaces and non-ASCII letters (`ſ`, `K`). It found no subject that changes or drops notes that this rule allows. It over-refuses only entity text.
 
 *Alternative:* refuse any `<`. Rejected: it refuses comparisons that release-please renders fine, so a person would
 learn to work around a rule that's wrong.
