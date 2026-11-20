@@ -73,6 +73,16 @@ def test_the_peaks_command_summarises_each_unit(capsys: pytest.CaptureFixture[st
     ]
 
 
+def test_a_unit_that_recorded_nothing_says_so_rather_than_vanishing() -> None:
+    """A run killed early in a unit leaves its marker with no lines after it: the summary names
+    that unit, which also says where the kill happened (#372's review)."""
+    assert run.peaks_summary("unit troupe\nmutmut 1048576 524288\nunit troupe-vcs-git\n") == [
+        "memory: troupe mutmut VmPeak=1024 MB VmHWM=512 MB",
+        "memory: troupe 1 processes recorded",
+        "memory: troupe-vcs-git no peaks recorded",
+    ]
+
+
 def test_the_peaks_command_prints_and_never_fails(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

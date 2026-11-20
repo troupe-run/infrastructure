@@ -286,7 +286,8 @@ def memory_lines(unit: str, text: str | None) -> list[str]:
 
 def peaks_summary(text: str) -> list[str]:
     """A peaks file's `memory:` lines, unit by unit, split at the `unit <name>` lines the run
-    writes before each unit; lines before any unit go under `?` (#371, design D2)."""
+    writes before each unit; lines before any unit go under `?`, and a unit with none says no
+    peaks were recorded (#371, design D2)."""
     sections: list[tuple[str, list[str]]] = []
     for line in text.splitlines():
         if line.startswith("unit "):
@@ -295,11 +296,10 @@ def peaks_summary(text: str) -> list[str]:
             if not sections:
                 sections.append(("?", []))
             sections[-1][1].append(line)
-    if not any(lines for _, lines in sections):
+    if not sections:
         return ["memory: no peaks recorded"]
-    return [
-        out for name, lines in sections if lines for out in memory_lines(name, "\n".join(lines))
-    ]
+    # A unit with no lines (a run killed early in it) says so, which also says where it ended.
+    return [out for name, lines in sections for out in memory_lines(name, "\n".join(lines))]
 
 
 def run_mutmut(
