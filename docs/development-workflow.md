@@ -726,7 +726,9 @@ on its own: mutmut records it and goes on, and the summary names it if it crashe
 and clean passes run and from which each mutant's process is forked, is never capped. The cap limits virtual size, which
 runs well above resident size, so it's set from measured peaks, never by arithmetic: after each unit, the log's
 `memory:` lines give mutmut's own peak virtual and resident size, the five largest mutant processes by name, and how
-many processes recorded. The setting is null (no cap) until a measured run sets it (#366). The run's own cgroup (12G)
+many processes recorded. The setting is null (no cap) until a measured run sets it (#366). In CI the peaks go into
+`peaks-<repository>.log` (`peaks-pr.log`), uploaded with the readings, and the step's exit trap, outside the contained
+run, prints the `memory:` lines from it, so a run its cgroup kills still logs them (#371). The run's own cgroup (12G)
 stays as the backstop.
 
 **A mutant can't stop the runner.** A GitHub step shares the runner agent's process group and user, so a mutant that
