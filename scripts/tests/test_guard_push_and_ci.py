@@ -720,7 +720,19 @@ def test_a_pull_request_with_a_no_verify_markup_commit_fails_naming_it(
     [refusal] = guard.run_ci(repo.path, base, repo.head(), "add-thing")
     assert refusal.rule == "commit-message"
     assert bad[:7] in refusal.problem
+    assert "'<NAME>'" in refusal.problem
     assert "backticks" in refusal.fix.lower()
+
+
+def test_a_pull_request_names_markup_hidden_in_a_breaking_note(
+    make_repo: Callable[[], Repo], tmp_path: Path
+) -> None:
+    """The commit's subject is clean, so the refusal must quote the note's text to say why."""
+    repo, base = pr_repo(make_repo, tmp_path)
+    bad = commit_without_hooks(repo, "feat: x\n\nBREAKING CHANGE: y\n## <NAME>", "a.txt")
+    [refusal] = guard.run_ci(repo.path, base, repo.head(), "add-thing")
+    assert bad[:7] in refusal.problem
+    assert "'<NAME>'" in refusal.problem
 
 
 def test_a_push_carrying_a_markup_commit_is_refused_naming_it(

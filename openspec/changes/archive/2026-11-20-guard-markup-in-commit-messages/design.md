@@ -45,7 +45,8 @@ that decision through instead of rewriting it as a "not a Conventional Commit" r
 
 `MARKUP` matches `<!--|</?[A-Za-z][-.:0-9_A-Za-z]*(?:\s|/?>|$)`. That is kMarkupPattern's opening, plus the
 character that has to follow the tag name for a match. It refuses `<NAME>`, `Vec<u8>`, `a <b`, `</details>` and
-`<!--`. It allows `a < b`, `<=`, `1<2`, `<3`, `->`, `<https://…>` and `<a@b.c>`. Those last two were measured: an
+`<!--`. It allows `a < b`, `<=`, `1<2`, `<3`, `->`, `<https://…>` and `<a@b.c>`. Letters are ASCII only (`re.A`), as in the parser's `[a-zA-Z]`: with `re.I` alone,
+Python's `[A-Za-z]` would also match `ſ`, `K` (U+212A) and `İ`, which release-notes text keeps (found by the review). Those last two were measured: an
 address isn't markup, since `@` can't follow a tag name.
 
 An entity that decodes to `<` is markup too, once the round trip has decoded it (`&ltNAME`, `&amp;lt;`, `&#60;`).

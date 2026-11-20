@@ -203,7 +203,7 @@ sections of DEFAULT_CHANGELOG_SECTIONS in its src/util/filter-commits.ts, which 
 override (protocol-schema-commit-types design D2)."""
 BREAKING_FOOTER = re.compile(r"^BREAKING[ -]CHANGE:", re.MULTILINE)
 AUTOSQUASH_PREFIXES = ("fixup! ", "squash! ", "amend! ")
-MARKUP = re.compile(r"<!--|</?[A-Za-z][-.:0-9_A-Za-z]*(?:\s|/?>|$)|&(?:lt|#|amp)", re.IGNORECASE)
+MARKUP = re.compile(r"<!--|</?[A-Za-z][-.:0-9_A-Za-z]*(?:\s|/?>|$)|&(?:lt|#|amp)", re.I | re.A)
 """Text release-please's notes parser (node-html-parser) reads as HTML once its round trip has
 decoded the notes, or an entity that decodes to it (guard-markup-in-commit-messages design D2)."""
 CLOSING = re.compile(
@@ -380,9 +380,11 @@ def commit_message(message: str) -> Decision:
 def _markup(message: str) -> Decision:
     """Refuse markup in what release-please writes into release notes: the subject line, and each
     BREAKING CHANGE note up to a blank line (troupe-run/troupe#484; design D3, D4). Lines end only
-    at "\n", as in git, not at every separator str.splitlines() knows."""
-    lines = [line for line in message.split("\n") if not line.startswith("#")]
-    noted, inside = [next((line for line in lines if line.strip()), "")], False
+    at "\n", as in git, not at every separator str.splitlines() knows. A "#" line is judged inside
+    a note: a stored or -m message keeps it, and release-please writes it."""
+    lines = message.split("\n")
+    subject = next((x for x in lines if x.strip() and not x.startswith("#")), "")
+    noted, inside = [subject], False
     for line in lines:
         inside = bool(line.strip()) and (inside or BREAKING_FOOTER.match(line) is not None)
         noted += [line] if inside else []
@@ -3249,9 +3251,12 @@ def nonconforming_commits(root: Path, commits: Iterable[str]) -> Decision:
     bad: list[str] = []
     for sha in commits:
         message = git(root, "log", "-1", "--format=%B", sha)
-        if commit_message(message).refused:
-            first = next((line for line in message.splitlines() if line.strip()), "")
-            bad.append(f"{sha[:7]} '{first}'")
+        decision = commit_message(message)
+        if decision.refused:
+            first = next((line for line in message.split("\n") if line.strip()), "")
+            conventional = COMMIT_PATTERN.match(_conventional_subject(message))
+            markup = _markup(message) if conventional else ALLOW
+            bad.append(f"{sha[:7]} " + (markup.problem if markup.refused else f"'{first}'"))
     if not bad:
         return ALLOW
     listed = "; ".join(bad[:5]) + (f"; and {len(bad) - 5} more" if len(bad) > 5 else "")

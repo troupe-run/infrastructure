@@ -79,7 +79,8 @@ write it without angle brackets and that backticks don't protect it.
 
 #### Scenario: The same text in a pushed commit or a pull request's title
 - **WHEN** a branch carrying such a commit is pushed, or a pull request's title contains such text
-- **THEN** the push, or the `guard` check, is refused under `commit-message` with the same reason and fix
+- **THEN** the push, or the `guard` check, is refused under `commit-message`, naming the commit, or the title, and
+  quoting the text
 
 ### Requirement: Schema changes use a commit type that releases
 In a governed repository with a `protocol/schemas/` directory, a commit that changes, adds or removes a file under it
@@ -491,8 +492,8 @@ SHALL be reported.
 
 ### Requirement: Commit messages are checked before a push
 A push SHALL be refused while any commit it would send, on any branch, has a message that isn't a Conventional
-Commit, or changes a file under `protocol/schemas/` under a type that releases nothing. The refusal names each such
-commit.
+Commit or holds text release notes would read as markup, or changes a file under `protocol/schemas/` under a type
+that releases nothing. The refusal names each such commit.
 
 #### Scenario: Pushing a non-conventional commit
 - **WHEN** a contributor pushes a branch carrying a commit whose first line is `Add a thing`

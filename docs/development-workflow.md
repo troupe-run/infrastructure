@@ -12,7 +12,7 @@ drift apart:
 | Layer | Runs | Covers | Can be skipped? |
 |---|---|---|---|
 | Git hooks: `pre-commit`, `commit-msg` | on every commit, for everyone | the git rules below | yes, `--no-verify` (it's your machine) |
-| Git hook: `pre-push` | on every push, any branch | every commit being pushed is a Conventional Commit, and changes no protocol schema under a type that releases nothing | yes, `--no-verify` |
+| Git hook: `pre-push` | on every push, any branch | every commit being pushed is a Conventional Commit with no markup in its release-notes text, and changes no protocol schema under a type that releases nothing | yes, `--no-verify` |
 | Claude Code hooks (`.claude/settings.json`) | before an agent's tool call | the Claude rules below, including refusing `--no-verify` | no, for an agent following `CLAUDE.md` |
 | The `guard` GitHub check (`.github/workflows/guard.yml`) | on every push to every branch but a merge queue's (`gh-readonly-queue/...`), every pull request, re-run when its title or description is edited, and every merge group, which it judges as a push to `main` (merge-queue design D3) | commit messages, schema changes' commit types, a pull request's title, that a pull request's description closes an issue (`pr-closes-issue`, release-please's exempt), the branch-change match, archived tasks, OpenSpec's strict validation (`openspec-strict`), and, in troupe, the capability labels its specs name (`capability-label`), and that no issue a pull request closes is blocked by an open issue (`blocked-by`, re-checked in each merge group) | no: it's a required check, so a pull request can't merge while it's red (`tofu/required-checks.json`) |
 
