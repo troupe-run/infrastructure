@@ -2,17 +2,19 @@
 
 ## 1. Recording into the job's file (design D1)
 
-- [x] 1.1 Tests first in `test_mutation_run.py`:
+- [x] 1.1 Tests first in `test_mutation_peaks.py` (`test_mutation_run.py` is at its size limit):
       - with `PEAKS` set, `run_mutmut` hands the plugin that path, appends `unit <name>`, prints no `memory:` lines
         and leaves the file;
-      - without it, today's behaviour holds (working-directory file, its own summary, removed after).
+      - without it, today's behaviour holds (working-directory file, its own summary, removed after): held by the
+        existing tests in `test_mutation_run.py`.
 - [x] 1.2 `run_mutmut` reads `PEAKS`
 
 ## 2. The summary from outside the run (design D2)
 
 - [x] 2.1 Tests first:
       - `mutation_run.py peaks <file>` prints each unit's `memory:` lines, split at its `unit` lines (and `?` for lines
-        before any), and that no peaks were recorded for an empty or missing file;
+        before any, and "no peaks recorded" for a unit with none), and that no peaks were recorded for an empty or
+        missing file;
       - in `test_mutation_workflows.py`, the sampler block's exit trap, with a peaks file written by a process that
         was then SIGKILLed, prints the `memory:` lines; with no `PEAKS` or an empty file it prints none and ends
         cleanly;
