@@ -394,7 +394,8 @@ nothing when there are none or the journal can't be read.
 ### Requirement: A runaway mutant ends only its own tests
 When the settings give a per-mutant memory cap, each process that tests a mutant SHALL run under it, so a mutant whose
 tests allocate past it ends only those tests, and the run records it and goes on. The passes with no mutant SHALL run
-without it. A cap that isn't null or a whole number in range SHALL be refused, naming the setting.
+without it. A cap that isn't null or a whole number in range SHALL be refused, naming the setting. The cap SHALL be
+set from a recorded run's measured peaks, never by arithmetic on the cgroup's limit.
 
 #### Scenario: A mutant allocates without bound
 - **WHEN** a mutant makes its tests allocate memory past the cap
@@ -412,6 +413,11 @@ without it. A cap that isn't null or a whole number in range SHALL be refused, n
 #### Scenario: A malformed cap
 - **WHEN** the setting is a string, a fraction, or out of range
 - **THEN** reading the settings fails, naming the setting, its value and the range
+
+#### Scenario: The cap troupe runs under
+- **WHEN** troupe's weekly run reads the settings
+- **THEN** each mutant's process is capped at 2,048 MB, set from dry run 44693481824's peaks (mutmut's own 1,111 MB
+  and the largest ordinary mutant's 1,270 MB of virtual size, plus half, rounded up to 256 MB)
 
 ### Requirement: A run records the memory its passes peak at
 For each unit, a run SHALL log the peak virtual size and peak resident size of mutmut's own process, where its stats
