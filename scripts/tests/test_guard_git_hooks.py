@@ -382,6 +382,9 @@ EDITOR_TEMPLATE = (
     "# with '#' will be ignored, and an empty message aborts the commit.\n"
     "#\n# On branch main\n# Changes to be committed:\n#\tmodified:   a.html\n#\n"
 )
+EDITOR_TEMPLATE_WITH_MARKUP = EDITOR_TEMPLATE.replace("a.html", "<x>.html")
+"""The same template for a file whose name the parser would read as a tag: only the comment
+stripping keeps it out of the judged note."""
 VERBOSE_DIFF = (
     "# ------------------------ >8 ------------------------\n"
     "# Do not modify or remove the line above.\n# Everything below it will be ignored.\n"
@@ -393,7 +396,7 @@ VERBOSE_DIFF = (
 @pytest.mark.parametrize(
     "message",
     [
-        f"feat: x\n\nBREAKING CHANGE: y\n{EDITOR_TEMPLATE}",
+        f"feat: x\n\nBREAKING CHANGE: y\n{EDITOR_TEMPLATE_WITH_MARKUP}",
         f"feat: x\n\nBREAKING CHANGE: y\n{EDITOR_TEMPLATE}{VERBOSE_DIFF}",
     ],
     ids=["editor template", "git commit -v"],
