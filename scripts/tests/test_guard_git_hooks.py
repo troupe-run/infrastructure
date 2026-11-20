@@ -371,3 +371,43 @@ def test_the_check_is_started_without_the_committing_index(
     result = commit_all(repo, "fix: change a")
     assert result.returncode == 0, result.stderr
     assert "check: index None" in result.stderr
+
+
+# guard-markup-in-commit-messages: the commit-msg hook gets COMMIT_EDITMSG before git's cleanup.
+# These are the files git 2.56 handed a commit-msg hook (captured), for an editor session whose
+# breaking note runs straight into the template, and for `git commit -v`.
+
+EDITOR_TEMPLATE = (
+    "# Please enter the commit message for your changes. Lines starting\n"
+    "# with '#' will be ignored, and an empty message aborts the commit.\n"
+    "#\n# On branch main\n# Changes to be committed:\n#\tmodified:   a.html\n#\n"
+)
+VERBOSE_DIFF = (
+    "# ------------------------ >8 ------------------------\n"
+    "# Do not modify or remove the line above.\n# Everything below it will be ignored.\n"
+    "diff --git a/a.html b/a.html\nindex e54a273..251a28f 100644\n--- a/a.html\n+++ b/a.html\n"
+    "@@ -1 +1,2 @@\n <div>\n+<p>\n"
+)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        f"feat: x\n\nBREAKING CHANGE: y\n{EDITOR_TEMPLATE}",
+        f"feat: x\n\nBREAKING CHANGE: y\n{EDITOR_TEMPLATE}{VERBOSE_DIFF}",
+    ],
+    ids=["editor template", "git commit -v"],
+)
+def test_the_hook_judges_a_breaking_note_without_the_comments_git_strips(
+    make_repo: Callable[[], Repo], monkeypatch: pytest.MonkeyPatch, message: str
+) -> None:
+    repo = make_repo()
+    assert commit_msg_with_index(repo, message, ".git/index", monkeypatch) == 0
+
+
+def test_the_hook_still_judges_the_note_above_the_template(
+    make_repo: Callable[[], Repo], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = make_repo()
+    message = f"feat: x\n\nBREAKING CHANGE: reads <config>\n{EDITOR_TEMPLATE}{VERBOSE_DIFF}"
+    assert commit_msg_with_index(repo, message, ".git/index", monkeypatch) == 1

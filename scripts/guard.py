@@ -4779,12 +4779,21 @@ def committing_paths(root: Path) -> list[str]:
     return result.stdout.splitlines()
 
 
+def _as_git_strips(message: str) -> str:
+    """COMMIT_EDITMSG as git's editor cleanup commits it: comment lines, and everything from the
+    `git commit -v` scissors line on, dropped. The hook sees it before that cleanup, and can't tell
+    an editor from -m, so a -m message's "#" lines are left to the push and GitHub checks."""
+    lines = message.split("\n")
+    cut = next((i for i, x in enumerate(lines) if "-" * 24 + " >8 " in x), len(lines))
+    return "\n".join(x for x in lines[:cut] if not x.startswith("#"))
+
+
 def run_commit_msg(root: Path, message_file: Path) -> int:
     message = message_file.read_text(encoding="utf-8")
     first = next((line for line in message.splitlines() if line.strip()), "")
 
     def checks() -> Iterable[Decision]:
-        yield commit_message(message)
+        yield commit_message(_as_git_strips(message))
         yield schema_commit_type(message, committing_paths(root))
 
     refusal = first_refusal(root, checks(), f"commit message: {first}")

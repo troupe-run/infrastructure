@@ -74,6 +74,14 @@ markup after them in the subject (found by the review).
 *Alternative:* stop the note at the next trailer, as release-please does. Rejected: release-please's footer
 boundary has exceptions (a `Refs:` line can continue the note), and copying them adds size and risk for no gain.
 
+A `#` line inside a note is judged: a stored or `-m` message keeps it, and release-please writes it. The
+`commit-msg` hook is the exception. It reads `COMMIT_EDITMSG` before git's cleanup, where an editor session's
+comment block, and under `git commit -v` the scissors line and the staged diff, can follow a note with no
+blank line between (captured from git 2.56). So the hook judges the message as git's editor cleanup will commit it:
+comment lines, and everything from the scissors line on, dropped. It can't tell an editor session from `-m`, so a
+`-m` message's `#` note line is left to the `pre-push` and `guard` checks, which judge the stored message
+(found by the review).
+
 ### D4. The fix says what works
 
 The reason quotes the first piece of markup found. The fix says to write the text without angle brackets, for
