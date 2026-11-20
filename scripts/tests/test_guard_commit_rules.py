@@ -571,6 +571,9 @@ def test_a_path_in_two_overlapping_scopes_runs_both_scopes(make_repo: Callable[[
         ("feat: x\n\nBREAKING CHANGE: runners now read <config>", "<config>"),
         ("feat: x\n\nBREAKING-CHANGE: one\nand <two> on the next line", "<two>"),
         ("feat: x\n\nBREAKING CHANGE: y\n## <NAME> as a heading line", "<NAME>"),
+        ("fix: a <b\u00a0c, a no-break space is whitespace to the parser", "<b"),
+        ("fix: a <b\u3000c, an ideographic space", "<b"),
+        ("fix: a <b\ufeffc, a byte order mark", "<b\ufeff"),  # str.strip() keeps U+FEFF
     ],
 )
 def test_text_release_notes_read_as_markup_is_refused_quoting_it(message: str, quoted: str) -> None:
@@ -600,6 +603,8 @@ def test_text_release_notes_read_as_markup_is_refused_quoting_it(message: str, q
         "fix: a long s, <\u017fb>, isn't an ASCII letter to the parser",
         "fix: nor is a Kelvin sign, <\u212ab>",
         "fix: nor a dotted capital I, <\u0130>",
+        "fix: a <b\x85c, which JavaScript's \\s doesn't count as whitespace",
+        "fix: a <b\x1cc, likewise",
     ],
 )
 def test_angle_brackets_release_notes_keep_as_text_are_accepted(message: str) -> None:

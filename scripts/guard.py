@@ -203,9 +203,14 @@ sections of DEFAULT_CHANGELOG_SECTIONS in its src/util/filter-commits.ts, which 
 override (protocol-schema-commit-types design D2)."""
 BREAKING_FOOTER = re.compile(r"^BREAKING[ -]CHANGE:", re.MULTILINE)
 AUTOSQUASH_PREFIXES = ("fixup! ", "squash! ", "amend! ")
-MARKUP = re.compile(r"<!--|</?[A-Za-z][-.:0-9_A-Za-z]*(?:\s|/?>|$)|&(?:lt|#|amp)", re.I | re.A)
+MARKUP = re.compile(
+    r"<!--|</?[A-Za-z][-.:0-9_A-Za-z]*(?:/?>|$|"
+    r"[\t-\r \xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff])|&(?:lt|#|amp)",
+    re.I | re.A,
+)
 """Text release-please's notes parser (node-html-parser) reads as HTML once its round trip has
-decoded the notes, or an entity that decodes to it (guard-markup-in-commit-messages design D2)."""
+decoded the notes, or an entity that decodes to it (guard-markup-in-commit-messages design D2).
+ASCII letters, and JavaScript's \\s spelled out: Python's \\s under re.A is ASCII only."""
 CLOSING = re.compile(
     r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+"
     r"(?:#\d+|[\w.-]+/[\w.-]+#\d+|https://github\.com/[\w.-]+/[\w.-]+/issues/\d+)",
