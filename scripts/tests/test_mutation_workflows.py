@@ -199,6 +199,8 @@ def test_the_mutate_job_tests_the_merge_with_the_base_not_the_branch_alone() -> 
     assert mutate["env"] == {
         "MERGE": "${{ github.sha }}",
         "RESOURCES": "${{ github.workspace }}/out/resources-pr.log",
+        "PEAKS": "${{ github.workspace }}/out/peaks-pr.log",
+        "MUTATION_SCRIPTS": "${{ github.workspace }}/scripts",
     }
     assert 'BASE=$(git rev-parse "$MERGE^1")' in mutate["run"]
     assert "pull_request.head.sha" not in json.dumps(load(PR)["jobs"]["mutate"])
@@ -634,7 +636,10 @@ JOURNAL = """\
 
 
 def run_sampler_exit(
-    tmp_path: Path, journal: str | None, readings_name: str = "resources-troupe.log"
+    tmp_path: Path,
+    journal: str | None,
+    readings_name: str = "resources-troupe.log",
+    extra_env: dict[str, str] | None = None,
 ) -> tuple[str, Path]:
     """The sampler block, exiting at once, with a stand-in sudo that prints `journal` for
     journalctl (or fails, as sudo -n does where it can't run)."""
@@ -647,13 +652,17 @@ def run_sampler_exit(
     (bin_dir / "sudo").chmod(0o755)
     readings = tmp_path / "out" / readings_name
     script = "set -euo pipefail\n" + sampler_block(WEEKLY, "mutate", "Mutate") + "\nexit 0\n"
-    env = dict(os.environ) | {
-        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
-        "RESOURCES": str(readings),
-        "RESOURCES_MEMINFO": str(tmp_path / "meminfo"),
-        "RESOURCES_LOADAVG": str(tmp_path / "loadavg"),
-        "RESOURCES_SECONDS": "30",
-    }
+    env = (
+        dict(os.environ)
+        | {
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+            "RESOURCES": str(readings),
+            "RESOURCES_MEMINFO": str(tmp_path / "meminfo"),
+            "RESOURCES_LOADAVG": str(tmp_path / "loadavg"),
+            "RESOURCES_SECONDS": "30",
+        }
+        | (extra_env or {})
+    )
     (tmp_path / "meminfo").write_text("MemAvailable: 1024 kB\nSwapFree: 0 kB\n", encoding="utf-8")
     (tmp_path / "loadavg").write_text("0.10 0 0 1/1 1\n", encoding="utf-8")
     done = subprocess.run(
@@ -714,7 +723,11 @@ def test_the_pull_request_run_keeps_its_readings_when_it_fails() -> None:
         if s.get("with", {}).get("name") == "resources"
     ]  # fmt: skip
     assert upload["if"] == "${{ !cancelled() }}"
-    assert upload["with"]["path"].split() == ["out/resources-pr.log", "out/journal-pr.log"]
+    assert upload["with"]["path"].split() == [
+        "out/resources-pr.log",
+        "out/journal-pr.log",
+        "out/peaks-pr.log",
+    ]
 
 
 def test_the_comment_job_checks_out_the_base_commit_only() -> None:
@@ -893,3 +906,56 @@ def test_every_tflint_and_tofu_install_matches_ci() -> None:
         assert [s["with"]["tofu_version"] for s in tofu] == [ci_tofu["with"]["tofu_version"]], (
             path.name
         )
+
+
+KILLED_WRITER = """
+import os, signal, sys
+with open(sys.argv[1], "a") as peaks:
+    peaks.write("unit troupe\\nmutmut 2097152 1048576\\nm.a__mutmut_9 5818072 5132328\\n")
+os.kill(os.getpid(), signal.SIGKILL)
+"""
+
+
+def test_the_step_prints_the_memory_summary_even_when_the_run_was_killed(tmp_path: Path) -> None:
+    """The run's cgroup OOM kill took a summary printed by the run down with it (dry run
+    44673717060). The step's exit trap, outside the run, prints it from the uploaded file (#371)."""
+    peaks = tmp_path / "out" / "peaks-troupe.log"
+    peaks.parent.mkdir()
+    killed = subprocess.run([sys.executable, "-c", KILLED_WRITER, str(peaks)], check=False)
+    assert killed.returncode == -9
+    stdout, _ = run_sampler_exit(
+        tmp_path,
+        None,
+        extra_env={"PEAKS": str(peaks), "MUTATION_SCRIPTS": str(REPO / "scripts")},
+    )
+    assert [line for line in stdout.splitlines() if line.startswith("memory: ")] == [
+        "memory: troupe mutmut VmPeak=2048 MB VmHWM=1024 MB",
+        "memory: troupe mutant m.a__mutmut_9 VmPeak=5682 MB VmHWM=5012 MB",
+        "memory: troupe 2 processes recorded",
+    ]
+
+
+@pytest.mark.parametrize("peaks", [None, ""])
+def test_without_peaks_the_step_prints_no_summary_and_ends_cleanly(
+    tmp_path: Path, peaks: str | None
+) -> None:
+    extra = {"MUTATION_SCRIPTS": str(REPO / "scripts")}
+    if peaks is not None:
+        (tmp_path / "out").mkdir()
+        (tmp_path / "out" / "peaks-troupe.log").write_text(peaks, encoding="utf-8")
+        extra["PEAKS"] = str(tmp_path / "out" / "peaks-troupe.log")
+    stdout, _ = run_sampler_exit(tmp_path, None, extra_env=extra)
+    assert "memory: " not in stdout
+
+
+def test_both_runs_name_their_peaks_file_and_scripts_and_keep_the_file() -> None:
+    [weekly] = [s for s in load(WEEKLY)["jobs"]["mutate"]["steps"] if s.get("name") == "Mutate"]
+    assert (
+        weekly["env"]["PEAKS"] == "${{ github.workspace }}/out/peaks-${{ matrix.repository }}.log"
+    )
+    assert weekly["env"]["MUTATION_SCRIPTS"] == "${{ github.workspace }}/infra/scripts"
+    [upload] = [
+        s for s in load(PR)["jobs"]["mutate"]["steps"]
+        if s.get("with", {}).get("name") == "resources"
+    ]  # fmt: skip
+    assert "out/peaks-pr.log" in upload["with"]["path"].split()
