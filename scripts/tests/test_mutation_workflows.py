@@ -633,7 +633,9 @@ JOURNAL = """\
 """
 
 
-def run_sampler_exit(tmp_path: Path, journal: str | None) -> tuple[str, Path]:
+def run_sampler_exit(
+    tmp_path: Path, journal: str | None, readings_name: str = "resources-troupe.log"
+) -> tuple[str, Path]:
     """The sampler block, exiting at once, with a stand-in sudo that prints `journal` for
     journalctl (or fails, as sudo -n does where it can't run)."""
     bin_dir = tmp_path / "bin"
@@ -643,7 +645,7 @@ def run_sampler_exit(tmp_path: Path, journal: str | None) -> tuple[str, Path]:
     body = f'case "$*" in *journalctl*) cat "{fixture}";; esac\n' if journal else "exit 1\n"
     (bin_dir / "sudo").write_text("#!/bin/sh\n" + body, encoding="utf-8")
     (bin_dir / "sudo").chmod(0o755)
-    readings = tmp_path / "out" / "resources-troupe.log"
+    readings = tmp_path / "out" / readings_name
     script = "set -euo pipefail\n" + sampler_block(WEEKLY, "mutate", "Mutate") + "\nexit 0\n"
     env = dict(os.environ) | {
         "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
@@ -680,6 +682,22 @@ def test_the_step_saves_the_journal_lines_that_say_who_ended_the_run(tmp_path: P
     assert [line for line in stdout.splitlines() if line.startswith("journal: ")] == [
         f"journal: {line}" for line in kept
     ]
+
+
+@pytest.mark.parametrize("readings_name", ["readings.log", "resources.log"])
+def test_the_journal_file_is_never_the_readings_file(tmp_path: Path, readings_name: str) -> None:
+    """A readings file not named resources-<repository>.log once became the journal's own path, so
+    the capture overwrote the readings and then deleted them (#361's review)."""
+    readings = tmp_path / "out" / readings_name
+    readings.parent.mkdir()
+    reading = "23:06:49 mem_available_mb=14708 swap_free_mb=3071 disk_free_mb=88678 load1=0.37\n"
+    readings.write_text(reading, encoding="utf-8")
+    run_sampler_exit(tmp_path, JOURNAL, readings_name)
+    assert readings.read_text(encoding="utf-8").startswith(reading), "the readings were lost"
+    journals = sorted(p.name for p in (tmp_path / "out").glob("journal-*"))
+    assert len(journals) == 1, journals
+    assert journals[0] != readings_name
+    assert "Out of memory" in (tmp_path / "out" / journals[0]).read_text(encoding="utf-8")
 
 
 def test_without_a_readable_journal_the_step_saves_nothing_and_still_ends_cleanly(
