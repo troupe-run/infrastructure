@@ -12,6 +12,10 @@ import pytest
 import check
 import quality_gates
 
+# The check's gates read tofu/guard_delivery.tf for the files they type-check for Windows (#369),
+# so a change to it runs these tests.
+pytestmark = pytest.mark.tofu
+
 
 def step(label: str, code: int, marker: Path) -> tuple[str, list[str]]:
     """A gate that records it ran (by touching `marker`) and exits with `code`."""
@@ -397,3 +401,29 @@ def test_a_missing_python_tool_stops_the_check_saying_to_sync(tmp_path: Path) ->
     with pytest.raises(SystemExit) as stopped:
         check.tool("ruff", path=str(tmp_path))
     assert str(stopped.value) == f"check: ruff is not installed in {check.BIN}. Fix: run `uv sync`."
+
+
+def test_the_check_type_checks_every_delivered_python_file_for_windows() -> None:
+    """A delivered file that only type-checks on POSIX fails here, before it reaches troupe's or
+    website's Windows check (#369, mutation-win32 design D2). The files are the ones
+    tofu/guard_delivery.tf delivers, so a file delivered later is checked with no second list."""
+    import tofu_text
+
+    tf = tofu_text.GUARD_DELIVERY_TF.read_text(encoding="utf-8")
+    delivered = sorted(
+        path
+        for path in {*tofu_text.guard_files(tf), *tofu_text.mutation_report_files(tf)}
+        if path.endswith(".py")
+    )
+    assert "scripts/mutation_children.py" in delivered
+    command = dict(check.gates())["mypy win32 (delivered)"]
+    assert command == [check.tool("mypy"), "--platform", "win32", *delivered]
+
+
+def test_an_empty_delivered_list_is_refused_never_a_vacuous_pass() -> None:
+    with pytest.raises(SystemExit) as raised:
+        check.delivered_python(
+            "locals {\n  guard_files = toset([])\n  mutation_report_files = toset([])\n}\n"
+        )
+    assert str(raised.value).startswith("check: ")
+    assert "lists no file" in str(raised.value)

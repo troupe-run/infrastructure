@@ -9,6 +9,9 @@ from conftest import Repo, git
 
 import check
 
+# The check's gates read tofu/guard_delivery.tf for the files they type-check for Windows (#369).
+pytestmark = pytest.mark.tofu
+
 
 @pytest.fixture(autouse=True)
 def not_on_the_leg(monkeypatch: pytest.MonkeyPatch) -> None:

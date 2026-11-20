@@ -35,6 +35,7 @@ BIN = Path(sys.executable).parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import guard  # noqa: E402  (scripts/guard.py reads the declaration and activates the hooks)
 import quality_gates  # noqa: E402  (whether this repository declares [coverage])
+import tofu_text  # noqa: E402  (the files this repository delivers, from tofu/guard_delivery.tf)
 
 TEST_WORKERS = 4
 """How many processes the tests run in, at most. Small, not `auto`: the machine is shared, and the
@@ -137,6 +138,25 @@ def coverage_report() -> Path:
     )
 
 
+def delivered_python(guard_delivery_tf: str) -> list[str]:
+    """The Python files this repository delivers to others (tofu/guard_delivery.tf), which the
+    check type-checks as Windows sees them: troupe's and website's checks run on Windows, and this
+    repository's Windows legs run only the guard's tests (#369, mutation-win32 design D2)."""
+    try:
+        listed = {
+            *tofu_text.guard_files(guard_delivery_tf),
+            *tofu_text.mutation_report_files(guard_delivery_tf),
+        }
+    except tofu_text.ShapeError as error:
+        sys.exit(f"check: {error}")
+    files = sorted(path for path in listed if path.endswith(".py"))
+    if not files:
+        sys.exit(
+            f"check: {tofu_text.GUARD_DELIVERY_TF} names no delivered Python files to type-check"
+        )
+    return files
+
+
 def gates(
     scopes: tuple[str, ...] = (),
     base: str | None = None,
@@ -163,6 +183,15 @@ def gates(
         ("ruff lint", [tool("ruff"), "check", "."]),
         ("ruff format", [tool("ruff"), "format", "--check", "."]),
         ("mypy --strict", [tool("mypy")]),
+        (
+            "mypy win32 (delivered)",
+            [
+                tool("mypy"),
+                "--platform",
+                "win32",
+                *delivered_python(tofu_text.GUARD_DELIVERY_TF.read_text(encoding="utf-8")),
+            ],
+        ),
         ("complexity", [sys.executable, QUALITY_GATES, "complexity", *on_base]),
         ("size", [sys.executable, QUALITY_GATES, "size", *on_base]),
         ("tests", pytest),
