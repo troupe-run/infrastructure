@@ -24,5 +24,6 @@
 
 ## Workflow follow-up
 
+- Act on Claude's review of the last push; mark ready once it's clean.
 - After the merge, the guard's delivery to troupe and website carries the rule (owner-approved plan).
 - Comment on #364 with the PR and the archived change; troupe-run/troupe#484 tracks the troupe side.
