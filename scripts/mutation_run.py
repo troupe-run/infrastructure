@@ -42,10 +42,10 @@ import mutation_settings as ms
 SETTINGS = Path(__file__).resolve().parent / "mutation.json"
 CHILDREN_PLUGIN = Path(__file__).resolve().parent / "mutation_children.py"
 PLUGIN_COPY = "_mutation_children_plugin"
-PEAKS = "_mutation_children_peaks.log"
-"""Where each process the plugin loads in records its memory peaks (#366, design D3)."""
 """The plugin's name in mutmut's working directory: not mutation_children, since infrastructure's
 own copy of that is in the source mutmut mutates, and a mutated copy would load in its place."""
+PEAKS = "_mutation_children_peaks.log"
+"""Where each process the plugin loads in records its memory peaks (#366, design D3)."""
 
 
 class RunError(Exception):
