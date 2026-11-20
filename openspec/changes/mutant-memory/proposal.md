@@ -7,7 +7,7 @@ resident memory in under a minute, which pushed the run's 12G cgroup (`MemoryMax
 OOM killer killed it, and systemd then stopped the whole run. Dry run 44633465646 ended the same way at the same
 point. That run's cgroup is the only memory limit, and mutmut's per-mutant timeout can't catch a process that eats
 gigabytes this fast. So one runaway mutant ends the run, no report is written, and #361's crashed-mutant list never
-names it (infrastructure#366).
+names it (infrastructure#366). This change is #366's first pull request, tracked as #367.
 
 ## What Changes
 
@@ -22,8 +22,9 @@ names it (infrastructure#366).
 
   The cap limits virtual size, not resident memory. A forked mutant's process also starts at mutmut's own size. So
   the default comes from these measured peaks, not from dividing 12G (orchestrator, 2026-11-20).
-- **The setting starts null.** It's set from a measured troupe run, and that run's clean pass must stay under it.
-  How that measurement reaches CI is the owner's open choice (design D4).
+- **The setting starts null.** The owner chose two pull requests (2026-11-20). This one ships the cap and the
+  measurement with the setting null. After its apply, a dry run measures, and a follow-up change sets the default
+  from that measurement (design D4).
 
 ## Capabilities
 

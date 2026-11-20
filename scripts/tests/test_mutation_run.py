@@ -68,7 +68,8 @@ def test_infrastructures_config_mutates_the_linked_source_but_not_its_tests_and_
     )
     assert "do_not_mutate=\n    src/tests/*\n" in config
     assert config.endswith(
-        "also_copy=\n    _mutation_children_plugin.py\n    .tflint.hcl\n    tofu\n"
+        "also_copy=\n    _mutation_children_plugin.py\n"
+        "    _mutation_children_plugin.json\n    .tflint.hcl\n    tofu\n"
     )
 
 
@@ -88,7 +89,9 @@ def test_a_packages_config_selects_its_own_tests(tmp_path: Path) -> None:
     unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
     config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
     assert "pytest_add_cli_args_test_selection=tests\n" in config
-    assert config.endswith("also_copy=\n    _mutation_children_plugin.py\n")
+    assert config.endswith(
+        "also_copy=\n    _mutation_children_plugin.py\n    _mutation_children_plugin.json\n"
+    )
 
 
 # Stryker's report (the mutation testing report schema, which Stryker 10 writes)
@@ -319,7 +322,7 @@ def test_a_unit_with_its_own_setup_cfg_is_refused_not_overwritten(tmp_path: Path
     (tmp_path / "packages" / "troupe" / "setup.cfg").write_text("[metadata]\n", encoding="utf-8")
     unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
     with pytest.raises(run.RunError, match="won't overwrite"):
-        run.run_mutmut(tmp_path, unit, [], 0.0, Recorder(), children=2)
+        run.run_mutmut(tmp_path, unit, [], 0.0, Recorder(), children=2, memory_mb=None)
     assert (tmp_path / "packages" / "troupe" / "setup.cfg").read_text(
         encoding="utf-8"
     ) == "[metadata]\n"
@@ -368,7 +371,8 @@ def test_a_linked_units_whole_config(tmp_path: Path) -> None:
         "    --deselect\n    src/tests/test_a.py::test_b\n"
         "max_children=2\n"
         "do_not_mutate=\n    src/tests/*\n"
-        "also_copy=\n    _mutation_children_plugin.py\n    tofu\n"
+        "also_copy=\n    _mutation_children_plugin.py\n"
+        "    _mutation_children_plugin.json\n    tofu\n"
     )
 
 
@@ -384,7 +388,8 @@ def test_a_packages_unit_copies_its_packages_own_files(tmp_path: Path) -> None:
     unit = ms.Unit("runner-a", "plugins/runner-a/src", "plugins/runner-a/tests")
     config = run.mutmut_config(package, tmp_path, unit, children=2)
     assert config.endswith(
-        "also_copy=\n    _mutation_children_plugin.py\n    LICENSE\n    fixtures\n"
+        "also_copy=\n    _mutation_children_plugin.py\n"
+        "    _mutation_children_plugin.json\n    LICENSE\n    fixtures\n"
         "    pyproject.toml\n    tools\n    uv.lock\n"
     )
 
@@ -402,7 +407,7 @@ def test_a_run_takes_max_children_from_the_settings(
     seen: list[int] = []
 
     def fake(checkout: Path, unit: ms.Unit, names: object, deadline: float, run_: object,
-             *, children: int) -> dict[str, object]:  # fmt: skip
+             *, children: int, memory_mb: int | None) -> dict[str, object]:  # fmt: skip
         seen.append(children)
         return {}
 
@@ -417,7 +422,10 @@ def test_a_packages_also_copy_is_named_from_its_own_directory(tmp_path: Path) ->
     (tmp_path / "packages" / "troupe").mkdir(parents=True)
     unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests", also_copy=("docs",))
     config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
-    assert config.endswith("also_copy=\n    ../../docs\n    _mutation_children_plugin.py\n")
+    assert config.endswith(
+        "also_copy=\n    ../../docs\n    _mutation_children_plugin.py\n"
+        "    _mutation_children_plugin.json\n"
+    )
 
 
 def test_a_deselected_parametrized_test_keeps_its_whole_node_id(tmp_path: Path) -> None:
@@ -522,7 +530,7 @@ def test_a_run_maps_crashed_mutants_back_to_the_real_source(
     monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
     fake_show(monkeypatch)
     unit = SETTINGS.repositories["infrastructure"].units[0]
-    modules = run.run_mutmut(tmp_path, unit, [], 1e12, CrashingMutmut(), children=2)
+    modules = run.run_mutmut(tmp_path, unit, [], 1e12, CrashingMutmut(), children=2, memory_mb=None)
     [crash] = modules["calc"].crashed_mutants
     assert (crash.path, crash.line, crash.name, crash.exit_code) == (
         "scripts/calc.py",
@@ -540,7 +548,7 @@ def test_a_run_maps_survivors_back_to_the_real_source_and_cleans_up(
     monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
     shown = fake_show(monkeypatch)
     unit = SETTINGS.repositories["infrastructure"].units[0]
-    modules = run.run_mutmut(tmp_path, unit, [], 1e12, FakeMutmut(), children=2)
+    modules = run.run_mutmut(tmp_path, unit, [], 1e12, FakeMutmut(), children=2, memory_mb=None)
     [survivor] = modules["calc"].survivors
     assert (survivor.path, survivor.line, survivor.name) == (
         "scripts/calc.py",
@@ -557,6 +565,59 @@ def test_a_run_maps_survivors_back_to_the_real_source_and_cleans_up(
     )
     assert not (tmp_path / "src").exists()
     assert not (tmp_path / "_mutation_children_plugin.py").exists()
+
+
+class ConfigSeeingMutmut(FakeMutmut):
+    """FakeMutmut that keeps the plugin's config as it stood while mutmut ran."""
+
+    seen: object = None
+
+    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+        self.seen = json.loads((cwd / "_mutation_children_plugin.json").read_text(encoding="utf-8"))
+        return super().__call__(command, cwd, timeout)
+
+
+@pytest.mark.parametrize("memory_mb", [None, 3072])
+def test_a_run_hands_the_plugin_its_cap_and_where_to_record_peaks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, memory_mb: int | None
+) -> None:
+    """The cap and the peaks file reach the plugin in a file beside its copy, which mutmut copies
+    into mutants/ with it, never through the environment (#366, design D2)."""
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "calc.py").write_text(
+        "def add(a, b):\n    return a + b\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
+    fake_show(monkeypatch)
+    unit = SETTINGS.repositories["infrastructure"].units[0]
+    mutmut = ConfigSeeingMutmut()
+    run.run_mutmut(tmp_path, unit, [], 1e12, mutmut, children=2, memory_mb=memory_mb)
+    assert mutmut.seen == {
+        "mutant_memory_mb": memory_mb,
+        "peaks": str(tmp_path / "_mutation_children_peaks.log"),
+    }
+    assert "    _mutation_children_plugin.json\n" in (tmp_path / "setup.cfg").read_text(
+        encoding="utf-8"
+    )
+    assert not (tmp_path / "_mutation_children_plugin.json").exists()
+    assert not (tmp_path / "_mutation_children_peaks.log").exists()
+
+
+def test_a_run_takes_the_per_mutant_cap_from_the_settings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    caps: list[int | None] = []
+
+    def fake(checkout: Path, unit: ms.Unit, names: object, deadline: float, run_: object,
+             *, children: int, memory_mb: int | None) -> dict[str, object]:  # fmt: skip
+        caps.append(memory_mb)
+        return {}
+
+    monkeypatch.setattr(run, "run_mutmut", fake)
+    settings = SETTINGS.__class__(**{**vars(SETTINGS), "mutant_memory_mb": 3072})
+    run.collect(SETTINGS.repositories["troupe"], tmp_path, settings, None, Recorder())
+    assert caps
+    assert set(caps) == {3072}
 
 
 def package_checkout(tmp_path: Path) -> ms.Unit:
@@ -609,10 +670,10 @@ def test_a_packages_run_finds_its_sibling_packages_and_cleans_up(
     recorder = SiblingRecorder(code)
     if code:
         with pytest.raises(run.RunError):
-            run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2)
+            run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2, memory_mb=None)
     else:
         fake_show(monkeypatch)
-        run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2)
+        run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2, memory_mb=None)
     assert recorder.sibling, "a test counting up to packages/ didn't find its sibling package"
     assert recorder.root, "a test counting up to the root no longer finds the checkout's files"
     also_copy = recorder.config.split("also_copy=", 1)[1].split()
@@ -630,10 +691,10 @@ def test_a_packages_run_finds_the_checkouts_files_from_one_level_up_and_cleans_u
     recorder = LinkRecorder(code)
     if code:
         with pytest.raises(run.RunError):
-            run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2)
+            run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2, memory_mb=None)
     else:
         fake_show(monkeypatch)
-        run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2)
+        run.run_mutmut(tmp_path, unit, [], 1e12, recorder, children=2, memory_mb=None)
     assert recorder.seen == {
         "plugins": True, "packages": True, "pyproject": True, "git": False, "own": True,
     }  # fmt: skip
@@ -703,7 +764,7 @@ def test_links_made_before_a_failed_link_are_removed(
     monkeypatch.setattr(Path, "symlink_to", second_fails)
     monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
     with pytest.raises(OSError, match="no room for a link"):
-        run.run_mutmut(tmp_path, unit, [], 1e12, Recorder(), children=2)
+        run.run_mutmut(tmp_path, unit, [], 1e12, Recorder(), children=2, memory_mb=None)
     assert made
     assert not any(link.is_symlink() for link in made)
     assert sorted(p.name for p in (tmp_path / "packages").iterdir()) == ["other", "troupe"]
@@ -727,6 +788,7 @@ def test_a_units_own_setup_cfg_is_refused_word_for_word(tmp_path: Path) -> None:
             1e12,
             Recorder(),
             children=2,
+            memory_mb=None,
         )
     assert str(raised.value) == (
         f"{tmp_path / 'setup.cfg'} exists, and mutmut reads its configuration from there: "
@@ -929,8 +991,8 @@ def test_a_run_writes_its_report_with_the_checkouts_commit(
     assert (report.commit, report.previous_commit) == (commit, commit)
     assert report.modules["calc"].survivors[0].commit == commit
     assert (
-        capsys.readouterr().out
-        == f"mutation_run: 1 modules from infrastructure, written to {out}\n"
+        capsys.readouterr().out == "memory: scripts no peaks recorded\n"
+        f"mutation_run: 1 modules from infrastructure, written to {out}\n"
     )
 
 
@@ -1023,6 +1085,60 @@ def test_only_a_mutants_test_process_starts_its_own_session(
     monkeypatch.setenv("MUTANT_UNDER_TEST", mutant)
     children.pytest_configure(object())
     assert calls == (["setsid"] if own_session else [])
+
+
+PEAKS = """\
+mutmut 1468004 412300
+mutmut 1500000 450000
+m.a__mutmut_1 1600000 300000
+m.a__mutmut_2 1610000 310000
+m.a__mutmut_3 5818044 5175188
+m.a__mutmut_4 1620000 320000
+m.a__mutmut_5 1500000 300000
+m.a__mutmut_6 1400000 290000
+not a line
+m.a__mutmut_7 x 1
+"""
+
+
+def test_a_units_peaks_are_logged_largest_first_in_megabytes() -> None:
+    """What sets the cap: mutmut's own peak, which every mutant's process starts from, and the
+    largest mutant processes, by name, so a runaway stands out from the ordinary ones (D3, D4)."""
+    assert run.memory_lines("troupe", PEAKS) == [
+        "memory: troupe mutmut VmPeak=1465 MB VmHWM=439 MB",
+        "memory: troupe mutant m.a__mutmut_3 VmPeak=5682 MB VmHWM=5054 MB",
+        "memory: troupe mutant m.a__mutmut_4 VmPeak=1582 MB VmHWM=313 MB",
+        "memory: troupe mutant m.a__mutmut_2 VmPeak=1572 MB VmHWM=303 MB",
+        "memory: troupe mutant m.a__mutmut_1 VmPeak=1563 MB VmHWM=293 MB",
+        "memory: troupe mutant m.a__mutmut_5 VmPeak=1465 MB VmHWM=293 MB",
+        "memory: troupe 8 processes recorded (2 malformed lines skipped)",
+    ]
+
+
+@pytest.mark.parametrize("text", ["", None])
+def test_a_unit_with_no_peaks_says_so(text: str | None) -> None:
+    assert run.memory_lines("troupe", text) == ["memory: troupe no peaks recorded"]
+
+
+def test_a_unit_whose_run_fails_still_logs_its_peaks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A run that stops is when the peaks matter most: the runaway's dry run never finished."""
+
+    class PeakingMutmut(Recorder):
+        def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+            super().__call__(command, cwd, timeout)
+            (cwd / "_mutation_children_peaks.log").write_text("mutmut 1048576 524288\n")
+            return 3
+
+    (tmp_path / "scripts").mkdir()
+    monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
+    unit = SETTINGS.repositories["infrastructure"].units[0]
+    with pytest.raises(run.RunError):
+        run.run_mutmut(tmp_path, unit, [], 1e12, PeakingMutmut(), children=2, memory_mb=None)
+    out = capsys.readouterr().out
+    assert "memory: scripts mutmut VmPeak=1024 MB VmHWM=512 MB\n" in out
+    assert not (tmp_path / "_mutation_children_peaks.log").exists()
 
 
 GROUP_KILL = """

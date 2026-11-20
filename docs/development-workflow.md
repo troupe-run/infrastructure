@@ -718,6 +718,15 @@ keeps the kernel's and systemd's lines since it began from the sources that can 
 lines, systemd-oomd, and systemd on the runner's service or the run's scope) as `journal: ` lines and in
 `journal-<repository>.log`.
 
+**A runaway mutant ends only its own tests.** Each mutant's test process can run under a memory cap, `mutant_memory_mb`
+in `scripts/mutation.json` (an address-space limit, `RLIMIT_AS`), so a mutant whose tests allocate without bound fails
+on its own: mutmut records it and goes on, and the summary names it if it crashed. mutmut's own process, where its stats
+and clean passes run and from which each mutant's process is forked, is never capped. The cap limits virtual size, which
+runs well above resident size, so it's set from measured peaks, never by arithmetic: after each unit, the log's
+`memory:` lines give mutmut's own peak virtual and resident size, the five largest mutant processes by name, and how
+many processes recorded. The setting is null (no cap) until a measured run sets it (#366). The run's own cgroup (12G)
+stays as the backstop.
+
 **A mutant can't stop the runner.** A GitHub step shares the runner agent's process group and user, so a mutant that
 kills its own group, or signals every process (`kill(-1)`), or a run that exhausts memory, would kill the runner itself:
 the job is lost, with no log (#341, #345, each proved by a probe). So each mutant's tests start a session of their own

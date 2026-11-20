@@ -75,11 +75,9 @@ ordinary mutants by its killed/survived rate matching the uncapped run's over th
 gives the comparison: 1,734 killed and 480 survived of its first 2,410. Many ordinary mutants killed by `MemoryError`
 would mean `RLIMIT_AS` is too blunt, which is D1's fallback.
 
-How the measurement reaches CI is the owner's choice:
-- **(A) Two pull requests.** This one with the setting null, and a dry run after its apply. Then one that sets the
-  value.
-- **(B) One.** A dry run dispatched from this branch. That route isn't documented, so it needs the owner's agreement
-  and a documentation issue.
+The owner chose two pull requests (2026-11-20, 13:07 AEST). This one ships the mechanism and the peak logging,
+with the setting null. After its apply, a troupe dry run measures (it still ends at the runaway, which is fine for
+measuring). A follow-up change then sets the default from that measurement, and the next dry run proves it.
 
 ## Risks / Trade-offs
 
