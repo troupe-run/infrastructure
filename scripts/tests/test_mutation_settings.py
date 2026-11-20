@@ -34,8 +34,10 @@ def test_the_declared_settings_load_with_the_owners_values() -> None:
     assert settings.max_new_issues == 5
     # Two mutants at once: four starved the hosted runner in both troupe dry runs (#337).
     assert settings.max_children == 2
-    # No per-mutant cap until a measured run sets one (#366, design D4).
-    assert settings.mutant_memory_mb is None
+    # Each mutant's process is capped at 2,048 MB (#366): dry run 44693481824 measured mutmut's own
+    # VmPeak at 1,111 MB and the largest ordinary mutant's at 1,270 MB; plus half, rounded up to
+    # 256 MB (mutant-memory design D4). The runaway it stops reached 5,289 MB.
+    assert settings.mutant_memory_mb == 2048
     # The one list of repositories that get coverage and mutation testing (#332, owner 2026-11-18).
     assert set(settings.repositories) == {"troupe"}
 
