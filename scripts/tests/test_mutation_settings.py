@@ -34,6 +34,8 @@ def test_the_declared_settings_load_with_the_owners_values() -> None:
     assert settings.max_new_issues == 5
     # Two mutants at once: four starved the hosted runner in both troupe dry runs (#337).
     assert settings.max_children == 2
+    # No per-mutant cap until a measured run sets one (#366, design D4).
+    assert settings.mutant_memory_mb is None
     # The one list of repositories that get coverage and mutation testing (#332, owner 2026-11-18).
     assert set(settings.repositories) == {"troupe"}
 
@@ -105,6 +107,18 @@ def test_a_missing_key_fails_naming_it() -> None:
     del changed["min_mutants"]
     with pytest.raises(ms.SettingsError, match="min_mutants"):
         ms.load_settings(text(changed))
+
+
+def test_a_per_mutant_memory_cap_is_read_in_megabytes() -> None:
+    assert ms.load_settings(changed(["mutant_memory_mb"], 3072)).mutant_memory_mb == 3072
+
+
+def test_a_settings_file_without_the_per_mutant_cap_fails_naming_it() -> None:
+    settings = declared()
+    del settings["mutant_memory_mb"]
+    with pytest.raises(ms.SettingsError) as raised:
+        ms.load_settings(text(settings))
+    assert str(raised.value) == "the settings has no 'mutant_memory_mb'"
 
 
 def test_not_json_fails() -> None:
@@ -215,8 +229,8 @@ SHA_40 = "a" * 40
 # Every refusal, word for word (lint-mutation 6b: the pull request report's survivors)
 
 KEYS = (
-    "['budget_minutes', 'max_children', 'max_new_issues', 'min_mutants', 'pr_budget_minutes', "
-    "'repositories', 'threshold', 'tolerance', 'tools']"
+    "['budget_minutes', 'max_children', 'max_new_issues', 'min_mutants', 'mutant_memory_mb', "
+    "'pr_budget_minutes', 'repositories', 'threshold', 'tolerance', 'tools']"
 )
 
 
@@ -271,6 +285,26 @@ def changed(path: list[str | int], value: object) -> str:
         (
             changed(["max_children"], 2.5),
             "max_children is 2.5; it must be a whole number from 1 to 4",
+        ),
+        (
+            changed(["mutant_memory_mb"], 255),
+            "mutant_memory_mb is 255; it must be null or a whole number from 256 to 12288",
+        ),
+        (
+            changed(["mutant_memory_mb"], 12289),
+            "mutant_memory_mb is 12289; it must be null or a whole number from 256 to 12288",
+        ),
+        (
+            changed(["mutant_memory_mb"], 3072.5),
+            "mutant_memory_mb is 3072.5; it must be null or a whole number from 256 to 12288",
+        ),
+        (
+            changed(["mutant_memory_mb"], "3G"),
+            "mutant_memory_mb is '3G'; it must be null or a whole number from 256 to 12288",
+        ),
+        (
+            changed(["mutant_memory_mb"], True),
+            "mutant_memory_mb is True; it must be null or a whole number from 256 to 12288",
         ),
         (changed(["repositories", "troupe"], []), "repositories.troupe isn't an object"),
         (
