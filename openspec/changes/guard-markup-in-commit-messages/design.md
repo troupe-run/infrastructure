@@ -43,14 +43,15 @@ that decision through instead of rewriting it as a "not a Conventional Commit" r
 
 ### D2. Copy the parser's rule, not "no `<`"
 
-`MARKUP = re.compile(r"<!--|</?[A-Za-z][-.:0-9_A-Za-z]*(?:\s|/?>|$)")`. That is kMarkupPattern's opening, plus the
+`MARKUP` matches `<!--|</?[A-Za-z][-.:0-9_A-Za-z]*(?:\s|/?>|$)`. That is kMarkupPattern's opening, plus the
 character that has to follow the tag name for a match. It refuses `<NAME>`, `Vec<u8>`, `a <b`, `</details>` and
 `<!--`. It allows `a < b`, `<=`, `1<2`, `<3`, `->`, `<https://…>` and `<a@b.c>`. Those last two were measured: an
 address isn't markup, since `@` can't follow a tag name.
 
 An entity that decodes to `<` is markup too, once the round trip has decoded it (`&ltNAME`, `&amp;lt;`, `&#60;`).
-Nobody needs entity text in a commit subject, so the rule also refuses `&lt`, `&#` and `&amp;` (case-insensitive)
-rather than copying the parser's decoding. Plain `&` (`R&D`) is allowed.
+Nobody needs entity text in a commit subject, so the rule also refuses `&lt`, `&#` and `&amp` (case-insensitive, with
+or without the `;`: `&amplt;b>` reaches the notes as `<b>`) rather than copying the parser's decoding. Plain `&`
+(`R&D`, `AT&T`) is allowed.
 
 Evidence: a differential run of 20,000 generated subjects through release-please 17.6.0's changelog writer and round
 trip. The subjects mixed `<`, `>`, `/`, `!`, `-`, letters, digits, `@`, `:`, `` ` ``, `&`, `;`, `&#60;`, `&#x3C` and
@@ -61,9 +62,11 @@ learn to work around a rule that's wrong.
 
 ### D3. Which text is judged
 
-The subject (for a fixup, the subject it names, as `commit-message` already reads it). Then each line from a
+The subject line (for a fixup, the whole line, which includes the subject it names). Then each line from a
 `BREAKING CHANGE:` or `BREAKING-CHANGE:` footer up to the next blank line. That over-reaches by the trailers
-after a note, but a trailer's `Name <address>` isn't markup (D2), so in practice it refuses nothing more.
+after a note, but a trailer's `Name <address>` isn't markup (D2), so in practice it refuses nothing more. Lines
+end only at `\n`, as in git: `str.splitlines()` also splits at `\x0b`, `\u2028` and others, which would hide
+markup after them in the subject (found by the review).
 
 *Alternative:* stop the note at the next trailer, as release-please does. Rejected: release-please's footer
 boundary has exceptions (a `Refs:` line can continue the note), and copying them adds size and risk for no gain.

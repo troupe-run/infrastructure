@@ -3,7 +3,7 @@
 ### Requirement: Commit text that release notes would read as markup is refused
 A commit message SHALL be refused under `commit-message` when its subject, or a `BREAKING CHANGE:` or
 `BREAKING-CHANGE:` note, contains text that release-please's notes parser reads as HTML markup (`<!--`, or a tag
-such as `<NAME>`), or an entity that decodes to it (`&lt`, `&#`, `&amp;`). The refusal quotes the text, and says to
+such as `<NAME>`), or an entity that decodes to it (`&lt`, `&#`, `&amp`). The refusal quotes the text, and says to
 write it without angle brackets and that backticks don't protect it.
 
 #### Scenario: A placeholder in angle brackets
