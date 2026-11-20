@@ -562,7 +562,10 @@ def test_a_path_in_two_overlapping_scopes_runs_both_scopes(make_repo: Callable[[
         ("fix: hide <!-- this -->", "<!--"),
         ("fix: read &lt;NAME&gt;", "&lt"),
         ("fix: read &#60;b", "&#"),
-        ("fix: read &amp;lt;b", "&amp;"),
+        ("fix: read &amp;lt;b", "&amp"),
+        ("fix: read &amplt;b>", "&amp"),
+        ("fix: a\x0b<b> after a vertical tab", "<b>"),
+        ("fix: a\u2028<b> after a line separator", "<b>"),
         ("feat!: drop <Old>", "<Old>"),
         ("fixup! fix: read <details>", "<details>"),
         ("feat: x\n\nBREAKING CHANGE: runners now read <config>", "<config>"),
@@ -599,11 +602,22 @@ def test_angle_brackets_release_notes_keep_as_text_are_accepted(message: str) ->
     assert guard.commit_message(message) == guard.ALLOW
 
 
-@given(kind=st.sampled_from(guard.COMMIT_TYPES), subject=st.text(min_size=1))
+MARKUP_PIECES = st.sampled_from(
+    ["<", ">", "/", "!--", "b", "B1", " ", "&lt", "&amp", "&#", ";", "\x0b", "\u2028"]
+)
+"""Fragments that make or nearly make markup, mixed with any text, so most examples aren't plain."""
+
+
+@given(
+    kind=st.sampled_from(guard.COMMIT_TYPES),
+    subject=st.lists(MARKUP_PIECES | st.text(max_size=3), min_size=1).map("".join),
+)
 def test_a_conventional_subject_is_refused_only_for_the_markup_it_contains(
     kind: str, subject: str
 ) -> None:
     line = f"{kind}: {subject}"
+    # Git ends a subject only at "\n" (and a "\r" before it): every other separator, such as
+    # "\x0b" or "\u2028", is part of the subject release-please reads (found by the review).
     if not guard.COMMIT_PATTERN.match(line) or "\n" in subject or "\r" in subject:
         return
     refused = guard.commit_message(line).refused
