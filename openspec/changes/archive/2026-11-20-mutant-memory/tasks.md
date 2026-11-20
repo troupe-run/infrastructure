@@ -44,7 +44,7 @@
 
 - [x] 4.1 `docs/development-workflow.md`, "Mutation testing": the per-mutant cap, its setting (null until measured),
       the `memory:` lines, and that the run's 12G cgroup stays as the backstop
-- [ ] 4.2 The full check passes (in the orchestrator's slot)
+- [x] 4.2 The full check passes (in the commit hook, in the orchestrator's slot, 2026-11-20)
 
 ## 5. The measured default: a follow-up change
 
