@@ -206,13 +206,14 @@ jobs:
               echo "resources: lowest mem_available_mb=$lowest"
               echo "Mutation run: lowest free memory: ${lowest/ at / MB at } UTC" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
             fi
-            # Who ended the run, if the host did: the kernel's and systemd's OOM, oomd and unit-stop lines
-            # since the step began, to the log and beside the readings (#361; dry run 44633465646).
+            # Who ended the run, if the host did: since the step began, the lines from the sources that can
+            # name a sender (the kernel's OOM lines, systemd-oomd, and systemd on the runner's service or
+            # this run's mutation-* scope), to the log and beside the readings (#361; dry run 44633465646).
             # journal-<repository>.log beside resources-<repository>.log, never the readings file itself.
             local journal="${RESOURCES%/*}/journal-${RESOURCES##*/}"
             journal=${journal/journal-resources-/journal-}
             { sudo -n journalctl --since "$resources_since" --no-pager -o short-iso 2>/dev/null || true; } \
-              | grep -iE 'out of memory|oom|memory cgroup|stopping|stopped|deactivated|sigterm|sigkill' \
+              | grep -iE 'kernel: .*(out of memory|oom-kill|oom_reaper|memory cgroup|killed process)|systemd-oomd|systemd\[1\]: .*(actions\.runner|mutation-[^ ]*\.scope)' \
               | tail -n 200 > "$journal" || true
             if [[ -s "$journal" ]]; then sed 's/^/journal: /' "$journal"; else rm -f "$journal"; fi
           }

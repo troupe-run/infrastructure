@@ -17,6 +17,11 @@ exclusions without the owner, and the containment (#341, #345, #347) stays eithe
 - **The weekly run's summary lists them,** saying what each ended. A crash in the report ended only its own test
   process: mutmut recorded it and went on. A crash that ended the run doesn't reach the report; it shows as the
   unit's failure in the step (#345's messages).
+- **A step keeps the host's account of how it ended** (design D4, folded in by the orchestrator, 2026-11-20): dry
+  run 44633465646 ended with SIGTERM to the step's own shell and nothing recorded the sender. Each mutate step's exit
+  trap now saves, since the step began, the journal lines from the sources that can name one (the kernel's OOM lines,
+  systemd-oomd, and systemd on the runner's service or the run's own scope), to the log and to
+  `journal-<repository>.log`, uploaded with the readings.
 
 ## Capabilities
 
@@ -26,10 +31,14 @@ None.
 
 ### Modified Capabilities
 
-- `mutation-testing`: a run's report and summary name its crashed mutants.
+- `mutation-testing`: a run's report and summary name its crashed mutants, and a run keeps the host's account of how
+  it ended.
 
 ## Impact
 
 - `scripts/mutation_report.py`, `scripts/mutation_run.py` (both delivered), `scripts/mutation_issues.py`, and their
-  tests. The plan updates troupe's delivered `mutation_report.py` and `mutation_run.py`.
-- After the apply: the troupe dry run names its crashed mutants.
+  tests. `.github/workflows/mutation.yml` and `.github/workflows/mutation-pr.yml` (delivered), and
+  `scripts/tests/test_mutation_workflows.py`. The plan updates troupe's delivered `mutation_report.py`,
+  `mutation_run.py` and `mutation-pr.yml`.
+- `docs/development-workflow.md`, "Mutation testing".
+- After the apply: the troupe dry run names its crashed mutants, and who ended it if the host did.

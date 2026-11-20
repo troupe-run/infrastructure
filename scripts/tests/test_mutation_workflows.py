@@ -626,6 +626,10 @@ JOURNAL = """\
 2026-11-19T23:26:23+00:00 runner systemd-oomd[1]: Killed /system.slice/x.scope: memory pressure
 2026-11-19T23:26:24+00:00 runner systemd[1]: Stopping actions.runner.service...
 2026-11-19T23:26:25+00:00 runner CRON[9]: (root) CMD (true)
+2026-11-19T23:21:00+00:00 runner systemd[1]: Stopped apt-daily.timer.
+2026-11-19T23:21:01+00:00 runner systemd[1]: run-docker-runtime.mount: Deactivated successfully.
+2026-11-19T23:21:02+00:00 runner kernel: no room left in the ring buffer
+2026-11-19T23:26:26+00:00 runner systemd[1]: mutation-1-m-2.scope: Killing process 4 (SIGKILL).
 """
 
 
@@ -660,8 +664,9 @@ def run_sampler_exit(tmp_path: Path, journal: str | None) -> tuple[str, Path]:
 
 def test_the_step_saves_the_journal_lines_that_say_who_ended_the_run(tmp_path: Path) -> None:
     """A SIGTERM to the step itself (dry run 44633465646) left no trace of its sender: the exit
-    trap now keeps the kernel's and systemd's OOM, oomd and unit-stop lines since the step began
-    (#361)."""
+    trap now keeps the lines since the step began from the sources that can name one (the kernel's
+    OOM lines, systemd-oomd, and systemd on the runner's service or the run's own scope), and not
+    other units stopping or words that merely contain "oom" (#361)."""
     stdout, journal = run_sampler_exit(tmp_path, JOURNAL)
     kept = journal.read_text(encoding="utf-8").splitlines()
     assert kept == [
@@ -669,6 +674,8 @@ def test_the_step_saves_the_journal_lines_that_say_who_ended_the_run(tmp_path: P
         "2026-11-19T23:26:23+00:00 runner systemd-oomd[1]: "
         "Killed /system.slice/x.scope: memory pressure",
         "2026-11-19T23:26:24+00:00 runner systemd[1]: Stopping actions.runner.service...",
+        "2026-11-19T23:26:26+00:00 runner systemd[1]: mutation-1-m-2.scope: "
+        "Killing process 4 (SIGKILL).",
     ]
     assert [line for line in stdout.splitlines() if line.startswith("journal: ")] == [
         f"journal: {line}" for line in kept
