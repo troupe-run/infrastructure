@@ -28,10 +28,12 @@ question is about the weekly run.
 
 ### D3. The summary says what each ended
 
-After the module table, `summary()` lists every crashed mutant:
-`` - `troupe.core.x_f__mutmut_3` packages/troupe/src/troupe/core/x.py:42 (exit -9) `- old` → `+ new` ``,
-under one line that says what they ended: "each ended only its own test process; mutmut recorded it and went on". A
-crash that ends the run never reaches the report: the step's `::error::` says how the run ended (#345 D3).
+After the module table, `summary()` lists every crashed mutant, one line each, shaped as an issue's survivor line:
+`` - `troupe.core.x_f__mutmut_3` at `packages/troupe/src/troupe/core/x.py:42` (exit -9): `-old / +new` ``, or
+"(no exit code)" for Stryker. The name, path and change go through `code()`, since they come from a run of other code.
+The list sits under one line that says what they ended: "Crashed mutants: each ended only its own test process, and
+the tool recorded it and went on. Excluding any (`# pragma: no mutate`) is the owner's decision." A crash that ends
+the run never reaches the report: the step's `::error::` says how the run ended (#345 D3).
 
 ### D4. The step keeps the host's account of how it ended
 
