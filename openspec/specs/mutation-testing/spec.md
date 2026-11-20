@@ -378,10 +378,10 @@ owner can decide on exclusions from them. No mutant SHALL be excluded without th
 - **THEN** reading the report fails, naming the module and both numbers
 
 ### Requirement: A run keeps the host's account of how it ended
-When a mutate step ends, it SHALL save the kernel's and systemd's lines since the step began that say who could have
-ended the run (OOM kills, memory cgroup, systemd-oomd, unit stops, SIGTERM and SIGKILL), to the job's log and to a
-`journal-<repository>.log` uploaded with the readings, and SHALL save nothing when there are none or the journal can't
-be read.
+When a mutate step ends, it SHALL save the journal lines since the step began from the sources that can name who ended
+the run (the kernel's OOM lines, systemd-oomd, and systemd's lines on the runner's service or the run's own scope), and
+no other units' lines, to the job's log and to a `journal-<repository>.log` uploaded with the readings, and SHALL save
+nothing when there are none or the journal can't be read.
 
 #### Scenario: The host ends the step
 - **WHEN** something on the host sends the step SIGTERM, as in dry run 44633465646

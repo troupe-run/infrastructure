@@ -401,10 +401,24 @@ def test_the_summary_names_every_crashed_mutant_and_what_it_ended() -> None:
     )
     assert (
         "- `troupe.platform.processes.x__kill_group__mutmut_4` at "
-        "`packages/troupe/src/troupe/platform/processes.py:389` (exit -9)" in text
+        "`packages/troupe/src/troupe/platform/processes.py:389` (exit -9): "
+        "`-    os.killpg(pid, signal.SIGKILL) / +    os.killpg(0, signal.SIGKILL)`" in text
     )
-    assert "    -    os.killpg(pid, signal.SIGKILL)\n    +    os.killpg(0, signal.SIGKILL)" in text
-    assert "- `ArithmeticOperator#3` at `src/lib/add.ts:2` (no exit code)" in text
+    assert (
+        "- `ArithmeticOperator#3` at `src/lib/add.ts:2` (no exit code): `-a + b / +a - b`" in text
+    )
+
+
+def test_a_backtick_in_a_crashed_mutant_cant_end_its_code_span_in_the_summary() -> None:
+    """A crash's strings come from a run of other code, as a survivor's do (#361's review)."""
+    crash = mr.Crashed("m`@owner`", "a`b`.py", 3, "-x`\n+*y*", -9)
+    r = report(**{"troupe.a": mr.Module(1, 0, 0, 0, 1, 0, True, (), (crash,))})
+    [line] = [
+        line
+        for line in mi.summary("troupe", r, plan(r), SETTINGS, dry=True).splitlines()
+        if line.startswith("- `m")
+    ]
+    assert line == "- `m'@owner'` at `a'b'.py:3` (exit -9): `-x' / +*y*`"
 
 
 def test_a_summary_with_no_crashed_mutant_has_no_section_for_them() -> None:

@@ -35,14 +35,16 @@ crash that ends the run never reaches the report: the step's `::error::` says ho
 
 ### D4. The step keeps the host's account of how it ended
 
-Dry run 44633465646 ended with SIGTERM to the step's own shell (exit 143): `run_contained`'s message never printed,
-and nothing inside the run's namespace can signal that shell. Free memory had fallen 4.7 GB in the last minute. The
-readings couldn't say who sent it. So the sampler's exit trap now also runs `sudo -n journalctl --since <step start>`
-and keeps only the lines that can say who ended a run: OOM kills, memory cgroup, systemd-oomd, unit stops, SIGTERM and
-SIGKILL, at most 200. It saves them to the log (`journal: …`) and to `out/journal-<repository>.log`, which uploads with
-the readings (the pull request report's `journal-pr.log` too). With none, or no readable journal, it saves nothing.
-`sudo -n` fails quietly where sudo can't run. The orchestrator folded this into #361 (2026-11-20): it's the same
-diagnostic purpose, in the same steps.
+Dry run 44633465646 ended with SIGTERM to the step's own shell (exit 143): `run_contained`'s message never printed, and
+nothing inside the run's namespace can signal that shell. Free memory had fallen 4.7 GB in the last minute. The readings
+couldn't say who sent it. So the sampler's exit trap now also runs `sudo -n journalctl --since <step start>` and keeps
+only the lines from the sources that can name who ended a run: the kernel's OOM lines, systemd-oomd, and systemd's lines
+on the runner's service or this run's `mutation-*` scope. Other units stopping (timers, mounts) and words that merely
+contain "oom" are left out, so they can't push the line that matters past the 200-line cap (review of #362). At most 200
+lines go to the log (`journal: …`) and to `out/journal-<repository>.log`, which uploads with the readings (the pull
+request report's `journal-pr.log` too). With none, or no readable journal, it saves nothing. `sudo -n` fails quietly
+where sudo can't run. The orchestrator folded this into #361 (2026-11-20): it's the same diagnostic purpose, in the same
+steps.
 
 ## Risks / Trade-offs
 

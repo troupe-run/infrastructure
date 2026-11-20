@@ -435,9 +435,10 @@ def crashed_section(report: mr.Report) -> list[str]:
         "",
     ]
     for crash in crashes:
-        code = "no exit code" if crash.exit_code is None else f"exit {crash.exit_code}"
-        lines.append(f"- `{crash.name}` at `{crash.path}:{crash.line}` ({code})")
-        lines += [f"    {change}" for change in crash.change.splitlines()]
+        status = "no exit code" if crash.exit_code is None else f"exit {crash.exit_code}"
+        where = f"`{code(crash.path)}:{crash.line}`"
+        change = code(crash.change.replace("\n", " / "))
+        lines.append(f"- `{code(crash.name)}` at {where} ({status}): `{change}`")
     return lines
 
 

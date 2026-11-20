@@ -714,8 +714,9 @@ troupe's run lost its hosted runner twice). While a run mutates, its job writes 
 load and running mutants once a minute, as `resources:` lines in the log and in `resources-<repository>.log` (the pull
 request report's is `resources-pr.log`), uploaded with the report even when the run fails. The run's summary gives the
 lowest free memory seen. If a runner is lost, its last readings in the log say what ran out. When the step ends, it also
-keeps the kernel's and systemd's lines since it began that say who ended it (OOM kills, systemd-oomd, unit stops) as
-`journal: ` lines and in `journal-<repository>.log`.
+keeps the kernel's and systemd's lines since it began from the sources that can say who ended it (the kernel's OOM
+lines, systemd-oomd, and systemd on the runner's service or the run's scope) as `journal: ` lines and in
+`journal-<repository>.log`.
 
 **A mutant can't stop the runner.** A GitHub step shares the runner agent's process group and user, so a mutant that
 kills its own group, or signals every process (`kill(-1)`), or a run that exhausts memory, would kill the runner itself:
