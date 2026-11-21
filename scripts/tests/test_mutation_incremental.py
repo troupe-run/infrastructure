@@ -1,5 +1,6 @@
 """The scheduled run resumes from mutmut's kept state (#378, mutation-incremental design D2, D3)."""
 
+import datetime
 import json
 from pathlib import Path
 from typing import Any
@@ -204,3 +205,27 @@ def test_a_killed_refresh_is_harvested_as_a_fresh_fill_not_with_its_stale_date(
     assert run.main(["state-harvest", "infrastructure", str(repo), str(state), str(record)]) == 0
     manifest = json.loads((state / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["units"]["scripts"]["filled_since"] != "2026-01-01"
+
+
+def test_a_killed_full_refresh_dispatch_is_harvested_as_a_fresh_fill(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With a recent fill date only the dispatch's input says it was a refresh (#380)."""
+    repo, _ = scratch_checkout(tmp_path)
+    meta = repo / "mutants" / "src" / "calc.py.meta"
+    meta.parent.mkdir(parents=True)
+    meta.write_text(json.dumps({"exit_code_by_key": {"calc.x_add__mutmut_1": 1}}), encoding="utf-8")
+    state = tmp_path / "state"
+    (state / "scripts").mkdir(parents=True)
+    recent = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=10)
+    manifest = {
+        "version": 1,
+        "mutmut": "3.8.1",
+        "units": {"scripts": {"filled_since": str(recent)}},
+    }
+    (state / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setenv("MUTATION_FULL_REFRESH", "true")
+    record = tmp_path / "out" / "state-infrastructure.json"
+    assert run.main(["state-harvest", "infrastructure", str(repo), str(state), str(record)]) == 0
+    kept = json.loads((state / "manifest.json").read_text(encoding="utf-8"))
+    assert kept["units"]["scripts"]["filled_since"] != str(recent)

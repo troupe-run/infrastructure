@@ -322,6 +322,7 @@ jobs:
         env:
           REPOSITORY: ${{ matrix.repository }}
           MUTATION_RUN_ID: ${{ github.run_id }}
+          MUTATION_FULL_REFRESH: ${{ inputs.full-refresh }}
         run: python3 infra/scripts/mutation_run.py state-harvest "$REPOSITORY" target state "out/state-$REPOSITORY.json"
       - name: Set this run's state aside
         if: always() && steps.skip.outputs.skip != 'true' && hashFiles('out/state-*.json') != ''

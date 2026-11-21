@@ -250,6 +250,8 @@ def test_the_save_keeps_only_this_runs_units_over_the_newest_entry_on_any_outcom
     assert "hashFiles('out/state-*.json') == ''" in harvest["if"]
     assert "steps.mutate.outcome != 'skipped'" in harvest["if"]
     assert "state-harvest" in harvest["run"]
+    # A killed full-refresh dispatch is a fresh fill, which the harvest can only tell from this.
+    assert harvest["env"]["MUTATION_FULL_REFRESH"] == "${{ inputs.full-refresh }}"
     for name in after[1:]:
         assert "hashFiles('out/state-*.json') != ''" in by_name[name]["if"]
     again = by_name["Restore the newest kept state again"]
