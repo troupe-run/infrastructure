@@ -218,6 +218,15 @@ def test_the_state_is_restored_before_mutating_newest_first_by_repository_and_mu
     assert env["MUTATION_RUN_ID"] == "${{ github.run_id }}"
 
 
+def test_the_repositorys_baselines_are_kept_before_the_run_whatever_it_exits() -> None:
+    """A run that exits 3 for lost state still hands on its report, so the issues job must get
+    the baselines too: copied before the run, or a below-baseline issue is closed (#380)."""
+    script = weekly_step("Mutate")["run"]
+    assert script.index('cp quality-gates.toml "../out/quality-gates-$REPOSITORY.toml"') < (
+        script.index("run_contained python3")
+    )
+
+
 def test_the_save_keeps_only_this_runs_units_over_the_newest_entry_on_any_outcome() -> None:
     """Two runs overlapping, despite the concurrency group, can't drop each other's progress on a
     unit only one ran: the newest entry is restored again just before the save (D1a)."""

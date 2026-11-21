@@ -687,7 +687,15 @@ def harvest(repository: str, checkout: Path, state: Path, record_path: Path) -> 
         record.discarded.append(
             "the run was killed before it saved its state: the results it had finished were kept"
         )
-        record.filled_since = manifest.get("units", {}).get(unit.name, {}).get("filled_since")
+        since = manifest.get("units", {}).get(unit.name, {}).get("filled_since")
+        # A refresh discarded the old state but rewrites the manifest only when it saves: a killed
+        # refresh is a fresh fill, not the stale date, or the next run discards it again (#380).
+        try:
+            age = (today - datetime.date.fromisoformat(str(since))).days
+        except ValueError:
+            age = settings.full_refresh_days + 1
+        refresh = os.environ.get("MUTATION_FULL_REFRESH") == "true"
+        record.filled_since = None if refresh or age > settings.full_refresh_days else since
         st.save(
             state,
             unit,

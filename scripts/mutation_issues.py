@@ -142,7 +142,7 @@ def body(
         marker(repository, judgement.module),
         f"<!-- mutation-testing-state: score={judgement.score:g} survived={module.survived} -->",
         "",
-        f"`{judgement.module}` scored **{judgement.score:g}%** in the weekly mutation run "
+        f"`{judgement.module}` scored **{judgement.score:g}%** in the nightly mutation run "
         f"([run]({run_url})): {module.caught} caught of {module.counted} "
         f"({module.killed} killed, {module.timeout} timed out, {module.crashed} crashed), "
         f"{module.survived} survived, {module.no_tests} reached by no test"
@@ -179,7 +179,7 @@ def body(
             lines.append(f"- and {more} more: {how} lists them all")
         lines.append("")
     lines.append(
-        "A test that fails for a mutant kills it. Close this by raising the score: the weekly run "
+        "A test that fails for a mutant kills it. Close this by raising the score: the nightly run "
         "closes it when the module is back at or over its threshold and baseline."
     )
     return "\n".join(lines) + "\n"
@@ -255,7 +255,7 @@ def plan_repository(
                         "comment",
                         name,
                         issue,
-                        comment=f"This week: {judgement.score:g}% with {module.survived} surviving "
+                        comment=f"This run: {judgement.score:g}% with {module.survived} surviving "
                         f"(was {was(issue.score)}% with {was(issue.survived)}). [Run]({run_url}).",
                     )
                 )
