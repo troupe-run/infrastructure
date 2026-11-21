@@ -680,7 +680,7 @@ infrastructure itself, a `[coverage]` table in `quality-gates.toml`; another rep
 `[coverage]` in its own pull request. Once applied, the weekly run mutates it, and if it receives the guard's files,
 the pull request report is delivered to it. Taking one off the list deletes its delivered copies.
 
-**Weekly** (`.github/workflows/mutation.yml`, Sunday 03:23 UTC, on Linux with Python 3.15), each listed repository is
+**Nightly** (`.github/workflows/mutation.yml`, 03:23 UTC, on Linux with Python 3.15), each listed repository is
 mutated at its `main` (mutmut for Python, Stryker for TypeScript). A module's score is
 the mutants caught as a percentage of those caught, survived or reached by no test. A module is judged when it has at
 least 10 mutants and all of them ran within the budget, and is **under** when its score is below 60% or below its
@@ -755,6 +755,38 @@ and the report names it as it names a survivor: its name, path, line, change and
 summary lists them all, each having ended only its own test process. A mutant that ended the whole run isn't in the
 report: the step says how the run ended. Excluding a mutant (`# pragma: no mutate`) is the owner's decision, made from
 that list (#361).
+
+**Each run resumes from the last** (#378). mutmut keeps every result as its mutant finishes, and keeps a function's
+results while its code is unchanged (a hash of its own code, without line numbers or comments). So the run keeps
+mutmut's state between runs in GitHub's cache: each unit's `.meta` files and `mutmut-stats.json` (about 3 MB for troupe;
+the mutated sources are rebuilt on every fresh checkout), one entry per repository and run, the newest for the mutmut
+version restored. Each unit runs whole with no mutant names, so mutmut skips every stored result: a run the budget stops
+keeps what it finished and the next continues, and once filled a night re-tests only the functions that changed and
+anything left unfinished. A dispatch can name one unit (`unit`); module globs aren't offered, since mutmut re-runs every
+mutant a glob names. The summary says, per unit, how many results were carried from the kept state and how many were
+tested in the run.
+
+**What incremental runs can't see**, and the refresh that clears it. mutmut doesn't notice an edited test body, doesn't
+re-test a function's callers when it changes, and only warns about non-Python files changed since its last full run (it
+keeps cached results; the summary names those files). So every `full_refresh_days` (28, in `scripts/mutation.json`), or
+on a dispatch with `full-refresh`, the run discards the kept state on purpose and refills; modules not yet reached again
+aren't judged meanwhile.
+
+**Lost or unfit state fails visibly.** Each run records what state it saved (`state-<repository>.json`, with its
+report). If the previous run saved a unit's state and this run can't restore it (the cache evicted it, or it was lost),
+the unit starts afresh, the summary names it, and the run fails. So does state from another mutmut version, or a unit
+whose sources or tests moved in the settings. A `.meta` file that can't be read drops only that source file's results,
+which are tested again, named, and the run fails. A save that doesn't land fails the run too. A first fill, with nothing
+saved before, doesn't fail. Two runs overlapping despite the concurrency group can't drop each other's progress: the
+save keeps the newest entry for every unit the run didn't run.
+
+**Seeding the baseline** (runbook). After a change that empties the kept state (the first time, a mutmut upgrade, or a
+lost cache), fill it with back-to-back dispatches: `gh workflow run mutation.yml -R troupe-run/infrastructure -f
+repository=troupe -f dry-run=true`, wait for the run to end, and dispatch again. Each resumes from the one before (the
+concurrency group runs them one at a time, and each restores the entry the last saved). troupe's `troupe` unit takes
+about 3 runs and its plugins about 1, from the proving run's rate. Each run's summary shows the carried and tested
+counts; the fill is done when every module is finished. Dry runs write no issues while the baseline is partial; the
+first nightly run after the fill judges every module.
 
 **Mutation runs happen only in CI.** Never run them on your own machine: a `kill(-1)` mutant would kill every process
 of your login, and macOS can't contain it. The scripts' tests never run a mutant.

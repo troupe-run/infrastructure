@@ -438,6 +438,65 @@ def test_the_summary_names_each_survivor_it_couldnt_attribute() -> None:
     assert "Unattributed" not in mi.summary("troupe", plain, plan(plain), SETTINGS, dry=True)
 
 
+STATE = {
+    "version": 1,
+    "repository": "troupe",
+    "units": {
+        "troupe": {
+            "restored_from": "41",
+            "filled_since": "2026-11-20",
+            "carried": 1805,
+            "tested": 3210,
+            "discarded": ["src/troupe/cut.py.meta can't be read: its mutants are tested again"],
+            "lost": False,
+            "unfit": True,
+            "refreshed": False,
+            "saved": True,
+            "non_python_changes": ["uv.lock"],
+        },
+        "troupe-vcs-git": {
+            "restored_from": None,
+            "filled_since": None,
+            "carried": 0,
+            "tested": 900,
+            "discarded": ["no state kept yet: a first fill"],
+            "lost": False,
+            "unfit": False,
+            "refreshed": False,
+            "saved": True,
+            "non_python_changes": [],
+        },
+    },
+}
+
+
+def test_the_summary_says_where_each_units_results_came_from() -> None:
+    """Carried from the kept state or tested this run, what was discarded and why, and the
+    non-Python changes mutmut keeps cached results despite (#378, design D4)."""
+    r = report(**{"troupe.a": module(killed=10)})
+    text = mi.summary("troupe", r, plan(r), SETTINGS, dry=True, state=STATE)
+    assert (
+        "Kept mutmut state: each run resumes from the last run's saved results and tests only "
+        "what changed or is left." in text
+    )
+    assert (
+        "- `troupe`: 1805 results carried from run 41, 3210 tested in this run (filled since "
+        "2026-11-20)" in text
+    )
+    assert "  - src/troupe/cut.py.meta can't be read: its mutants are tested again" in text
+    assert (
+        "  - non-Python files changed since the last full run, cached results kept: `uv.lock`"
+        in text
+    )
+    assert "- `troupe-vcs-git`: 900 tested in this run" in text
+    assert "  - no state kept yet: a first fill" in text
+
+
+def test_a_summary_with_no_state_record_has_no_section_for_it() -> None:
+    r = report(**{"troupe.a": module(killed=10)})
+    assert "Kept mutmut state" not in mi.summary("troupe", r, plan(r), SETTINGS, dry=True)
+
+
 def test_a_summary_with_no_crashed_mutant_has_no_section_for_them() -> None:
     r = report(**{"troupe.a": module(killed=10)})
     assert "Crashed mutants" not in mi.summary("troupe", r, plan(r), SETTINGS, dry=True)

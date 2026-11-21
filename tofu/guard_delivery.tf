@@ -46,6 +46,8 @@ locals {
     "scripts/mutation_report.py",
     "scripts/mutation_run.py",
     "scripts/mutation_settings.py",
+    # The scheduled run's kept mutmut state, which mutation_run.py imports (#378).
+    "scripts/mutation_state.py",
   ])
 
   mutation_listed = toset(keys(jsondecode(file("${path.module}/../scripts/mutation.json")).repositories))

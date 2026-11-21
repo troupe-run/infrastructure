@@ -49,7 +49,8 @@ def triggers(workflow: dict[Any, Any]) -> set[str]:
 def test_the_weekly_run_runs_on_its_schedule_and_by_hand_only() -> None:
     workflow = load(WEEKLY)
     assert triggers(workflow) == {"schedule", "workflow_dispatch"}
-    assert workflow[True]["schedule"] == [{"cron": "23 3 * * 0"}]
+    # Nightly: each run resumes from the last one's kept state (#378).
+    assert workflow[True]["schedule"] == [{"cron": "23 3 * * *"}]
     assert workflow["permissions"] == {}
     assert workflow["concurrency"] == {"group": "mutation", "cancel-in-progress": False}
 
@@ -159,8 +160,90 @@ def test_the_weekly_run_is_watched_for_stopping() -> None:
     assert {
         "repository": "infrastructure",
         "workflow": "mutation.yml",
-        "max_age_days": 8,
+        "max_age_days": 2,
     } in watched
+
+
+# The kept state (#378, mutation-incremental design D1, D1a)
+
+CACHE = "actions/cache"
+
+
+def mutate_steps() -> list[dict[str, Any]]:
+    steps: list[dict[str, Any]] = load(WEEKLY)["jobs"]["mutate"]["steps"]
+    return steps
+
+
+def weekly_step(name: str) -> dict[str, Any]:
+    [step] = [s for s in mutate_steps() if s.get("name") == name]
+    return step
+
+
+def test_a_dispatch_can_name_one_unit_or_ask_for_a_full_refresh() -> None:
+    inputs = load(WEEKLY)[True]["workflow_dispatch"]["inputs"]
+    assert inputs["unit"]["type"] == "string"
+    assert inputs["unit"]["default"] == ""
+    assert inputs["full-refresh"] == {
+        "description": "Discard the kept mutmut state and fill afresh",
+        "type": "boolean",
+        "default": False,
+    }
+    mutate = weekly_step("Mutate")
+    assert mutate["env"]["UNIT"] == "${{ inputs.unit }}"
+    assert mutate["env"]["MUTATION_FULL_REFRESH"] == "${{ inputs.full-refresh }}"
+    assert 'args+=(--unit "$UNIT")' in mutate["run"]
+
+
+def test_the_state_is_restored_before_mutating_newest_first_by_repository_and_mutmut_version() -> (
+    None
+):
+    steps = mutate_steps()
+    names = [s.get("name") for s in steps]
+    [key] = [s for s in steps if s.get("name") == "The kept state's cache key"]
+    assert 'prefix="mutmut-state-$REPOSITORY-mutmut$mutmut-"' in key["run"]
+    assert "key=$prefix$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" in key["run"]
+    [restore] = [s for s in steps if s.get("name") == "Restore the kept state"]
+    assert restore["uses"].startswith(f"{CACHE}/restore@")
+    assert restore["with"] == {
+        "path": "state",
+        "key": "${{ steps.state.outputs.key }}",
+        "restore-keys": "${{ steps.state.outputs.prefix }}",
+    }
+    assert names.index("Restore the kept state") < names.index("Mutate")
+    env = weekly_step("Mutate")["env"]
+    assert env["MUTATION_STATE"] == "${{ github.workspace }}/state"
+    assert env["MUTATION_PREVIOUS_STATE"] == (
+        "${{ runner.temp }}/previous/state-${{ matrix.repository }}.json"
+    )
+    assert env["MUTATION_RUN_ID"] == "${{ github.run_id }}"
+
+
+def test_the_save_keeps_only_this_runs_units_over_the_newest_entry_on_any_outcome() -> None:
+    """Two runs overlapping, despite the concurrency group, can't drop each other's progress on a
+    unit only one ran: the newest entry is restored again just before the save (D1a)."""
+    steps = mutate_steps()
+    names = [s.get("name") for s in steps]
+    after = [
+        "Set this run's state aside",
+        "Restore the newest kept state again",
+        "Keep this run's units over the newest kept state",
+        "Save the kept state",
+        "Check the kept state was saved",
+    ]
+    assert [n for n in names if n in after] == after
+    assert names.index("Mutate") < names.index(after[0])
+    by_name = {s.get("name"): s for s in steps}
+    for name in after:
+        assert by_name[name]["if"].startswith("always() && steps.skip.outputs.skip != 'true'")
+    again = by_name["Restore the newest kept state again"]
+    assert again["uses"].startswith(f"{CACHE}/restore@")
+    assert again["with"]["path"] == "state"
+    assert again["with"]["restore-keys"] == "${{ steps.state.outputs.prefix }}"
+    assert "state-merge" in by_name["Keep this run's units over the newest kept state"]["run"]
+    save = by_name["Save the kept state"]
+    assert save["uses"].startswith(f"{CACHE}/save@")
+    assert save["with"] == {"path": "state", "key": "${{ steps.state.outputs.key }}"}
+    assert "gh cache list" in by_name["Check the kept state was saved"]["run"]
 
 
 # The pull request report

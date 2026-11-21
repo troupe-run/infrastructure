@@ -39,6 +39,16 @@ unit, because a workflow's steps are fixed while the units vary by repository; a
 runs one, and saves them all back. About 3 MB a night against the repository's shared 10 GB; a nightly run keeps the
 newest entry inside the 7-day eviction window.
 
+### D1a. Overlapping runs never drop a unit's progress they didn't make
+
+The concurrency group runs one mutation run at a time, but the save mustn't depend on that. Suppose a nightly run and a
+unit dispatch ever overlapped: the one saving later would otherwise write back, for units it didn't run, the state it
+restored at its start, dropping what the other run saved in between. So before saving, the job moves its own `state/`
+aside, restores the newest entry again into `state/` (`actions/cache` restores an entry only to the path it was saved
+from), and copies back only the units this run ran (`mutation_run.py state-merge`, reading the run's state record).
+Every other unit is the newest saved copy, byte for byte. Overlap can then cost at most the progress on a unit both runs
+ran, never on a unit only one of them ran.
+
 ### D2. The run restores, validates, resumes and saves each unit
 
 `run_mutmut` already clears `mutants/` first; it then copies `state/<unit>/` in, after checks:
@@ -68,9 +78,10 @@ Modules with a mutant not yet run aren't finished, so they're never judged, as n
 ### D4. The summary says where results came from
 
 The weekly summary (now nightly) gains a state section from `state-<repo>.json`: per unit, carried and tested counts,
-the restored run, the age of the fill, and each discarded file or unit with its reason. `mutation_run` keeps mutmut's
-"non-Python file(s) changed since the last full run" warning from its output and the summary names those files: cached
-results stay, as the owner chose ("warn"); the next full refresh re-tests them.
+the restored run, the age of the fill, and each discarded file or unit with its reason. It names the non-Python files
+mutmut warns about and keeps cached results despite ("warn", as the owner chose): `mutation_state.non_python_changes`
+computes them as mutmut does, `git diff --name-only` from the baseline commit in `mutmut-stats.json`, without `.py`
+files and with mutmut's own exclusion list, rather than parsing mutmut's output. The next full refresh re-tests them.
 
 ### D5. The schedule, the refresh and the inputs
 

@@ -34,7 +34,7 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mutation_report as mr
@@ -457,8 +457,42 @@ def crashed_section(report: mr.Report) -> list[str]:
     return lines
 
 
+def state_section(state: Mapping[str, Any] | None) -> list[str]:
+    """Where each unit's results came from: carried from the kept state or tested this run, what
+    was discarded and why, and the non-Python changes mutmut keeps cached results despite (#378)."""
+    if not state:
+        return []
+    lines = [
+        "",
+        "Kept mutmut state: each run resumes from the last run's saved results and tests only what "
+        "changed or is left.",
+        "",
+    ]
+    for name, unit in sorted(state.get("units", {}).items()):
+        parts = []
+        if unit.get("restored_from"):
+            parts.append(
+                f"{unit.get('carried', 0)} results carried from run {unit['restored_from']}"
+            )
+        parts.append(f"{unit.get('tested', 0)} tested in this run")
+        since = f" (filled since {unit['filled_since']})" if unit.get("filled_since") else ""
+        lines.append(f"- `{code(name)}`: {', '.join(parts)}{since}")
+        lines += [f"  - {reason}" for reason in unit.get("discarded", [])]
+        changed = unit.get("non_python_changes") or []
+        if changed:
+            files = ", ".join(f"`{code(path)}`" for path in changed)
+            kept = "non-Python files changed since the last full run, cached results kept"
+            lines.append(f"  - {kept}: {files}")
+    return lines
+
+
 def summary(
-    repository: str, report: mr.Report, plan: Plan, settings: ms.Settings, dry: bool
+    repository: str,
+    report: mr.Report,
+    plan: Plan,
+    settings: ms.Settings,
+    dry: bool,
+    state: Mapping[str, Any] | None = None,
 ) -> str:
     verb = "would " if dry else ""
     lines = [f"## {repository} at {report.commit[:12]}", ""]
@@ -480,6 +514,7 @@ def summary(
         )
     lines += crashed_section(report)
     lines += unattributed_section(report)
+    lines += state_section(state)
     if plan.raises:
         lines += [
             "",
@@ -528,7 +563,9 @@ def handle(
     plan = plan_repository(report, baselines, issues, settings, run_url, tool, pulls)
     if not dry:
         apply(gh, repository, plan, opened)
-    return summary(repository, report, plan, settings, dry)
+    record = directory / f"state-{repository}.json"
+    state = json.loads(record.read_text(encoding="utf-8")) if record.exists() else None
+    return summary(repository, report, plan, settings, dry, state)
 
 
 def reading_gh(token: str) -> Gh:
