@@ -318,6 +318,30 @@ def test_a_run_opens_the_issues_and_hands_their_urls_to_the_board_job(tmp_path: 
     assert len(json.loads(out.removeprefix("issue-urls="))) == 3
 
 
+def test_a_run_reads_each_repositorys_state_record_into_its_summary(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The file mutation_run.py writes beside the report, by the same name (#380's review)."""
+    write_reports(tmp_path)
+    (tmp_path / "state-troupe.json").write_text(json.dumps(STATE), encoding="utf-8")
+    assert mi.main([str(tmp_path)], actions_env(tmp_path), FakeGitHub()) == 0
+    assert "- `troupe`: 1805 results carried from run 41" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("bad", ["{not json", '{"units": []}', '{"units": {"troupe": 1}}'])
+def test_a_malformed_state_record_is_named_and_its_repository_left_untouched(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], bad: str
+) -> None:
+    """Read before any issue is written: a bad record can't strand opened issues off the board."""
+    write_reports(tmp_path)
+    (tmp_path / "state-troupe.json").write_text(bad, encoding="utf-8")
+    gh = FakeGitHub()
+    assert mi.main([str(tmp_path)], actions_env(tmp_path), gh) == 1
+    assert len(gh.writes) == 2
+    assert "troupe: state-troupe.json is malformed" in capsys.readouterr().err
+    assert (tmp_path / "out").read_text(encoding="utf-8").startswith("issue-urls=[")
+
+
 def test_a_malformed_report_fails_the_run_after_the_others_are_handled(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

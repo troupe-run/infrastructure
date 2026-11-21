@@ -224,6 +224,7 @@ def test_the_save_keeps_only_this_runs_units_over_the_newest_entry_on_any_outcom
     steps = mutate_steps()
     names = [s.get("name") for s in steps]
     after = [
+        "Keep what a killed run finished",
         "Set this run's state aside",
         "Restore the newest kept state again",
         "Keep this run's units over the newest kept state",
@@ -235,6 +236,13 @@ def test_the_save_keeps_only_this_runs_units_over_the_newest_entry_on_any_outcom
     by_name = {s.get("name"): s for s in steps}
     for name in after:
         assert by_name[name]["if"].startswith("always() && steps.skip.outputs.skip != 'true'")
+    # A run killed outright wrote no record: its finished results are harvested first (#380).
+    harvest = by_name["Keep what a killed run finished"]
+    assert "hashFiles('out/state-*.json') == ''" in harvest["if"]
+    assert "steps.mutate.outcome != 'skipped'" in harvest["if"]
+    assert "state-harvest" in harvest["run"]
+    for name in after[1:]:
+        assert "hashFiles('out/state-*.json') != ''" in by_name[name]["if"]
     again = by_name["Restore the newest kept state again"]
     assert again["uses"].startswith(f"{CACHE}/restore@")
     assert again["with"]["path"] == "state"
@@ -845,6 +853,8 @@ def test_the_pull_request_report_and_what_it_runs_are_delivered() -> None:
         "scripts/mutation_report.py",
         "scripts/mutation_run.py",
         "scripts/mutation_settings.py",
+        # mutation_run.py imports it (#378): without it troupe's copy fails on import.
+        "scripts/mutation_state.py",
     }
     assert needed <= delivered, needed - delivered
     # The weekly run, its issue upkeep and the App's credential stay here.

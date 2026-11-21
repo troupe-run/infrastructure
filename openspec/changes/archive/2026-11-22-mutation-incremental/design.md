@@ -98,6 +98,26 @@ about
 summary's carried and tested counts show progress, and the fill is done when every module is finished. Dry runs write no
 issues while the baseline is partial; the first nightly run after the fill judges every module.
 
+### D7. "Weekly" elsewhere in the spec means the scheduled run
+
+This change replaces the requirement that set the schedule ("runs weekly" becomes "runs nightly"). The other
+mutation-testing requirements still say "weekly" (the weekly run, the previous weekly run's tested commit, the weekly
+summary): there it names the scheduled run, now nightly, and "the previous weekly run" is the previous successful
+scheduled run, a dispatch included. Rewording those requirements touches a dozen requirements this change doesn't
+otherwise alter, so it's left to its own change, #381; the docs are reworded here (#380's review).
+
+### D8. A run's end, and which ends keep its progress
+
+- **The budget** (240 minutes, `budget_minutes`) is enforced by `mutation_run` itself: mutmut gets the time left as its
+  timeout and is stopped at the deadline, after which each unit's `finally` saves its state and the record is written.
+  The job's own timeout is 270 minutes (the budget plus 30 for setup, the report and the save; a test holds the two
+  together), so the budget always stops mutmut well before the job's timeout, which happens only if something hangs.
+- **A failure** (`mutation_run` exits 2) still writes the record, so the save runs on what the units finished.
+- **A kill of the whole run** (an OOM of its cgroup, a signal) runs no `finally`, but mutmut wrote each finished result
+  to its `.meta` files: the "Keep what a killed run finished" step harvests them before the save.
+- **The job's timeout** is the one end that keeps nothing of that night: GitHub stops the job, so no later step runs.
+  The next run restores the last saved entry, and the run shows as timed out.
+
 ## Risks / Trade-offs
 
 - Cache eviction under pressure from the repository's other caches → detected (D3) and named; the next runs refill.
