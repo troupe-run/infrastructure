@@ -720,6 +720,14 @@ keeps the kernel's and systemd's lines since it began from the sources that can 
 lines, systemd-oomd, and systemd on the runner's service or the run's scope) as `journal: ` lines and in
 `journal-<repository>.log`.
 
+**Where a survivor is placed.** A survivor's or crashed mutant's line comes from `mutmut show`'s diff, which counts from
+the function's first line as mutmut renders it: the first of the comments directly above the `def`, when there are any,
+since libcst attaches them to the function. `scripts/mutation_locator_check.py` checks the locator against real mutmut
+(in a container: it needs mutmut, and runs no mutated code); at troupe 0515e2d it placed all 27,492 mutants right. Run
+it again when mutmut's version moves (#377). If `git blame` can't read a survivor's line, that survivor is reported with
+no commit, the run's log says why, and the weekly summary names it as unattributed: one survivor's attribution never
+costs the report.
+
 **A runaway mutant ends only its own tests.** Each mutant's test process can run under a memory cap, `mutant_memory_mb`
 in `scripts/mutation.json` (an address-space limit, `RLIMIT_AS`), so a mutant whose tests allocate without bound fails
 on its own: mutmut records it and goes on, and the summary names it if it crashed. mutmut's own process, where its stats

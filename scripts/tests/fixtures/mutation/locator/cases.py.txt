@@ -1,0 +1,40 @@
+"""Where mutmut 3.8.1 starts each function's diff (#377): with and without comments above."""
+
+import functools
+
+
+def plain(a, b):
+    return a + b
+
+
+# a comment directly above
+def commented(a, b):
+    return a - b
+
+
+# a comment above, then a blank line
+
+def spaced(a, b):
+    return a * b
+
+
+# a comment above the decorator
+@functools.cache
+def decorated(a):
+    return a + 1
+
+
+class Holder:
+    def first(self, a):
+        if a:
+            return a + 1
+            # a comment in first's body, deeper than the next def
+
+    def second(self, a):
+        return a - 1
+
+    # a comment above a method
+    def third(self, a):
+        """A docstring
+        over two lines."""
+        return a * 2
