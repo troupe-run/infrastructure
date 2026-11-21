@@ -673,11 +673,11 @@ test notices is a surviving mutant, which says a test is missing (spec: mutation
 never blocks a merge. Every number it judges by is in `scripts/mutation.json`.
 
 **Which repositories.** `scripts/mutation.json`'s `repositories` is the one list of repositories that get coverage
-and mutation testing: the weekly run, the pull request report and the coverage gate (owner, 2026-11-18, #332).
+and mutation testing: the scheduled run, the pull request report and the coverage gate (owner, 2026-11-18, #332).
 Today it names troupe alone. website and infrastructure keep complexity, the audit and linting. To add a repository,
 in one pull request here: add its entry to `repositories` (what to mutate, with mutmut or Stryker), and, for
 infrastructure itself, a `[coverage]` table in `quality-gates.toml`; another repository declares its own
-`[coverage]` in its own pull request. Once applied, the weekly run mutates it, and if it receives the guard's files,
+`[coverage]` in its own pull request. Once applied, the scheduled run mutates it, and if it receives the guard's files,
 the pull request report is delivered to it. Taking one off the list deletes its delivered copies.
 
 **Nightly** (`.github/workflows/mutation.yml`, 03:23 UTC, on Linux with Python 3.15), each listed repository is
@@ -725,7 +725,7 @@ the function's first line as mutmut renders it: the first of the comments direct
 since libcst attaches them to the function. `scripts/mutation_locator_check.py` checks the locator against real mutmut
 (in a container: it needs mutmut, and runs no mutated code); at troupe 0515e2d it placed all 27,492 mutants right. Run
 it again when mutmut's version moves (#377). If `git blame` can't read a survivor's line, that survivor is reported with
-no commit, the run's log says why, and the weekly summary names it as unattributed: one survivor's attribution never
+no commit, the run's log says why, and the scheduled run's summary names it as unattributed: one survivor's attribution never
 costs the report.
 
 **A runaway mutant ends only its own tests.** Each mutant's test process can run under a memory cap, `mutant_memory_mb`
@@ -751,7 +751,7 @@ most the run. The step then says "ran out of memory (MemoryMax 12G)", "killed by
 read from the kernel log.
 
 **Crashed mutants are named.** A mutant whose tests die (by a signal, or the tool's runtime error) is counted as caught,
-and the report names it as it names a survivor: its name, path, line, change and the tool's exit code. The weekly run's
+and the report names it as it names a survivor: its name, path, line, change and the tool's exit code. The scheduled run's
 summary lists them all, each having ended only its own test process. A mutant that ended the whole run isn't in the
 report: the step says how the run ended. Excluding a mutant (`# pragma: no mutate`) is the owner's decision, made from
 that list (#361).

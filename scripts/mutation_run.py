@@ -654,10 +654,54 @@ def subcommand(given: Sequence[str]) -> int | None:
         return 0
     if given[:1] == ["state-merge"] and len(given) == 4:
         # Before the save: units this run ran from its state, the rest from the newest entry (D1a).
-        record = json.loads(Path(given[3]).read_text(encoding="utf-8"))
+        record_path = Path(given[3])
+        record = json.loads(record_path.read_text(encoding="utf-8"))
         st.merge(Path(given[1]), Path(given[2]), ran=sorted(record.get("units", {})))
+        # Every unit the saved entry holds, so the next run notices any of them gone (#380).
+        record["kept"] = sorted((st.read_manifest(Path(given[2])) or {}).get("units", {}))
+        record_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        return 0
+    if given[:1] == ["state-harvest"] and len(given) == 5:
+        harvest(given[1], Path(given[2]), Path(given[3]), Path(given[4]))
         return 0
     return None
+
+
+def harvest(repository: str, checkout: Path, state: Path, record_path: Path) -> None:
+    """After a run killed outright (no `finally` ran, no record), keep the results mutmut had
+    written to each unit's .meta files, and record that it did (#380's review)."""
+    settings = ms.load_settings(SETTINGS.read_text(encoding="utf-8"))
+    manifest = st.read_manifest(state) or {}
+    today = datetime.datetime.now(datetime.UTC).date()
+    try:
+        commit = head(checkout)
+    except RunError:
+        commit = ""
+    records = []
+    for unit in settings.repositories[repository].units:
+        source = checkout / unit.source
+        mutants = (source.parent if source.name == "src" else checkout) / "mutants"
+        if not mutants.is_dir():
+            continue
+        record = st.UnitState(unit.name)
+        record.discarded.append(
+            "the run was killed before it saved its state: the results it had finished were kept"
+        )
+        record.filled_since = manifest.get("units", {}).get(unit.name, {}).get("filled_since")
+        st.save(
+            state,
+            unit,
+            mutants,
+            record,
+            mutmut=settings.tools["mutmut"],
+            run_id=os.environ.get("MUTATION_RUN_ID", "local"),
+            commit=commit,
+            today=today,
+        )
+        records.append(record)
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    body = {"version": 1, "repository": repository, "units": {r.name: r.record() for r in records}}
+    record_path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
 
 
 def finish_state(state: StateRun, repository: str, out: Path) -> int:
@@ -695,6 +739,7 @@ def main(argv: Sequence[str] | None = None, run: Run = run_command) -> int:
     parser.add_argument("--only", default=None)
     parser.add_argument("--unit", default=None)
     args = parser.parse_args(argv)
+    state: StateRun | None = None
     try:
         settings = ms.load_settings(SETTINGS.read_text(encoding="utf-8"))
         if args.repository not in settings.repositories:
@@ -720,6 +765,10 @@ def main(argv: Sequence[str] | None = None, run: Run = run_command) -> int:
         )
     except (RunError, ms.SettingsError, mr.ReportError) as error:
         print(f"mutation_run: {error}", file=sys.stderr)
+        if state is not None:
+            # The units saved before the failure are kept: record them, so the save runs (#380).
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            finish_state(state, args.repository, args.out)
         return 2
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(mr.dump_report(report), encoding="utf-8")
@@ -737,7 +786,9 @@ def state_run(settings: ms.Settings, commit: str) -> StateRun | None:
     previous = os.environ.get("MUTATION_PREVIOUS_STATE")
     if previous and Path(previous).is_file():
         record = json.loads(Path(previous).read_text(encoding="utf-8"))
-        saved = {name for name, unit in record.get("units", {}).items() if unit.get("saved")}
+        # The units its saved entry kept, which a single-unit run's own units don't cover (#380).
+        saved = set(record.get("kept", []))
+        saved |= {name for name, unit in record.get("units", {}).items() if unit.get("saved")}
     return StateRun(
         directory=Path(directory),
         mutmut=settings.tools["mutmut"],

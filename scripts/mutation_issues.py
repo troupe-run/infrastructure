@@ -561,11 +561,27 @@ def handle(
     pulls = pulls_for(reader, repository, commits) if commits else {}
     tool = settings.repositories[repository].tool
     plan = plan_repository(report, baselines, issues, settings, run_url, tool, pulls)
+    # Read before any issue is written, so a bad record can't strand opened issues (#380).
+    state = read_state(directory / f"state-{repository}.json")
     if not dry:
         apply(gh, repository, plan, opened)
-    record = directory / f"state-{repository}.json"
-    state = json.loads(record.read_text(encoding="utf-8")) if record.exists() else None
     return summary(repository, report, plan, settings, dry, state)
+
+
+def read_state(path: Path) -> dict[str, Any] | None:
+    """The scheduled run's state record (mutation_run.py writes it beside the report), checked:
+    malformed is an error naming the file, never read as no record (#378)."""
+    if not path.exists():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as error:
+        raise mr.ReportError(f"{path.name} is malformed: {error}") from error
+    units = record.get("units") if isinstance(record, dict) else None
+    if not isinstance(units, dict) or not all(isinstance(u, dict) for u in units.values()):
+        raise mr.ReportError(f"{path.name} is malformed: its units aren't an object of objects")
+    checked: dict[str, Any] = record
+    return checked
 
 
 def reading_gh(token: str) -> Gh:

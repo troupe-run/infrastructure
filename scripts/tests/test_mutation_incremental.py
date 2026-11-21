@@ -113,3 +113,74 @@ def test_state_merge_takes_the_units_the_run_recorded(tmp_path: Path) -> None:
     assert run.main(["state-merge", str(mine), str(newest), str(record)]) == 0
     assert '"k": 1' in (newest / "scripts" / "a.meta").read_text(encoding="utf-8")
     assert '"k": 0' in (newest / "other" / "a.meta").read_text(encoding="utf-8")
+    # The record names every unit the saved entry holds, not only the units this run ran, so a
+    # later eviction is noticed for all of them (#380's review).
+    assert json.loads(record.read_text(encoding="utf-8"))["kept"] == ["other", "scripts"]
+
+
+def test_a_unit_the_last_run_didnt_run_but_kept_is_noticed_when_its_state_is_gone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A unit dispatch's record runs one unit but its saved entry keeps the others: an eviction
+    after it must still fail for every unit that entry held."""
+    previous = {"version": 1, "repository": "infrastructure", "units": {}, "kept": ["scripts"]}
+    code, _, _ = weekly(tmp_path, monkeypatch, previous)
+    assert code == 3
+
+
+class FailingMutmut(FakeMutmut):
+    """mutmut writing a result, then failing as when a unit's tests fail in its copy."""
+
+    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+        super().__call__(command, cwd, timeout)
+        return 3
+
+
+def test_a_run_that_fails_still_records_and_keeps_what_it_finished(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A RunError exits 2, but the units saved before it are kept, with their record (#380)."""
+    repo, _ = scratch_checkout(tmp_path)
+    monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
+    fake_show(monkeypatch)
+    state = tmp_path / "state"
+    monkeypatch.setenv("MUTATION_STATE", str(state))
+    monkeypatch.setenv("MUTATION_RUN_ID", "43")
+    out = tmp_path / "out" / "report-infrastructure.json"
+    assert run.main(["infrastructure", str(repo), str(out)], FailingMutmut()) == 2
+    record = json.loads((out.parent / "state-infrastructure.json").read_text(encoding="utf-8"))
+    assert record["units"]["scripts"]["saved"]
+    assert (state / "scripts" / "src" / "calc.py.meta").exists()
+
+
+def test_a_killed_runs_finished_results_are_harvested_from_disk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A run killed outright (OOM of the whole run, a signal, the job's timeout) runs no
+    `finally`, but mutmut wrote every finished result to its .meta files: the workflow harvests
+    them, so the night's progress is kept and named (#380)."""
+    repo, _ = scratch_checkout(tmp_path)
+    meta = repo / "mutants" / "src" / "calc.py.meta"
+    meta.parent.mkdir(parents=True)
+    meta.write_text(json.dumps({"exit_code_by_key": {"calc.x_add__mutmut_1": 1}}), encoding="utf-8")
+    state = tmp_path / "state"
+    (state / "scripts").mkdir(parents=True)
+    (state / "manifest.json").write_text(
+        json.dumps(
+            {"version": 1, "mutmut": "3.8.1", "units": {"scripts": {"filled_since": "2026-11-20"}}}
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MUTATION_RUN_ID", "44")
+    record = tmp_path / "out" / "state-infrastructure.json"
+    argv = ["state-harvest", "infrastructure", str(repo), str(state), str(record)]
+    assert run.main(argv) == 0
+    assert json.loads((state / "scripts" / "src" / "calc.py.meta").read_text(encoding="utf-8"))
+    manifest = json.loads((state / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["units"]["scripts"]["saved_by"] == "44"
+    assert manifest["units"]["scripts"]["filled_since"] == "2026-11-20"
+    unit = json.loads(record.read_text(encoding="utf-8"))["units"]["scripts"]
+    assert unit["saved"]
+    assert unit["discarded"] == [
+        "the run was killed before it saved its state: the results it had finished were kept"
+    ]

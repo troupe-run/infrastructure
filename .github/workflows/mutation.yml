@@ -197,6 +197,7 @@ jobs:
             uv pip install "mutmut==$mutmut"
           fi
       - name: Mutate
+        id: mutate
         if: steps.skip.outputs.skip != 'true'
         working-directory: target
         env:
@@ -312,6 +313,14 @@ jobs:
       # Two runs overlapping despite the concurrency group mustn't drop each other's progress on a
       # unit only one ran, so the newest entry is restored again and only this run's units replace
       # it (D1a): actions/cache restores an entry only to the path it was saved from.
+      # A run killed outright (an OOM of the whole run, a signal) runs no `finally` and writes no
+      # record, but mutmut wrote every finished result to its .meta files: keep them (#380).
+      - name: Keep what a killed run finished
+        if: always() && steps.skip.outputs.skip != 'true' && steps.mutate.outcome != 'skipped' && hashFiles('out/state-*.json') == ''
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+          MUTATION_RUN_ID: ${{ github.run_id }}
+        run: python3 infra/scripts/mutation_run.py state-harvest "$REPOSITORY" target state "out/state-$REPOSITORY.json"
       - name: Set this run's state aside
         if: always() && steps.skip.outputs.skip != 'true' && hashFiles('out/state-*.json') != ''
         run: |
