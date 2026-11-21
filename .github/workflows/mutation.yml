@@ -263,6 +263,11 @@ jobs:
           sampler=$!
           trap lowest_resources EXIT
           # resources: end
+          # Before the run: one that exits 3 for lost state still hands on its report, and the issues job
+          # needs the baselines with it, or it would close a below-baseline issue (#380).
+          if [[ -f quality-gates.toml ]]; then
+            cp quality-gates.toml "../out/quality-gates-$REPOSITORY.toml"
+          fi
           args=("$REPOSITORY" . "../out/report-$REPOSITORY.json")
           [[ -z "$PREVIOUS" ]] || args+=(--previous "$PREVIOUS")
           # A whole unit, never module globs: mutmut re-runs every mutant a glob names (#378).
@@ -305,9 +310,6 @@ jobs:
             run_contained python3 ../infra/scripts/mutation_run.py "${args[@]}"
           else
             run_contained uv run --no-sync python ../infra/scripts/mutation_run.py "${args[@]}"
-          fi
-          if [[ -f quality-gates.toml ]]; then
-            cp quality-gates.toml "../out/quality-gates-$REPOSITORY.toml"
           fi
       # The save, on any outcome, so what a run the budget or a failure stops finished is kept (D1).
       # Two runs overlapping despite the concurrency group mustn't drop each other's progress on a

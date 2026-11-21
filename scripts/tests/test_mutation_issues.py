@@ -1,4 +1,4 @@
-"""The weekly run keeps exactly one test-quality issue per module under its threshold or baseline
+"""The scheduled run keeps exactly one test-quality issue per module under its threshold or baseline
 (spec: mutation-testing; lint-mutation design D5, D7, D8). GitHub is faked: each test records the
 gh calls the script makes."""
 
@@ -796,13 +796,13 @@ def test_the_body_says_what_was_measured_and_how_to_close_it() -> None:
         "",
     ]
     assert (
-        f"`troupe.a` scored **50%** in the weekly mutation run ([run]({RUN})): 10 caught of 20 "
+        f"`troupe.a` scored **50%** in the nightly mutation run ([run]({RUN})): 10 caught of 20 "
         "(10 killed, 0 timed out, 0 crashed), 5 survived, 5 reached by no test in the test process"
     ) in text
     assert f"Settings: [scripts/mutation.json]({mi.SETTINGS_URL})." in text
     assert "\n### Surviving mutants\n\n- `src/m.py:1`" in text
     assert text.endswith(
-        "A test that fails for a mutant kills it. Close this by raising the score: the weekly run "
+        "A test that fails for a mutant kills it. Close this by raising the score: the nightly run "
         "closes it when the module is back at or over its threshold and baseline.\n"
     )
 

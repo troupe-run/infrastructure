@@ -184,3 +184,23 @@ def test_a_killed_runs_finished_results_are_harvested_from_disk(
     assert unit["discarded"] == [
         "the run was killed before it saved its state: the results it had finished were kept"
     ]
+
+
+def test_a_killed_refresh_is_harvested_as_a_fresh_fill_not_with_its_stale_date(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A refresh discards the old state on purpose but rewrites the manifest only when it
+    saves: a refresh killed before then must not be re-stamped with the stale date, or the next
+    run discards its harvested results again and the refresh never fills (#380's review)."""
+    repo, _ = scratch_checkout(tmp_path)
+    meta = repo / "mutants" / "src" / "calc.py.meta"
+    meta.parent.mkdir(parents=True)
+    meta.write_text(json.dumps({"exit_code_by_key": {"calc.x_add__mutmut_1": 1}}), encoding="utf-8")
+    state = tmp_path / "state"
+    (state / "scripts").mkdir(parents=True)
+    stale = {"version": 1, "mutmut": "3.8.1", "units": {"scripts": {"filled_since": "2026-01-01"}}}
+    (state / "manifest.json").write_text(json.dumps(stale), encoding="utf-8")
+    record = tmp_path / "out" / "state-infrastructure.json"
+    assert run.main(["state-harvest", "infrastructure", str(repo), str(state), str(record)]) == 0
+    manifest = json.loads((state / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["units"]["scripts"]["filled_since"] != "2026-01-01"
