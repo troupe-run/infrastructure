@@ -1,0 +1,13 @@
+{
+  "_about": "mutmut 3.8.1's `show` diffs, made with scripts/mutation_locator_check.py diffs in a container (#377); config.py.txt is troupe's packages/troupe/src/troupe/cli/config.py at 0515e2d82da0.",
+  "config.py.txt": {
+    "x_run_flush__mutmut_64": "--- src/pkg/config.py\n+++ src/pkg/config.py\n@@ -14,6 +14,6 @@\n     for file in result[\"files\"]:\n         print(would + _file_line(file, rehearse=arguments.rehearse), file=stdout)\n     if arguments.rehearse:\n-        print(\"Rehearsal: nothing was written.\", file=stdout)\n+        print(\"XXRehearsal: nothing was written.XX\", file=stdout)\n         return ExitCode.WOULD_CHANGE\n     return ExitCode.OK"
+  },
+  "cases.py.txt": {
+    "x_plain__mutmut_1": "--- src/pkg/cases.py\n+++ src/pkg/cases.py\n@@ -1,2 +1,2 @@\n def plain(a, b):\n-    return a + b\n+    return a - b",
+    "x_commented__mutmut_1": "--- src/pkg/cases.py\n+++ src/pkg/cases.py\n@@ -1,3 +1,3 @@\n # a comment directly above\n def commented(a, b):\n-    return a - b\n+    return a + b",
+    "x_spaced__mutmut_1": "--- src/pkg/cases.py\n+++ src/pkg/cases.py\n@@ -1,4 +1,4 @@\n # a comment above, then a blank line\n \n def spaced(a, b):\n-    return a * b\n+    return a / b",
+    "xǁHolderǁsecond__mutmut_1": "--- src/pkg/cases.py\n+++ src/pkg/cases.py\n@@ -1,2 +1,2 @@\n def second(self, a):\n-    return a - 1\n+    return a + 1",
+    "xǁHolderǁthird__mutmut_1": "--- src/pkg/cases.py\n+++ src/pkg/cases.py\n@@ -2,4 +2,4 @@\n def third(self, a):\n     \"\"\"A docstring\n         over two lines.\"\"\"\n-    return a * 2\n+    return a / 2"
+  }
+}

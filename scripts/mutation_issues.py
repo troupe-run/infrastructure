@@ -421,6 +421,21 @@ def apply(gh: Gh, repository: str, plan: Plan, opened: list[str]) -> None:
 # The run
 
 
+def unattributed_section(report: mr.Report) -> list[str]:
+    """Every survivor whose `git blame` failed, named rather than lost (#377)."""
+    lost = mr.unattributed(report)
+    if not lost:
+        return []
+    lines = [
+        "",
+        "Unattributed survivors: their `git blame` failed, so who last changed their line isn't "
+        "known; the run's log says why.",
+        "",
+    ]
+    lines += [f"- `{code(s.name)}` at `{code(s.path)}:{s.line}`" for s in lost]
+    return lines
+
+
 def crashed_section(report: mr.Report) -> list[str]:
     """Every crashed mutant the report names, for the owner to decide on exclusions (#361). A
     crash the report names ended only its own test process; one that ended the run never reaches
@@ -464,6 +479,7 @@ def summary(
             + " (raised by a later run)"
         )
     lines += crashed_section(report)
+    lines += unattributed_section(report)
     if plan.raises:
         lines += [
             "",

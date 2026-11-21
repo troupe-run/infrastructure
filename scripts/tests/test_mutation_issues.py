@@ -42,7 +42,8 @@ def survivors(count: int, new: bool = False, commit: str | None = None) -> tuple
 
 def module(killed: int, survived: int = 0, finished: bool = True, **extra: int) -> mr.Module:
     new = bool(extra.pop("new", 0))
-    commit = "b" * 40 if new else None
+    # Every survivor in a weekly report is attributed; only a failed blame leaves none (#377).
+    commit = "b" * 40 if new else "a" * 40
     return mr.Module(
         killed=killed,
         survived=survived,
@@ -419,6 +420,22 @@ def test_a_backtick_in_a_crashed_mutant_cant_end_its_code_span_in_the_summary() 
         if line.startswith("- `m")
     ]
     assert line == "- `m'@owner'` at `a'b'.py:3` (exit -9): `-x' / +*y*`"
+
+
+def test_the_summary_names_each_survivor_it_couldnt_attribute() -> None:
+    """A failed blame leaves one survivor without a commit rather than losing the report, and the
+    summary says so, never silently (#377)."""
+    lost = mr.Survivor("m.f__mutmut_9", "src/m.py", 9, "-a\n+b", None, False)
+    m = module(killed=10, survived=1)
+    r = report(**{"troupe.a": mr.Module(10, 1, 0, 0, 0, 0, True, (lost,))})
+    text = mi.summary("troupe", r, plan(r), SETTINGS, dry=True)
+    assert (
+        "Unattributed survivors: their `git blame` failed, so who last changed their line isn't "
+        "known; the run's log says why." in text
+    )
+    assert "- `m.f__mutmut_9` at `src/m.py:9`" in text
+    plain = report(**{"troupe.a": m})
+    assert "Unattributed" not in mi.summary("troupe", plain, plan(plain), SETTINGS, dry=True)
 
 
 def test_a_summary_with_no_crashed_mutant_has_no_section_for_them() -> None:

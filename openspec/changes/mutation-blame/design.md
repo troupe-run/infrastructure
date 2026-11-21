@@ -35,8 +35,20 @@ compared stripped.
 | mutants in commented functions (1,140) | 0 | 1,140 |
 
 Hits on a line that occurs more than once in its function: 623 today, 633 with the change, and none can be an
-accidental match under the whole-hunk rule. The check ran in a throwaway Linux container; it isn't a test here,
-because it needs mutmut and troupe's sources. The committed tests use real cases copied from its output.
+accidental match under the whole-hunk rule.
+
+The checker is kept as `scripts/mutation_locator_check.py`, so the claim can be checked again whenever mutmut or libcst
+moves. Run with the fixed locator, its `check` command placed all 27,492 mutants right (exit 0). It needs mutmut, which
+this repository doesn't install, so it runs in a throwaway container. No mutated code runs, so it isn't a mutation run:
+
+    docker run --rm --cpus 3 -v "$PWD/scripts:/infra/scripts:ro" -v "<troupe checkout>:/troupe:ro" \
+      python:3.13-slim sh -c "pip install -q mutmut==<version> && \
+      python /infra/scripts/mutation_locator_check.py check /troupe/packages"
+
+Its matcher is tested here. Its `diffs` command printed mutmut's diffs for the test fixtures
+(`scripts/tests/fixtures/mutation/locator/`): troupe's `cli/config.py` at 0515e2d and a file of cases. One test goes
+through mutation-pr's path, `from_mutmut` then `on_changed_lines`, because the pull request comment keeps only
+survivors on changed lines, so a misplaced survivor was dropped from it or kept for a line it isn't on.
 
 ### D2. A blame failure leaves one survivor unattributed
 
@@ -48,5 +60,7 @@ results to one survivor's attribution is the opposite of refusing to guess: noth
 
 ## Risks / Trade-offs
 
-- A future mutmut renders differently → the version is pinned (`scripts/mutation.json`); a change of version reruns the
-  differential check, which the design records how to do.
+- A future mutmut renders differently → the version is pinned (`scripts/mutation.json`); a change of version reruns
+  `scripts/mutation_locator_check.py check`, and its `diffs` command refreshes the fixtures.
+- mutmut 3.8.1 doesn't mutate decorated functions, so a comment above a decorator has no mutant to check; the locator
+  still starts at it, as libcst attaches it.
