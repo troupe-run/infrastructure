@@ -187,13 +187,26 @@ def test_without_a_previous_run_no_survivor_is_new(tmp_path: Path) -> None:
     assert all(s.commit for s in attributed.modules["m"].survivors)
 
 
-def test_a_line_blame_cant_read_fails_naming_it(tmp_path: Path) -> None:
+def test_a_survivor_blame_cant_read_is_left_unattributed_and_the_rest_stand(tmp_path: Path) -> None:
+    """One survivor's attribution once lost a four-hour report (#377): now that survivor alone
+    has no commit, the run is told why, and everything else is kept."""
     repo, old, new = scratch(tmp_path)
-    broken = mr.Report(
-        "troupe", new, None, {"m": mr.Module(0, 1, 0, 0, 0, 0, True, (survivor_at(9),))}
+    module = mr.Module(0, 2, 0, 0, 0, 0, True, (survivor_at(1), survivor_at(9)))
+    logged: list[str] = []
+    attributed = mr.attribute(
+        mr.Report("troupe", new, None, {"m": module}), repo, previous=old, log=logged.append
     )
-    with pytest.raises(mr.ReportError, match=r"m\.py:9"):
-        mr.attribute(broken, repo, previous=old)
+    first, broken = attributed.modules["m"].survivors
+    assert (first.commit, first.new) == (old, False)
+    assert (broken.commit, broken.new) == (None, False)
+    [line] = logged
+    assert line.startswith("m.py:9 unattributed: git blame of m.py:9 at ")
+    assert mr.unattributed(attributed) == [broken]
+
+
+def test_with_every_blame_read_nothing_is_unattributed(tmp_path: Path) -> None:
+    repo, old, new = scratch(tmp_path)
+    assert mr.unattributed(mr.attribute(weekly(new), repo, previous=old)) == []
 
 
 # mutmut's results (design D3). The meta file and diff are shaped as mutmut 3.8.1 writes them
