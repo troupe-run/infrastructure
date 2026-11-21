@@ -38,6 +38,9 @@ def test_the_declared_settings_load_with_the_owners_values() -> None:
     # VmPeak at 1,111 MB and the largest ordinary mutant's at 1,270 MB; plus half, rounded up to
     # 256 MB (mutant-memory design D4). The runaway it stops reached 5,289 MB.
     assert settings.mutant_memory_mb == 2048
+    # Incremental runs miss edited tests and changed callees; a full refresh every 28 days clears
+    # them (#378).
+    assert settings.full_refresh_days == 28
     # The one list of repositories that get coverage and mutation testing (#332, owner 2026-11-18).
     assert set(settings.repositories) == {"troupe"}
 
@@ -121,6 +124,14 @@ def test_a_settings_file_without_the_per_mutant_cap_fails_naming_it() -> None:
     with pytest.raises(ms.SettingsError) as raised:
         ms.load_settings(text(settings))
     assert str(raised.value) == "the settings has no 'mutant_memory_mb'"
+
+
+def test_a_settings_file_without_a_full_refresh_period_fails_naming_it() -> None:
+    settings = declared()
+    del settings["full_refresh_days"]
+    with pytest.raises(ms.SettingsError) as raised:
+        ms.load_settings(text(settings))
+    assert str(raised.value) == "the settings has no 'full_refresh_days'"
 
 
 def test_not_json_fails() -> None:
@@ -231,8 +242,8 @@ SHA_40 = "a" * 40
 # Every refusal, word for word (lint-mutation 6b: the pull request report's survivors)
 
 KEYS = (
-    "['budget_minutes', 'max_children', 'max_new_issues', 'min_mutants', 'mutant_memory_mb', "
-    "'pr_budget_minutes', 'repositories', 'threshold', 'tolerance', 'tools']"
+    "['budget_minutes', 'full_refresh_days', 'max_children', 'max_new_issues', 'min_mutants', "
+    "'mutant_memory_mb', 'pr_budget_minutes', 'repositories', 'threshold', 'tolerance', 'tools']"
 )
 
 
@@ -307,6 +318,18 @@ def changed(path: list[str | int], value: object) -> str:
         (
             changed(["mutant_memory_mb"], True),
             "mutant_memory_mb is True; it must be null or a whole number from 256 to 12288",
+        ),
+        (
+            changed(["full_refresh_days"], 0),
+            "full_refresh_days is 0; it must be a whole number from 1 to 365",
+        ),
+        (
+            changed(["full_refresh_days"], 366),
+            "full_refresh_days is 366; it must be a whole number from 1 to 365",
+        ),
+        (
+            changed(["full_refresh_days"], None),
+            "full_refresh_days is None; it must be a whole number from 1 to 365",
         ),
         (changed(["repositories", "troupe"], []), "repositories.troupe isn't an object"),
         (

@@ -50,6 +50,7 @@ DEPENDS_ON = (
     "scripts/mutation_report.py",
     "scripts/mutation_run.py",
     "scripts/mutation_settings.py",
+    "scripts/mutation_state.py",
     # Its tests, what they share, and what they run with.
     "scripts/tests/test_guard_",
     "scripts/tests/conftest.py",

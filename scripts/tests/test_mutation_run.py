@@ -407,7 +407,8 @@ def test_a_run_takes_max_children_from_the_settings(
     seen: list[int] = []
 
     def fake(checkout: Path, unit: ms.Unit, names: object, deadline: float, run_: object,
-             *, children: int, memory_mb: int | None) -> dict[str, object]:  # fmt: skip
+             *, children: int, memory_mb: int | None, state: object = None,
+             ) -> dict[str, object]:  # fmt: skip
         seen.append(children)
         return {}
 
@@ -609,7 +610,8 @@ def test_a_run_takes_the_per_mutant_cap_from_the_settings(
     caps: list[int | None] = []
 
     def fake(checkout: Path, unit: ms.Unit, names: object, deadline: float, run_: object,
-             *, children: int, memory_mb: int | None) -> dict[str, object]:  # fmt: skip
+             *, children: int, memory_mb: int | None, state: object = None,
+             ) -> dict[str, object]:  # fmt: skip
         caps.append(memory_mb)
         return {}
 

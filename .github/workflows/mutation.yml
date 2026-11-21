@@ -1,6 +1,6 @@
 name: mutation
 
-# Weekly mutation testing of the repositories scripts/mutation.json lists (today troupe alone;
+# Nightly mutation testing of the repositories scripts/mutation.json lists (today troupe alone;
 # #332), which keeps one test-quality issue per module under its threshold or baseline (spec:
 # mutation-testing; #325; lint-mutation design D3-D8). It runs on no pull request and is no required
 # check, so it never blocks a merge.
@@ -19,10 +19,11 @@ name: mutation
 # A dispatch can name one repository, and can be a dry run: every module's score and what it would
 # open, update or close go to the run's summary, and nothing is written (design D6's calibration).
 on:
-  # Sunday 03:23 UTC, off the hour. The schedule watch reports it if GitHub stops running it
-  # (scripts/watched-schedules.json).
+  # 03:23 UTC nightly, off the hour. Each run resumes from the last one's kept mutmut state, so a
+  # night re-tests only what changed (#378). The schedule watch reports it if GitHub stops running
+  # it (scripts/watched-schedules.json).
   schedule:
-    - cron: "23 3 * * 0"
+    - cron: "23 3 * * *"
   workflow_dispatch:
     inputs:
       repository:
@@ -31,6 +32,14 @@ on:
         default: all
       dry-run:
         description: "Report every score and what would change, and write nothing"
+        type: boolean
+        default: false
+      unit:
+        description: "One unit of the repository, run whole so it resumes (no module globs), or blank for all"
+        type: string
+        default: ""
+      full-refresh:
+        description: "Discard the kept mutmut state and fill afresh"
         type: boolean
         default: false
 
@@ -153,6 +162,26 @@ jobs:
             exit 1
           fi
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      # The kept mutmut state (#378, mutation-incremental design D1): one cache entry per repository
+      # per run, holding each unit's .meta files and stats; the newest for this mutmut version wins.
+      - name: The kept state's cache key
+        id: state
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+        run: |
+          set -euo pipefail
+          mutmut=$(jq -r '.tools.mutmut' infra/scripts/mutation.json)
+          prefix="mutmut-state-$REPOSITORY-mutmut$mutmut-"
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+          echo "key=$prefix$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - name: Restore the kept state
+        if: steps.skip.outputs.skip != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: state
+          key: ${{ steps.state.outputs.key }}
+          restore-keys: ${{ steps.state.outputs.prefix }}
       - name: Install the repository and the tool
         if: steps.skip.outputs.skip != 'true'
         working-directory: target
@@ -173,6 +202,11 @@ jobs:
         env:
           REPOSITORY: ${{ matrix.repository }}
           PREVIOUS: ${{ steps.previous.outputs.commit }}
+          UNIT: ${{ inputs.unit }}
+          MUTATION_STATE: ${{ github.workspace }}/state
+          MUTATION_PREVIOUS_STATE: ${{ runner.temp }}/previous/state-${{ matrix.repository }}.json
+          MUTATION_FULL_REFRESH: ${{ inputs.full-refresh }}
+          MUTATION_RUN_ID: ${{ github.run_id }}
           RESOURCES: ${{ github.workspace }}/out/resources-${{ matrix.repository }}.log
           PEAKS: ${{ github.workspace }}/out/peaks-${{ matrix.repository }}.log
           MUTATION_SCRIPTS: ${{ github.workspace }}/infra/scripts
@@ -230,6 +264,8 @@ jobs:
           # resources: end
           args=("$REPOSITORY" . "../out/report-$REPOSITORY.json")
           [[ -z "$PREVIOUS" ]] || args+=(--previous "$PREVIOUS")
+          # A whole unit, never module globs: mutmut re-runs every mutant a glob names (#378).
+          if [[ -n "${UNIT:-}" ]]; then args+=(--unit "$UNIT"); fi
           # containment: begin
           # The mutation runs in a PID namespace, a session and a cgroup of its own, as the runner's user with the
           # step's environment: a mutant that signals every process (kill -1) or its own group (kill 0), or a run
@@ -271,6 +307,47 @@ jobs:
           fi
           if [[ -f quality-gates.toml ]]; then
             cp quality-gates.toml "../out/quality-gates-$REPOSITORY.toml"
+          fi
+      # The save, on any outcome, so what a run the budget or a failure stops finished is kept (D1).
+      # Two runs overlapping despite the concurrency group mustn't drop each other's progress on a
+      # unit only one ran, so the newest entry is restored again and only this run's units replace
+      # it (D1a): actions/cache restores an entry only to the path it was saved from.
+      - name: Set this run's state aside
+        if: always() && steps.skip.outputs.skip != 'true' && hashFiles('out/state-*.json') != ''
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/state-mine"
+          if [[ -d state ]]; then mv state "$RUNNER_TEMP/state-mine"; else mkdir "$RUNNER_TEMP/state-mine"; fi
+      - name: Restore the newest kept state again
+        if: always() && steps.skip.outputs.skip != 'true' && hashFiles('out/state-*.json') != ''
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: state
+          key: ${{ steps.state.outputs.prefix }}newest
+          restore-keys: ${{ steps.state.outputs.prefix }}
+      - name: Keep this run's units over the newest kept state
+        if: always() && steps.skip.outputs.skip != 'true' && hashFiles('out/state-*.json') != ''
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+        run: python3 infra/scripts/mutation_run.py state-merge "$RUNNER_TEMP/state-mine" state "out/state-$REPOSITORY.json"
+      - name: Save the kept state
+        if: always() && steps.skip.outputs.skip != 'true' && hashFiles('out/state-*.json') != ''
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: state
+          key: ${{ steps.state.outputs.key }}
+      # actions/cache only warns when a save fails; a lost save must fail the run (D4).
+      - name: Check the kept state was saved
+        if: always() && steps.skip.outputs.skip != 'true' && hashFiles('out/state-*.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEY: ${{ steps.state.outputs.key }}
+        run: |
+          set -euo pipefail
+          found=$(gh cache list -R "$GITHUB_REPOSITORY" --key "$KEY" --json key --jq "map(select(.key == \"$KEY\")) | length")
+          if [[ "$found" != 1 ]]; then
+            echo "::error::the kept mutmut state wasn't saved as $KEY: tonight's progress is lost, and the next run restores the previous entry"
+            exit 1
           fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
