@@ -45,6 +45,40 @@ def test_the_declared_settings_load_with_the_owners_values() -> None:
     assert set(settings.repositories) == {"troupe"}
 
 
+MOVED = (
+    "packages/troupe/tests/test_cli_startup.py"
+    "::test_importing_the_command_line_loads_none_of_the_heavy_modules",
+    "packages/troupe/tests/test_config_schemas.py::test_the_models_are_what_the_schemas_generate",
+    "packages/troupe/tests/test_package.py"
+    "::test_the_built_wheel_carries_the_recorded_protocol_version_and_every_schema",
+)
+"""troupe's three tests that fail in mutmut's copy, by their ids before troupe-run/troupe#507
+moves them (#395)."""
+
+
+@pytest.mark.parametrize("old", MOVED)
+def test_each_deselected_troupe_test_is_named_before_and_after_its_move(old: str) -> None:
+    """An unmatched --deselect is silently ignored, so until #394 trims the old ids, each test
+    is named by its current id and by exactly one id under tests/unit/ or tests/integration/:
+    the same test name, for the same reason. #507 also renames files it splits, so the file
+    name may differ. troupe's pull request mutation run then works on either side of #507's
+    merge (#395)."""
+    troupe = ms.load_settings(DECLARED.read_text(encoding="utf-8")).repositories["troupe"]
+    [unit] = [u for u in troupe.units if u.name == "troupe"]
+    name = old.split("::")[1]
+    named = [(test, why) for test, why in unit.deselect if test.split("::")[1] == name]
+    tests = [test for test, _ in named]
+    assert old in tests
+    moved = [
+        test
+        for test in tests
+        if test.startswith(("packages/troupe/tests/unit/", "packages/troupe/tests/integration/"))
+    ]
+    assert len(moved) == 1, tests
+    assert len(named) == 2, tests
+    assert len({why for _, why in named}) == 1, "the same reason"
+
+
 def test_the_fixtures_three_repositories_name_their_tools_and_what_they_mutate() -> None:
     settings = ms.load_settings(THREE.read_text(encoding="utf-8"))
     assert settings.repositories["website"].tool == "stryker"
