@@ -17,9 +17,10 @@
 ## 2. Verify
 
 - [x] 2.1 Run `openspec validate hand-edits-purpose --strict` and verify it passes (passes)
-- [ ] 2.2 Once the owner approves the pull request's `plan-pr` run (if one runs), read its plan comment and verify it
+- [x] 2.2 Once the owner approves the pull request's `plan-pr` run (if one runs), read its plan comment and verify it
       shows nothing of this change's created, changed or deleted, or that no plan ran because only `oob/` and
-      `openspec/` changed
+      `openspec/` changed. Done: no plan runs. `scripts/plan_needed.py` over the diff (`oob/` and `openspec/` only,
+      before and after the archive) prints `plan=false`; tofu run 45103923970 on 8d2f376 skipped the plan as a draft
 
 ## Workflow follow-up
 
