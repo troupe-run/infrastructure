@@ -423,6 +423,21 @@ def changed(path: list[str | int], value: object) -> str:
             "packages/troupe/tests, such as 'unit'",
         ),
         (
+            changed(["repositories", "troupe", "units", 0, "select"], "unit x"),
+            "repositories.troupe.units[0].select is 'unit x'; it must be a directory under "
+            "packages/troupe/tests, such as 'unit'",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "select"], "unit\nfoo"),
+            "repositories.troupe.units[0].select is 'unit\\nfoo'; it must be a directory under "
+            "packages/troupe/tests, such as 'unit'",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "select"], "unit\t"),
+            "repositories.troupe.units[0].select is 'unit\\t'; it must be a directory under "
+            "packages/troupe/tests, such as 'unit'",
+        ),
+        (
             changed(["repositories", "troupe", "units", 0, "select"], 1),
             "repositories.troupe.units[0].select is 1; it must be a directory under "
             "packages/troupe/tests, such as 'unit'",
