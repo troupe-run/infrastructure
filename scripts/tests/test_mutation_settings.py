@@ -45,38 +45,13 @@ def test_the_declared_settings_load_with_the_owners_values() -> None:
     assert set(settings.repositories) == {"troupe"}
 
 
-MOVED = (
-    "packages/troupe/tests/test_cli_startup.py"
-    "::test_importing_the_command_line_loads_none_of_the_heavy_modules",
-    "packages/troupe/tests/test_config_schemas.py::test_the_models_are_what_the_schemas_generate",
-    "packages/troupe/tests/test_package.py"
-    "::test_the_built_wheel_carries_the_recorded_protocol_version_and_every_schema",
-)
-"""troupe's three tests that fail in mutmut's copy, by their ids before troupe-run/troupe#507
-moves them (#395)."""
-
-
-@pytest.mark.parametrize("old", MOVED)
-def test_each_deselected_troupe_test_is_named_before_and_after_its_move(old: str) -> None:
-    """An unmatched --deselect is silently ignored, so until #394 trims the old ids, each test
-    is named by its current id and by exactly one id under tests/unit/ or tests/integration/:
-    the same test name, for the same reason. #507 also renames files it splits, so the file
-    name may differ. troupe's pull request mutation run then works on either side of #507's
-    merge (#395)."""
+def test_every_troupe_unit_runs_only_its_unit_tests() -> None:
+    """Owner decision (2026-11-23): mutation runs only the fast unit tests, never integration
+    tests, and troupe keeps those in each package's tests/unit (troupe#507; #394). Its
+    integration tests need no deselect, since they're never run."""
     troupe = ms.load_settings(DECLARED.read_text(encoding="utf-8")).repositories["troupe"]
-    [unit] = [u for u in troupe.units if u.name == "troupe"]
-    name = old.split("::")[1]
-    named = [(test, why) for test, why in unit.deselect if test.split("::")[1] == name]
-    tests = [test for test, _ in named]
-    assert old in tests
-    moved = [
-        test
-        for test in tests
-        if test.startswith(("packages/troupe/tests/unit/", "packages/troupe/tests/integration/"))
-    ]
-    assert len(moved) == 1, tests
-    assert len(named) == 2, tests
-    assert len({why for _, why in named}) == 1, "the same reason"
+    assert {unit.select for unit in troupe.units} == {"unit"}
+    assert [unit.deselect for unit in troupe.units] == [()] * len(troupe.units)
 
 
 def test_the_fixtures_three_repositories_name_their_tools_and_what_they_mutate() -> None:
@@ -250,19 +225,24 @@ def with_deselect(entry: object) -> str:
 
 
 def test_a_deselected_test_carries_its_reason() -> None:
-    entry = {"test": "scripts/tests/test_a.py::test_b", "why": "it pretends to be Windows"}
+    entry = {"test": "scripts/tests/unit/test_a.py::test_b", "why": "it pretends to be Windows"}
     settings = ms.load_settings(with_deselect(entry))
     unit = settings.repositories["infrastructure"].units[0]
-    assert unit.deselect == (("scripts/tests/test_a.py::test_b", "it pretends to be Windows"),)
+    assert unit.deselect == (("scripts/tests/unit/test_a.py::test_b", "it pretends to be Windows"),)
 
 
 @pytest.mark.parametrize(
     ("entry", "named"),
     [
-        ({"test": "scripts/tests/test_a.py::test_b"}, "why"),
-        ({"test": "tests/test_a.py::test_b", "why": "x"}, "node id under scripts/tests"),
-        ({"test": "scripts/tests/test_a.py", "why": "x"}, "node id"),
-        ({"test": "scripts/tests/test_a.py::t", "why": ""}, "why"),
+        ({"test": "scripts/tests/unit/test_a.py::test_b"}, "why"),
+        ({"test": "tests/unit/test_a.py::test_b", "why": "x"}, "node id under scripts/tests/unit"),
+        # Outside the selection, it could never match: the run never collects it (#394).
+        (
+            {"test": "scripts/tests/test_a.py::test_b", "why": "x"},
+            "node id under scripts/tests/unit",
+        ),
+        ({"test": "scripts/tests/unit/test_a.py", "why": "x"}, "node id"),
+        ({"test": "scripts/tests/unit/test_a.py::t", "why": ""}, "why"),
     ],
 )
 def test_a_deselection_without_a_reason_or_a_node_id_fails(entry: object, named: str) -> None:
@@ -279,6 +259,15 @@ KEYS = (
     "['budget_minutes', 'full_refresh_days', 'max_children', 'max_new_issues', 'min_mutants', "
     "'mutant_memory_mb', 'pr_budget_minutes', 'repositories', 'threshold', 'tolerance', 'tools']"
 )
+
+
+def removed(path: list[str | int]) -> str:
+    settings = declared()
+    target: Any = settings
+    for key in path[:-1]:
+        target = target[key]
+    del target[path[-1]]
+    return text(settings)
 
 
 def changed(path: list[str | int], value: object) -> str:
@@ -395,6 +384,50 @@ def changed(path: list[str | int], value: object) -> str:
             "repositories.troupe.units[0].tests is ''; it must be a non-empty string",
         ),
         (
+            removed(["repositories", "troupe", "units", 0, "select"]),
+            "repositories.troupe.units[0] has no 'select'",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "select"], ""),
+            "repositories.troupe.units[0].select is ''; it must be a directory under "
+            "packages/troupe/tests, such as 'unit'",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "select"], "/unit"),
+            "repositories.troupe.units[0].select is '/unit'; it must be a directory under "
+            "packages/troupe/tests, such as 'unit'",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "select"], "../unit"),
+            "repositories.troupe.units[0].select is '../unit'; it must be a directory under "
+            "packages/troupe/tests, such as 'unit'",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "select"], "unit/../.."),
+            "repositories.troupe.units[0].select is 'unit/../..'; it must be a directory under "
+            "packages/troupe/tests, such as 'unit'",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "select"], "."),
+            "repositories.troupe.units[0].select is '.'; it must be a directory under "
+            "packages/troupe/tests, such as 'unit'",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "select"], "unit/"),
+            "repositories.troupe.units[0].select is 'unit/'; it must be a directory under "
+            "packages/troupe/tests, such as 'unit'",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "select"], "unit\\x"),
+            "repositories.troupe.units[0].select is 'unit\\\\x'; it must be a directory under "
+            "packages/troupe/tests, such as 'unit'",
+        ),
+        (
+            changed(["repositories", "troupe", "units", 0, "select"], 1),
+            "repositories.troupe.units[0].select is 1; it must be a directory under "
+            "packages/troupe/tests, such as 'unit'",
+        ),
+        (
             changed(["repositories", "troupe", "units", 0, "also_copy"], "x"),
             "repositories.troupe.units[0].also_copy must be a list of paths",
         ),
@@ -461,10 +494,11 @@ def test_the_fixtures_repositories_load_as_written() -> None:
     for unit, written in zip(
         settings.repositories["troupe"].units, raw["repositories"]["troupe"]["units"], strict=True
     ):
-        assert (unit.name, unit.source, unit.tests) == (
+        assert (unit.name, unit.source, unit.tests, unit.select) == (
             written["name"],
             written["source"],
             written["tests"],
+            written["select"],
         )
     infrastructure = settings.repositories["infrastructure"].units[0]
     assert [test for test, _ in infrastructure.deselect] == [

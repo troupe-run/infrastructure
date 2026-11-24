@@ -447,7 +447,7 @@ def test_a_hunk_before_any_file_header_is_ignored_and_a_count_of_zero_adds_nothi
 
 
 def test_a_changed_test_file_or_non_python_file_is_never_mutated() -> None:
-    unit = ms.Unit("scripts", "scripts", "scripts/tests")
+    unit = ms.Unit("scripts", "scripts", "scripts/tests", "unit")
     repository = ms.Repository("infrastructure", "mutmut", units=(unit,))
     changed = {"scripts/tests/test_a.py": {1}, "scripts/a.txt": {1}, "scripts/b.py": {2}}
     targets = pr.plan(repository, changed, lambda path: "def f():\n    return 1\n")

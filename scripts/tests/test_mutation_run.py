@@ -31,14 +31,14 @@ def three_repositories(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_a_package_with_a_src_directory_runs_mutmut_in_the_package(tmp_path: Path) -> None:
     (tmp_path / "packages" / "troupe" / "src").mkdir(parents=True)
-    unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
+    unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests", "unit")
     assert run.mutmut_workdir(tmp_path, unit) == tmp_path / "packages" / "troupe"
     assert not (tmp_path / "src").exists()
 
 
 def test_a_source_not_named_src_is_linked_as_src_at_the_root(tmp_path: Path) -> None:
     (tmp_path / "scripts").mkdir()
-    unit = ms.Unit("scripts", "scripts", "scripts/tests")
+    unit = ms.Unit("scripts", "scripts", "scripts/tests", "unit")
     assert run.mutmut_workdir(tmp_path, unit) == tmp_path
     assert (tmp_path / "src").is_symlink()
     assert (tmp_path / "src").resolve() == (tmp_path / "scripts").resolve()
@@ -48,12 +48,14 @@ def test_a_checkout_that_already_has_a_src_is_refused(tmp_path: Path) -> None:
     (tmp_path / "scripts").mkdir()
     (tmp_path / "src").mkdir()
     with pytest.raises(run.RunError, match="already has a src"):
-        run.mutmut_workdir(tmp_path, ms.Unit("scripts", "scripts", "scripts/tests"))
+        run.mutmut_workdir(tmp_path, ms.Unit("scripts", "scripts", "scripts/tests", "unit"))
 
 
-def test_infrastructures_config_mutates_the_linked_source_but_not_its_tests_and_copies_the_rest(
+def test_a_root_units_config_runs_only_its_selected_tests_and_mutates_none_of_its_tests(
     tmp_path: Path,
 ) -> None:
+    """mutmut runs src/tests/unit, while do_not_mutate still covers all of src/tests: the helpers
+    both kinds of test import are run, never mutated (#394, design D1)."""
     for name in ("scripts", "tofu", ".git", ".venv"):
         (tmp_path / name).mkdir()
     (tmp_path / ".tflint.hcl").touch()
@@ -61,7 +63,7 @@ def test_infrastructures_config_mutates_the_linked_source_but_not_its_tests_and_
     unit = SETTINGS.repositories["infrastructure"].units[0]
     config = run.mutmut_config(tmp_path, tmp_path, unit, children=2)
     assert "source_paths=src/\n" in config
-    assert "pytest_add_cli_args_test_selection=src/tests\n" in config
+    assert "pytest_add_cli_args_test_selection=src/tests/unit\n" in config
     assert (
         "pytest_add_cli_args=\n    -o\n    addopts=-ra\n    -p\n    _mutation_children_plugin\n"
         in config
@@ -84,11 +86,15 @@ def test_a_failed_mutmut_run_is_an_error_not_an_empty_report(
         )
 
 
-def test_a_packages_config_selects_its_own_tests(tmp_path: Path) -> None:
+def test_a_packages_config_runs_only_its_selected_tests_but_keeps_all_of_them(
+    tmp_path: Path,
+) -> None:
+    """mutmut runs tests/unit; the whole tests directory stays out of also_copy, since mutmut
+    copies it itself, so the helpers both kinds import are there too (#394, design D1)."""
     (tmp_path / "packages" / "troupe").mkdir(parents=True)
-    unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
+    unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests", "unit")
     config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
-    assert "pytest_add_cli_args_test_selection=tests\n" in config
+    assert "pytest_add_cli_args_test_selection=tests/unit\n" in config
     assert config.endswith(
         "also_copy=\n    _mutation_children_plugin.py\n    _mutation_children_plugin.json\n"
     )
@@ -257,6 +263,7 @@ def test_a_deselected_test_is_named_from_mutmuts_working_directory(tmp_path: Pat
         "scripts",
         "scripts",
         "scripts/tests",
+        "unit",
         deselect=(("scripts/tests/test_a.py::test_b[x]", "why"),),
     )
     assert run.deselected(tmp_path, tmp_path, linked) == [
@@ -267,6 +274,7 @@ def test_a_deselected_test_is_named_from_mutmuts_working_directory(tmp_path: Pat
         "troupe",
         "packages/troupe/src",
         "packages/troupe/tests",
+        "unit",
         deselect=(("packages/troupe/tests/test_a.py::test_b", "why"),),
     )
     workdir = tmp_path / "packages" / "troupe"
@@ -320,7 +328,7 @@ def test_a_whole_run_with_unrun_mutants_isnt_finished(
 def test_a_unit_with_its_own_setup_cfg_is_refused_not_overwritten(tmp_path: Path) -> None:
     (tmp_path / "packages" / "troupe" / "src").mkdir(parents=True)
     (tmp_path / "packages" / "troupe" / "setup.cfg").write_text("[metadata]\n", encoding="utf-8")
-    unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
+    unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests", "unit")
     with pytest.raises(run.RunError, match="won't overwrite"):
         run.run_mutmut(tmp_path, unit, [], 0.0, Recorder(), children=2, memory_mb=None)
     assert (tmp_path / "packages" / "troupe" / "setup.cfg").read_text(
@@ -361,12 +369,16 @@ def test_a_linked_units_whole_config(tmp_path: Path) -> None:
     (tmp_path / "setup.cfg").touch()
     (tmp_path / "src").symlink_to("scripts")
     unit = ms.Unit(
-        "scripts", "scripts", "scripts/tests", deselect=(("scripts/tests/test_a.py::test_b", "w"),)
+        "scripts",
+        "scripts",
+        "scripts/tests",
+        "unit",
+        deselect=(("scripts/tests/test_a.py::test_b", "w"),),
     )
     assert run.mutmut_config(tmp_path, tmp_path, unit, children=2) == (
         "[mutmut]\n"
         "source_paths=src/\n"
-        "pytest_add_cli_args_test_selection=src/tests\n"
+        "pytest_add_cli_args_test_selection=src/tests/unit\n"
         "pytest_add_cli_args=\n    -o\n    addopts=-ra\n    -p\n    _mutation_children_plugin\n"
         "    --deselect\n    src/tests/test_a.py::test_b\n"
         "max_children=2\n"
@@ -385,7 +397,7 @@ def test_a_packages_unit_copies_its_packages_own_files(tmp_path: Path) -> None:
     for name in ("LICENSE", "pyproject.toml", "uv.lock", "setup.cfg",
                  "_mutation_children_plugin.py", ".coverage"):  # fmt: skip
         (package / name).touch()
-    unit = ms.Unit("runner-a", "plugins/runner-a/src", "plugins/runner-a/tests")
+    unit = ms.Unit("runner-a", "plugins/runner-a/src", "plugins/runner-a/tests", "unit")
     config = run.mutmut_config(package, tmp_path, unit, children=2)
     assert config.endswith(
         "also_copy=\n    _mutation_children_plugin.py\n"
@@ -396,7 +408,7 @@ def test_a_packages_unit_copies_its_packages_own_files(tmp_path: Path) -> None:
 
 def test_the_config_runs_as_many_mutants_at_once_as_the_settings_say(tmp_path: Path) -> None:
     (tmp_path / "packages" / "troupe").mkdir(parents=True)
-    unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
+    unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests", "unit")
     config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=3)
     assert "\nmax_children=3\n" in config
 
@@ -421,7 +433,9 @@ def test_a_run_takes_max_children_from_the_settings(
 
 def test_a_packages_also_copy_is_named_from_its_own_directory(tmp_path: Path) -> None:
     (tmp_path / "packages" / "troupe").mkdir(parents=True)
-    unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests", also_copy=("docs",))
+    unit = ms.Unit(
+        "troupe", "packages/troupe/src", "packages/troupe/tests", "unit", also_copy=("docs",)
+    )
     config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
     assert config.endswith(
         "also_copy=\n    ../../docs\n    _mutation_children_plugin.py\n"
@@ -434,6 +448,7 @@ def test_a_deselected_parametrized_test_keeps_its_whole_node_id(tmp_path: Path) 
         "scripts",
         "scripts",
         "scripts/tests",
+        "unit",
         deselect=(
             ("scripts/tests/test_a.py::test_b[x::y]", "w"),
             ("scripts/tests/test_c.py::test_d", "w"),
@@ -628,7 +643,7 @@ def package_checkout(tmp_path: Path) -> ms.Unit:
                  "packages/troupe/tests", "packages/other"):  # fmt: skip
         (tmp_path / name).mkdir(parents=True)
     (tmp_path / "pyproject.toml").write_text("[project]\nname = 'x'\n", encoding="utf-8")
-    return ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
+    return ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests", "unit")
 
 
 class LinkRecorder(Recorder):
@@ -666,7 +681,10 @@ def test_a_packages_run_finds_its_sibling_packages_and_cleans_up(
     for name in ("packages/troupe-store-text/src", "packages/troupe-store-text/tests"):
         (tmp_path / name).mkdir(parents=True)
     unit = ms.Unit(
-        "troupe-store-text", "packages/troupe-store-text/src", "packages/troupe-store-text/tests"
+        "troupe-store-text",
+        "packages/troupe-store-text/src",
+        "packages/troupe-store-text/tests",
+        "unit",
     )
     monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
     recorder = SiblingRecorder(code)
@@ -871,8 +889,8 @@ def test_a_unit_after_the_deadline_isnt_run(
 ) -> None:
     monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
     units = (
-        ms.Unit("a", "packages/a/src", "packages/a/tests"),
-        ms.Unit("b", "packages/b/src", "packages/b/tests"),
+        ms.Unit("a", "packages/a/src", "packages/a/tests", "unit"),
+        ms.Unit("b", "packages/b/src", "packages/b/tests", "unit"),
     )
     for unit in units:
         (tmp_path / unit.source).mkdir(parents=True)
@@ -898,8 +916,8 @@ def test_a_pull_request_names_only_its_units(
 ) -> None:
     monkeypatch.setattr(run, "mutmut_bin", lambda: "mutmut")
     units = (
-        ms.Unit("a", "packages/a/src", "packages/a/tests"),
-        ms.Unit("b", "packages/b/src", "packages/b/tests"),
+        ms.Unit("a", "packages/a/src", "packages/a/tests", "unit"),
+        ms.Unit("b", "packages/b/src", "packages/b/tests", "unit"),
     )
     for unit in units:
         (tmp_path / unit.source).mkdir(parents=True)

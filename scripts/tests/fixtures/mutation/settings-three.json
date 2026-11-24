@@ -19,42 +19,50 @@
         {
           "name": "troupe",
           "source": "packages/troupe/src",
-          "tests": "packages/troupe/tests"
+          "tests": "packages/troupe/tests",
+          "select": "unit"
         },
         {
           "name": "troupe-plugin-sdk",
           "source": "packages/troupe-plugin-sdk/src",
-          "tests": "packages/troupe-plugin-sdk/tests"
+          "tests": "packages/troupe-plugin-sdk/tests",
+          "select": "unit"
         },
         {
           "name": "troupe-store-text",
           "source": "packages/troupe-store-text/src",
-          "tests": "packages/troupe-store-text/tests"
+          "tests": "packages/troupe-store-text/tests",
+          "select": "unit"
         },
         {
           "name": "troupe-vcs-git",
           "source": "packages/troupe-vcs-git/src",
-          "tests": "packages/troupe-vcs-git/tests"
+          "tests": "packages/troupe-vcs-git/tests",
+          "select": "unit"
         },
         {
           "name": "troupe-vcs-files",
           "source": "packages/troupe-vcs-files/src",
-          "tests": "packages/troupe-vcs-files/tests"
+          "tests": "packages/troupe-vcs-files/tests",
+          "select": "unit"
         },
         {
           "name": "troupe-artifacts-local",
           "source": "packages/troupe-artifacts-local/src",
-          "tests": "packages/troupe-artifacts-local/tests"
+          "tests": "packages/troupe-artifacts-local/tests",
+          "select": "unit"
         },
         {
           "name": "troupe-identity-local",
           "source": "packages/troupe-identity-local/src",
-          "tests": "packages/troupe-identity-local/tests"
+          "tests": "packages/troupe-identity-local/tests",
+          "select": "unit"
         },
         {
           "name": "troupe-stage-local",
           "source": "packages/troupe-stage-local/src",
-          "tests": "packages/troupe-stage-local/tests"
+          "tests": "packages/troupe-stage-local/tests",
+          "select": "unit"
         }
       ]
     },
@@ -65,25 +73,26 @@
           "name": "scripts",
           "source": "scripts",
           "tests": "scripts/tests",
+          "select": "unit",
           "deselect": [
             {
-              "test": "scripts/tests/test_guard_session.py::test_nothing_is_reported_where_git_ignores_the_mode",
+              "test": "scripts/tests/unit/test_guard_session.py::test_nothing_is_reported_where_git_ignores_the_mode",
               "why": "It makes pathlib act as Windows, and mutmut's stats hook builds a Path while it does, which fails (trial, 2026-11-18)."
             },
             {
-              "test": "scripts/tests/test_hook_modes.py::test_plan_writes_the_mode_plan_from_the_saved_plan",
+              "test": "scripts/tests/unit/test_hook_modes.py::test_plan_writes_the_mode_plan_from_the_saved_plan",
               "why": "It reads file modes from git, and mutmut's copy isn't a git checkout (trial, 2026-11-18)."
             },
             {
-              "test": "scripts/tests/test_hook_modes.py::test_this_repository_delivers_its_hooks_as_executable",
+              "test": "scripts/tests/unit/test_hook_modes.py::test_this_repository_delivers_its_hooks_as_executable",
               "why": "It reads the hooks' modes from git, and mutmut's copy isn't a git checkout (trial, 2026-11-18)."
             },
             {
-              "test": "scripts/tests/test_needs_guard_tests.py::test_every_guard_test_and_its_fixtures_need_them",
+              "test": "scripts/tests/unit/test_needs_guard_tests.py::test_every_guard_test_and_its_fixtures_need_them",
               "why": "It matches the guard tests' paths under scripts/, which mutmut's copy has under src/ (trial, 2026-11-18)."
             },
             {
-              "test": "scripts/tests/test_guard_review_threads.py::test_the_guard_s_delivered_python_is_ascii_only",
+              "test": "scripts/tests/unit/test_guard_review_threads.py::test_the_guard_s_delivered_python_is_ascii_only",
               "why": "It reads guard.py's text, which in mutmut's copy is the mutated source, whose mutant names aren't ASCII (trial, 2026-11-18)."
             }
           ]
