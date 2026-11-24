@@ -15,9 +15,11 @@ example over troupe's sources at a commit:
       python:3.13-slim sh -c "pip install -q mutmut==3.8.1 && \\
       python /infra/scripts/mutation_locator_check.py check /troupe/packages"
 
-Run it again whenever `scripts/mutation.json` moves mutmut to a new version. Its other command,
-`diffs <file> [<text>]`, prints mutmut's diffs for a file's mutants as JSON, which is how the
-locator's test fixtures were made (scripts/tests/fixtures/mutation/locator/).
+Run it again whenever `scripts/mutation.json` moves mutmut to a new version, and check that the
+new mutmut still says `mutation_run.UNREACHED`, word for word, when a unit's tests reach none of
+its code (#399). Its other command, `diffs <file> [<text>]`, prints mutmut's diffs for a file's
+mutants as JSON, which is how the locator's test fixtures were made
+(scripts/tests/fixtures/mutation/locator/).
 """
 
 import argparse

@@ -34,7 +34,8 @@ None.
 ## Impact
 
 - `scripts/mutation_run.py`, `scripts/mutation_report.py` and `scripts/mutation_state.py`, all delivered to troupe,
-  with their tests. The new tests go in `scripts/tests/test_mutation_unreached.py`, since `test_mutation_run.py` is at
-  the size gate.
+  and `scripts/mutation_issues.py` (the summary's state section), with their tests. The new tests go in
+  `scripts/tests/test_mutation_unreached.py`. `test_mutation_run.py` is at the size gate, so its `addopts` tests move to
+  `scripts/tests/test_mutation_addopts.py`, and its fakes take the new `tail` keyword.
 - `docs/development-workflow.md`.
 - The plan updates troupe's delivered copies of the three scripts.

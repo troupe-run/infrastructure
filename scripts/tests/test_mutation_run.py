@@ -165,7 +165,9 @@ class Recorder:
         self.commands: list[tuple[list[str], Path, float]] = []
         self.code = code
 
-    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+    def __call__(
+        self, command: list[str], cwd: Path, timeout: float, *, tail: list[str] | None = None
+    ) -> int:
         self.commands.append((command, cwd, timeout))
         (cwd / "mutants").mkdir(exist_ok=True)
         return self.code
@@ -294,7 +296,7 @@ def limited_tree(tmp_path: Path) -> None:
 class MetaRecorder(Recorder):
     """mutmut, as far as its meta file: one mutant run and killed, one left unrun."""
 
-    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+    def __call__(self, command: list[str], cwd: Path, timeout: float, **_: object) -> int:
         code = super().__call__(command, cwd, timeout)
         meta = cwd / "mutants" / "src" / "calc.py.meta"
         meta.parent.mkdir(parents=True, exist_ok=True)
@@ -500,7 +502,7 @@ def test_stryker_is_run_exactly_so() -> None:
 class FakeMutmut(Recorder):
     """mutmut, as far as its files: a meta file for calc.py with one survivor and one kill."""
 
-    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+    def __call__(self, command: list[str], cwd: Path, timeout: float, **_: object) -> int:
         code = super().__call__(command, cwd, timeout)
         meta = cwd / "mutants" / "src" / "calc.py.meta"
         meta.parent.mkdir(parents=True, exist_ok=True)
@@ -533,7 +535,7 @@ def fake_show(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
 class CrashingMutmut(Recorder):
     """mutmut, as far as its files: a meta file for calc.py with one crash (SIGKILL)."""
 
-    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+    def __call__(self, command: list[str], cwd: Path, timeout: float, **_: object) -> int:
         code = super().__call__(command, cwd, timeout)
         meta = cwd / "mutants" / "src" / "calc.py.meta"
         meta.parent.mkdir(parents=True, exist_ok=True)
@@ -591,7 +593,7 @@ class ConfigSeeingMutmut(FakeMutmut):
 
     seen: object = None
 
-    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+    def __call__(self, command: list[str], cwd: Path, timeout: float, **_: object) -> int:
         self.seen = json.loads((cwd / "_mutation_children_plugin.json").read_text(encoding="utf-8"))
         return super().__call__(command, cwd, timeout)
 
@@ -652,7 +654,7 @@ def package_checkout(tmp_path: Path) -> ms.Unit:
 class LinkRecorder(Recorder):
     """What a test counting one directory too many from inside mutmut's copy finds (#332)."""
 
-    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+    def __call__(self, command: list[str], cwd: Path, timeout: float, **_: object) -> int:
         packages = cwd.parent
         self.seen = {
             "plugins": (packages / "plugins" / "runner" / "fixtures").is_dir(),
@@ -668,7 +670,7 @@ class SiblingRecorder(Recorder):
     """What troupe-store-text's test_processes.py finds from inside mutmut's copy: its child's
     path is `Path(__file__).resolve().parents[2] / "troupe" / "tests"` (#343)."""
 
-    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+    def __call__(self, command: list[str], cwd: Path, timeout: float, **_: object) -> int:
         test_file = cwd / "mutants" / "tests" / "test_processes.py"
         self.sibling = (test_file.parents[2] / "troupe" / "tests").is_dir()
         self.root = (test_file.parents[3] / "plugins" / "runner" / "fixtures").is_dir()
@@ -724,65 +726,6 @@ def test_a_packages_run_finds_the_checkouts_files_from_one_level_up_and_cleans_u
     assert sorted(p.name for p in (tmp_path / "packages").iterdir()) == ["other", "troupe"]
 
 
-def write_addopts(tmp_path: Path, addopts: str) -> None:
-    text = f"[tool.pytest.ini_options]\naddopts = {addopts}\n"
-    (tmp_path / "pyproject.toml").write_text(text, encoding="utf-8")
-
-
-def test_a_run_keeps_the_repositorys_pytest_options_but_those_the_copy_cant_honour(
-    tmp_path: Path,
-) -> None:
-    """troupe's own plugins load; strict markers and the guard's tag plugin, which finds its
-    declarations from the repository's root, don't (#332)."""
-    unit = package_checkout(tmp_path)
-    write_addopts(
-        tmp_path,
-        '["-ra", "--strict-markers", "--strict-config", "-p", "protocol_guard", '
-        '"-p", "guard_pytest", "-p", "gitrepo"]',
-    )
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
-    assert "\n    addopts=-ra --strict-config -p protocol_guard -p gitrepo\n" in config
-
-
-def test_troupes_kinds_plugin_is_left_out_of_the_copy(tmp_path: Path) -> None:
-    """In mutmut's copy kinds_pytest finds no suite and refuses every test (#398)."""
-    unit = package_checkout(tmp_path)
-    write_addopts(
-        tmp_path,
-        '["-ra", "--strict-markers", "-p", "protocol_guard", "-p", "guard_pytest", '
-        '"-p", "kinds_pytest", "-pkinds_pytest", "-p", "hypothesis_profiles", "-p", "gitrepo"]',
-    )
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
-    assert "\n    addopts=-ra -p protocol_guard -p hypothesis_profiles -p gitrepo\n" in config
-
-
-def test_addopts_as_one_string_is_split_as_pytest_splits_it(tmp_path: Path) -> None:
-    unit = package_checkout(tmp_path)
-    write_addopts(tmp_path, "\"-ra --strict-markers -p guard_pytest -k 'a or b'\"")
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
-    assert "\n    addopts=-ra -k 'a or b'\n" in config
-
-
-def test_the_joined_plugin_form_is_left_out_too(tmp_path: Path) -> None:
-    unit = package_checkout(tmp_path)
-    write_addopts(tmp_path, '["-ra", "-pguard_pytest", "-pgitrepo"]')
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
-    assert "\n    addopts=-ra -pgitrepo\n" in config
-
-
-def test_no_addopts_gives_ra(tmp_path: Path) -> None:
-    unit = package_checkout(tmp_path)
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
-    assert "\n    addopts=-ra\n" in config
-
-
-def test_a_pyproject_that_isnt_toml_is_refused_naming_it(tmp_path: Path) -> None:
-    unit = package_checkout(tmp_path)
-    (tmp_path / "pyproject.toml").write_text("[tool.pytest\n", encoding="utf-8")
-    with pytest.raises(run.RunError, match=r"pyproject.toml isn't valid TOML"):
-        run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
-
-
 def test_links_made_before_a_failed_link_are_removed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -803,13 +746,6 @@ def test_links_made_before_a_failed_link_are_removed(
     assert made
     assert not any(link.is_symlink() for link in made)
     assert sorted(p.name for p in (tmp_path / "packages").iterdir()) == ["other", "troupe"]
-
-
-def test_addopts_of_another_type_is_refused_naming_it(tmp_path: Path) -> None:
-    unit = package_checkout(tmp_path)
-    write_addopts(tmp_path, "3")
-    with pytest.raises(run.RunError, match=r"pyproject.toml's addopts is 3; it must be"):
-        run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
 
 
 def test_a_units_own_setup_cfg_is_refused_word_for_word(tmp_path: Path) -> None:
@@ -917,7 +853,7 @@ def test_a_unit_after_the_deadline_isnt_run(
     class Slow(Recorder):
         """Each unit takes exactly the minute's budget: the next one starts at the deadline."""
 
-        def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+        def __call__(self, command: list[str], cwd: Path, timeout: float, **_: object) -> int:
             now[0] += 60.0
             return super().__call__(command, cwd, timeout)
 
@@ -966,7 +902,7 @@ def test_stryker_installs_then_runs_the_settings_globs_when_none_are_named(tmp_p
     out = tmp_path / "reports" / "mutation" / "mutation.json"
     commands: list[list[str]] = []
 
-    def fake(command: list[str], cwd: Path, timeout: float) -> int:
+    def fake(command: list[str], cwd: Path, timeout: float, **_: object) -> int:
         commands.append(command)
         if command[0] == "npx":
             out.parent.mkdir(parents=True, exist_ok=True)
@@ -980,7 +916,7 @@ def test_stryker_installs_then_runs_the_settings_globs_when_none_are_named(tmp_p
 def test_a_failed_stryker_install_is_named(tmp_path: Path) -> None:
     with pytest.raises(run.RunError) as raised:
         run.run_stryker(
-            tmp_path, SETTINGS.repositories["website"], [], 1e12, "10.1.1", lambda c, w, t: 7
+            tmp_path, SETTINGS.repositories["website"], [], 1e12, "10.1.1", lambda c, w, t, **_: 7
         )
     assert str(raised.value) == "installing Stryker 10.1.1 failed (exit 7)"
 
@@ -1161,7 +1097,7 @@ def test_a_unit_whose_run_fails_still_logs_its_peaks(
     """A run that stops is when the peaks matter most: the runaway's dry run never finished."""
 
     class PeakingMutmut(Recorder):
-        def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+        def __call__(self, command: list[str], cwd: Path, timeout: float, **_: object) -> int:
             super().__call__(command, cwd, timeout)
             (cwd / "_mutation_children_peaks.log").write_text("mutmut 1048576 524288\n")
             return 3
