@@ -712,9 +712,12 @@ by an ordinary pull request.
 
 **mutmut's limits here.** It can't see code a test runs in a subprocess, so a function reached only that way counts
 as reached by no test, and the issue says so. A selected test that can't run under its hooks at all is listed in
-`scripts/mutation.json` under `deselect`, with its reason (troupe has none since #394). A run keeps the repository's own pytest `addopts`
-except `--strict-markers`, the guard's tag plugin and troupe's kinds plugin, which can't find their declarations or
-suites from mutmut's copy. For a
+`scripts/mutation.json` under `deselect`, with its reason (troupe has none since #394). If a unit's selected tests
+reach none of its code, mutmut stops after its stats pass; the run recognises mutmut's own words for that stop, counts
+every mutant of the unit as reached by no test, so its modules score 0 and their issues ask for unit tests, names the
+unit in the summary, and goes on to the next unit (#399). Any other mutmut failure fails the run. A run keeps the
+repository's own pytest `addopts` except `--strict-markers`, the guard's tag plugin and troupe's kinds plugin, which
+can't find their declarations or suites from mutmut's copy. For a
 package's unit, the checkout's top-level entries are linked into its parent directory during the run, so a test that
 finds the repository's root by counting directories finds it from inside the copy too, and the package's own other
 entries (a plugin's `tools/` and `fixtures/`, its `pyproject.toml`; not caches, hidden entries or build output) are

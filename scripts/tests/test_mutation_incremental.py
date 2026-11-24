@@ -132,7 +132,7 @@ def test_a_unit_the_last_run_didnt_run_but_kept_is_noticed_when_its_state_is_gon
 class FailingMutmut(FakeMutmut):
     """mutmut writing a result, then failing as when a unit's tests fail in its copy."""
 
-    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+    def __call__(self, command: list[str], cwd: Path, timeout: float, **_: object) -> int:
         super().__call__(command, cwd, timeout)
         return 3
 

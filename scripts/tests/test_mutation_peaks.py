@@ -20,7 +20,7 @@ pytestmark = pytest.mark.mutation
 class PeakingMutmut(Recorder):
     """mutmut, as far as the peaks: its process records into the file the plugin is handed."""
 
-    def __call__(self, command: list[str], cwd: Path, timeout: float) -> int:
+    def __call__(self, command: list[str], cwd: Path, timeout: float, **_: object) -> int:
         super().__call__(command, cwd, timeout)
         config = json.loads((cwd / "_mutation_children_plugin.json").read_text(encoding="utf-8"))
         with Path(config["peaks"]).open("a", encoding="utf-8") as peaks:

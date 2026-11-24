@@ -478,6 +478,11 @@ def state_section(state: Mapping[str, Any] | None) -> list[str]:
         since = f" (filled since {unit['filled_since']})" if unit.get("filled_since") else ""
         lines.append(f"- `{code(name)}`: {', '.join(parts)}{since}")
         lines += [f"  - {reason}" for reason in unit.get("discarded", [])]
+        if unit.get("unreached"):
+            lines.append(
+                "  - its selected tests reach none of its code: every mutant counted as reached "
+                "by no test"
+            )
         changed = unit.get("non_python_changes") or []
         if changed:
             files = ", ".join(f"`{code(path)}`" for path in changed)
