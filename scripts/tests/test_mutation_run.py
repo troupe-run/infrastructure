@@ -91,9 +91,12 @@ def test_a_packages_config_runs_only_its_selected_tests_but_keeps_all_of_them(
 ) -> None:
     """mutmut runs tests/unit; the whole tests directory stays out of also_copy, since mutmut
     copies it itself, so the helpers both kinds import are there too (#394, design D1)."""
-    (tmp_path / "packages" / "troupe").mkdir(parents=True)
+    package = tmp_path / "packages" / "troupe"
+    (package / "tests" / "unit").mkdir(parents=True)
+    (package / "tests" / "integration").mkdir()
+    (package / "tests" / "cli_shared.py").touch()
     unit = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests", "unit")
-    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
+    config = run.mutmut_config(package, tmp_path, unit, children=2)
     assert "pytest_add_cli_args_test_selection=tests/unit\n" in config
     assert config.endswith(
         "also_copy=\n    _mutation_children_plugin.py\n    _mutation_children_plugin.json\n"

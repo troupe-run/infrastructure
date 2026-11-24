@@ -142,12 +142,15 @@ def text(value: object, where: str) -> str:
 
 def selection(value: object, where: str, tests: str) -> str:
     """A directory under `tests`, by plain relative segments: no absolute path, no `.` or `..`, no
-    backslash, no trailing slash. A mutation run uses only these tests (#394)."""
+    backslash, whitespace or control character, no trailing slash. A mutation run uses only these
+    tests (#394)."""
     if (
         not isinstance(value, str)
         or not value
         or value.startswith("/")
-        or "\\" in value
+        # setup.cfg takes it unquoted: a newline would start another key, a space split it (#394)
+        or not value.isprintable()
+        or any(c.isspace() or c == "\\" for c in value)
         or any(part in {"", ".", ".."} for part in value.split("/"))
     ):
         raise SettingsError(
