@@ -265,8 +265,8 @@ can't run under the tool at all SHALL be deselected in the settings, with its re
 
 #### Scenario: troupe's own pytest plugins load
 - **WHEN** troupe's package is mutated
-- **THEN** its tests run with the plugins troupe's pytest options load, without `--strict-markers` and the guard's tag
-  plugin, which can't find their declarations from the copy
+- **THEN** its tests run with the plugins troupe's pytest options load, without `--strict-markers`, the guard's tag
+  plugin and troupe's kinds plugin, which can't find their declarations or suites from the copy
 
 #### Scenario: A package's tests find a sibling package
 - **WHEN** `troupe-store-text` is mutated and a test points a child process at `packages/troupe/tests`, counting two
