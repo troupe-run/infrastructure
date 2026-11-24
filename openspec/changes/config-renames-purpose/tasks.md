@@ -8,9 +8,11 @@
       between `config-hand-edits` and `docs-publishing`; read from `config-mv` at bdd8f124)
 - [x] 1.2 Check the description of `cap:config` against the Purpose (design D2), and leave `tofu/labels/troupe.json`
       unchanged. Verify `git diff tofu/` is empty and `scripts/tests/test_labels.py` passes (empty; 24 passed)
-- [ ] 1.3 Once troupe#505 has merged, rebase onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports
+- [x] 1.3 Once troupe#505 has merged, rebase onto `origin/main` and run `uv run scripts/oob.py`. Verify it reports
       nothing about troupe's specs or Purposes. Keep the output for the pull request. Stop and revise the change if it
-      reports anything of this change's
+      reports anything of this change's. On 29d0347 (rebased onto ac4cd39, after troupe#505 merged as 4e5e2612): the
+      Purpose read from troupe's `main` equals the record, and `oob: no differences (... troupe specs, troupe label
+      descriptions, ...)`
 
 ## 2. Verify
 
