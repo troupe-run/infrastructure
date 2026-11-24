@@ -15,7 +15,7 @@
     {
       "key": "0.2.0",
       "title": "0.3.0",
-      "state": "open",
+      "state": "closed",
       "description": "Config by hand: edits made to troupe’s files by hand are read back into config, and entities can be renamed"
     },
     {

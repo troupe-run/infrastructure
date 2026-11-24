@@ -2,17 +2,20 @@
 
 ## 1. Close 0.3.0
 
-- [ ] 1.1 Wait for `troupe-run-v0.3.0`'s release, and its install check passing on all twelve platform and Python
+- [x] 1.1 Wait for `troupe-run-v0.3.0`'s release, and its install check passing on all twelve platform and Python
   legs. Verify with `gh run view <id> -R troupe-run/troupe --json jobs` for the `release install check` run of that
   release: every `install (...)` job succeeded. If one fails, file a Bug on the board and stop.
-- [ ] 1.2 Rebase this branch onto `origin/main` after its latest state commit. Verify
+  Done: troupe-run/troupe#516 merged 2026-11-24 21:41Z; `troupe-run-v0.3.0` published (release run 45493675730,
+  "Creating 1 releases"); install check 45493715020 passed on all 12 legs.
+- [x] 1.2 Rebase this branch onto `origin/main` after its latest state commit. Verify
   `git rev-list --count HEAD..origin/main` is 0.
-- [ ] 1.3 Check 0.3.0 is still empty of open issues. Verify
+- [x] 1.3 Check 0.3.0 is still empty of open issues. Verify
   `gh issue list -R troupe-run/<repo> --milestone 0.3.0 --state open` lists nothing for troupe, infrastructure and
   website. If one has appeared, stop and ask the owner.
-- [ ] 1.4 In `tofu/milestones.json`, change the `state` of the entry titled 0.3.0 (key `0.2.0`) from `open` to
+- [x] 1.4 In `tofu/milestones.json`, change the `state` of the entry titled 0.3.0 (key `0.2.0`) from `open` to
   `closed`, and rename `test_today_s_release_in_progress_is_0_3_0` to `..._is_0_4_0`, asserting `0.4.0`. Verify
   `git diff` changes only those, and `uv run scripts/check.py` passes.
+  Done: check passed (4062 passed, 26 skipped).
 - [ ] 1.5 Open a draft pull request with `Closes #401`, using `--body-file`, and act on Claude's review. Verify the
   review of the last push completed with no must-fix or decision open. No local plan: CI's plan is the evidence
   (#261), checked on the final head under "Workflow follow-up".
