@@ -700,11 +700,19 @@ functions or lines it changed are mutated, on its merge with its base, and one c
 lines, with the run's time. It's a report: it's not a required check, and it succeeds when it finds survivors. To
 answer a survivor, add a test that fails for it, or exempt the line with the tool's own comment and a reason
 (`# pragma: no mutate`, `// Stryker disable next-line <mutator>: <reason>`). Most of its time is mutmut's pass over
-the whole suite.
+the unit's selected tests.
+
+**Only unit tests.** Mutation runs, nightly and on pull requests, run only each unit's selected tests: its `select` in
+`scripts/mutation.json`, a directory under its `tests`. Every troupe unit selects `unit`, so `packages/*/tests/unit`
+runs and `tests/integration` never does (owner decision, 2026-11-23; #394). The rest of `tests` is still copied
+beside the source and never mutated, since the helpers both kinds import live there. A unit without a selection, or
+with one outside its tests, is refused. Code that only integration tests reach shows as surviving, or as reached by
+no test. That's the honest signal: no unit test checks it. Where that's intended, the module's baseline is lowered
+by an ordinary pull request.
 
 **mutmut's limits here.** It can't see code a test runs in a subprocess, so a function reached only that way counts
-as reached by no test, and the issue says so. A few tests can't run under its hooks at all; they're listed in
-`scripts/mutation.json` under `deselect`, each with its reason. A run keeps the repository's own pytest `addopts`
+as reached by no test, and the issue says so. A selected test that can't run under its hooks at all is listed in
+`scripts/mutation.json` under `deselect`, with its reason (troupe has none since #394). A run keeps the repository's own pytest `addopts`
 except `--strict-markers` and the guard's tag plugin, which can't find their declarations from mutmut's copy. For a
 package's unit, the checkout's top-level entries are linked into its parent directory during the run, so a test that
 finds the repository's root by counting directories finds it from inside the copy too, and the package's own other
@@ -775,7 +783,7 @@ aren't judged meanwhile.
 **Lost or unfit state fails visibly.** Each run records what state it saved (`state-<repository>.json`, with its
 report). If the previous run saved a unit's state and this run can't restore it (the cache evicted it, or it was lost),
 the unit starts afresh, the summary names it, and the run fails. So does state from another mutmut version, or a unit
-whose sources or tests moved in the settings. A `.meta` file that can't be read drops only that source file's results,
+whose sources, tests or test selection moved in the settings. A `.meta` file that can't be read drops only that source file's results,
 which are tested again, named, and the run fails. A save that doesn't land fails the run too. A first fill, with nothing
 saved before, doesn't fail. Two runs overlapping despite the concurrency group can't drop each other's progress: the
 save keeps the newest entry for every unit the run didn't run.
@@ -783,10 +791,12 @@ save keeps the newest entry for every unit the run didn't run.
 **Seeding the baseline** (runbook). After a change that empties the kept state (the first time, a mutmut upgrade, or a
 lost cache), fill it with back-to-back dispatches: `gh workflow run mutation.yml -R troupe-run/infrastructure -f
 repository=troupe -f dry-run=true`, wait for the run to end, and dispatch again. Each resumes from the one before (the
-concurrency group runs them one at a time, and each restores the entry the last saved). troupe's `troupe` unit takes
-about 3 runs and its plugins about 1, from the proving run's rate. Each run's summary shows the carried and tested
-counts; the fill is done when every module is finished. Dry runs write no issues while the baseline is partial; the
-first nightly run after the fill judges every module.
+concurrency group runs them one at a time, and each restores the entry the last saved). Each run's summary shows
+the carried and tested counts; the fill is done when every module is finished. Dry runs write no issues while the
+baseline is partial; the first nightly run after the fill judges every module. If the schedule is disabled, reseed
+first and re-enable it after (`gh workflow enable mutation.yml -R troupe-run/infrastructure`), so the nightly run
+never judges a partial fill. The first run after a change of test selection (#394) discards the kept state, says
+so, and fails visibly: that's expected, and the next dispatch resumes from what it saved.
 
 **Mutation runs happen only in CI.** Never run them on your own machine: a `kill(-1)` mutant would kill every process
 of your login, and macOS can't contain it. The scripts' tests never run a mutant.

@@ -12,8 +12,10 @@ import mutation_state as st
 
 pytestmark = pytest.mark.mutation
 
-UNIT = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests")
-OTHER = ms.Unit("troupe-vcs-git", "packages/troupe-vcs-git/src", "packages/troupe-vcs-git/tests")
+UNIT = ms.Unit("troupe", "packages/troupe/src", "packages/troupe/tests", "unit")
+OTHER = ms.Unit(
+    "troupe-vcs-git", "packages/troupe-vcs-git/src", "packages/troupe-vcs-git/tests", "unit"
+)
 TODAY = datetime.date(2026, 11, 22)
 
 
@@ -37,6 +39,7 @@ def kept(
     mutmut: str = "3.8.1",
     filled_since: str = "2026-11-20",
     source: str | None = None,
+    select: str | None = "unit",
 ) -> Path:
     """A state directory as a previous run saved it: each unit's files under state/<unit>/."""
     state = tmp_path / "state"
@@ -46,13 +49,16 @@ def kept(
         for rel, content in files.items():
             (state / name / rel).parent.mkdir(parents=True, exist_ok=True)
             (state / name / rel).write_text(content, encoding="utf-8")
-        manifest["units"][name] = {  # type: ignore[index]
+        entry: dict[str, str] = {
             "source": source or unit.source,
             "tests": unit.tests,
             "filled_since": filled_since,
             "saved_by": "41",
             "commit": "a" * 40,
         }
+        if select is not None:  # None: a manifest saved before units had a selection (#394)
+            entry["select"] = select
+        manifest["units"][name] = entry  # type: ignore[index]
     state.mkdir(exist_ok=True)
     (state / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     return state
@@ -126,9 +132,25 @@ def test_a_unit_whose_sources_changed_in_the_settings_is_discarded_and_unfit(
     unit = restore(state, tmp_path / "mutants")
     assert unit.unfit
     assert unit.discarded == [
-        "the settings moved the unit's sources or tests since its state was saved: discarded, "
-        "filling afresh"
+        "the settings moved the unit's sources, tests or test selection since its state was "
+        "saved: discarded, filling afresh"
     ]
+
+
+@pytest.mark.parametrize("select", [None, "integration"])
+def test_a_unit_whose_test_selection_changed_is_discarded_and_unfit(
+    tmp_path: Path, select: str | None
+) -> None:
+    """Results an integration test killed would otherwise be carried as killed: the first run
+    after #394 (a manifest with no selection) starts each unit afresh, named, and fails visibly."""
+    state = kept(tmp_path, {"troupe": CALC}, select=select)
+    unit = restore(state, tmp_path / "mutants")
+    assert unit.unfit
+    assert unit.discarded == [
+        "the settings moved the unit's sources, tests or test selection since its state was "
+        "saved: discarded, filling afresh"
+    ]
+    assert not (tmp_path / "mutants" / "src").exists()
 
 
 def test_an_unreadable_meta_drops_only_that_file_and_is_named(tmp_path: Path) -> None:
@@ -175,6 +197,7 @@ def test_a_save_writes_back_the_units_results_and_stats_and_counts_what_was_test
     assert not (state / "troupe" / "src/troupe/calc.py").exists()
     manifest = json.loads((state / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["units"]["troupe"]["saved_by"] == "42"
+    assert manifest["units"]["troupe"]["select"] == "unit"
     assert manifest["units"]["troupe"]["filled_since"] == "2026-11-20"
     assert (unit.carried, unit.tested, unit.saved) == (1, 1, True)
 
