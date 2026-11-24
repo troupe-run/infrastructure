@@ -19,15 +19,21 @@
 
 ## 2. Outcomes for the issues with no milestone
 
-- [ ] 2.1 Comment on #401 with the list of open issues with no milestone
+- [x] 2.1 Comment on #401 with the list of open issues with no milestone
   (`gh issue list -R troupe-run/<repo> --state open --search no:milestone`), grouped, one line per issue, marking
   those #375 already gave an outcome. Ask the owner (through the orchestrator) for each one's outcome: into a milestone
   (which), `parked` (with the reason to come back), or closed as not planned. Verify the comment is on #401.
-- [ ] 2.2 Carry out each outcome the owner gives, at their word: set the milestone, add the `parked` label with a
+  Done: issuecomment-7144799808 lists 66 (troupe 28, infrastructure 29, website 9; `.github` left out as its issues
+  are off): 45 with #375's outcomes still open, 21 new.
+- [x] 2.2 Carry out each outcome the owner gives, at their word: set the milestone, add the `parked` label with a
   comment giving the reason, or `gh issue close <n> -R troupe-run/<repo> --reason "not planned" --comment "<why>"`.
   Verify by re-running the 2.1 query: what it still lists is only issues the owner parked or kept open.
-- [ ] 2.3 Record the outcomes on #401 in one comment: each issue, its outcome, and the owner's reason where given.
+  Done: troupe-run/troupe#506 is in 0.4.0. The query now lists troupe 27, infrastructure 30 (with #401), website 9:
+  the 65 kept and #401.
+- [x] 2.3 Record the outcomes on #401 in one comment: each issue, its outcome, and the owner's reason where given.
   Verify every issue from 2.1's list appears in it.
+  Done: issuecomment-7144843344 (owner, 2026-11-25) accounts for all 66: 1 into 0.4.0, 45 keep #375's outcomes (9
+  parked, 5 decisions, 31 upkeep), 20 new upkeep. None closed as not planned.
 
 ## Workflow follow-up
 
