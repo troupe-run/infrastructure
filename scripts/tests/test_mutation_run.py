@@ -744,6 +744,18 @@ def test_a_run_keeps_the_repositorys_pytest_options_but_those_the_copy_cant_hono
     assert "\n    addopts=-ra --strict-config -p protocol_guard -p gitrepo\n" in config
 
 
+def test_troupes_kinds_plugin_is_left_out_of_the_copy(tmp_path: Path) -> None:
+    """In mutmut's copy kinds_pytest finds no suite and refuses every test (#398)."""
+    unit = package_checkout(tmp_path)
+    write_addopts(
+        tmp_path,
+        '["-ra", "--strict-markers", "-p", "protocol_guard", "-p", "guard_pytest", '
+        '"-p", "kinds_pytest", "-pkinds_pytest", "-p", "hypothesis_profiles", "-p", "gitrepo"]',
+    )
+    config = run.mutmut_config(tmp_path / "packages" / "troupe", tmp_path, unit, children=2)
+    assert "\n    addopts=-ra -p protocol_guard -p hypothesis_profiles -p gitrepo\n" in config
+
+
 def test_addopts_as_one_string_is_split_as_pytest_splits_it(tmp_path: Path) -> None:
     unit = package_checkout(tmp_path)
     write_addopts(tmp_path, "\"-ra --strict-markers -p guard_pytest -k 'a or b'\"")
