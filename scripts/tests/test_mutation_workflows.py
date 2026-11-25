@@ -2,11 +2,13 @@
 block a merge, and keep their budgets and token in step with their declarations (spec:
 mutation-testing, mutation-issue-credentials; lint-mutation design D3, D4, D9)."""
 
+import io
 import json
 import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -610,7 +612,25 @@ def test_a_kill_of_every_process_inside_reaches_nothing_outside(tmp_path: Path) 
         sentinel.wait()
 
 
-ORPHAN = """
+STATE_OF = """
+def state_of(pid):
+    # None once the process is gone: the open fails (ENOENT), the read fails because it was reaped
+    # after the open (ESRCH, ProcessLookupError), or the read comes back empty (#407).
+    try:
+        with open(f"/proc/{pid}/stat") as stat:
+            line = stat.read()
+    except (FileNotFoundError, ProcessLookupError):
+        return None
+    if not line:
+        return None
+    if ")" not in line:
+        raise ValueError(f"/proc/{pid}/stat has no ')' after the name: {line!r}")
+    return line.rsplit(")", 1)[1].split()[0]
+"""
+
+ORPHAN = (
+    STATE_OF
+    + """
 import os, signal, subprocess, sys, time
 start = ["sh", "-c", "sleep 300 >/dev/null 2>&1 & echo $!"]
 out = subprocess.run(start, capture_output=True, text=True, check=True).stdout
@@ -618,15 +638,51 @@ out = subprocess.run(start, capture_output=True, text=True, check=True).stdout
 grandchild = int(out)
 os.kill(grandchild, signal.SIGKILL)
 for _ in range(50):
-    try:
-        state = open(f"/proc/{grandchild}/stat").read().rsplit(")", 1)[1].split()[0]
-    except FileNotFoundError:
+    state = state_of(grandchild)
+    if state is None:
         print("reaped")
         sys.exit(0)
     time.sleep(0.1)
 print("left as", state)
 sys.exit(1)
 """
+)
+
+
+def state_of_reading(read: Callable[[], str]) -> Callable[[int], str | None]:
+    """ORPHAN's `state_of`, with `open` replaced by a stub whose file's `read` calls `read`. The
+    function looks `open` up in its own namespace before the builtins, so nothing global changes."""
+
+    class Stat(io.StringIO):
+        def read(self, size: int | None = -1) -> str:
+            return str(read())
+
+    namespace: dict[str, Any] = {"open": lambda path: Stat()}
+    exec(STATE_OF, namespace)  # noqa: S102 (this file's own constant, the code under test)
+    state_of: Callable[[int], str | None] = namespace["state_of"]
+    return state_of
+
+
+def vanished_mid_read() -> str:
+    raise ProcessLookupError(3, "No such process")
+
+
+def test_a_process_reaped_between_the_open_and_the_read_counts_as_reaped() -> None:
+    """The read of /proc/<pid>/stat fails with ESRCH when the reap lands after the open (#407)."""
+    assert state_of_reading(vanished_mid_read)(42) is None
+
+
+def test_an_empty_read_of_stat_counts_as_reaped() -> None:
+    assert state_of_reading(lambda: "")(42) is None
+
+
+def test_a_stat_line_gives_the_state_letter_even_with_a_paren_in_the_name() -> None:
+    assert state_of_reading(lambda: "42 (sl) eep) Z 1 42 42 0 -1\n")(42) == "Z"
+
+
+def test_a_stat_line_with_no_closing_paren_is_an_error_not_reaped() -> None:
+    with pytest.raises(ValueError, match="/proc/42/stat"):
+        state_of_reading(lambda: "42 sleep Z 1")(42)
 
 
 def test_the_runs_init_waits_for_the_command_rather_than_becoming_it() -> None:
