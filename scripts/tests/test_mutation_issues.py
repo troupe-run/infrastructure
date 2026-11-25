@@ -239,6 +239,18 @@ def test_more_modules_under_than_the_cap_opens_the_cap_and_names_the_rest() -> N
     assert p.deferred == ["troupe.m5", "troupe.m6"]
 
 
+def test_new_issues_open_for_the_lowest_scores_first_ties_by_name() -> None:
+    """Owner decision (2026-11-26, #412): past the cap, the worst modules get issues first. Name
+    order opened troupe.a (50%) and troupe.b (40%) before troupe.c (0%)."""
+    scores = {"a": 5, "b": 4, "c": 0, "d": 3, "e": 0, "f": 2, "g": 1, "h": 3}  # killed of 10
+    modules = {f"troupe.{n}": module(killed=k, survived=10 - k) for n, k in scores.items()}
+    p = plan(report(**modules))
+    opened = [module for kind, module in kinds(p) if kind == "open"]
+    # 0% (c, e), 10% (g), 20% (f), then one slot for the 30% tie: d before h by name.
+    assert sorted(opened) == ["troupe.c", "troupe.d", "troupe.e", "troupe.f", "troupe.g"]
+    assert p.deferred == ["troupe.a", "troupe.b", "troupe.h"]
+
+
 # New survivors are attributed (design D8)
 
 
