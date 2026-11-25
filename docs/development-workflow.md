@@ -685,7 +685,7 @@ mutated at its `main` (mutmut for Python, Stryker for TypeScript). A module's sc
 the mutants caught as a percentage of those caught, survived or reached by no test. A module is judged when it has at
 least 10 mutants and all of them ran within the budget, and is **under** when its score is below 60% or below its
 recorded baseline. Each under module has one issue in its repository, labelled `test-quality`, on the board, listing
-its surviving mutants: opened (at most 5 new ones a run), updated in place, and closed when the module is back over
+its surviving mutants: opened (at most 5 new ones a run, lowest score first), updated in place, and closed when the module is back over
 both. A survivor on a line changed since the last run names the pull request that added it, which GitHub shows on
 that pull request.
 

@@ -228,10 +228,21 @@ def plan_repository(
 ) -> Plan:
     plan = Plan()
     open_issues = {issue.module: issue for issue in issues}
-    opened = 0
+    judgements = {
+        name: judge(name, module, baselines.get(name), settings)
+        for name, module in report.modules.items()
+    }
+    # Past the cap, the lowest scores get new issues first, ties by name so the order is stable
+    # (owner decision 2026-11-26, #412). Updates and closes still cover every open issue.
+    wanting = [
+        name
+        for name, judgement in judgements.items()
+        if judgement.judged and judgement.under and name not in open_issues
+    ]
+    chosen = set(sorted(wanting, key=lambda n: (judgements[n].score, n))[: settings.max_new_issues])
     for name in sorted(report.modules):
         module = report.modules[name]
-        judgement = judge(name, module, baselines.get(name), settings)
+        judgement = judgements[name]
         issue = open_issues.get(name)
         if not judgement.judged:
             plan.not_judged.append(name)
@@ -242,10 +253,9 @@ def plan_repository(
             text = body(report.repository, judgement, module, settings, run_url, tool, pulls)
             heading = title(judgement, settings)
             if issue is None:
-                if opened >= settings.max_new_issues:
+                if name not in chosen:
                     plan.deferred.append(name)
                     continue
-                opened += 1
                 plan.actions.append(Action("open", name, None, heading, text))
                 continue
             plan.actions.append(Action("update", name, issue, heading, text))
