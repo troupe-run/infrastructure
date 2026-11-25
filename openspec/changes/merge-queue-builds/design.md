@@ -33,9 +33,9 @@ What each queue entry runs (2026-11-25):
 
 The module gains `merge_queue_builds` (number, default 5) and `merge_queue_check_timeout_minutes` (number, default 60),
 used for `max_entries_to_build` and `check_response_timeout_minutes`. Defaults equal to today's values mean
-infrastructure's and website's rulesets plan no change. Each input validates its range as GitHub's API does
-(`max_entries_to_build` 0–100, `check_response_timeout_minutes` 1–360), so a wrong value fails `tofu validate` rather
-than the apply.
+infrastructure's and website's rulesets plan no change. Each input validates its range, so a wrong value fails
+`tofu validate` rather than the apply: builds 1–100 (GitHub refuses 101, and 0 would build nothing) and the wait 1–360
+minutes (GitHub refuses 0 and 361; probe, 2026-11-25).
 
 **Alternative: one object input for every queue parameter.** It would make each repository repeat the five values it
 doesn't change, and nothing else differs between repositories yet.
@@ -53,9 +53,8 @@ macOS legs in line instead of 20, and 120 minutes covers a 30-minute leg plus th
 
 With `ALLGREEN`, a group lands only entries whose own queue commit passed, so at most the entries being built can merge
 together. Building 2 caps a merge at 2 already; lowering the merge limit too changes nothing the queue does, and would
-add a third value to the plan. If GitHub refuses a merge limit above the build limit, the apply fails and changes
-nothing; the change is checked on a throwaway repository first (tasks 1.1) so the plan isn't approved for an apply
-GitHub refuses.
+add a third value to the plan. GitHub accepts a merge limit above the build limit: a probe ruleset with 2, 5 and 120
+read back unchanged (2026-11-25, tasks 1.1).
 
 ### D4. infrastructure and website: recommendation, no change
 
@@ -74,8 +73,6 @@ GitHub refuses.
 - [infrastructure's entries still compete with troupe's for macOS runners] → troupe's 8 legs at most, plus
   infrastructure's 4 per entry, is still above 5, so a busy moment queues for runners; 120 minutes absorbs it on troupe,
   and D4 says what to do if infrastructure times out.
-- [GitHub refuses `max_entries_to_merge` > `max_entries_to_build`] → checked on a throwaway repository before the PR
-  is marked ready (D3).
 
 ## Migration Plan
 

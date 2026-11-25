@@ -82,6 +82,11 @@ module "repo_troupe" {
   # Every check it requires runs on merge groups: `check` in full since troupe-run/troupe#183, which
   # troupe's own tests guard, and the delivered guard (#197; spec: rulesets).
   merge_queue = true
+  # Each entry runs CI's 12 legs, 4 on macOS, against about 5 macOS runners for the org, and a leg
+  # may take 30 minutes: 5 entries at once waited past 60 minutes and were dropped (#409; owner,
+  # 2026-11-25; merge-queue-builds D2).
+  merge_queue_builds                = 2
+  merge_queue_check_timeout_minutes = 120
 }
 
 module "repo_github" {

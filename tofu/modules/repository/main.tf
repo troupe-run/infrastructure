@@ -162,17 +162,19 @@ resource "github_repository_ruleset" "main" {
 
     # The queue lands only what it tested: main with the pull requests ahead of it and this one's
     # commits, rebased, each pull request's own commit green (ALLGREEN). A lone pull request lands
-    # straight away; with one maintainer, waiting for a group only adds delay (merge-queue D2).
+    # straight away; with one maintainer, waiting for a group only adds delay (merge-queue D2). How
+    # many it tests at once, and how long it waits for a check, each repository sets to fit its CI
+    # (merge-queue-builds D1).
     dynamic "merge_queue" {
       for_each = var.merge_queue ? [1] : []
       content {
         merge_method                      = "REBASE"
         grouping_strategy                 = "ALLGREEN"
-        max_entries_to_build              = 5
+        max_entries_to_build              = var.merge_queue_builds
         max_entries_to_merge              = 5
         min_entries_to_merge              = 1
         min_entries_to_merge_wait_minutes = 0
-        check_response_timeout_minutes    = 60
+        check_response_timeout_minutes    = var.merge_queue_check_timeout_minutes
       }
     }
 

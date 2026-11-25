@@ -107,6 +107,30 @@ variable "merge_queue" {
   default     = false
 }
 
+# How many queued pull requests the queue tests at once, and how long it waits for a required
+# check. Sized to the repository's CI: macOS runners are shared across the org, so an entry whose
+# legs wait too long for one is dropped with checks_timed_out (spec: rulesets; merge-queue-builds
+# D1). GitHub refuses builds above 100 and waits outside 1-360 minutes.
+variable "merge_queue_builds" {
+  description = "How many queued pull requests the merge queue tests at once."
+  type        = number
+  default     = 5
+  validation {
+    condition     = var.merge_queue_builds >= 1 && var.merge_queue_builds <= 100 && floor(var.merge_queue_builds) == var.merge_queue_builds
+    error_message = "merge_queue_builds must be a whole number from 1 to 100."
+  }
+}
+
+variable "merge_queue_check_timeout_minutes" {
+  description = "How long the merge queue waits for a required check to report before it removes the pull request."
+  type        = number
+  default     = 60
+  validation {
+    condition     = var.merge_queue_check_timeout_minutes >= 1 && var.merge_queue_check_timeout_minutes <= 360 && floor(var.merge_queue_check_timeout_minutes) == var.merge_queue_check_timeout_minutes
+    error_message = "merge_queue_check_timeout_minutes must be a whole number of minutes from 1 to 360."
+  }
+}
+
 # Every review conversation is resolved before a merge (spec: rulesets; review-findings-by-severity
 # design D2). On everywhere, in the same apply that delivers the review that resolves its own
 # must-fixes (design D8); scripts/tests/test_review_thread_resolution.py keeps it on.
