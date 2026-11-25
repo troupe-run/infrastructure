@@ -21,7 +21,7 @@
 - [ ] 3.1 The PR's plan shows exactly one resource changing, troupe's `protect main` ruleset, with only
       `max_entries_to_build` 5 → 2 and `check_response_timeout_minutes` 60 → 120; infrastructure's and website's
       rulesets plan no change.
-- [ ] 3.2 The PR body records D4's recommendation for infrastructure and website.
+- [x] 3.2 The PR body records D4's recommendation for infrastructure and website.
 
 ## Workflow follow-up
 
