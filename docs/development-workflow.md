@@ -680,14 +680,13 @@ infrastructure itself, a `[coverage]` table in `quality-gates.toml`; another rep
 `[coverage]` in its own pull request. Once applied, the scheduled run mutates it, and if it receives the guard's files,
 the pull request report is delivered to it. Taking one off the list deletes its delivered copies.
 
-**Nightly** (`.github/workflows/mutation.yml`, 03:23 UTC, on Linux with Python 3.15), each listed repository is
-mutated at its `main` (mutmut for Python, Stryker for TypeScript). A module's score is
-the mutants caught as a percentage of those caught, survived or reached by no test. A module is judged when it has at
-least 10 mutants and all of them ran within the budget, and is **under** when its score is below 60% or below its
-recorded baseline. Each under module has one issue in its repository, labelled `test-quality`, on the board, listing
-its surviving mutants: opened (at most 5 new ones a run, lowest score first), updated in place, and closed when the module is back over
-both. A survivor on a line changed since the last run names the pull request that added it, which GitHub shows on
-that pull request.
+**Nightly** (`.github/workflows/mutation.yml`, 03:23 UTC, on Linux with Python 3.15), each listed repository is mutated
+at its `main` (mutmut for Python, Stryker for TypeScript). A module's score is the mutants caught as a percentage of
+those caught, survived or reached by no test. A module is judged when it has at least 10 mutants and all of them ran
+within the budget, and is **under** when its score is below 60% or below its recorded baseline. Each under module has
+one issue in its repository, labelled `test-quality`, on the board, listing its surviving mutants: opened (at most 5 new
+ones a run, lowest score first), updated in place, and closed when the module is back over both. A survivor on a line
+changed since the last run names the pull request that added it, which GitHub shows on that pull request.
 
 **Baselines only move up.** Each repository's `quality-gates.toml` holds, under `[mutation.baselines."<module>"]`,
 the score a module may not fall below. The run never writes it: its summary, and each module's issue, give the
