@@ -515,6 +515,8 @@ def fake_show(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     shown: list[list[str]] = []
 
     class Done:
+        returncode = 0
+        stderr = ""
         stdout = (
             "--- src/calc.py\n+++ src/calc.py\n@@ -1,2 +1,2 @@\n def add(a, b):\n"
             "-    return a + b\n+    return a - b"
@@ -523,10 +525,14 @@ def fake_show(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     real_run = subprocess.run
 
     def fake_run(args: list[str], **kwargs: Any) -> Any:  # noqa: ANN401
-        if args[0] != "mutmut":
+        if not args[-1].endswith("mutation_show.py"):
             return real_run(args, **kwargs)  # git, for the commit and blame
-        shown.append([*args, str(kwargs.get("cwd"))])
-        return Done()
+        # One render of every wanted mutant, by mutmut's own interpreter (#404).
+        wanted = json.loads(kwargs["input"])
+        shown.append([Path(args[0]).name, Path(args[-1]).name, str(kwargs.get("cwd")), wanted])
+        done = Done()
+        done.stdout = json.dumps({n: Done.stdout for names in wanted.values() for n in names})
+        return done
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     return shown
@@ -576,7 +582,8 @@ def test_a_run_maps_survivors_back_to_the_real_source_and_cleans_up(
         2,
         "calc.x_add__mutmut_1",
     )
-    assert shown == [["mutmut", "show", "calc.x_add__mutmut_1", str(tmp_path)]]
+    wanted = {"src/calc.py": ["calc.x_add__mutmut_1"]}
+    assert shown == [["python", "mutation_show.py", str(tmp_path), wanted]]
     assert not (tmp_path / "mutants" / "stale").exists(), (
         "an earlier run's mutants are removed first"
     )
