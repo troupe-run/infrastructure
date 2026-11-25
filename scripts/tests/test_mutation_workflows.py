@@ -864,6 +864,8 @@ def test_the_pull_request_report_and_what_it_runs_are_delivered() -> None:
         "scripts/mutation_report.py",
         "scripts/mutation_run.py",
         "scripts/mutation_settings.py",
+        # mutation_run.py runs it for the survivors' diffs (#404): without it troupe's report fails.
+        "scripts/mutation_show.py",
         # mutation_run.py imports it (#378): without it troupe's copy fails on import.
         "scripts/mutation_state.py",
     }
