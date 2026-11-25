@@ -2,10 +2,10 @@
 
 ## 1. infrastructure's limits
 
-- [ ] 1.1 `tofu/repositories.tf`: infrastructure's module call sets `merge_queue_builds = 2` and
+- [x] 1.1 `tofu/repositories.tf`: infrastructure's module call sets `merge_queue_builds = 2` and
       `merge_queue_check_timeout_minutes = 120`, with a comment naming #413 (D1, D2). Verify: `tofu validate` and
       `uv run scripts/check.py` pass (the commit hook's check).
-- [ ] 1.2 The PR body carries #413's numbers and links #414.
+- [x] 1.2 The PR body carries #413's numbers and links #414.
 
 ## Workflow follow-up
 

@@ -131,6 +131,11 @@ module "repo_infrastructure" {
   # Every check it requires runs on merge groups (scripts/tests/test_required_checks.py; spec:
   # rulesets, merge-queue design D7).
   merge_queue = true
+  # Each entry's 4 macOS legs take minutes, but wait behind troupe's 30-minute legs for the org's
+  # ~5 macOS runners: 5 entries at once waited past 60 minutes and were dropped (#413; owner,
+  # 2026-11-26; merge-queue-builds-infra D1).
+  merge_queue_builds                = 2
+  merge_queue_check_timeout_minutes = 120
 }
 
 module "repo_website" {
