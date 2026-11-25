@@ -46,6 +46,8 @@ locals {
     "scripts/mutation_report.py",
     "scripts/mutation_run.py",
     "scripts/mutation_settings.py",
+    # Survivors' diffs in one process, which mutation_run.py runs with mutmut's interpreter (#404).
+    "scripts/mutation_show.py",
     # The scheduled run's kept mutmut state, which mutation_run.py imports (#378).
     "scripts/mutation_state.py",
   ])

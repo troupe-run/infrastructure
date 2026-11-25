@@ -15,7 +15,11 @@ example over troupe's sources at a commit:
       python:3.13-slim sh -c "pip install -q mutmut==3.8.1 && \\
       python /infra/scripts/mutation_locator_check.py check /troupe/packages"
 
-Run it again whenever `scripts/mutation.json` moves mutmut to a new version, and check that the
+Its `show-equal` command checks mutation_show.py against real `mutmut show` for every survivor a
+CI run's report names (#404), in a unit's mutmut working directory: it generates the mutants as
+text and takes the results from the report, so no mutant runs.
+
+Run them again whenever `scripts/mutation.json` moves mutmut to a new version, and check that the
 new mutmut still says `mutation_run.UNREACHED`, word for word, when a unit's tests reach none of
 its code (#399). Its other command, `diffs <file> [<text>]`, prints mutmut's diffs for a file's
 mutants as JSON, which is how the locator's test fixtures were made
@@ -149,6 +153,81 @@ def check_file(path: Path) -> tuple[Counter[str], list[str]]:
     return counts, misses
 
 
+def survivors_of(report: Path, source: str) -> dict[str, list[str]]:
+    """The survivors a CI run's report names under one unit's `source`, by mutmut's paths there
+    (`src/...`): the results come from that run, never from running a mutant here (#404)."""
+    modules = json.loads(report.read_text(encoding="utf-8"))["modules"]
+    prefix = source.rstrip("/") + "/"
+    wanted: dict[str, list[str]] = {}
+    for module in modules.values():
+        for survivor in module.get("survivors", []):
+            if survivor["path"].startswith(prefix):
+                path = "src/" + survivor["path"][len(prefix) :]
+                wanted.setdefault(path, []).append(survivor["name"])
+    return wanted
+
+
+def show_equal(report: Path, source: str, processes: int) -> int:
+    """In a unit's mutmut working directory (its setup.cfg written as mutation_run.py writes it):
+    generate the mutants as text, mark the report's survivors as survived in mutmut's .meta files,
+    then compare `mutmut show` with mutation_show.py for every one. No mutant runs (#404)."""
+    import subprocess
+    from multiprocessing import Pool
+
+    import mutmut.__main__ as m  # type: ignore[import-not-found]
+
+    wanted = survivors_of(report, source)
+    if not wanted:
+        print(f"show-equal: {report} names no survivor under {source}")
+        return 1
+    m.set_mutant_under_test("mutant_generation")
+    Path("mutants").mkdir(exist_ok=True)
+    m.copy_src_dir()
+    m.copy_also_copy_files()
+    m.setup_source_paths()
+    m.create_mutants(processes)
+    missing: list[str] = []
+    for path, names in wanted.items():
+        meta = Path("mutants") / f"{path}.meta"
+        data = json.loads(meta.read_text(encoding="utf-8")) if meta.exists() else {}
+        codes = data.get("exit_code_by_key", {})
+        for name in names:
+            if name in codes:
+                codes[name] = 0  # survived, as the report says
+            else:
+                missing.append(name)
+        if data:
+            meta.write_text(json.dumps(data), encoding="utf-8")
+    names = [name for names_ in wanted.values() for name in names_ if name not in missing]
+    with Pool(processes) as pool:
+        real = dict(zip(names, pool.map(_mutmut_show, names), strict=True))
+    script = Path(__file__).resolve().parent / "mutation_show.py"
+    done = subprocess.run(
+        [sys.executable, str(script)],
+        input=json.dumps({p: [n for n in ns if n not in missing] for p, ns in wanted.items()}),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    rendered = json.loads(done.stdout)
+    differ = [name for name in names if rendered.get(name) != real[name]]
+    print(
+        f"show-equal: {source}: {len(names)} survivors compared, {len(names) - len(differ)} equal, "
+        f"{len(differ)} differ, {len(missing)} not in the generated mutants"
+    )
+    for name in (differ + missing)[:10]:
+        print(f"  {name}")
+    return 1 if differ or missing else 0
+
+
+def _mutmut_show(name: str) -> str:
+    import subprocess
+
+    return subprocess.run(
+        ["mutmut", "show", name], capture_output=True, text=True, check=True
+    ).stdout
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
@@ -158,7 +237,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     show = commands.add_parser("diffs", help="print mutmut's diffs for a file's mutants as JSON")
     show.add_argument("file", type=Path)
     show.add_argument("text", nargs="?", default="", help="only mutants whose name holds this")
+    equal = commands.add_parser(
+        "show-equal", help="compare mutation_show.py with mutmut show for a report's survivors"
+    )
+    equal.add_argument("report", type=Path, help="a CI run's report-<repository>.json")
+    equal.add_argument("source", help="the unit's source in the checkout, e.g. packages/troupe/src")
+    equal.add_argument("--processes", type=int, default=3)
     args = parser.parse_args(argv)
+    if args.command == "show-equal":
+        return show_equal(args.report, args.source, args.processes)
     if args.command == "diffs":
         chosen = {k: v for k, v in show_diffs(args.file).items() if args.text in k}
         print(json.dumps(chosen, indent=2, ensure_ascii=False))
