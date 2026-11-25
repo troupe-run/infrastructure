@@ -13,6 +13,8 @@
   under ruff 0.17.5 and under ruff 0.17.6 (`uvx ruff@0.17.6 check .` and `uvx ruff@0.17.6 format --check .`).
   Done: the module's tests pass (52 passed, 9 skipped: the contained ones need Linux, so CI runs them); both ruff
   versions report all checks passed and 142 files formatted.
-- [ ] 1.3 Open a draft pull request with `Closes #407`, using `--body-file`, and act on Claude's review. Verify the
+- [x] 1.3 Open a draft pull request with `Closes #407`, using `--body-file`, and act on Claude's review. Verify the
   review of the last push completed with no must-fix or decision open, and CI's check passes, the contained test
   included.
+  Done: #408. Claude's review of 27877ae had no findings. CI's check passed on 27877ae: 4064 passed, none skipped,
+  so the contained orphan test ran.
