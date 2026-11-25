@@ -18,14 +18,14 @@
 
 ## 3. Evidence
 
-- [ ] 3.1 The PR's plan shows exactly one resource changing, troupe's `protect main` ruleset, with only
-      `max_entries_to_build` 5 → 2 and `check_response_timeout_minutes` 60 → 120; infrastructure's and website's
-      rulesets plan no change.
-- [x] 3.2 The PR body records D4's recommendation for infrastructure and website.
+- [x] 3.1 The PR body records D4's recommendation for infrastructure and website.
 
 ## Workflow follow-up
 
-- Archive the change once Claude's review of the last push is clean.
+- Archive the change before the PR is marked ready, so the owner approves the plan once, on the final head.
+- Before the merge, the PR's plan shows exactly one resource changing, troupe's `protect main` ruleset, with only
+  `max_entries_to_build` 5 → 2 and `check_response_timeout_minutes` 60 → 120; infrastructure's and website's
+  rulesets plan no change.
 - After the merge, the owner approves the `apply` job; then `gh api repos/troupe-run/troupe/rulesets/24895454` shows
   `max_entries_to_build` 2 and `check_response_timeout_minutes` 120. Comment on infrastructure#409 with the PR and the
   archived change.
