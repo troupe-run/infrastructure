@@ -54,7 +54,7 @@ approver of a gate, not a separate thing.
 
 ### D3. 0.4.0's new description
 
-> Gates: a run's approvers decide whether its work is kept; troupe keeps clean work, and the rest waits for whoever
+> Gates: a run’s approvers decide whether its work is kept; troupe keeps clean work, and the rest waits for whoever
 > runs troupe
 
 The old description says what was planned before troupe#62's scoping. The new one says what was built:

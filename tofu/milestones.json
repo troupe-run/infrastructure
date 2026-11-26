@@ -22,7 +22,7 @@
       "key": "0.3.0",
       "title": "0.4.0",
       "state": "open",
-      "description": "Gates: a run stops for approval before its work is kept; every gate is manual, and the approver is whoever runs troupe"
+      "description": "Gates: a run’s approvers decide whether its work is kept; troupe keeps clean work, and the rest waits for whoever runs troupe"
     },
     {
       "key": "0.4.0",
