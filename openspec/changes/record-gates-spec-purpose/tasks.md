@@ -25,7 +25,8 @@
 ## 3. Verify
 
 - [x] 3.1 Run `openspec validate record-gates-spec-purpose --strict` and verify it passes
-- [ ] 3.2 Run `uv run scripts/check.py` with its output kept in a scratch file, and verify every gate passes
+- [x] 3.2 Run `uv run scripts/check.py` with its output kept in a scratch file, and verify every gate passes (the
+      commit's `check.py --scope milestones --scope oob` passed, every gate, in 70 s)
 
 ## Workflow follow-up
 
