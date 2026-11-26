@@ -19,8 +19,10 @@
       nothing else. Verify `git diff tofu/milestones.json` is that one line, and `scripts/tests/test_milestones.py`
       passes (one line; passes, once the apostrophe is the typographic one the test asks for)
 - [x] 2.2 Verify a plan is needed, since `tofu/` changes: `scripts/plan_needed.py` over the diff prints `plan=true` (it does)
-- [ ] 2.3 Once CI's plan of the pull request is posted, read it. Verify it updates only the `description` of the 0.4.0
-      milestone in each repository in `repositories`, and nothing else. Stop and revise the change if it shows more
+- [x] 2.3 Once CI's plan of the pull request is posted, read it. Verify it updates only the `description` of the 0.4.0
+      milestone in each repository in `repositories`, and nothing else. Stop and revise the change if it shows more (PR
+      #420's plan for 595c821: 0 to add, 4 to change, 0 to destroy; only `description` of
+      `github_repository_milestone.release["<repo>/0.3.0"]` in `.github`, `infrastructure`, `troupe` and `website`)
 
 ## 3. Verify
 
