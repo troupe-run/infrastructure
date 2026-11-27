@@ -411,9 +411,9 @@ def test_a_closing_line_to_someone_else_s_issue_still_gets_the_app_s_issue() -> 
 
 
 @pytest.mark.milestones
-def test_today_s_release_in_progress_is_0_4_0() -> None:
+def test_today_s_release_in_progress_is_0_5_0() -> None:
     text = (REPO / "tofu" / "milestones.json").read_text(encoding="utf-8")
-    assert di.release_in_progress(text) == "0.4.0"
+    assert di.release_in_progress(text) == "0.5.0"
 
 
 def test_the_lowest_version_wins_not_the_first_listed() -> None:

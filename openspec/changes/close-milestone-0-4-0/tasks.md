@@ -2,18 +2,24 @@
 
 ## 1. Close 0.4.0
 
-- [ ] 1.1 Wait for `troupe-run-v0.4.0`'s release, and for its install check to pass on all twelve platform and Python
+- [x] 1.1 Wait for `troupe-run-v0.4.0`'s release, and for its install check to pass on all twelve platform and Python
   legs. Verify with `gh run view <id> -R troupe-run/troupe --json jobs` for the `release install check` run of that
   release: every `install (...)` job succeeded. A macOS leg cancelled for runner capacity is re-run, not a failure. If
   a leg fails, file a Bug on the board and stop.
-- [ ] 1.2 Rebase this branch onto `origin/main` after its latest state commit. Verify
+  Done: troupe-run/troupe#541 merged 2026-11-27; `troupe-run-v0.4.0` published (release run 45948621807, "Creating 1
+  releases"). Install check 45948648669: macOS / 3.12 failed to connect to github.com:443 on attempt 1; the re-run of
+  that leg passed, so all 12 legs are green. Its Bug, troupe-run/troupe#542, was closed with that run.
+- [x] 1.2 Rebase this branch onto `origin/main` after its latest state commit. Verify
   `git rev-list --count HEAD..origin/main` is 0.
-- [ ] 1.3 Check 0.4.0 is still empty of open issues. Verify
+  Done: rebased onto d3fb77c.
+- [x] 1.3 Check 0.4.0 is still empty of open issues. Verify
   `gh issue list -R troupe-run/<repo> --milestone 0.4.0 --state open` lists nothing for troupe, infrastructure and
   website. If one has appeared, stop and ask the owner.
-- [ ] 1.4 In `tofu/milestones.json`, change the `state` of the entry titled 0.4.0 (key `0.3.0`) from `open` to
+  Done: 0 open in troupe, infrastructure and website.
+- [x] 1.4 In `tofu/milestones.json`, change the `state` of the entry titled 0.4.0 (key `0.3.0`) from `open` to
   `closed`. Rename `test_today_s_release_in_progress_is_0_4_0` to `..._is_0_5_0`, asserting `0.5.0`. Verify
   `git diff` changes only those, and `uv run scripts/check.py` passes.
+  Done: see the commit's check.
 - [ ] 1.5 Open a draft pull request with `Closes #423`, using `--body-file`, and act on Claude's review. Verify that the
   review of the last push completed with no must-fix or decision open. No local plan: CI's plan is the evidence
   (#261), checked on the final head under "Workflow follow-up".
