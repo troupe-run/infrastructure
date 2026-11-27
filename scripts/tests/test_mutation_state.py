@@ -77,6 +77,8 @@ def restore(
         full_refresh_days=28,
         full_refresh=full_refresh,
         previously_saved=previously_saved,
+        tests=mutants.parent / "no-tests",
+        local_tests="tests",
     )
 
 
