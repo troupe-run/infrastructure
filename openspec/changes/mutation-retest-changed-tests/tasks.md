@@ -23,7 +23,7 @@
 
 ## 3. The second pass and the summary (D4, D6)
 
-- [x] 3.1 Tests first (`test_mutation_run.py`'s recorder): when the post-run step clears results, `run_mutmut` runs
+- [x] 3.1 Tests first (`test_mutation_retest.py`, a recorder writing mutmut's files): when the post-run step clears results, `run_mutmut` runs
       `mutmut run` a second time within the remaining budget; not when nothing was cleared, mutmut exited -1 or the
       unit was unreached; the report reads the results after the last pass. The summary's state section shows the
       cleared count, the first changed paths, and when cleared results wait for the next night.
