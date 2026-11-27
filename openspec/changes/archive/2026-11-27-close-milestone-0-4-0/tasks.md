@@ -20,9 +20,10 @@
   `closed`. Rename `test_today_s_release_in_progress_is_0_4_0` to `..._is_0_5_0`, asserting `0.5.0`. Verify
   `git diff` changes only those, and `uv run scripts/check.py` passes.
   Done: see the commit's check.
-- [ ] 1.5 Open a draft pull request with `Closes #423`, using `--body-file`, and act on Claude's review. Verify that the
+- [x] 1.5 Open a draft pull request with `Closes #423`, using `--body-file`, and act on Claude's review. Verify that the
   review of the last push completed with no must-fix or decision open. No local plan: CI's plan is the evidence
   (#261), checked on the final head under "Workflow follow-up".
+  Done: #424. Claude's review of 6440bb5 had no findings.
 
 ## 2. Outcomes for the issues with no milestone
 
