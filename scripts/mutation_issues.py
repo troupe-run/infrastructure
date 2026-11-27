@@ -467,6 +467,32 @@ def crashed_section(report: mr.Report) -> list[str]:
     return lines
 
 
+SHOWN_TEST_CHANGES = 5
+
+
+def tests_lines(unit: Mapping[str, Any]) -> list[str]:
+    """What a unit's test changes cleared from its kept results (#418)."""
+    lines = []
+    if unit.get("tests_unrecorded"):
+        lines.append(
+            "  - no record of the unit's tests in its kept state: every test counts as changed"
+        )
+    changed = unit.get("tests_changed") or []
+    if changed:
+        files = ", ".join(f"`{code(path)}`" for path in changed[:SHOWN_TEST_CHANGES])
+        more = len(changed) - SHOWN_TEST_CHANGES
+        files += f" and {more} more" if more > 0 else ""
+        lines.append(f"  - test files changed since its state was saved: {files}")
+    cleared = unit.get("cleared_for_tests", 0)
+    if cleared:
+        again = ", mutmut ran again for them" if unit.get("retested") else ""
+        lines.append(f"  - {cleared} kept results cleared for changed or new tests{again}")
+    left = unit.get("left_for_next_run", 0)
+    if left:
+        lines.append(f"  - {left} of them are left for the next run to test")
+    return lines
+
+
 def state_section(state: Mapping[str, Any] | None) -> list[str]:
     """Where each unit's results came from: carried from the kept state or tested this run, what
     was discarded and why, and the non-Python changes mutmut keeps cached results despite (#378)."""
@@ -493,6 +519,7 @@ def state_section(state: Mapping[str, Any] | None) -> list[str]:
                 "  - its selected tests reach none of its code: every mutant counted as reached "
                 "by no test"
             )
+        lines += tests_lines(unit)
         changed = unit.get("non_python_changes") or []
         if changed:
             files = ", ".join(f"`{code(path)}`" for path in changed)

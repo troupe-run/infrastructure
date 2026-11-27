@@ -75,6 +75,11 @@ mutmut collects new tests' stats before it runs any mutant, so a mutant it tests
 carried results miss them. After the run, the stats are compared with those kept (after D3): a function that gained a
 test, whose hash is unchanged and which still holds results decided before the run, has those results set to `null`.
 
+The save records the checkout's fingerprint only when mutmut got past collecting what its tests reach (it exited
+0, or tested a mutant: it tests none before its stats are done). A run the budget stopped earlier keeps the old
+fingerprint, so the next run looks at the same changes again; so does a run killed outright (the harvest keeps the
+manifest's). Otherwise the first night after this change, which can't finish in one budget, would lose its D5.
+
 If any were cleared, mutmut exited 0 and the budget isn't spent, `mutmut run` runs once more: it regenerates nothing
 new, loads the stats, runs the clean tests and tests only the cleared mutants. Otherwise the cleared results are saved
 as they are and the next night tests them. One more pass is enough: the second run adds no test.
@@ -90,8 +95,9 @@ reach, once, much like a full refresh but without failing the run: the state fit
 
 ### D6. Named in the record and the summary
 
-`UnitState` gains `tests_changed` (the changed paths, relative to `tests`), `cleared_for_tests` (results cleared by D3
-and D4) and `retested` (whether the second pass ran). The summary's state section gives the count and the first few
+`UnitState` gains `tests_changed` (the changed paths, relative to `tests`), `tests_unrecorded` (D5),
+`cleared_for_tests` (results cleared by D3 and D4), `retested` (whether the second pass ran) and `left_for_next_run`
+(results D4 cleared with no second pass). A cleared result counts as tested, not carried. The summary's state section gives the count and the first few
 paths per unit, and says when the budget left cleared results for the next night.
 
 ## Risks / Trade-offs
@@ -100,8 +106,8 @@ paths per unit, and says when the budget left cleared results for the next night
   every test; Python run as a child is integration-only (unit tests start no processes, #507); the full refresh
   remains.
 - [A node id form the mapping doesn't expect] → the tests are built from node ids mutmut 3.8.1 wrote in the
-  reproduction, and the apply's container trial runs the whole path against real mutmut. A file whose tests D2
-  named but which matches no kept test names is printed, so a mismatch shows in the log.
+  reproduction, and the apply's container trial runs the whole path against real mutmut. A new test file matches
+  no kept test by design, so a mismatch can't be told from it in the log; D4 still catches new tests either way.
 - [The second pass costs a clean run of the unit's tests] → only on nights when tests changed; minutes against a
   4-hour budget.
 - [The first night re-tests nearly everything] → once, and it's what #525/#526 need anyway.

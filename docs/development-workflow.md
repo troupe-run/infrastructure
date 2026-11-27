@@ -777,8 +777,20 @@ anything left unfinished. A dispatch can name one unit (`unit`); module globs ar
 mutant a glob names. The summary says, per unit, how many results were carried from the kept state and how many were
 tested in the run.
 
-**What incremental runs can't see**, and the refresh that clears it. mutmut doesn't notice an edited test body, doesn't
-re-test a function's callers when it changes, and only warns about non-Python files changed since its last full run (it
+**Changed tests re-test what they reach** (#418). mutmut alone never re-tests a kept result for a test change: a new
+test only gets a stats run (what it reaches), and an edited one isn't noticed. So the kept state records a hash of
+every file under each unit's `tests`. Before a unit runs, the files changed since its state was saved name the tests
+they could change: a changed test file its own tests, a changed helper the tests in every file that imports it
+(directly or through other helpers), a changed `conftest.py` every test under its directory, and a changed file
+that isn't Python every test. Every kept result of a function those tests reached is cleared, and mutmut collects
+what they reach afresh. After mutmut's run, a function that gained a test (a new one, or one re-collected) has the
+results it carried cleared, and mutmut runs once more for them if the budget allows; otherwise the next night tests
+them. State saved without that record counts every test as changed, once. The summary names the changed test files
+and how many results they cleared. A night with no test change runs mutmut once and clears nothing.
+
+**What incremental runs can't see**, and the refresh that clears it. mutmut doesn't re-test a function's callers when
+it changes; a helper a test reaches other than by an import (loaded by path, or run as a child) isn't traced to that
+test; and mutmut only warns about non-Python files changed since its last full run (it
 keeps cached results; the summary names those files). So every `full_refresh_days` (28, in `scripts/mutation.json`), or
 on a dispatch with `full-refresh`, the run discards the kept state on purpose and refills; modules not yet reached again
 aren't judged meanwhile.
