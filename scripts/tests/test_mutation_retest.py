@@ -368,9 +368,9 @@ class GainingMutmut:
     """mutmut, as far as its files: the first run collects a new test reaching `add` and tests
     nothing (the kept survivor is carried); a second run tests the cleared mutant and kills it."""
 
-    def __init__(self, first: int = 0, gain: bool = True) -> None:
+    def __init__(self, first: int = 0, gain: bool = True, stop: str | None = None) -> None:
         self.calls = 0
-        self.first, self.gain = first, gain
+        self.first, self.gain, self.stop = first, gain, stop
 
     def __call__(
         self, command: list[str], cwd: Path, timeout: float, *, tail: list[str] | None = None
@@ -380,6 +380,8 @@ class GainingMutmut:
         if self.calls == 1:
             tests = [OLD_TEST, NEW_TEST] if self.gain else [OLD_TEST]
             write(mutants, {"mutmut-stats.json": stats({"calc.x_add": tests})})
+            if self.stop is not None and tail is not None:
+                tail.append(self.stop)
             return self.first
         assert codes_of(mutants) == {KEY: None}
         write(mutants, {"src/calc.py.meta": meta({KEY: 1})})
@@ -497,3 +499,57 @@ def test_a_units_record_carries_the_test_counts_but_not_the_fingerprint() -> Non
     assert record["cleared_for_tests"] == 2
     assert "tests_fingerprint" not in record
     assert "kept_tests" not in record
+
+
+def test_a_unit_whose_tests_reach_none_of_its_code_runs_mutmut_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """mutmut stopped for a unit its tests don't reach (#399): nothing is cleared after it and it
+    isn't run again, though the stats it left would show a gained test."""
+    from test_mutation_unreached import STOP
+
+    mutmut = GainingMutmut(first=1, stop=STOP)
+    _, record, _ = scheduled(tmp_path, monkeypatch, mutmut)
+    assert mutmut.calls == 1
+    assert (record.unreached, record.retested, record.left_for_next_run) == (True, False, 0)
+
+
+# A run killed outright: the harvest keeps the fingerprint the results were saved against (D4)
+
+
+def harvest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, printed: dict[str, str] | None
+) -> dict[str, object]:
+    from test_mutation_run import SETTINGS_THREE, scratch_checkout
+
+    import mutation_run as run
+
+    monkeypatch.setattr(run, "SETTINGS", SETTINGS_THREE)
+    repo, _ = scratch_checkout(tmp_path)
+    write(repo / "scripts/tests", {"unit/test_new.py": "def test_add_value(): ...\n"})
+    write(repo / "mutants", {"src/calc.py.meta": meta({KEY: 1})})
+    entry: dict[str, object] = {"filled_since": "2026-11-20"}
+    if printed is not None:
+        entry["tests_fingerprint"] = printed
+    state = tmp_path / "state"
+    manifest = {"version": 1, "mutmut": "3.8.1", "units": {"scripts": entry}}
+    write(state, {"manifest.json": json.dumps(manifest), "scripts/.keep": ""})
+    record = tmp_path / "out" / "state-infrastructure.json"
+    assert run.main(["state-harvest", "infrastructure", str(repo), str(state), str(record)]) == 0
+    saved = json.loads((state / "manifest.json").read_text(encoding="utf-8"))
+    unit: dict[str, object] = saved["units"]["scripts"]
+    return unit
+
+
+def test_a_harvested_run_keeps_the_fingerprint_its_state_was_saved_against(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Not the checkout's (test_new.py is new): the next run then looks at the same changes."""
+    old = {"unit/test_old.py": "h"}
+    assert harvest(tmp_path, monkeypatch, old)["tests_fingerprint"] == old
+
+
+def test_a_harvested_run_with_no_fingerprint_writes_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert "tests_fingerprint" not in harvest(tmp_path, monkeypatch, None)
