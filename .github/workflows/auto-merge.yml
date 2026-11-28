@@ -58,7 +58,8 @@ jobs:
           python-version: "3.12"
       # Once any permission is listed the token gets only those, so it asks for every one the App
       # is declared with in oob/app-installations.json, and the workflow test holds the two together
-      # (#238). Queueing needs contents write (design D10's probe).
+      # (#238). The one exception is Variables read, which the action has no input for; reading
+      # AUTO_MERGE works without one (#363). Queueing needs contents write (design D10's probe).
       - name: Mint the troupe-run-merge App's token
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -68,7 +69,6 @@ jobs:
           owner: troupe-run
           repositories: troupe,infrastructure,website
           permission-actions: read
-          permission-actions-variables: read
           permission-checks: read
           permission-contents: write
           permission-issues: read

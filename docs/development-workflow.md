@@ -458,8 +458,9 @@ counts. The protected list covers:
 - deleting a component (a `pyproject.toml`, a `package.json` or a spec).
 
 **The switch.** Each repository's variable `AUTO_MERGE` is `off`, `dry-run` or `on`. Unset is `off`, and any other
-value is an error that does nothing. OpenTofu sets it, so a change is a plan the owner approves. Setting it to `off`
-on GitHub is the break-glass.
+value is an error that does nothing. It's `on` in troupe, infrastructure and website, since the dry-run week ended
+(owner, 2026-11-28, #320). OpenTofu sets it, so a change is a plan the owner approves. Setting it to `off` on GitHub
+is the break-glass.
 
 **What you see.**
 - **Queued:** the `auto-merged` label, and one comment from `troupe-run-merge[bot]` listing what each condition saw.

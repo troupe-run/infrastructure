@@ -12,12 +12,13 @@ locals {
   merge_app_client_id = "Iv23liKUpo42H7OQcQ4g"
 
   # Each governed repository's switch (spec: auto-merge, "A repository variable switches it per
-  # repository"): off, dry-run or on; unset reads as off. dry-run for a week first, then on in all
-  # three at once by a later pull request (#319's rollout; design Migration Plan).
+  # repository"): off, dry-run or on; unset reads as off. On in all three since the dry-run week
+  # (owner, 2026-11-28, #320; auto-merge-on). scripts/tests/test_auto_merge_switches.py holds these
+  # values, and off set on GitHub is the break-glass.
   auto_merge_switches = {
-    troupe         = "dry-run"
-    infrastructure = "dry-run"
-    website        = "dry-run"
+    troupe         = "on"
+    infrastructure = "on"
+    website        = "on"
   }
 }
 

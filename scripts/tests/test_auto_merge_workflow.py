@@ -32,6 +32,13 @@ def workflow() -> dict[str, Any]:
     return loaded
 
 
+# Permissions the App has that the token step can't ask for: create-github-app-token takes no input
+# for them, and warns about and ignores one it doesn't know (#363). Every token has metadata. The
+# Variables read works without an input: the 2026-11-19 probe (auto-merge design D10) and every
+# dry-run run since read AUTO_MERGE in all three repositories.
+UNREQUESTED = {"metadata", "actions_variables"}
+
+
 def declared_permissions() -> dict[str, str]:
     """The merge App's permissions as oob declares them, as create-github-app-token's inputs."""
     apps = json.loads(INSTALLATIONS.read_text(encoding="utf-8"))
@@ -39,7 +46,7 @@ def declared_permissions() -> dict[str, str]:
     return {
         f"permission-{name.replace('_', '-')}": level
         for name, level in app["permissions"].items()
-        if name != "metadata"  # every token has it; the action takes no input for it
+        if name not in UNREQUESTED
     }
 
 
@@ -98,7 +105,6 @@ def test_the_merge_app_is_declared_with_the_probed_permissions() -> None:
     """Queueing needs contents write (design D10's probe); nothing org-wide."""
     assert declared_permissions() == {
         "permission-actions": "read",
-        "permission-actions-variables": "read",
         "permission-checks": "read",
         "permission-contents": "write",
         "permission-issues": "read",

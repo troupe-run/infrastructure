@@ -934,7 +934,7 @@ def comment_body(pr: PullRequest, verdict: Verdict, kind: str) -> str:
             f"**Auto-merge would have queued this** at `{pr.head}`, under the {RULE}. "
             "It's in dry-run here, so nothing was queued."
         )
-        after = "This is a record for the dry-run week; queue it by hand as usual."
+        after = "This is a record only; queue it by hand as usual."
     rows = "\n".join(f"| {check.name} | {check.saw} |" for check in verdict.checks)
     return (
         f"<!-- auto-merge:{kind} {pr.head} -->\n{title}\n\n| Condition | What it saw |\n|---|---|\n"
