@@ -14,7 +14,11 @@
 - [x] 3.1 Say in `docs/development-workflow.md` ("The switch") and `README.md` that it's `on` in all three, `off` the break-glass, `dry-run` still a valid value
 - [x] 3.2 `uv run scripts/check.py` passes
 
-## 4. Rollout
+## Workflow follow-up
 
-- [ ] 4.1 The pull request's plan shows only the three `AUTO_MERGE` variables changing; the owner approves it
-- [ ] 4.2 After the merge, main's apply sets them (owner approves), and the next `auto-merge.yml` run queues what qualifies and comments nothing
+- Open the draft pull request with `Closes #320` and `Closes #363`. Archive the change before marking it ready.
+- The pull request's plan shows only the three `AUTO_MERGE` variables changing, `dry-run` to `on`; the owner approves it.
+- The owner merges by rebase, through the merge queue, then approves main's apply.
+- The next `auto-merge.yml` run's summary shows `(on)` for all three repositories, queues what qualifies and comments
+  nothing; no repository shows an `error` reading its switch (#363).
+- Check #320 and #363 are closed and their cards say Done; comment on each with the pull request and the archived change.
